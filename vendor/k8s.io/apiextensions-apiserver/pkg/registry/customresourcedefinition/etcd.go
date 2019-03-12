@@ -29,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
-	"k8s.io/apiserver/pkg/util/dryrun"
 )
 
 // rest implements a RESTStorage for API services against etcd
@@ -130,7 +129,6 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 				})
 				return existingCRD, nil
 			}),
-			dryrun.IsDryRun(options.DryRun),
 		)
 
 		if err != nil {
@@ -174,8 +172,6 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
-	// subresources should never allow create on update.
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }

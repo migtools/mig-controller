@@ -1,0 +1,21 @@
+syntax = "proto3";
+package generated;
+
+message Empty {}
+
+message InitRequest {
+    string plugin = 1;
+    map<string, string> config = 2;
+}
+
+message AppliesToRequest {
+    string plugin = 1;
+}
+
+message AppliesToResponse {
+    repeated string includedNamespaces = 1;
+    repeated string excludedNamespaces = 2;
+    repeated string includedResources = 3;
+    repeated string excludedResources = 4;
+    string selector = 5;
+}

@@ -20,7 +20,7 @@ import (
 	"flag"
 	"os"
 
-	"k8s.io/klog"
+	"github.com/golang/glog"
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -32,9 +32,9 @@ func main() {
 	defer logs.FlushLogs()
 
 	stopCh := genericapiserver.SetupSignalHandler()
-	cmd := server.NewServerCommand(os.Stdout, os.Stderr, stopCh)
+	cmd := server.NewCommandStartCustomResourceDefinitionsServer(os.Stdout, os.Stderr, stopCh)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
-		klog.Fatal(err)
+		glog.Fatal(err)
 	}
 }

@@ -1,0 +1,27 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message ExecuteRequest {
+    string plugin = 1;
+    bytes item = 2;
+    bytes backup = 3;
+}
+
+message ExecuteResponse {
+    bytes item = 1;
+    repeated ResourceIdentifier additionalItems = 2;
+}
+
+message ResourceIdentifier {
+    string group = 1;
+    string resource = 2;
+    string namespace = 3;
+    string name = 4;
+}
+
+service BackupItemAction {
+    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}

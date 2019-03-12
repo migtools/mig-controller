@@ -13,5 +13,3 @@ reviewers:
 - soltysh
 - sttts
 - yliaog
-labels:
-- sig/api-machinery
