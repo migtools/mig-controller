@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,12 +28,17 @@ import (
 type MigrationClusterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	ClusterCoordinatesRef *kapi.ObjectReference `json:"clusterCoordinatesRef,omitempty"`
+	ClusterAuthSecretRef  *kapi.ObjectReference `json:"clusterAuthSecretRef,omitempty"`
 }
 
 // MigrationClusterStatus defines the observed state of MigrationCluster
 type MigrationClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	ClusterVersion string `json:"clusterVersion,omitempty"`
 }
 
 // +genclient

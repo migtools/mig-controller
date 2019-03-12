@@ -26,10 +26,13 @@ import (
 // MigrationAssetCollectionSpec defines the desired state of MigrationAssetCollection
 type MigrationAssetCollectionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Important: Run "make" to regenerate code after modifying this filecccccc
+
+	Namespaces []string `json:"namespaces,omitempty"`
+	Images     []string `json:"images,omitempty"`
 }
 
-// MigrationAssetCollectionStatus defines the observed state of MigrationAssetCollection
+// MigrationAssetCollectionStatus definces the observed state of MigrationAssetCollection
 type MigrationAssetCollectionStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

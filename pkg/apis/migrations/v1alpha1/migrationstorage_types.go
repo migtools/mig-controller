@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,6 +28,9 @@ import (
 type MigrationStorageSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	BackupStorageLocationRef  *kapi.ObjectReference `json:"backupStorageLocationRef,omitempty"`
+	VolumeSnapshotLocationRef *kapi.ObjectReference `json:"volumeSnapshotLocationRef,omitempty"`
 }
 
 // MigrationStorageStatus defines the observed state of MigrationStorage
