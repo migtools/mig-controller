@@ -1,0 +1,9 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigPlan
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: migplan-sample
+spec:
+  # Add fields here
+  foo: bar
