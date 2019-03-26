@@ -1,9 +1,0 @@
-apiVersion: migrations.openshift.io/v1alpha1
-kind: Migration
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: migration-sample
-spec:
-  # Add fields here
-  foo: bar
