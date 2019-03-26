@@ -27,6 +27,15 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            destClusterRef:
+              type: object
+            migAssetCollectionRef:
+              type: object
+            migStorageRef:
+              type: object
+            srcClusterRef:
+              type: object
           type: object
         status:
           type: object

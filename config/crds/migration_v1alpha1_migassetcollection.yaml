@@ -27,6 +27,11 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            namespaces:
+              items:
+                type: string
+              type: array
           type: object
         status:
           type: object

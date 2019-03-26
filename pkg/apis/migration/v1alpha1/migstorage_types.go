@@ -25,8 +25,11 @@ import (
 
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	VolumeSnapshotProvider string `json:"volumeSnapshotProvider"`
+	VolumeSnapshotConfig   `json:"volumeSnapshotConfig"`
+
+	BackupStorageProvider string `json:"backupStorageProvider"`
+	BackupStorageConfig   `json:"backupStorageConfig"`
 }
 
 // MigStorageStatus defines the observed state of MigStorage
@@ -55,6 +58,25 @@ type MigStorageList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []MigStorage `json:"items"`
+}
+
+// VolumeSnapshotConfig defines config for taking Volume Snapshots
+type VolumeSnapshotConfig struct {
+	AwsRegion          string `json:"awsRegion"`
+	AzureAPITimeout    string `json:"azureApiTimeout"`
+	AzureResourceGroup string `json:"azureResourceGroup"`
+}
+
+// BackupStorageConfig defines config for creating and storing Backups
+type BackupStorageConfig struct {
+	AwsBucketName       string `json:"awsBucketName"`
+	AwsRegion           string `json:"awsRegion"`
+	AwsS3ForcePathStyle bool   `json:"awsS3ForcePathStyle"`
+	AwsPublicURL        string `json:"awsPublicUrl"`
+	AwsKmsKeyID         string `json:"awsKmsKeyId"`
+	AwsSignatureVersion string `json:"awsSignatureVersion"`
+	AzureStorageAccount string `json:"azureStorageAccount"`
+	AzureResourceGroup  string `json:"azureResourceGroup"`
 }
 
 func init() {

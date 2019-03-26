@@ -17,16 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	MigStageRef *kapi.ObjectReference `json:"migStageRef,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration

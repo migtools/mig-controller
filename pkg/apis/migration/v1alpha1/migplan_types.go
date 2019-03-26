@@ -17,22 +17,20 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	SrcClusterRef         *kapi.ObjectReference `json:"srcClusterRef,omitempty"`
+	DestClusterRef        *kapi.ObjectReference `json:"destClusterRef,omitempty"`
+	MigStorageRef         *kapi.ObjectReference `json:"migStorageRef,omitempty"`
+	MigAssetCollectionRef *kapi.ObjectReference `json:"migAssetCollectionRef,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +genclient

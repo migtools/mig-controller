@@ -27,6 +27,54 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            backupStorageConfig:
+              properties:
+                awsBucketName:
+                  type: string
+                awsKmsKeyId:
+                  type: string
+                awsPublicUrl:
+                  type: string
+                awsRegion:
+                  type: string
+                awsSignatureVersion:
+                  type: string
+                azureResourceGroup:
+                  type: string
+                azureStorageAccount:
+                  type: string
+              required:
+              - awsBucketName
+              - awsRegion
+              - awsPublicUrl
+              - awsKmsKeyId
+              - awsSignatureVersion
+              - azureStorageAccount
+              - azureResourceGroup
+              type: object
+            backupStorageProvider:
+              type: string
+            volumeSnapshotConfig:
+              properties:
+                awsRegion:
+                  type: string
+                azureApiTimeout:
+                  type: string
+                azureResourceGroup:
+                  type: string
+              required:
+              - awsRegion
+              - azureApiTimeout
+              - azureResourceGroup
+              type: object
+            volumeSnapshotProvider:
+              type: string
+          required:
+          - volumeSnapshotProvider
+          - volumeSnapshotConfig
+          - backupStorageProvider
+          - backupStorageConfig
           type: object
         status:
           type: object
