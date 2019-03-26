@@ -14,10 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha1 contains API Schema definitions for the migrations v1alpha1 API group
-// +k8s:openapi-gen=true
-// +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/fusor/mig-controller/pkg/apis/migrations
-// +k8s:defaulter-gen=TypeMeta
-// +groupName=migrations.openshift.io
-package v1alpha1
+// Package migration contains migration API versions
+package migration
