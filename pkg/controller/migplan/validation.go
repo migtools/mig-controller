@@ -10,7 +10,6 @@ import (
 
 // Types
 const (
-	// Type
 	Ready                        = "Ready"
 	InvalidSourceClusterRef      = "InvalidSourceClusterRef"
 	InvalidDestinationClusterRef = "InvalidDestinationClusterRef"
