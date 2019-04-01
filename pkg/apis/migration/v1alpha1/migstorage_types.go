@@ -34,8 +34,7 @@ type MigStorageSpec struct {
 
 // MigStorageStatus defines the observed state of MigStorage
 type MigStorageStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Conditions
 }
 
 // +genclient
