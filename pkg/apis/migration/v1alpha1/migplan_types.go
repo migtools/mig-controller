@@ -31,6 +31,7 @@ type MigPlanSpec struct {
 
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
+	Conditions
 }
 
 // +genclient
