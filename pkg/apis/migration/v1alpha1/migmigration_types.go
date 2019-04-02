@@ -23,7 +23,7 @@ import (
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
-	MigStageRef *kapi.ObjectReference `json:"migStageRef,omitempty"`
+	MigPlanRef *kapi.ObjectReference `json:"migPlanRef,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration
