@@ -17,11 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
 type MigClusterSpec struct {
+	IsHostCluster           bool                  `json:"isHostCluster,omitempty"`
+	ClusterRef              *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
