@@ -44,8 +44,8 @@ func init() {
 	rwmInstance.nsNameToRemoteCluster = make(map[types.NamespacedName]*RemoteWatchCluster)
 }
 
-// Get a RemoteWatchCluster associated with a MigCluster resource nsName, return nil if not found
-func Get(key types.NamespacedName) *RemoteWatchCluster {
+// GetRWC gets the RemoteWatchCluster associated with a MigCluster resource nsName, return nil if not found
+func GetRWC(key types.NamespacedName) *RemoteWatchCluster {
 	mu.RLock()
 	defer mu.RUnlock()
 	rwm, ok := rwmInstance.nsNameToRemoteCluster[key]
@@ -55,15 +55,15 @@ func Get(key types.NamespacedName) *RemoteWatchCluster {
 	return rwm
 }
 
-// Set a RemoteWatchCluster associated with a MigCluster resource nsName
-func Set(key types.NamespacedName, value *RemoteWatchCluster) {
+// SetRWC sets the RemoteWatchCluster associated with a MigCluster resource nsName
+func SetRWC(key types.NamespacedName, value *RemoteWatchCluster) {
 	mu.Lock()
 	defer mu.Unlock()
 	rwmInstance.nsNameToRemoteCluster[key] = value
 }
 
-// Delete a RemoteWatchCluster associated with a MigCluster resource nsName
-func Delete(key types.NamespacedName) {
+// DeleteRWC deletes the RemoteWatchCluster associated with a MigCluster resource nsName
+func DeleteRWC(key types.NamespacedName) {
 	mu.Lock()
 	defer mu.Unlock()
 	delete(rwmInstance.nsNameToRemoteCluster, key)
