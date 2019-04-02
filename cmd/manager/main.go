@@ -22,6 +22,7 @@ import (
 	"github.com/fusor/mig-controller/pkg/apis"
 	"github.com/fusor/mig-controller/pkg/controller"
 	"github.com/fusor/mig-controller/pkg/webhook"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -54,7 +55,11 @@ func main() {
 	// Setup Scheme for all resources
 	log.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable add APIs to scheme")
+		log.Error(err, "unable add K8s APIs to scheme")
+		os.Exit(1)
+	}
+	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable add Velero APIs to scheme")
 		os.Exit(1)
 	}
 
