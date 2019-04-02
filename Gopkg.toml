@@ -26,19 +26,19 @@ required = [
 
 [[override]]
   name="k8s.io/api"
-  version="kubernetes-1.11.0"
+  version="kubernetes-1.13.0"
 
 [[override]]
   name="k8s.io/apimachinery"
-  version="kubernetes-1.11.0"
+  version="kubernetes-1.13.0"
 
 [[override]]
   name="k8s.io/apiextensions-apiserver"
-  version="kubernetes-1.11.0"
+  version="kubernetes-1.13.0"
 
 [[override]]
   name="k8s.io/client-go"
-  version="kubernetes-1.11.0"
+  version="kubernetes-1.13.0"
 
 [[constraint]]
   name="github.com/heptio/velero"
@@ -52,7 +52,7 @@ required = [
 
 [[constraint]]
   name="sigs.k8s.io/controller-runtime"
-  version="=v0.1.7"
+  version="=v0.1.10"
 
 [[constraint]]
   name="sigs.k8s.io/controller-tools"
