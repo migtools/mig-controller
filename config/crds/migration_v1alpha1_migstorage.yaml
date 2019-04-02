@@ -38,6 +38,8 @@ spec:
                   type: string
                 awsRegion:
                   type: string
+                awsS3ForcePathStyle:
+                  type: boolean
                 awsSignatureVersion:
                   type: string
                 azureResourceGroup:
@@ -47,6 +49,7 @@ spec:
               required:
               - awsBucketName
               - awsRegion
+              - awsS3ForcePathStyle
               - awsPublicUrl
               - awsKmsKeyId
               - awsSignatureVersion
