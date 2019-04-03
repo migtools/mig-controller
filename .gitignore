@@ -23,3 +23,6 @@ bin
 *.swo
 *~
 .vscode
+
+# dir for user symlinking of testing files
+migstuff
