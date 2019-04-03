@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -93,13 +94,12 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Get the host cluster object
 	isHostCluster := instance.Spec.IsHostCluster
-	logmsg := fmt.Sprintf("isHostCluster: [%v]", isHostCluster)
-	log.Info(logmsg)
+	log.Info(fmt.Sprintf("isHostCluster: [%v]", isHostCluster))
 
 	// Get the SA secret attached to MigCluster
-	saRef := instance.Spec.ServiceAccountSecretRef
-	clusterSaSecret := &kapi.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: saRef.Name, Namespace: saRef.Namespace}, clusterSaSecret)
+	saSecretRef := instance.Spec.ServiceAccountSecretRef
+	saSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: saSecretRef.Name, Namespace: saSecretRef.Namespace}, saSecret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -107,13 +107,27 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 	saTokenKey := "saToken"
-	saTokenData, ok := clusterSaSecret.Data[saTokenKey]
-	if ok {
-		logmsg = fmt.Sprintf("saToken: [%v]", saTokenData)
-	} else {
-		logmsg = fmt.Sprint("saToken: [not present]")
+	_, ok := saSecret.Data[saTokenKey]
+	log.Info(fmt.Sprintf("saToken: [%v]", ok))
+
+	// Get cluster-registry Cluster associated with MigCluster
+	crClusterRef := instance.Spec.ClusterRef
+	crCluster := &clusterregv1alpha1.Cluster{}
+
+	err = r.Get(context.TODO(), types.NamespacedName{Name: crClusterRef.Name, Namespace: crClusterRef.Namespace}, crCluster)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
 	}
-	log.Info(logmsg)
+	k8sEndpoints := crCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
+	if len(k8sEndpoints) > 0 {
+		remoteClusterURL := k8sEndpoints[0].ServerAddress
+		log.Info(fmt.Sprintf("remoteClusterURL: [%s]", remoteClusterURL))
+	} else {
+		log.Info(fmt.Sprintf("remoteClusterURL: [len=0]"))
+	}
 
 	return reconcile.Result{}, nil
 }

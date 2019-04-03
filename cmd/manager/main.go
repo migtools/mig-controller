@@ -24,6 +24,7 @@ import (
 	"github.com/fusor/mig-controller/pkg/webhook"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -60,6 +61,10 @@ func main() {
 	}
 	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable add Velero APIs to scheme")
+		os.Exit(1)
+	}
+	if err := clusterregv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable add Cluster Registry APIs to scheme")
 		os.Exit(1)
 	}
 
