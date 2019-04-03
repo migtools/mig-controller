@@ -13,10 +13,15 @@ const (
 // Reasons
 const ()
 
-// Status
+// Statuses
 const (
 	True  = "True"
 	False = "False"
+)
+
+// Messages
+const (
+	ReadyMessage = "The storage is ready."
 )
 
 // Validate the storage resource.

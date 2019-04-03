@@ -19,7 +19,6 @@ package migstorage
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,17 +57,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to MigStorage
-	err = c.Watch(&source.Kind{Type: &migapi.MigStorage{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by MigStorage - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &migapi.MigStorage{},
-	})
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigStorage{}},
+		&handler.EnqueueRequestForObject{},
+		&UpdatedPredicate{})
 	if err != nil {
 		return err
 	}
@@ -117,8 +109,9 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Set the Ready condition
 	if nSet == 0 {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:   Ready,
-			Status: True,
+			Type:    Ready,
+			Status:  True,
+			Message: ReadyMessage,
 		})
 	} else {
 		storage.Status.DeleteCondition(Ready)

@@ -21,13 +21,10 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -51,23 +48,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
-type PlanUpdatedPredicate struct {
-	predicate.Funcs
-}
-
-func (r PlanUpdatedPredicate) Update(e event.UpdateEvent) bool {
-	planOld, cast := e.ObjectOld.(*migapi.MigPlan)
-	if !cast {
-		return true
-	}
-	planNew, cast := e.ObjectNew.(*migapi.MigPlan)
-	if !cast {
-		return true
-	}
-	changed := !reflect.DeepEqual(planOld.Spec, planNew.Spec)
-	return changed
-}
-
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
@@ -80,7 +60,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{
 		Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestForObject{},
-		&PlanUpdatedPredicate{},
+		&UpdatedPredicate{},
 	)
 	if err != nil {
 		return err
@@ -126,8 +106,9 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Set the Ready condition
 	if nSet == 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:   Ready,
-			Status: True,
+			Type:    Ready,
+			Status:  True,
+			Message: ReadyMessage,
 		})
 	} else {
 		plan.Status.DeleteCondition(Ready)
