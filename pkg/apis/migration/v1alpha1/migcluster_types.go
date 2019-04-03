@@ -23,7 +23,7 @@ import (
 
 // MigClusterSpec defines the desired state of MigCluster
 type MigClusterSpec struct {
-	IsHostCluster           bool                  `json:"isHostCluster,omitempty"`
+	IsHostCluster           bool                  `json:"isHostCluster"`
 	ClusterRef              *kapi.ObjectReference `json:"clusterRef,omitempty"`
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 }
