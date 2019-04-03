@@ -19,6 +19,8 @@ package util
 import (
 	"time"
 
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,10 +63,10 @@ func BuildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 			TTL:                metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces: backupNamespaces,
 			// Unused but defaulted fields
-			ExcludedNamespaces: []string{},
-			IncludedResources:  []string{},
-			ExcludedResources:  []string{},
-			Hooks:              velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
+			ExcludedNamespaces:      []string{},
+			IncludedResources:       []string{},
+			ExcludedResources:       []string{},
+			Hooks:                   velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
 			VolumeSnapshotLocations: []string{},
 		},
 	}

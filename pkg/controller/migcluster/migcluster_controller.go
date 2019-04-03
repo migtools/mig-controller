@@ -18,10 +18,12 @@ package migcluster
 
 import (
 	"context"
+	"fmt"
 
 	migrationv1alpha1 "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -29,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	kapi "k8s.io/api/core/v1"
 )
 
 var log = logf.Log.WithName("controller")
@@ -66,7 +70,8 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme     *runtime.Scheme
+	Controller controller.Controller
 }
 
 // Reconcile reads that state of the cluster for a MigCluster object and makes changes based on the state read
@@ -81,12 +86,34 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, nil // don't requeue
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{}, err // requeue
 	}
+
+	// Get the host cluster object
+	isHostCluster := instance.Spec.IsHostCluster
+	logmsg := fmt.Sprintf("isHostCluster: [%v]", isHostCluster)
+	log.Info(logmsg)
+
+	// Get the SA secret attached to MigCluster
+	saRef := instance.Spec.ServiceAccountSecretRef
+	clusterSaSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: saRef.Name, Namespace: saRef.Namespace}, clusterSaSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+	saTokenKey := "saToken"
+	saTokenData, ok := clusterSaSecret.Data[saTokenKey]
+	if ok {
+		logmsg = fmt.Sprintf("saToken: [%v]", saTokenData)
+	} else {
+		logmsg = fmt.Sprint("saToken: [not present]")
+	}
+	log.Info(logmsg)
+
 	return reconcile.Result{}, nil
 }

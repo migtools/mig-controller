@@ -19,6 +19,7 @@ package util
 import (
 	"os"
 
+	"github.com/fusor/mig-controller/pkg/controller/migcluster"
 	"github.com/fusor/mig-controller/pkg/controller/remotewatcher"
 	"github.com/prometheus/common/log"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,6 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	migrationv1alpha1 "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 // RemoteManagerConfig specifies config options for setting up a RemoteWatch Manager
@@ -45,7 +49,7 @@ type RemoteManagerConfig struct {
 // StartRemoteWatch will configure a new RemoteWatcher manager + controller to monitor Velero
 // events on a remote cluster. A GenericEvent channel will be configured to funnel events from
 // the RemoteWatcher controller to the MigCluster controller.
-func StartRemoteWatch(r *ReconcileMigrationAIO, config RemoteManagerConfig, watchKey string) error {
+func StartRemoteWatch(r *migcluster.ReconcileMigCluster, config RemoteManagerConfig, watchKey string) error {
 
 	mgr, err := manager.New(config.remoteRestConfig, manager.Options{})
 	if err != nil {
