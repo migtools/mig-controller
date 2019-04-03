@@ -21,39 +21,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MigMigrationSpec defines the desired state of MigMigration
-type MigMigrationSpec struct {
-	MigPlanRef *kapi.ObjectReference `json:"migPlanRef,omitempty"`
+// MigClusterSpec defines the desired state of MigCluster
+type MigClusterSpec struct {
+	IsHostCluster           bool                  `json:"isHostCluster"`
+	ClusterRef              *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 }
 
-// MigMigrationStatus defines the observed state of MigMigration
-type MigMigrationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+// MigClusterStatus defines the observed state of MigCluster
+type MigClusterStatus struct {
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MigMigration is the Schema for the migmigrations API
+// MigCluster is the Schema for the migclusters API
 // +k8s:openapi-gen=true
-type MigMigration struct {
+type MigCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MigMigrationSpec   `json:"spec,omitempty"`
-	Status MigMigrationStatus `json:"status,omitempty"`
+	Spec   MigClusterSpec   `json:"spec,omitempty"`
+	Status MigClusterStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MigMigrationList contains a list of MigMigration
-type MigMigrationList struct {
+// MigClusterList contains a list of MigCluster
+type MigClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MigMigration `json:"items"`
+	Items           []MigCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&MigMigration{}, &MigMigrationList{})
+	SchemeBuilder.Register(&MigCluster{}, &MigClusterList{})
 }
