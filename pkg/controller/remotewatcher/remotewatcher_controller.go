@@ -71,7 +71,8 @@ type ReconcileRemoteWatcher struct {
 
 // Reconcile reads that state of the cluster for a RemoteWatcher object and makes changes
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("*** RECONCILE RemoteWatcher [nsName=%s/%s]", request.Namespace, request.Name))
+	log.Info(fmt.Sprintf("[rWatch] FORWARDING reconcile [%s/%s] to MigCluster [nsName=%s/%s]",
+		request.Namespace, request.Name, r.ForwardEvent.Meta.GetNamespace(), r.ForwardEvent.Meta.GetName()))
 
 	// Forward a known Event back to the parent controller
 	r.ForwardChannel <- r.ForwardEvent

@@ -89,7 +89,7 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("*** RECONCILE MigCluster [nsName=%s/%s]", request.Namespace, request.Name))
+	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
 
 	// Fetch the MigCluster instance
 	instance := &migrationv1alpha1.MigCluster{}
@@ -103,7 +103,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Get the host cluster object
 	isHostCluster := instance.Spec.IsHostCluster
-	log.Info(fmt.Sprintf("isHostCluster: [%v]", isHostCluster))
+	log.Info(fmt.Sprintf("[mCluster] isHostCluster: [%v]", isHostCluster))
 
 	// Get the SA secret attached to MigCluster
 	saSecretRef := instance.Spec.ServiceAccountSecretRef
@@ -118,7 +118,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	saTokenKey := "saToken"
 	saTokenData, ok := saSecret.Data[saTokenKey]
 	if !ok {
-		log.Info(fmt.Sprintf("saToken: [%v]", ok))
+		log.Info(fmt.Sprintf("[mCluster] saToken: [%v]", ok))
 		return reconcile.Result{}, nil // don't requeue
 	}
 	saToken := string(saTokenData)
@@ -140,9 +140,9 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	k8sEndpoints := crCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
 	if len(k8sEndpoints) > 0 {
 		remoteClusterURL = string(k8sEndpoints[0].ServerAddress)
-		log.Info(fmt.Sprintf("remoteClusterURL: [%s]", remoteClusterURL))
+		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [%s]", remoteClusterURL))
 	} else {
-		log.Info(fmt.Sprintf("remoteClusterURL: [len=0]"))
+		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [len=0]"))
 	}
 
 	// Create a Remote Watch for this MigCluster if one doesn't exist
@@ -151,13 +151,13 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
 
 	if rwc == nil {
-		log.Info(fmt.Sprintf(">>> Starting Remote Watch for MigCluster [ns=%s], [name=%s]", request.Namespace, request.Name))
+		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [ns=%s], [name=%s]", request.Namespace, request.Name))
 		StartRemoteWatch(r, RemoteManagerConfig{
 			RemoteRestConfig: restCfg,
 			ParentNsName:     request.NamespacedName,
 			ParentResource:   instance,
 		})
-		log.Info(">>> Remote watch started!")
+		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [ns=%s], [name=%s]", request.Namespace, request.Name))
 	}
 
 	return reconcile.Result{}, nil
