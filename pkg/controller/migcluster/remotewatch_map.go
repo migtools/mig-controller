@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package migcluster
 
 import (
 	"sync"
@@ -25,12 +25,7 @@ import (
 )
 
 var rwmInstance *RemoteWatchMap
-var mu sync.RWMutex
-
-// RemoteWatchMap provides a concurrent-safe map between MigCluster nsNames and RemoteWatchClusters
-type RemoteWatchMap struct {
-	nsNameToRemoteCluster map[types.NamespacedName]*RemoteWatchCluster
-}
+var createRemoteWatchMapOnce sync.Once
 
 // RemoteWatchCluster tracks Remote Managers and Event Forward Channels
 type RemoteWatchCluster struct {
@@ -39,32 +34,42 @@ type RemoteWatchCluster struct {
 	//  TODO - setup stop channel for manager so that manager will stop when we close the event channel from parent
 }
 
-func init() {
-	rwmInstance := &RemoteWatchMap{}
-	rwmInstance.nsNameToRemoteCluster = make(map[types.NamespacedName]*RemoteWatchCluster)
+// RemoteWatchMap provides a map between MigCluster nsNames and RemoteWatchClusters
+type RemoteWatchMap struct {
+	sync.RWMutex
+	nsNameToRemoteCluster map[types.NamespacedName]*RemoteWatchCluster
+}
+
+// GetRemoteWatchMap returns the shared RemoteWatchMap instance
+func GetRemoteWatchMap() *RemoteWatchMap {
+	createRemoteWatchMapOnce.Do(func() {
+		rwmInstance = &RemoteWatchMap{}
+		rwmInstance.nsNameToRemoteCluster = make(map[types.NamespacedName]*RemoteWatchCluster)
+	})
+	return rwmInstance
 }
 
 // GetRWC gets the RemoteWatchCluster associated with a MigCluster resource nsName, return nil if not found
-func GetRWC(key types.NamespacedName) *RemoteWatchCluster {
-	mu.RLock()
-	defer mu.RUnlock()
-	rwm, ok := rwmInstance.nsNameToRemoteCluster[key]
+func (r *RemoteWatchMap) GetRWC(key types.NamespacedName) *RemoteWatchCluster {
+	r.RLock()
+	defer r.RUnlock()
+	rwc, ok := rwmInstance.nsNameToRemoteCluster[key]
 	if !ok {
 		return nil
 	}
-	return rwm
+	return rwc
 }
 
 // SetRWC sets the RemoteWatchCluster associated with a MigCluster resource nsName
-func SetRWC(key types.NamespacedName, value *RemoteWatchCluster) {
-	mu.Lock()
-	defer mu.Unlock()
+func (r *RemoteWatchMap) SetRWC(key types.NamespacedName, value *RemoteWatchCluster) {
+	r.Lock()
+	defer r.Unlock()
 	rwmInstance.nsNameToRemoteCluster[key] = value
 }
 
 // DeleteRWC deletes the RemoteWatchCluster associated with a MigCluster resource nsName
-func DeleteRWC(key types.NamespacedName) {
-	mu.Lock()
-	defer mu.Unlock()
+func (r *RemoteWatchMap) DeleteRWC(key types.NamespacedName) {
+	r.Lock()
+	defer r.Unlock()
 	delete(rwmInstance.nsNameToRemoteCluster, key)
 }
