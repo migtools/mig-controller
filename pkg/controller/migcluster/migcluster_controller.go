@@ -139,7 +139,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
-	// Valid Cluster found, add MigCluster as parent to receive reconciliation events
+	// Valid referenced Secret found, add MigCluster as parent to receive reconciliation events
 	childSecret := util.KubeResource{
 		Kind: util.KindSecret,
 		NsName: types.NamespacedName{
@@ -170,7 +170,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
-	// Valid Cluster found, add MigCluster as parent to receive reconciliation events
+	// Valid referenced Cluster found, add MigCluster as parent to receive reconciliation events
 	childCrCluster := util.KubeResource{
 		Kind: util.KindClusterRegCluster,
 		NsName: types.NamespacedName{

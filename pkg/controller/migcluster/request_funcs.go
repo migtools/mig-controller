@@ -51,7 +51,7 @@ func ClusterToMigCluster(a handler.MapObject) []reconcile.Request {
 // SecretToMigCluster maps a Secret request to a MigCluster request
 func SecretToMigCluster(a handler.MapObject) []reconcile.Request {
 	log.Info("[mapFn] SecretToMigCluster running...")
-	// Create childCrCluster to look up parents
+	// Create childSecret to look up parents
 	childSecret := util.KubeResource{
 		Kind: util.KindSecret,
 		NsName: types.NamespacedName{
