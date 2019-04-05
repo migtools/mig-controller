@@ -20,7 +20,10 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("controller")
 
 // Kind strings to be used in KubeResource object creation
 // Use these kinds when adding to the ResourceParentsMap
@@ -43,15 +46,14 @@ const (
 var rpmInstance *ResourceParentsMap
 var createChildParentsMapOnce sync.Once
 
-// KubeResource holds information about a Parent resource which references a Child resource.
+// KubeResource is a simplified way to related child to parent resources
 type KubeResource struct {
 	Kind   string
 	NsName types.NamespacedName
 }
 
-// ResourceParentsMap maps from Mig K8s kinds to child objects to parents of those child objects.
-// Meant to be used so that controllers for parent resources can enqueue events from child resources
-// on the relevant parent resource.
+// ResourceParentsMap maps from "parents resources" to "child resources"
+// Maintaining this allows event triggering with a 1:N reference relationship
 type ResourceParentsMap struct {
 	sync.RWMutex
 	childToParentsMap map[KubeResource][]KubeResource // 1:N child:parent mapping
@@ -70,9 +72,7 @@ func GetResourceParentsMap() *ResourceParentsMap {
 //  - [DONE] Get the list of parent resources _of a particular kind_ for a particular child resource
 //  - [DONE] Add a reference from a child resource to a parent resource
 //  - [DONE] Delete a reference from a child resource to a parent resource
-
-// Probably useful
-//  - Get list of child resources for a particular parent
+//  - [DONE] Get list of child resources for a particular parent
 
 // Maybe useful
 //  - Get the list of all child resources of a particular kind
@@ -159,6 +159,7 @@ func (r *ResourceParentsMap) AddChildToParent(child KubeResource, parent KubeRes
 
 	// Add the new parent to the child resource
 	parents = append(parents, parent)
+	rpmInstance.childToParentsMap[child] = parents
 }
 
 // DeleteChildFromParent ...
@@ -174,6 +175,7 @@ func (r *ResourceParentsMap) DeleteChildFromParent(child KubeResource, parent Ku
 	for i := range childParents {
 		if childParents[i] == parent {
 			childParents = append(childParents[:i], childParents[i+1:]...)
+			rpmInstance.childToParentsMap[child] = childParents
 			return
 		}
 	}

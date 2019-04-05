@@ -69,11 +69,41 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	}
 
 	// >>>> DWHATLEY - MULTIPLE OWNERS
-	// rpm := util.GetResourceParentsMap()
+	rpm := util.GetResourceParentsMap()
 
-	// migClusterResource := util.KubeResource{NsName: types.NamespacedName{Name: }
+	mapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			log.Info("mapFn running...")
+			// Create childCrCluster to look up parents
+			childCrCluster := util.KubeResource{
+				Kind: util.KindClusterRegCluster,
+				NsName: types.NamespacedName{
+					Name:      a.Meta.GetName(),
+					Namespace: a.Meta.GetNamespace(),
+				},
+			}
+			// Find all parent resources of this child
+			parents := rpm.GetParentsOfKind(childCrCluster, util.KindMigCluster)
 
-	// rpm.GetParentsOfKind(util.KubeResource{Kind: })
+			// Build list of requests to dispatch
+			requests := []reconcile.Request{}
+			for i := range parents {
+				newRequest := reconcile.Request{
+					NamespacedName: parents[i].NsName,
+				}
+				requests = append(requests, newRequest)
+			}
+			return requests
+		})
+
+	err = c.Watch(
+		&source.Kind{Type: &clusterregv1alpha1.Cluster{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: mapFn,
+		})
+	if err != nil {
+		return err
+	}
 
 	// mapFn := handler.ToRequestsFunc(
 	// 	func(a handler.MapObject) []reconcile.Request {
