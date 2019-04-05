@@ -18,9 +18,11 @@ package migplan
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -31,11 +33,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller")
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -55,6 +52,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	// >>>> DWHATLEY - MULTIPLE OWNERS
+	mapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      a.Meta.GetName() + "-1",
+					Namespace: a.Meta.GetNamespace(),
+				}},
+				{NamespacedName: types.NamespacedName{
+					Name:      a.Meta.GetName() + "-2",
+					Namespace: a.Meta.GetNamespace(),
+				}},
+			}
+		})
+	// <<<< DWHATLEY - MULITPLE OWNERS
 
 	// Watch for changes to MigPlan
 	err = c.Watch(&source.Kind{
