@@ -68,57 +68,25 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
-	// >>>> DWHATLEY - MULTIPLE OWNERS
-	rpm := util.GetResourceParentsMap()
-
-	mapFn := handler.ToRequestsFunc(
-		func(a handler.MapObject) []reconcile.Request {
-			log.Info("mapFn running...")
-			// Create childCrCluster to look up parents
-			childCrCluster := util.KubeResource{
-				Kind: util.KindClusterRegCluster,
-				NsName: types.NamespacedName{
-					Name:      a.Meta.GetName(),
-					Namespace: a.Meta.GetNamespace(),
-				},
-			}
-			// Find all parent resources of this child
-			parents := rpm.GetParentsOfKind(childCrCluster, util.KindMigCluster)
-
-			// Build list of requests to dispatch
-			requests := []reconcile.Request{}
-			for i := range parents {
-				newRequest := reconcile.Request{
-					NamespacedName: parents[i].NsName,
-				}
-				requests = append(requests, newRequest)
-			}
-			return requests
-		})
-
+	// Watch for changes to Clusters referenced by MigCluster
 	err = c.Watch(
 		&source.Kind{Type: &clusterregv1alpha1.Cluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: mapFn,
+			ToRequests: handler.ToRequestsFunc(ClusterToMigCluster),
 		})
 	if err != nil {
 		return err
 	}
 
-	// mapFn := handler.ToRequestsFunc(
-	// 	func(a handler.MapObject) []reconcile.Request {
-	// 		return []reconcile.Request{
-	// 			{NamespacedName: types.NamespacedName{
-	// 				Name:      a.Meta.GetName() + "-1",
-	// 				Namespace: a.Meta.GetNamespace(),
-	// 			}},
-	// 			{NamespacedName: types.NamespacedName{
-	// 				Name:      a.Meta.GetName() + "-2",
-	// 				Namespace: a.Meta.GetNamespace(),
-	// 			}},
-	// 		}
-	// 	})
-	// <<<< DWHATLEY - MULITPLE OWNERS
+	// Watch for changes to Secrets referenced by MigCluster
+	err = c.Watch(
+		&source.Kind{Type: &kapi.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(SecretToMigCluster),
+		})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
