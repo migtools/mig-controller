@@ -22,13 +22,31 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var rpmInstance *ResourceParentsMap
-var createResourceParentMapOnce sync.Once
+// Kind strings to be used in KubeResource object creation
+// Use these kinds when adding to the ResourceParentsMap
+const (
+	KindSecret = "Secret"
 
-// ResourceParent holds information about a Parent resource which references a Child resource.
-type ResourceParent struct {
-	ParentKind   string
-	ParentNsName types.NamespacedName
+	KindMigPlan    = "MigPlan"
+	KindMigCluster = "MigCluster"
+	KindMigAssets  = "MigAssetCollection"
+	KindMigStorage = "MigStorage"
+
+	KindClusterRegCluster = "Cluster"
+
+	KindVeleroBackup                 = "VeleroBackup"
+	KindVeleroRestore                = "VeleroRestore"
+	KindVeleroBackupStorageLocation  = "VeleroBackupStorageLocation"
+	KindVeleroVolumeSnapshotLocation = "VeleroVolumeSnapshotLocation"
+)
+
+var rpmInstance *ResourceParentsMap
+var createChildParentsMapOnce sync.Once
+
+// KubeResource holds information about a Parent resource which references a Child resource.
+type KubeResource struct {
+	Kind   string
+	NsName types.NamespacedName
 }
 
 // ResourceParentsMap maps from Mig K8s kinds to child objects to parents of those child objects.
@@ -36,73 +54,126 @@ type ResourceParent struct {
 // on the relevant parent resource.
 type ResourceParentsMap struct {
 	sync.RWMutex
-	kindToChildrenAndParentsMap map[string]map[types.NamespacedName][]ResourceParent
+	childToParentsMap map[KubeResource][]KubeResource // 1:N child:parent mapping
 }
 
 // GetResourceParentsMap must be called to get a reference to the singleton ResourceParentsMap
 func GetResourceParentsMap() *ResourceParentsMap {
-	createResourceParentMapOnce.Do(func() {
+	createChildParentsMapOnce.Do(func() {
 		rpmInstance = &ResourceParentsMap{}
-		rpmInstance.kindToChildrenAndParentsMap = make(map[string]map[types.NamespacedName][]ResourceParent)
+		rpmInstance.childToParentsMap = make(map[KubeResource][]KubeResource)
 	})
 	return rpmInstance
 }
 
-// GetResourceParents ...
-func (r *ResourceParentsMap) GetResourceParents(childKind string, childNsName types.NamespacedName) []ResourceParent {
+// Definitely useful
+//  - [DONE] Get the list of parent resources _of a particular kind_ for a particular child resource
+//  - [DONE] Add a reference from a child resource to a parent resource
+//  - [DONE] Delete a reference from a child resource to a parent resource
+
+// Probably useful
+//  - Get list of child resources for a particular parent
+
+// Maybe useful
+//  - Get the list of all child resources of a particular kind
+
+// GetParentsOfKind ...
+func (r *ResourceParentsMap) GetParentsOfKind(child KubeResource, parentKind string) []KubeResource {
 	r.RLock()
 	defer r.RUnlock()
-	childKindResources, ok := rpmInstance.kindToChildrenAndParentsMap[childKind]
+
+	parents, ok := rpmInstance.childToParentsMap[child]
 	if !ok {
 		return nil
 	}
-	resourceParents, ok := childKindResources[childNsName]
-	if !ok {
-		return nil
+
+	// Find parents of particular kind
+	matchingParents := []KubeResource{}
+	for i := range parents {
+		if parents[i].Kind == parentKind {
+			matchingParents = append(matchingParents, parents[i])
+		}
 	}
-	return resourceParents
+
+	// Will return empty slice if nothing found
+	return matchingParents
 }
 
-// SetResourceParents ...
-func (r *ResourceParentsMap) SetResourceParents(childKind string, childNsName types.NamespacedName, parents []ResourceParent) {
-	r.Lock()
-	defer r.Unlock()
-	rpmInstance.kindToChildrenAndParentsMap[childKind][childNsName] = parents
+// GetChildrenOfKind ...
+func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind string) []KubeResource {
+	r.RLock()
+	defer r.RUnlock()
+
+	// First get all of the child keys of the appropriate kind
+	matchKeys := []KubeResource{}
+	for childKey := range rpmInstance.childToParentsMap {
+		if childKey.Kind == childKind {
+			matchKeys = append(matchKeys, childKey)
+		}
+	}
+
+	// Next filter down to only children with the requested parent
+	// childrenWithCorrectParent := []KubeResource{}
+	hasCorrectParentMap := make(map[KubeResource]int)
+	for i := range matchKeys {
+		parents, ok := rpmInstance.childToParentsMap[matchKeys[i]]
+		if !ok {
+			panic("GetChildrenOfKind - expected child key not found")
+		}
+		// Check if desired parent is attached to child
+		for j := range parents {
+			if parents[j] == parent {
+				hasCorrectParentMap[parents[j]] = 1
+			}
+		}
+	}
+
+	// Build the final list of correct parents to return
+	childrenOfKind := []KubeResource{}
+	for child := range hasCorrectParentMap {
+		childrenOfKind = append(childrenOfKind, child)
+	}
+
+	return childrenOfKind
 }
 
-// DeleteResourceParents ...
-func (r *ResourceParentsMap) DeleteResourceParents(childKind string, childNsName types.NamespacedName) {
+// AddChildToParent ...
+func (r *ResourceParentsMap) AddChildToParent(child KubeResource, parent KubeResource) {
 	r.Lock()
 	defer r.Unlock()
-	delete(rpmInstance.kindToChildrenAndParentsMap[childKind], childNsName)
+
+	parents, ok := rpmInstance.childToParentsMap[child]
+
+	// Create parent list on child if it doesn't exist
+	if !ok {
+		rpmInstance.childToParentsMap[child] = []KubeResource{}
+		parents = rpmInstance.childToParentsMap[child]
+	}
+
+	// Don't add a duplicate parent refs to a child
+	for i := range parents {
+		if parents[i] == parent {
+			return
+		}
+	}
+
+	// Add the new parent to the child resource
+	parents = append(parents, parent)
 }
 
-// AddResourceParent ...
-func (r *ResourceParentsMap) AddResourceParent(childKind string, childNsName types.NamespacedName, parent ResourceParent) {
+// DeleteChildFromParent ...
+func (r *ResourceParentsMap) DeleteChildFromParent(child KubeResource, parent KubeResource) {
 	r.Lock()
 	defer r.Unlock()
 
-	resourceParents := rpmInstance.kindToChildrenAndParentsMap[childKind][childNsName]
-	resourceParents = append(resourceParents, parent)
-}
-
-// DeleteResourceParent ...
-func (r *ResourceParentsMap) DeleteResourceParent(childKind string, childNsName types.NamespacedName, parent ResourceParent) {
-	r.Lock()
-	defer r.Unlock()
-
-	childKindResources, ok := rpmInstance.kindToChildrenAndParentsMap[childKind]
+	childParents, ok := rpmInstance.childToParentsMap[child]
 	if !ok {
 		return
 	}
-	resourceParents, ok := childKindResources[childNsName]
-	if !ok {
-		return
-	}
 
-	for i := range resourceParents {
-		if resourceParents[i] == parent {
-			resourceParents = append(resourceParents[:i], resourceParents[i+1:]...)
+	for i := range childParents {
+		if childParents[i] == parent {
+			childParents = append(childParents[:i], childParents[i+1:]...)
 			return
 		}
 	}

@@ -68,6 +68,28 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
+	// >>>> DWHATLEY - MULTIPLE OWNERS
+	// rpm := util.GetResourceParentsMap()
+
+	// migClusterResource := util.KubeResource{NsName: types.NamespacedName{Name: }
+
+	// rpm.GetParentsOfKind(util.KubeResource{Kind: })
+
+	// mapFn := handler.ToRequestsFunc(
+	// 	func(a handler.MapObject) []reconcile.Request {
+	// 		return []reconcile.Request{
+	// 			{NamespacedName: types.NamespacedName{
+	// 				Name:      a.Meta.GetName() + "-1",
+	// 				Namespace: a.Meta.GetNamespace(),
+	// 			}},
+	// 			{NamespacedName: types.NamespacedName{
+	// 				Name:      a.Meta.GetName() + "-2",
+	// 				Namespace: a.Meta.GetNamespace(),
+	// 			}},
+	// 		}
+	// 	})
+	// <<<< DWHATLEY - MULITPLE OWNERS
+
 	return nil
 }
 
@@ -91,6 +113,10 @@ type ReconcileMigCluster struct {
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
 
+	// Set up ResourceParentsMap to manage parent-child mapping
+	rpm := util.GetResourceParentsMap()
+	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
+
 	// Fetch the MigCluster instance
 	instance := &migrationv1alpha1.MigCluster{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
@@ -101,7 +127,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
-	// Get the host cluster object
+	// Check if this cluster is also hosting the controller
 	isHostCluster := instance.Spec.IsHostCluster
 	log.Info(fmt.Sprintf("[mCluster] isHostCluster: [%v]", isHostCluster))
 
@@ -115,6 +141,17 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
+	// Valid Cluster found, add MigCluster as parent to receive reconciliation events
+	childSecret := util.KubeResource{
+		Kind: util.KindSecret,
+		NsName: types.NamespacedName{
+			Name:      saSecretRef.Name,
+			Namespace: saSecretRef.Namespace,
+		},
+	}
+	rpm.AddChildToParent(childSecret, parentMigCluster)
+
+	// Get data from saToken secret
 	saTokenKey := "saToken"
 	saTokenData, ok := saSecret.Data[saTokenKey]
 	if !ok {
@@ -124,7 +161,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	saToken := string(saTokenData)
 	// log.Info(fmt.Sprintf("saToken: [%s]", saToken))
 
-	// Get k8s URL from cluster-registry Cluster associated with MigCluster
+	// Get k8s URL from Cluster associated with MigCluster
 	crClusterRef := instance.Spec.ClusterRef
 	crCluster := &clusterregv1alpha1.Cluster{}
 
@@ -135,7 +172,17 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
+	// Valid Cluster found, add MigCluster as parent to receive reconciliation events
+	childCrCluster := util.KubeResource{
+		Kind: util.KindClusterRegCluster,
+		NsName: types.NamespacedName{
+			Name:      crClusterRef.Name,
+			Namespace: crClusterRef.Namespace,
+		},
+	}
+	rpm.AddChildToParent(childCrCluster, parentMigCluster)
 
+	// Get remoteClusterURL from Cluster
 	var remoteClusterURL string
 	k8sEndpoints := crCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
 	if len(k8sEndpoints) > 0 {

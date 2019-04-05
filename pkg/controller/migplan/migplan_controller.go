@@ -22,7 +22,6 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -52,22 +51,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	// >>>> DWHATLEY - MULTIPLE OWNERS
-	mapFn := handler.ToRequestsFunc(
-		func(a handler.MapObject) []reconcile.Request {
-			return []reconcile.Request{
-				{NamespacedName: types.NamespacedName{
-					Name:      a.Meta.GetName() + "-1",
-					Namespace: a.Meta.GetNamespace(),
-				}},
-				{NamespacedName: types.NamespacedName{
-					Name:      a.Meta.GetName() + "-2",
-					Namespace: a.Meta.GetNamespace(),
-				}},
-			}
-		})
-	// <<<< DWHATLEY - MULITPLE OWNERS
 
 	// Watch for changes to MigPlan
 	err = c.Watch(&source.Kind{
