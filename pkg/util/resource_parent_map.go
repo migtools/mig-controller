@@ -20,6 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
@@ -30,10 +32,10 @@ var log = logf.Log.WithName("controller")
 const (
 	KindSecret = "Secret"
 
-	KindMigPlan    = "MigPlan"
-	KindMigCluster = "MigCluster"
-	KindMigAssets  = "MigAssetCollection"
-	KindMigStorage = "MigStorage"
+	KindMigPlan            = "MigPlan"
+	KindMigCluster         = "MigCluster"
+	KindMigAssetCollection = "MigAssetCollection"
+	KindMigStorage         = "MigStorage"
 
 	KindClusterRegCluster = "Cluster"
 
@@ -179,4 +181,28 @@ func (r *ResourceParentsMap) DeleteChildFromParent(child KubeResource, parent Ku
 			return
 		}
 	}
+}
+
+// MapChildToParents can be called from handlerFuncs to lookup all parents of a child
+func MapChildToParents(a handler.MapObject, childKind string, parentKind string) []reconcile.Request {
+	// Create childCrCluster to look up parents
+	childResource := KubeResource{
+		Kind: childKind,
+		NsName: types.NamespacedName{
+			Name:      a.Meta.GetName(),
+			Namespace: a.Meta.GetNamespace(),
+		},
+	}
+	// Find all parent resources of this child
+	rpm := GetResourceParentsMap()
+	parents := rpm.GetParentsOfKind(childResource, parentKind)
+	// Build list of requests to dispatch
+	requests := []reconcile.Request{}
+	for i := range parents {
+		newRequest := reconcile.Request{
+			NamespacedName: parents[i].NsName,
+		}
+		requests = append(requests, newRequest)
+	}
+	return requests
 }

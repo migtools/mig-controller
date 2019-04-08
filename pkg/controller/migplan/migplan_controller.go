@@ -62,6 +62,36 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to MigClusters referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigCluster{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigClusterToMigPlan),
+		})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to MigStorage referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigStorage{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigStorageToMigPlan),
+		})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to MigAssetCollections referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigAssetCollection{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigAssetCollectionToMigPlan),
+		})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

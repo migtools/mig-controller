@@ -68,21 +68,21 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
-	// Watch for changes to Clusters referenced by MigCluster
+	// Watch for changes to Clusters referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &clusterregv1alpha1.Cluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(ClusterToMigCluster),
+			ToRequests: handler.ToRequestsFunc(ClusterToMigClusters),
 		})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to Secrets referenced by MigCluster
+	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(SecretToMigCluster),
+			ToRequests: handler.ToRequestsFunc(SecretToMigClusters),
 		})
 	if err != nil {
 		return err
