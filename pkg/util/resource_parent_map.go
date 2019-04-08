@@ -107,6 +107,7 @@ func (r *ResourceParentsMap) GetParentsOfKind(child KubeResource, parentKind str
 }
 
 // GetChildrenOfKind ...
+// WARNING: this function has not been tested. It is likely to not work as desired.
 func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind string) []KubeResource {
 	r.RLock()
 	defer r.RUnlock()
@@ -120,8 +121,7 @@ func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind st
 	}
 
 	// Next filter down to only children with the requested parent
-	// childrenWithCorrectParent := []KubeResource{}
-	hasCorrectParentMap := make(map[KubeResource]int)
+	childrenWithCorrectParent := make(map[KubeResource]int)
 	for i := range matchKeys {
 		parents, ok := rpmInstance.childToParentsMap[matchKeys[i]]
 		if !ok {
@@ -130,14 +130,15 @@ func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind st
 		// Check if desired parent is attached to child
 		for j := range parents {
 			if parents[j] == parent {
-				hasCorrectParentMap[parents[j]] = 1
+				// Using a map here as a quasi-set
+				childrenWithCorrectParent[matchKeys[i]] = 1
 			}
 		}
 	}
 
 	// Build the final list of correct parents to return
 	childrenOfKind := []KubeResource{}
-	for child := range hasCorrectParentMap {
+	for child := range childrenWithCorrectParent {
 		childrenOfKind = append(childrenOfKind, child)
 	}
 

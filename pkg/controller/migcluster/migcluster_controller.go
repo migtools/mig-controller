@@ -196,13 +196,13 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
 
 	if rwc == nil {
-		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [ns=%s], [name=%s]", request.Namespace, request.Name))
+		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
 		StartRemoteWatch(r, RemoteManagerConfig{
 			RemoteRestConfig: restCfg,
 			ParentNsName:     request.NamespacedName,
 			ParentResource:   instance,
 		})
-		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [ns=%s], [name=%s]", request.Namespace, request.Name))
+		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
 	}
 
 	return reconcile.Result{}, nil
