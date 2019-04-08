@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migcluster
+package migassetcollection
 
 import (
 	"github.com/fusor/mig-controller/pkg/util"
@@ -22,20 +22,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// ClusterToMigClusters maps a Cluster request to MigCluster requests
-func ClusterToMigClusters(a handler.MapObject) []reconcile.Request {
+// NamespaceToMigAssetCollection maps a Cluster request to MigCluster requests
+func NamespaceToMigAssetCollection(a handler.MapObject) []reconcile.Request {
 	// Customize these kinds for each mapFunc
-	childKind := util.KindClusterRegCluster
-	parentKind := util.KindMigCluster
-
-	return util.MapChildToParents(a, childKind, parentKind)
-}
-
-// SecretToMigClusters maps a Secret request to MigCluster requests
-func SecretToMigClusters(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindSecret
-	parentKind := util.KindMigCluster
+	childKind := util.KindNamespace
+	parentKind := util.KindMigAssetCollection
 
 	return util.MapChildToParents(a, childKind, parentKind)
 }

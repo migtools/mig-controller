@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migcluster
+package migmigration
 
 import (
 	"github.com/fusor/mig-controller/pkg/util"
@@ -22,20 +22,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// ClusterToMigClusters maps a Cluster request to MigCluster requests
-func ClusterToMigClusters(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindClusterRegCluster
-	parentKind := util.KindMigCluster
+// MigPlanToMigMigration ...
+func MigPlanToMigMigration(a handler.MapObject) []reconcile.Request {
+	childKind := util.KindMigPlan
+	parentKind := util.KindMigMigration
 
 	return util.MapChildToParents(a, childKind, parentKind)
 }
 
-// SecretToMigClusters maps a Secret request to MigCluster requests
-func SecretToMigClusters(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindSecret
-	parentKind := util.KindMigCluster
+// MigClusterToMigMigration ...
+func MigClusterToMigMigration(a handler.MapObject) []reconcile.Request {
+	childKind := util.KindMigCluster
+	parentKind := util.KindMigMigration
+
+	return util.MapChildToParents(a, childKind, parentKind)
+}
+
+// MigStageToMigMigration ...
+func MigStageToMigMigration(a handler.MapObject) []reconcile.Request {
+	childKind := util.KindMigStage
+	parentKind := util.KindMigMigration
 
 	return util.MapChildToParents(a, childKind, parentKind)
 }

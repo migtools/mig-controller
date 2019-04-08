@@ -27,7 +27,6 @@ func MigClusterToMigPlan(a handler.MapObject) []reconcile.Request {
 	childKind := util.KindMigCluster
 	parentKind := util.KindMigPlan
 
-	log.Info("[mapFn] MigCluster => MigPlan")
 	return util.MapChildToParents(a, childKind, parentKind)
 }
 
@@ -36,7 +35,6 @@ func MigStorageToMigPlan(a handler.MapObject) []reconcile.Request {
 	childKind := util.KindMigStorage
 	parentKind := util.KindMigPlan
 
-	log.Info("[mapFn] MigStorage => MigPlan")
 	return util.MapChildToParents(a, childKind, parentKind)
 }
 
@@ -45,6 +43,5 @@ func MigAssetCollectionToMigPlan(a handler.MapObject) []reconcile.Request {
 	childKind := util.KindMigAssetCollection
 	parentKind := util.KindMigPlan
 
-	log.Info("[mapFn] MigAssetCollection => MigPlan")
 	return util.MapChildToParents(a, childKind, parentKind)
 }

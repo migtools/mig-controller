@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -30,12 +31,16 @@ var log = logf.Log.WithName("controller")
 // Kind strings to be used in KubeResource object creation
 // Use these kinds when adding to the ResourceParentsMap
 const (
-	KindSecret = "Secret"
+	KindSecret    = "Secret"
+	KindNamespace = "Namespace"
 
 	KindMigPlan            = "MigPlan"
 	KindMigCluster         = "MigCluster"
 	KindMigAssetCollection = "MigAssetCollection"
 	KindMigStorage         = "MigStorage"
+
+	KindMigStage     = "MigStage"
+	KindMigMigration = "MigMigration"
 
 	KindClusterRegCluster = "Cluster"
 
@@ -204,5 +209,11 @@ func MapChildToParents(a handler.MapObject, childKind string, parentKind string)
 		}
 		requests = append(requests, newRequest)
 	}
+
+	// Log request redirection if at least 1 request was redirected
+	if len(requests) > 0 {
+		log.Info(fmt.Sprintf("[mapFn] %s => %s", childKind, parentKind))
+	}
+
 	return requests
 }
