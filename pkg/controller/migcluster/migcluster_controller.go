@@ -115,9 +115,9 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	rpm := util.GetResourceParentsMap()
 	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
 
-	// Fetch the MigCluster instance
-	instance := &migrationv1alpha1.MigCluster{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	// Fetch the MigCluster
+	migCluster := &migrationv1alpha1.MigCluster{}
+	err := r.Get(context.TODO(), request.NamespacedName, migCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -126,11 +126,11 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Check if this cluster is also hosting the controller
-	isHostCluster := instance.Spec.IsHostCluster
+	isHostCluster := migCluster.Spec.IsHostCluster
 	log.Info(fmt.Sprintf("[mCluster] isHostCluster: [%v]", isHostCluster))
 
 	// Get the SA secret attached to MigCluster
-	saSecretRef := instance.Spec.ServiceAccountSecretRef
+	saSecretRef := migCluster.Spec.ServiceAccountSecretRef
 	saSecret := &kapi.Secret{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: saSecretRef.Name, Namespace: saSecretRef.Namespace}, saSecret)
 	if err != nil {
@@ -160,10 +160,10 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// log.Info(fmt.Sprintf("saToken: [%s]", saToken))
 
 	// Get k8s URL from Cluster associated with MigCluster
-	crClusterRef := instance.Spec.ClusterRef
-	crCluster := &clusterregv1alpha1.Cluster{}
+	clusterRef := migCluster.Spec.ClusterRef
+	cluster := &clusterregv1alpha1.Cluster{}
 
-	err = r.Get(context.TODO(), types.NamespacedName{Name: crClusterRef.Name, Namespace: crClusterRef.Namespace}, crCluster)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: clusterRef.Name, Namespace: clusterRef.Namespace}, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -171,18 +171,18 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 	// Valid referenced Cluster found, add MigCluster as parent to receive reconciliation events
-	childCrCluster := util.KubeResource{
+	childcluster := util.KubeResource{
 		Kind: util.KindClusterRegCluster,
 		NsName: types.NamespacedName{
-			Name:      crClusterRef.Name,
-			Namespace: crClusterRef.Namespace,
+			Name:      clusterRef.Name,
+			Namespace: clusterRef.Namespace,
 		},
 	}
-	rpm.AddChildToParent(childCrCluster, parentMigCluster)
+	rpm.AddChildToParent(childcluster, parentMigCluster)
 
 	// Get remoteClusterURL from Cluster
 	var remoteClusterURL string
-	k8sEndpoints := crCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
+	k8sEndpoints := cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
 	if len(k8sEndpoints) > 0 {
 		remoteClusterURL = string(k8sEndpoints[0].ServerAddress)
 		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [%s]", remoteClusterURL))
@@ -200,7 +200,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		StartRemoteWatch(r, RemoteManagerConfig{
 			RemoteRestConfig: restCfg,
 			ParentNsName:     request.NamespacedName,
-			ParentResource:   instance,
+			ParentResource:   migCluster,
 		})
 		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
 	}
