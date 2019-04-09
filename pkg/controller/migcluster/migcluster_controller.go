@@ -191,12 +191,14 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Create a Remote Watch for this MigCluster if one doesn't exist
-	rwm := GetRemoteWatchMap()
-	rwc := rwm.GetRWC(request.NamespacedName)
-	restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
+	remoteWatchMap := GetRemoteWatchMap()
+	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
 
-	if rwc == nil {
+	if remoteWatchCluster == nil {
 		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
+
+		restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
+
 		StartRemoteWatch(r, RemoteManagerConfig{
 			RemoteRestConfig: restCfg,
 			ParentNsName:     request.NamespacedName,

@@ -51,7 +51,7 @@ type RemoteManagerConfig struct {
 // events on a remote cluster. A GenericEvent channel will be configured to funnel events from
 // the RemoteWatcher controller to the MigCluster controller.
 func StartRemoteWatch(r *ReconcileMigCluster, config RemoteManagerConfig) error {
-	rwm := GetRemoteWatchMap()
+	remoteWatchMap := GetRemoteWatchMap()
 
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
@@ -95,11 +95,11 @@ func StartRemoteWatch(r *ReconcileMigCluster, config RemoteManagerConfig) error 
 	log.Info("[rWatch] Manager started!")
 	// TODO: provide a way to dynamically change where events are being forwarded to (multiple controllers)
 	// Create remoteWatchCluster tracking obj and attach reference to parent object so we don't create extra
-	rwc := &RemoteWatchCluster{ForwardChannel: forwardChannel, RemoteManager: mgr}
+	remoteWatchCluster := &RemoteWatchCluster{ForwardChannel: forwardChannel, RemoteManager: mgr}
 
 	// MigClusters have a 1:1 association with a RemoteWatchCluster, so we will store the mapping
 	// to avoid creating duplicate remote managers in the future.
-	rwm.SetRWC(config.ParentNsName, rwc)
+	remoteWatchMap.Set(config.ParentNsName, remoteWatchCluster)
 
 	return nil
 }
@@ -113,7 +113,7 @@ type RemoteWatchCluster struct {
 
 // RemoteWatchMap provides a map between MigCluster nsNames and RemoteWatchClusters
 type RemoteWatchMap struct {
-	sync.RWMutex
+	mutex                 sync.RWMutex
 	nsNameToRemoteCluster map[types.NamespacedName]*RemoteWatchCluster
 }
 
@@ -126,10 +126,10 @@ func GetRemoteWatchMap() *RemoteWatchMap {
 	return rwmInstance
 }
 
-// GetRWC gets the RemoteWatchCluster associated with a MigCluster resource nsName, return nil if not found
-func (r *RemoteWatchMap) GetRWC(key types.NamespacedName) *RemoteWatchCluster {
-	r.RLock()
-	defer r.RUnlock()
+// Get the RemoteWatchCluster associated with a MigCluster resource nsName, return nil if not found
+func (r *RemoteWatchMap) Get(key types.NamespacedName) *RemoteWatchCluster {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 	rwc, ok := rwmInstance.nsNameToRemoteCluster[key]
 	if !ok {
 		return nil
@@ -137,16 +137,16 @@ func (r *RemoteWatchMap) GetRWC(key types.NamespacedName) *RemoteWatchCluster {
 	return rwc
 }
 
-// SetRWC sets the RemoteWatchCluster associated with a MigCluster resource nsName
-func (r *RemoteWatchMap) SetRWC(key types.NamespacedName, value *RemoteWatchCluster) {
-	r.Lock()
-	defer r.Unlock()
+// Set the RemoteWatchCluster associated with a MigCluster resource nsName
+func (r *RemoteWatchMap) Set(key types.NamespacedName, value *RemoteWatchCluster) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	rwmInstance.nsNameToRemoteCluster[key] = value
 }
 
-// DeleteRWC deletes the RemoteWatchCluster associated with a MigCluster resource nsName
-func (r *RemoteWatchMap) DeleteRWC(key types.NamespacedName) {
-	r.Lock()
-	defer r.Unlock()
+// Delete the RemoteWatchCluster associated with a MigCluster resource nsName
+func (r *RemoteWatchMap) Delete(key types.NamespacedName) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	delete(rwmInstance.nsNameToRemoteCluster, key)
 }
