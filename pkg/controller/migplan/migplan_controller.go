@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,11 +32,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller")
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -62,6 +58,36 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&UpdatedPredicate{},
 	)
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to MigClusters referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigCluster{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigClusterToMigPlan),
+		})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to MigStorage referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigStorage{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigStorageToMigPlan),
+		})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to MigAssetCollections referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigAssetCollection{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigAssetCollectionToMigPlan),
+		})
 	if err != nil {
 		return err
 	}

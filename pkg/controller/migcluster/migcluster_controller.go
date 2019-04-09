@@ -18,10 +18,14 @@ package migcluster
 
 import (
 	"context"
+	"fmt"
 
 	migrationv1alpha1 "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -29,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	kapi "k8s.io/api/core/v1"
 )
 
 var log = logf.Log.WithName("controller")
@@ -40,20 +46,44 @@ func Add(mgr manager.Manager) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
 	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
+	// Add reference to controller on ReconcileMigCluster object to be used
+	// for adding remote watches at a later time
+	r.Controller = c
+
 	// Watch for changes to MigCluster
 	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.MigCluster{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to Clusters referenced by MigClusters
+	err = c.Watch(
+		&source.Kind{Type: &clusterregv1alpha1.Cluster{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(ClusterToMigClusters),
+		})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to Secrets referenced by MigClusters
+	err = c.Watch(
+		&source.Kind{Type: &kapi.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(SecretToMigClusters),
+		})
 	if err != nil {
 		return err
 	}
@@ -63,10 +93,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 var _ reconcile.Reconciler = &ReconcileMigCluster{}
 
+// var _ remoteWatchMap = GetRemoteWatchMap()
+
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme     *runtime.Scheme
+	Controller controller.Controller
 }
 
 // Reconcile reads that state of the cluster for a MigCluster object and makes changes based on the state read
@@ -76,17 +109,103 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the MigCluster instance
-	instance := &migrationv1alpha1.MigCluster{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
+
+	// Set up ResourceParentsMap to manage parent-child mapping
+	resourceParentsMap := util.GetResourceParentsMap()
+	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
+
+	// Fetch the MigCluster
+	migCluster := &migrationv1alpha1.MigCluster{}
+	err := r.Get(context.TODO(), request.NamespacedName, migCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, nil // don't requeue
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{}, err // requeue
 	}
+
+	// Check if this cluster is also hosting the controller
+	isHostCluster := migCluster.Spec.IsHostCluster
+	log.Info(fmt.Sprintf("[mCluster] isHostCluster: [%v]", isHostCluster))
+
+	// Get the SA secret attached to MigCluster
+	saSecretRef := migCluster.Spec.ServiceAccountSecretRef
+	saSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: saSecretRef.Name, Namespace: saSecretRef.Namespace}, saSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+	// Valid referenced Secret found, add MigCluster as parent to receive reconciliation events
+	childSecret := util.KubeResource{
+		Kind: util.KindSecret,
+		NsName: types.NamespacedName{
+			Name:      saSecretRef.Name,
+			Namespace: saSecretRef.Namespace,
+		},
+	}
+	resourceParentsMap.AddChildToParent(childSecret, parentMigCluster)
+
+	// Get data from saToken secret
+	saTokenKey := "saToken"
+	saTokenData, ok := saSecret.Data[saTokenKey]
+	if !ok {
+		log.Info(fmt.Sprintf("[mCluster] saToken: [%v]", ok))
+		return reconcile.Result{}, nil // don't requeue
+	}
+	saToken := string(saTokenData)
+	// log.Info(fmt.Sprintf("saToken: [%s]", saToken))
+
+	// Get k8s URL from Cluster associated with MigCluster
+	clusterRef := migCluster.Spec.ClusterRef
+	cluster := &clusterregv1alpha1.Cluster{}
+
+	err = r.Get(context.TODO(), types.NamespacedName{Name: clusterRef.Name, Namespace: clusterRef.Namespace}, cluster)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+	// Valid referenced Cluster found, add MigCluster as parent to receive reconciliation events
+	childCluster := util.KubeResource{
+		Kind: util.KindClusterRegCluster,
+		NsName: types.NamespacedName{
+			Name:      clusterRef.Name,
+			Namespace: clusterRef.Namespace,
+		},
+	}
+	resourceParentsMap.AddChildToParent(childCluster, parentMigCluster)
+
+	// Get remoteClusterURL from Cluster
+	var remoteClusterURL string
+	k8sEndpoints := cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
+	if len(k8sEndpoints) > 0 {
+		remoteClusterURL = string(k8sEndpoints[0].ServerAddress)
+		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [%s]", remoteClusterURL))
+	} else {
+		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [len=0]"))
+	}
+
+	// Create a Remote Watch for this MigCluster if one doesn't exist
+	remoteWatchMap := GetRemoteWatchMap()
+	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
+
+	if remoteWatchCluster == nil {
+		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
+
+		restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
+
+		StartRemoteWatch(r, RemoteManagerConfig{
+			RemoteRestConfig: restCfg,
+			ParentNsName:     request.NamespacedName,
+			ParentResource:   migCluster,
+		})
+		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
+	}
+
 	return reconcile.Result{}, nil
 }

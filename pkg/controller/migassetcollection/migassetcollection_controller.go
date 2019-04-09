@@ -18,6 +18,7 @@ package migassetcollection
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	kapi "k8s.io/api/core/v1"
 )
 
 var log = logf.Log.WithName("controller")
@@ -61,6 +64,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&source.Kind{Type: &migapi.MigAssetCollection{}},
 		&handler.EnqueueRequestForObject{},
 		&UpdatedPredicate{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to Namespaces referenced by MigAssetCollections
+	err = c.Watch(
+		&source.Kind{Type: &kapi.Namespace{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(NamespaceToMigAssetCollection),
+		})
 	if err != nil {
 		return err
 	}
