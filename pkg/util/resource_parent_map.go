@@ -62,7 +62,7 @@ type KubeResource struct {
 // ResourceParentsMap maps from "parents resources" to "child resources"
 // Maintaining this allows event triggering with a 1:N reference relationship
 type ResourceParentsMap struct {
-	sync.RWMutex
+	mutex             sync.RWMutex
 	childToParentsMap map[KubeResource][]KubeResource // 1:N child:parent mapping
 }
 
@@ -86,8 +86,8 @@ func GetResourceParentsMap() *ResourceParentsMap {
 
 // GetParentsOfKind ...
 func (r *ResourceParentsMap) GetParentsOfKind(child KubeResource, parentKind string) []KubeResource {
-	r.RLock()
-	defer r.RUnlock()
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 
 	parents, ok := rpmInstance.childToParentsMap[child]
 	if !ok {
@@ -109,8 +109,8 @@ func (r *ResourceParentsMap) GetParentsOfKind(child KubeResource, parentKind str
 // GetChildrenOfKind ...
 // WARNING: this function has not been tested. It is likely to not work as desired.
 func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind string) []KubeResource {
-	r.RLock()
-	defer r.RUnlock()
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
 
 	// First get all of the child keys of the appropriate kind
 	matchKeys := []KubeResource{}
@@ -147,8 +147,8 @@ func (r *ResourceParentsMap) GetChildrenOfKind(parent KubeResource, childKind st
 
 // AddChildToParent ...
 func (r *ResourceParentsMap) AddChildToParent(child KubeResource, parent KubeResource) {
-	r.Lock()
-	defer r.Unlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	parents, ok := rpmInstance.childToParentsMap[child]
 
@@ -172,8 +172,8 @@ func (r *ResourceParentsMap) AddChildToParent(child KubeResource, parent KubeRes
 
 // DeleteChildFromParent ...
 func (r *ResourceParentsMap) DeleteChildFromParent(child KubeResource, parent KubeResource) {
-	r.Lock()
-	defer r.Unlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 
 	childParents, ok := rpmInstance.childToParentsMap[child]
 	if !ok {
@@ -189,7 +189,7 @@ func (r *ResourceParentsMap) DeleteChildFromParent(child KubeResource, parent Ku
 	}
 }
 
-// MapChildToParents can be called from handlerFuncs to lookup all parents of a child
+// MapChildToParents can be called from Watch handlerFuncs to lookup all parents of a child
 func MapChildToParents(a handler.MapObject, childKind string, parentKind string) []reconcile.Request {
 	// Create childCrCluster to look up parents
 	childResource := KubeResource{
