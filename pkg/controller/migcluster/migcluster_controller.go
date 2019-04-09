@@ -171,14 +171,14 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 	// Valid referenced Cluster found, add MigCluster as parent to receive reconciliation events
-	childcluster := util.KubeResource{
+	childCluster := util.KubeResource{
 		Kind: util.KindClusterRegCluster,
 		NsName: types.NamespacedName{
 			Name:      clusterRef.Name,
 			Namespace: clusterRef.Namespace,
 		},
 	}
-	resourceParentsMap.AddChildToParent(childcluster, parentMigCluster)
+	resourceParentsMap.AddChildToParent(childCluster, parentMigCluster)
 
 	// Get remoteClusterURL from Cluster
 	var remoteClusterURL string
