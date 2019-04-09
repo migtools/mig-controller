@@ -112,7 +112,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
 
 	// Set up ResourceParentsMap to manage parent-child mapping
-	rpm := util.GetResourceParentsMap()
+	resourceParentsMap := util.GetResourceParentsMap()
 	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
 
 	// Fetch the MigCluster
@@ -147,7 +147,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			Namespace: saSecretRef.Namespace,
 		},
 	}
-	rpm.AddChildToParent(childSecret, parentMigCluster)
+	resourceParentsMap.AddChildToParent(childSecret, parentMigCluster)
 
 	// Get data from saToken secret
 	saTokenKey := "saToken"
@@ -178,7 +178,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			Namespace: clusterRef.Namespace,
 		},
 	}
-	rpm.AddChildToParent(childcluster, parentMigCluster)
+	resourceParentsMap.AddChildToParent(childcluster, parentMigCluster)
 
 	// Get remoteClusterURL from Cluster
 	var remoteClusterURL string
