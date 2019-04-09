@@ -107,6 +107,7 @@ func (r *ReconcileMigAssetCollection) Reconcile(request reconcile.Request) (reco
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+
 	// Validations.
 	// The 'nSet' is the number of conditions set during validation.
 	err, nSet := r.validate(assetCollection)

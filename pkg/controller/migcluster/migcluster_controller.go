@@ -19,13 +19,13 @@ package migcluster
 import (
 	"context"
 	"fmt"
-
-	migrationv1alpha1 "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/util"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
+	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -33,8 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	kapi "k8s.io/api/core/v1"
 )
 
 var log = logf.Log.WithName("controller")
@@ -63,14 +61,17 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	r.Controller = c
 
 	// Watch for changes to MigCluster
-	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.MigCluster{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigCluster{}},
+		&handler.EnqueueRequestForObject{},
+		&UpdatedPredicate{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Clusters referenced by MigClusters
 	err = c.Watch(
-		&source.Kind{Type: &clusterregv1alpha1.Cluster{}},
+		&source.Kind{Type: &crapi.Cluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
 			ToRequests: handler.ToRequestsFunc(ClusterToMigClusters),
 		})
@@ -116,7 +117,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
 
 	// Fetch the MigCluster
-	migCluster := &migrationv1alpha1.MigCluster{}
+	migCluster := &migapi.MigCluster{}
 	err := r.Get(context.TODO(), request.NamespacedName, migCluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -139,6 +140,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
+
 	// Valid referenced Secret found, add MigCluster as parent to receive reconciliation events
 	childSecret := util.KubeResource{
 		Kind: util.KindSecret,
@@ -161,7 +163,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Get k8s URL from Cluster associated with MigCluster
 	clusterRef := migCluster.Spec.ClusterRef
-	cluster := &clusterregv1alpha1.Cluster{}
+	cluster := &crapi.Cluster{}
 
 	err = r.Get(context.TODO(), types.NamespacedName{Name: clusterRef.Name, Namespace: clusterRef.Namespace}, cluster)
 	if err != nil {
@@ -207,5 +209,28 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
 	}
 
+	// Validations.
+	// The 'nSet' is the number of conditions set during validation.
+	err, nSet := r.validate(migCluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Set the Ready condition
+	if nSet == 0 {
+		migCluster.Status.SetCondition(migapi.Condition{
+			Type:    Ready,
+			Status:  True,
+			Message: ReadyMessage,
+		})
+	} else {
+		migCluster.Status.DeleteCondition(Ready)
+	}
+	err = r.Update(context.TODO(), migCluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Done
 	return reconcile.Result{}, nil
 }

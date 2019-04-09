@@ -23,8 +23,8 @@ import (
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
-	SrcClusterRef         *kapi.ObjectReference `json:"srcClusterRef,omitempty"`
-	DestClusterRef        *kapi.ObjectReference `json:"destClusterRef,omitempty"`
+	SrcMigClusterRef      *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef     *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	MigStorageRef         *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 	MigAssetCollectionRef *kapi.ObjectReference `json:"migAssetCollectionRef,omitempty"`
 }

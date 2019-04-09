@@ -30,6 +30,7 @@ type MigClusterSpec struct {
 
 // MigClusterStatus defines the observed state of MigCluster
 type MigClusterStatus struct {
+	Conditions
 }
 
 // +genclient
