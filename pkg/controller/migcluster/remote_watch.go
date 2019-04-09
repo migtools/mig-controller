@@ -17,7 +17,6 @@ limitations under the License.
 package migcluster
 
 import (
-	"os"
 	"sync"
 
 	"github.com/fusor/mig-controller/pkg/controller/remotewatcher"
@@ -57,13 +56,13 @@ func StartRemoteWatch(r *ReconcileMigCluster, config RemoteManagerConfig) error 
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
 		log.Error(err, "[rWatch] unable to set up remote watcher controller manager")
-		os.Exit(1)
+		return err
 	}
 
 	log.Info("[rWatch] Adding Velero to scheme...")
 	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable add Velero APIs to scheme")
-		os.Exit(1)
+		return err
 	}
 
 	// Parent controller watches for events from forwardChannel.
