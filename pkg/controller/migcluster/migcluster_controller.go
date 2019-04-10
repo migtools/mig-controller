@@ -22,7 +22,6 @@ import (
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	"github.com/fusor/mig-controller/pkg/util"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -159,7 +158,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil // don't requeue
 	}
 	saToken := string(saTokenData)
-	// log.Info(fmt.Sprintf("saToken: [%s]", saToken))
+	log.Info(fmt.Sprintf("saToken: [%s]", saToken))
 
 	// Get k8s URL from Cluster associated with MigCluster
 	clusterRef := migCluster.Spec.ClusterRef
@@ -173,15 +172,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
-	// Get remoteClusterURL from Cluster
-	var remoteClusterURL string
-	k8sEndpoints := cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
-	if len(k8sEndpoints) > 0 {
-		remoteClusterURL = string(k8sEndpoints[0].ServerAddress)
-	} else {
-		log.Info(fmt.Sprintf("[mCluster] remoteClusterURL: [len=0]"))
-	}
-
 	// Create a Remote Watch for this MigCluster if one doesn't exist
 	remoteWatchMap := GetRemoteWatchMap()
 	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
@@ -189,7 +179,11 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	if remoteWatchCluster == nil {
 		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
 
-		restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
+		// restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
+		restCfg, err := migCluster.BuildRestConfig(r.Client)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("[mCluster] Error during BuildRestConfig for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
+		}
 
 		StartRemoteWatch(r, RemoteManagerConfig{
 			RemoteRestConfig: restCfg,

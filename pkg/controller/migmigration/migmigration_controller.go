@@ -27,11 +27,9 @@ import (
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/util"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -227,50 +225,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	// TODO: dedupe this code section (shared with MigCluster controller)
-	// Get the cluster-registry Cluster from MigCluster
-	srcCrClusterRef := srcCluster.Spec.ClusterRef
-	srcCrCluster := &crapi.Cluster{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: srcCrClusterRef.Name, Namespace: srcCrClusterRef.Namespace}, srcCrCluster)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-
-	var srcRemoteClusterURL string
-	srcK8sEndpoints := srcCrCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
-	if len(srcK8sEndpoints) > 0 {
-		srcRemoteClusterURL = string(srcK8sEndpoints[0].ServerAddress)
-		// log.Info(fmt.Sprintf("[mMigration] srcRemoteClusterURL: [%s]", srcRemoteClusterURL))
-	} else {
-		log.Info(fmt.Sprintf("[mMigration] srcRemoteClusterURL: [len=0]"))
-	}
-
-	// TODO: dedupe this code section (shared with MigCluster controller)
-	// Get SA token from srcCluster
-	srcSaSecretRef := srcCluster.Spec.ServiceAccountSecretRef
-	srcSaSecret := &kapi.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: srcSaSecretRef.Name, Namespace: srcSaSecretRef.Namespace}, srcSaSecret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-	// Get data from srcSaToken secret
-	srcSaTokenKey := "saToken"
-	srcSaTokenData, ok := srcSaSecret.Data[srcSaTokenKey]
-	if !ok {
-		log.Info(fmt.Sprintf("[mCluster] srcSaToken: [%v]", ok))
-		return reconcile.Result{}, nil // don't requeue
-	}
-	srcSaToken := string(srcSaTokenData)
-
-	// Create srcCluster client which we will use to create a Velero Backup
-	srcClusterRestConfig := util.BuildRestConfig(srcRemoteClusterURL, srcSaToken)
-	srcClusterK8sClient, err := util.BuildControllerRuntimeClient(srcClusterRestConfig)
+	srcClusterK8sClient, err := srcCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET srcClusterK8sClient")
 		return reconcile.Result{}, nil
@@ -335,50 +290,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	// TODO: dedupe this code section (shared with MigCluster controller)
-	// Get the cluster-registry Cluster from MigCluster
-	destCrClusterRef := destCluster.Spec.ClusterRef
-	destCrCluster := &crapi.Cluster{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: destCrClusterRef.Name, Namespace: destCrClusterRef.Namespace}, destCrCluster)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-
-	var destRemoteClusterURL string
-	destK8sEndpoints := destCrCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
-	if len(destK8sEndpoints) > 0 {
-		destRemoteClusterURL = string(destK8sEndpoints[0].ServerAddress)
-		// log.Info(fmt.Sprintf("[mMigration] destRemoteClusterURL: [%s]", destRemoteClusterURL))
-	} else {
-		log.Info(fmt.Sprintf("[mMigration] destRemoteClusterURL: [len=0]"))
-	}
-
-	// TODO: dedupe this code section (shared with MigCluster controller)
-	// Get SA token from destCluster
-	destSaSecretRef := destCluster.Spec.ServiceAccountSecretRef
-	destSaSecret := &kapi.Secret{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: destSaSecretRef.Name, Namespace: destSaSecretRef.Namespace}, destSaSecret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-	// Get data from destSaToken secret
-	destSaTokenKey := "saToken"
-	destSaTokenData, ok := destSaSecret.Data[destSaTokenKey]
-	if !ok {
-		log.Info(fmt.Sprintf("[mCluster] destSaToken: [%v]", ok))
-		return reconcile.Result{}, nil // don't requeue
-	}
-	destSaToken := string(destSaTokenData)
-
-	// Create destCluster client which we will use to create a Velero Backup
-	destClusterRestConfig := util.BuildRestConfig(destRemoteClusterURL, destSaToken)
-	destClusterK8sClient, err := util.BuildControllerRuntimeClient(destClusterRestConfig)
+	destClusterK8sClient, err := destCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET destClusterK8sClient")
 		return reconcile.Result{}, nil
