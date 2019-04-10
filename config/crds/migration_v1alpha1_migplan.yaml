@@ -28,13 +28,13 @@ spec:
           type: object
         spec:
           properties:
-            destClusterRef:
+            destMigClusterRef:
               type: object
             migAssetCollectionRef:
               type: object
             migStorageRef:
               type: object
-            srcClusterRef:
+            srcMigClusterRef:
               type: object
           type: object
         status:

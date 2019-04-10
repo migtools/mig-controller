@@ -28,7 +28,7 @@ spec:
           type: object
         spec:
           properties:
-            migStageRef:
+            migPlanRef:
               type: object
           type: object
         status:
