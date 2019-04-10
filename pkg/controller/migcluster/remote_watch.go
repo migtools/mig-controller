@@ -55,28 +55,28 @@ func StartRemoteWatch(r *ReconcileMigCluster, config RemoteManagerConfig) error 
 
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
-		log.Error(err, "[rWatch] unable to set up remote watcher controller manager")
+		log.Error(err, "[rWatch] Unable to set up remote watcher controller manager")
 		return err
 	}
 
-	log.Info("[rWatch] Adding Velero to scheme...")
+	log.Info("[rWatch] Adding Velero to scheme")
 	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "unable add Velero APIs to scheme")
+		log.Error(err, "[rWatch] Unable add Velero APIs to scheme")
 		return err
 	}
 
 	// Parent controller watches for events from forwardChannel.
-	log.Info("[rWatch] Creating forwardChannel...")
+	log.Info("[rWatch] Creating forwardChannel")
 	forwardChannel := make(chan event.GenericEvent)
 
-	log.Info("[rWatch] Starting watch on forwardChannel...")
+	log.Info("[rWatch] Starting watch on forwardChannel")
 	err = r.Controller.Watch(&source.Channel{Source: forwardChannel}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Add remoteWatcher to remote MGR
-	log.Info("[rWatch] Adding controller to manager...")
+	log.Info("[rWatch] Adding controller to manager")
 	forwardEvent := event.GenericEvent{
 		Meta:   config.ParentResource.GetObjectMeta(),
 		Object: config.ParentResource,
@@ -89,10 +89,10 @@ func StartRemoteWatch(r *ReconcileMigCluster, config RemoteManagerConfig) error 
 
 	// TODO: keep track of sigStopChan so that we can stop the manager at a later time
 	sigStopChan := make(chan struct{})
-	log.Info("[rWatch] Starting manager...")
+	log.Info("[rWatch] Starting manager")
 	go mgr.Start(sigStopChan)
 
-	log.Info("[rWatch] Manager started!")
+	log.Info("[rWatch] Manager started")
 	// TODO: provide a way to dynamically change where events are being forwarded to (multiple controllers)
 	// Create remoteWatchCluster tracking obj and attach reference to parent object so we don't create extra
 	remoteWatchCluster := &RemoteWatchCluster{ForwardChannel: forwardChannel, RemoteManager: mgr}
