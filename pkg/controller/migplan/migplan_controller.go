@@ -21,8 +21,10 @@ import (
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"github.com/fusor/mig-controller/pkg/util"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -130,6 +132,56 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	// Add all referenced
+
+	// Set up ResourceParentsMap to manage parent-child mapping
+	rpm := util.GetResourceParentsMap()
+	parentMigPlan := util.KubeResource{Kind: util.KindMigPlan, NsName: request.NamespacedName}
+
+	if plan.Spec.SrcMigClusterRef != nil {
+		childSrcCluster := util.KubeResource{
+			Kind: util.KindMigCluster,
+			NsName: types.NamespacedName{
+				Name:      plan.Spec.SrcMigClusterRef.Name,
+				Namespace: plan.Spec.SrcMigClusterRef.Namespace,
+			},
+		}
+		rpm.AddChildToParent(childSrcCluster, parentMigPlan)
+	}
+
+	if plan.Spec.DestMigClusterRef != nil {
+		childDestCluster := util.KubeResource{
+			Kind: util.KindMigCluster,
+			NsName: types.NamespacedName{
+				Name:      plan.Spec.DestMigClusterRef.Name,
+				Namespace: plan.Spec.DestMigClusterRef.Namespace,
+			},
+		}
+		rpm.AddChildToParent(childDestCluster, parentMigPlan)
+	}
+
+	if plan.Spec.MigStorageRef != nil {
+		childMigStorage := util.KubeResource{
+			Kind: util.KindMigStorage,
+			NsName: types.NamespacedName{
+				Name:      plan.Spec.MigStorageRef.Name,
+				Namespace: plan.Spec.MigStorageRef.Namespace,
+			},
+		}
+		rpm.AddChildToParent(childMigStorage, parentMigPlan)
+	}
+
+	if plan.Spec.MigAssetCollectionRef != nil {
+		childMigAssets := util.KubeResource{
+			Kind: util.KindMigAssetCollection,
+			NsName: types.NamespacedName{
+				Name:      plan.Spec.MigAssetCollectionRef.Name,
+				Namespace: plan.Spec.MigAssetCollectionRef.Namespace,
+			},
+		}
+		rpm.AddChildToParent(childMigAssets, parentMigPlan)
 	}
 
 	// Validations.

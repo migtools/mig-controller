@@ -18,11 +18,21 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/controller/migassetcollection"
+	"github.com/fusor/mig-controller/pkg/controller/migplan"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"github.com/fusor/mig-controller/pkg/util"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -95,7 +105,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigStages referenced by MigMigrations
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigStage{}},
+		&source.Kind{Type: &migapi.MigMigration{}},
 		&handler.EnqueueRequestsFromMapFunc{
 			ToRequests: handler.ToRequestsFunc(
 				func(a handler.MapObject) []reconcile.Request {
@@ -127,18 +137,309 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the MigMigration instance
-	instance := &migapi.MigMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	// TODO: instead of individually getting each piece of the data model, see if it's
+	// possible to write a function that will compile one struct with all of the info
+	// we need to perform a stage operation in one place. Would make this reconcile function
+	// much cleaner.
+
+	// Hardcode Velero namespace for now
+	veleroNs := "velero"
+
+	// Set up ResourceParentsMap to manage parent-child mapping
+	rpm := util.GetResourceParentsMap()
+	parentMigMigration := util.KubeResource{Kind: util.KindMigMigration, NsName: request.NamespacedName}
+
+	// Fetch the MigMigration migMigration
+	migMigration := &migapi.MigMigration{}
+	err := r.Get(context.TODO(), request.NamespacedName, migMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+			return reconcile.Result{}, nil // don't requeue
 		}
-		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err // requeue
+	}
+
+	// Retrieve MigPlan from ref
+	migPlanRef := migMigration.Spec.MigPlanRef
+	migPlan := &migapi.MigPlan{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: migPlanRef.Name, Namespace: migPlanRef.Namespace}, migPlan)
+	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Error getting MigPlan [%s/%s]", migPlanRef.Namespace, migPlanRef.Name))
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	// Valid MigPlan found, add MigMigration as parent to receive reconciliation events
+	childMigPlan := util.KubeResource{
+		Kind: util.KindMigPlan,
+		NsName: types.NamespacedName{
+			Name:      migPlanRef.Name,
+			Namespace: migPlanRef.Namespace,
+		},
+	}
+	rpm.AddChildToParent(childMigPlan, parentMigMigration)
+
+	// Check for 'Ready' condition on referenced MigPlan
+	_, migPlanReady := migPlan.Status.FindCondition(migplan.Ready)
+	if migPlanReady == nil {
+		log.Info(fmt.Sprintf("[mMigration] Referenced MigPlan [%s/%s] was not ready.", migPlanRef.Namespace, migPlanRef.Name))
+		return reconcile.Result{}, nil // don't requeue
+	}
+
+	// [TODO] Create Velero BackupStorageLocation if needed
+
+	// [TODO] Create Velero VolumeSnapshotLocation if needed
+
+	// Retrieve MigAssetCollection from ref
+	assetsRef := migPlan.Spec.MigAssetCollectionRef
+	assets := &migapi.MigAssetCollection{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: assetsRef.Name, Namespace: assetsRef.Namespace}, assets)
+	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Error getting MigAssetCollection [%s/%s]", assetsRef.Namespace, assetsRef.Name))
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	// Check for 'Ready' condition on referenced MigAssetCollection
+	_, assetsReady := assets.Status.FindCondition(migassetcollection.Ready)
+	if assetsReady == nil {
+		log.Info(fmt.Sprintf("[mMigration] Referenced MigAssetCollection [%s/%s] was not ready.", assetsRef.Namespace, assetsRef.Name))
+		return reconcile.Result{}, nil // don't requeue
+	}
+
+	// ###########################################
+	// ###########################################
+	// ###########################################
+	// ###########################################
+	// Get the srcCluster MigCluster
+	srcClusterRef := migPlan.Spec.SrcMigClusterRef
+	srcCluster := &migapi.MigCluster{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: srcClusterRef.Name, Namespace: srcClusterRef.Namespace}, srcCluster)
+	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Error getting srcCluster MigCluster [%s/%s]", srcClusterRef.Namespace, srcClusterRef.Name))
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	// TODO: dedupe this code section (shared with MigCluster controller)
+	// Get the cluster-registry Cluster from MigCluster
+	srcCrClusterRef := srcCluster.Spec.ClusterRef
+	srcCrCluster := &crapi.Cluster{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: srcCrClusterRef.Name, Namespace: srcCrClusterRef.Namespace}, srcCrCluster)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	var srcRemoteClusterURL string
+	srcK8sEndpoints := srcCrCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
+	if len(srcK8sEndpoints) > 0 {
+		srcRemoteClusterURL = string(srcK8sEndpoints[0].ServerAddress)
+		// log.Info(fmt.Sprintf("[mMigration] srcRemoteClusterURL: [%s]", srcRemoteClusterURL))
+	} else {
+		log.Info(fmt.Sprintf("[mMigration] srcRemoteClusterURL: [len=0]"))
+	}
+
+	// TODO: dedupe this code section (shared with MigCluster controller)
+	// Get SA token from srcCluster
+	srcSaSecretRef := srcCluster.Spec.ServiceAccountSecretRef
+	srcSaSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: srcSaSecretRef.Name, Namespace: srcSaSecretRef.Namespace}, srcSaSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+	// Get data from srcSaToken secret
+	srcSaTokenKey := "saToken"
+	srcSaTokenData, ok := srcSaSecret.Data[srcSaTokenKey]
+	if !ok {
+		log.Info(fmt.Sprintf("[mCluster] srcSaToken: [%v]", ok))
+		return reconcile.Result{}, nil // don't requeue
+	}
+	srcSaToken := string(srcSaTokenData)
+
+	// Create srcCluster client which we will use to create a Velero Backup
+	srcClusterRestConfig := util.BuildRestConfig(srcRemoteClusterURL, srcSaToken)
+	srcClusterK8sClient, err := util.BuildControllerRuntimeClient(srcClusterRestConfig)
+	if err != nil {
+		log.Error(err, "Failed to GET srcClusterK8sClient")
+		return reconcile.Result{}, nil
+	}
+	// ###########################################
+	// ###########################################
+	// ###########################################
+	// ###########################################
+
+	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
+	backupNamespaces := assets.Spec.Namespaces
+	backupUniqueName := fmt.Sprintf("%s-velero-backup", migMigration.Name)
+	vBackupNew := util.BuildVeleroBackup(veleroNs, backupUniqueName, backupNamespaces)
+
+	vBackupExisting := &velerov1.Backup{}
+	err = srcClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: vBackupNew.Name, Namespace: vBackupNew.Namespace}, vBackupExisting)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Backup not found
+			err = srcClusterK8sClient.Create(context.TODO(), vBackupNew)
+			if err != nil {
+				log.Error(err, "[mMigration] Failed to CREATE Velero Backup on source cluster")
+				return reconcile.Result{}, nil
+			}
+			log.Info("[mMigration] Velero Backup CREATED successfully on source cluster")
+		}
+		// Error reading the 'Backup' object - requeue the request.
+		log.Error(err, "[mMigration] Exit 4: Requeueing")
 		return reconcile.Result{}, err
 	}
+
+	if !reflect.DeepEqual(vBackupNew.Spec, vBackupExisting.Spec) {
+		// Send "Create" action for Velero Backup to K8s API
+		vBackupExisting.Spec = vBackupNew.Spec
+		err = srcClusterK8sClient.Update(context.TODO(), vBackupExisting)
+		if err != nil {
+			log.Error(err, "[mMigration] Failed to UPDATE Velero Backup on src cluster")
+			return reconcile.Result{}, nil
+		}
+		log.Info("[mMigration] Velero Backup UPDATED successfully on source cluster")
+	} else {
+		log.Info("[mMigration] Velero Backup EXISTS already on source cluster")
+	}
+
+	// Monitor changes to Velero Backup state on srcCluster, wait for completion (watch MigCluster)
+
+	// Create Velero Restore on dstCluster pointing at Velero Backup unique name
+
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// Get the destCluster MigCluster
+	destClusterRef := migPlan.Spec.DestMigClusterRef
+	destCluster := &migapi.MigCluster{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: destClusterRef.Name, Namespace: destClusterRef.Namespace}, destCluster)
+	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Error getting destCluster MigCluster [%s/%s]", destClusterRef.Name, destClusterRef.Namespace))
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	// TODO: dedupe this code section (shared with MigCluster controller)
+	// Get the cluster-registry Cluster from MigCluster
+	destCrClusterRef := destCluster.Spec.ClusterRef
+	destCrCluster := &crapi.Cluster{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: destCrClusterRef.Name, Namespace: destCrClusterRef.Namespace}, destCrCluster)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+
+	var destRemoteClusterURL string
+	destK8sEndpoints := destCrCluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
+	if len(destK8sEndpoints) > 0 {
+		destRemoteClusterURL = string(destK8sEndpoints[0].ServerAddress)
+		// log.Info(fmt.Sprintf("[mMigration] destRemoteClusterURL: [%s]", destRemoteClusterURL))
+	} else {
+		log.Info(fmt.Sprintf("[mMigration] destRemoteClusterURL: [len=0]"))
+	}
+
+	// TODO: dedupe this code section (shared with MigCluster controller)
+	// Get SA token from destCluster
+	destSaSecretRef := destCluster.Spec.ServiceAccountSecretRef
+	destSaSecret := &kapi.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: destSaSecretRef.Name, Namespace: destSaSecretRef.Namespace}, destSaSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil // don't requeue
+		}
+		return reconcile.Result{}, err // requeue
+	}
+	// Get data from destSaToken secret
+	destSaTokenKey := "saToken"
+	destSaTokenData, ok := destSaSecret.Data[destSaTokenKey]
+	if !ok {
+		log.Info(fmt.Sprintf("[mCluster] destSaToken: [%v]", ok))
+		return reconcile.Result{}, nil // don't requeue
+	}
+	destSaToken := string(destSaTokenData)
+
+	// Create destCluster client which we will use to create a Velero Backup
+	destClusterRestConfig := util.BuildRestConfig(destRemoteClusterURL, destSaToken)
+	destClusterK8sClient, err := util.BuildControllerRuntimeClient(destClusterRestConfig)
+	if err != nil {
+		log.Error(err, "Failed to GET destClusterK8sClient")
+		return reconcile.Result{}, nil
+	}
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+	restoreUniqueName := fmt.Sprintf("%s-velero-restore", migMigration.Name)
+	vRestoreNew := util.BuildVeleroRestore(veleroNs, restoreUniqueName, backupUniqueName)
+
+	vRestoreExisting := &velerov1.Restore{}
+	err = destClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: vRestoreNew.Name, Namespace: vRestoreNew.Namespace}, vRestoreExisting)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Restore not found, we need to check if the Backup we want to use has completed
+			vBackupDestCluster := &velerov1.Backup{}
+			err2 := destClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}, vBackupDestCluster)
+			if err2 != nil {
+				if errors.IsNotFound(err2) {
+					log.Info(fmt.Sprintf("[mMigration] Velero Backup doesn't yet exist on destination cluster [%s/%s]", veleroNs, backupUniqueName))
+					return reconcile.Result{}, nil // don't requeue
+				}
+			}
+
+			if vBackupDestCluster.Status.Phase != velerov1.BackupPhaseCompleted {
+				log.Info(fmt.Sprintf("[mMigration] Velero Backup on destination cluster in unusable phase [%s] [%s/%s]", vBackupDestCluster.Status.Phase, veleroNs, backupUniqueName))
+				return reconcile.Result{}, nil // don't requeue
+			}
+
+			log.Info(fmt.Sprintf("[mMigration] Found completed Backup on destination cluster [%s/%s], creating Restore on destination cluster", veleroNs, backupUniqueName))
+			// Create a restore once we're certain that the required Backup exists
+			err = destClusterK8sClient.Create(context.TODO(), vRestoreNew)
+			if err != nil {
+				log.Error(err, "[mMigration] Failed to CREATE Velero Restore on destination cluster")
+				return reconcile.Result{}, nil
+			}
+			log.Info("[mMigration] Velero Restore CREATED successfully on destination cluster")
+		}
+		// Error reading the 'Backup' object - requeue the request.
+		log.Error(err, "[mMigration] Exit 4: Requeueing")
+		return reconcile.Result{}, err
+	}
+
+	if !reflect.DeepEqual(vRestoreNew.Spec, vRestoreExisting.Spec) {
+		// Send "Create" action for Velero Backup to K8s API
+		vRestoreExisting.Spec = vRestoreNew.Spec
+		err = destClusterK8sClient.Update(context.TODO(), vRestoreExisting)
+		if err != nil {
+			log.Error(err, "[mMigration] Failed to UPDATE Velero Restore")
+			return reconcile.Result{}, nil
+		}
+		log.Info("[mMigration] Velero Restore UPDATED successfully on destination cluster")
+	} else {
+		log.Info("[mMigration] Velero Restore EXISTS already on destination cluster")
+	}
+
+	// Monitor changes to Velero Restore state on dstCluster, wait for completion (watch MigCluster)
+
+	// Mark MigMigration as complete
 
 	return reconcile.Result{}, nil
 }
