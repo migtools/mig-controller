@@ -61,21 +61,21 @@ type MigStorageList struct {
 
 // VolumeSnapshotConfig defines config for taking Volume Snapshots
 type VolumeSnapshotConfig struct {
-	AwsRegion          string `json:"awsRegion"`
-	AzureAPITimeout    string `json:"azureApiTimeout"`
-	AzureResourceGroup string `json:"azureResourceGroup"`
+	AwsRegion          string `json:"awsRegion,omitempty"`
+	AzureAPITimeout    string `json:"azureApiTimeout,omitempty"`
+	AzureResourceGroup string `json:"azureResourceGroup,omitempty"`
 }
 
 // BackupStorageConfig defines config for creating and storing Backups
 type BackupStorageConfig struct {
-	AwsBucketName       string `json:"awsBucketName"`
-	AwsRegion           string `json:"awsRegion"`
-	AwsS3ForcePathStyle bool   `json:"awsS3ForcePathStyle"`
-	AwsPublicURL        string `json:"awsPublicUrl"`
-	AwsKmsKeyID         string `json:"awsKmsKeyId"`
-	AwsSignatureVersion string `json:"awsSignatureVersion"`
-	AzureStorageAccount string `json:"azureStorageAccount"`
-	AzureResourceGroup  string `json:"azureResourceGroup"`
+	AwsBucketName       string `json:"awsBucketName,omitempty"`
+	AwsRegion           string `json:"awsRegion,omitempty"`
+	AwsS3ForcePathStyle bool   `json:"awsS3ForcePathStyle,omitempty"`
+	AwsPublicURL        string `json:"awsPublicUrl,omitempty"`
+	AwsKmsKeyID         string `json:"awsKmsKeyId,omitempty"`
+	AwsSignatureVersion string `json:"awsSignatureVersion,omitempty"`
+	AzureStorageAccount string `json:"azureStorageAccount,omitempty"`
+	AzureResourceGroup  string `json:"azureResourceGroup,omitempty"`
 }
 
 func init() {

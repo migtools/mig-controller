@@ -46,15 +46,6 @@ spec:
                   type: string
                 azureStorageAccount:
                   type: string
-              required:
-              - awsBucketName
-              - awsRegion
-              - awsS3ForcePathStyle
-              - awsPublicUrl
-              - awsKmsKeyId
-              - awsSignatureVersion
-              - azureStorageAccount
-              - azureResourceGroup
               type: object
             backupStorageProvider:
               type: string
@@ -66,10 +57,6 @@ spec:
                   type: string
                 azureResourceGroup:
                   type: string
-              required:
-              - awsRegion
-              - azureApiTimeout
-              - azureResourceGroup
               type: object
             volumeSnapshotProvider:
               type: string
