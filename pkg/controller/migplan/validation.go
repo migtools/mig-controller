@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,12 +37,12 @@ const (
 // Messages
 const (
 	ReadyMessage                        = "The migration plan is ready."
-	InvalidSourceClusterRefMessage      = "The `srcClusterRef` must reference a `migcluster`."
-	InvalidDestinationClusterRefMessage = "The `dstClusterRef` must reference a `migcluster`."
+	InvalidSourceClusterRefMessage      = "The `srcMigClusterRef` must reference a `migcluster`."
+	InvalidDestinationClusterRefMessage = "The `dstMigClusterRef` must reference a `migcluster`."
 	InvalidStorageRefMessage            = "The `migStorageRef` must reference a `migstorage`."
 	InvalidAssetCollectionRefMessage    = "The `migAssetCollectionRef` must reference a `migassetcollection`."
-	SourceClusterNotReadyMessage        = "The referenced `srcClusterRef` does not have a `Ready` condition."
-	DestinationClusterNotReadyMessage   = "The referenced `dstClusterRef` does not have a `Ready` condition."
+	SourceClusterNotReadyMessage        = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
+	DestinationClusterNotReadyMessage   = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
 )
