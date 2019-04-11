@@ -17,23 +17,12 @@ limitations under the License.
 package migstage
 
 import (
-	"github.com/fusor/mig-controller/pkg/util"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// MigPlanToMigStage ...
-func MigPlanToMigStage(a handler.MapObject) []reconcile.Request {
-	childKind := util.KindMigPlan
-	parentKind := util.KindMigStage
-
-	return util.MapChildToParents(a, childKind, parentKind)
-}
-
-// MigClusterToMigStage ...
-func MigClusterToMigStage(a handler.MapObject) []reconcile.Request {
-	childKind := util.KindMigCluster
-	parentKind := util.KindMigStage
-
-	return util.MapChildToParents(a, childKind, parentKind)
+func RefToStage(a handler.MapObject) []reconcile.Request {
+	return migref.GetRequests(a, migapi.MigStage{})
 }

@@ -17,25 +17,12 @@ limitations under the License.
 package migcluster
 
 import (
-	"github.com/fusor/mig-controller/pkg/util"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// ClusterToMigClusters maps a Cluster request to MigCluster requests
-func ClusterToMigClusters(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindClusterRegCluster
-	parentKind := util.KindMigCluster
-
-	return util.MapChildToParents(a, childKind, parentKind)
-}
-
-// SecretToMigClusters maps a Secret request to MigCluster requests
-func SecretToMigClusters(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindSecret
-	parentKind := util.KindMigCluster
-
-	return util.MapChildToParents(a, childKind, parentKind)
+func RefToCluster(a handler.MapObject) []reconcile.Request {
+	return migref.GetRequests(a, migapi.MigCluster{})
 }

@@ -56,7 +56,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{
 		Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestForObject{},
-		&UpdatedPredicate{},
+		&PlanPredicate{},
 	)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigClusterToMigPlan),
+			ToRequests: handler.ToRequestsFunc(RefToPlan),
 		})
 	if err != nil {
 		return err
@@ -76,7 +76,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStorage{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigStorageToMigPlan),
+			ToRequests: handler.ToRequestsFunc(RefToPlan),
 		})
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigAssetCollection{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigAssetCollectionToMigPlan),
+			ToRequests: handler.ToRequestsFunc(RefToPlan),
 		})
 	if err != nil {
 		return err

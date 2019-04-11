@@ -64,7 +64,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestForObject{},
-		&UpdatedPredicate{})
+		&ClusterPredicate{})
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &crapi.Cluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(ClusterToMigClusters),
+			ToRequests: handler.ToRequestsFunc(RefToCluster),
 		})
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(SecretToMigClusters),
+			ToRequests: handler.ToRequestsFunc(RefToCluster),
 		})
 	if err != nil {
 		return err
@@ -112,10 +112,6 @@ type ReconcileMigCluster struct {
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
 
-	// Set up ResourceParentsMap to manage parent-child mapping
-	resourceParentsMap := util.GetResourceParentsMap()
-	parentMigCluster := util.KubeResource{Kind: util.KindMigCluster, NsName: request.NamespacedName}
-
 	// Fetch the MigCluster
 	migCluster := &migapi.MigCluster{}
 	err := r.Get(context.TODO(), request.NamespacedName, migCluster)
@@ -141,16 +137,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
-	// Valid referenced Secret found, add MigCluster as parent to receive reconciliation events
-	childSecret := util.KubeResource{
-		Kind: util.KindSecret,
-		NsName: types.NamespacedName{
-			Name:      saSecretRef.Name,
-			Namespace: saSecretRef.Namespace,
-		},
-	}
-	resourceParentsMap.AddChildToParent(childSecret, parentMigCluster)
-
 	// Get data from saToken secret
 	saTokenKey := "saToken"
 	saTokenData, ok := saSecret.Data[saTokenKey]
@@ -172,15 +158,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		return reconcile.Result{}, err // requeue
 	}
-	// Valid referenced Cluster found, add MigCluster as parent to receive reconciliation events
-	childCluster := util.KubeResource{
-		Kind: util.KindClusterRegCluster,
-		NsName: types.NamespacedName{
-			Name:      clusterRef.Name,
-			Namespace: clusterRef.Namespace,
-		},
-	}
-	resourceParentsMap.AddChildToParent(childCluster, parentMigCluster)
 
 	// Get remoteClusterURL from Cluster
 	var remoteClusterURL string

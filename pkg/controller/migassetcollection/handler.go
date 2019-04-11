@@ -17,16 +17,12 @@ limitations under the License.
 package migassetcollection
 
 import (
-	"github.com/fusor/mig-controller/pkg/util"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// NamespaceToMigAssetCollection maps a Cluster request to MigCluster requests
-func NamespaceToMigAssetCollection(a handler.MapObject) []reconcile.Request {
-	// Customize these kinds for each mapFunc
-	childKind := util.KindNamespace
-	parentKind := util.KindMigAssetCollection
-
-	return util.MapChildToParents(a, childKind, parentKind)
+func RefToAssetCollection(a handler.MapObject) []reconcile.Request {
+	return migref.GetRequests(a, migapi.MigAssetCollection{})
 }

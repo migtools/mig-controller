@@ -63,7 +63,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigAssetCollection{}},
 		&handler.EnqueueRequestForObject{},
-		&UpdatedPredicate{})
+		&AssetCollectionPredicate{})
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Namespace{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(NamespaceToMigAssetCollection),
+			ToRequests: handler.ToRequestsFunc(RefToAssetCollection),
 		})
 	if err != nil {
 		return err

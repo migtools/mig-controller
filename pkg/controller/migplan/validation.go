@@ -4,6 +4,7 @@ import (
 	"context"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -97,7 +98,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
-	if ref == nil || (ref.Name == "") {
+	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    InvalidStorageRef,
 			Status:  True,
@@ -148,9 +149,6 @@ func (r ReconcileMigPlan) getStorage(ref *kapi.ObjectReference, ns string) (erro
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
 	}
-	if key.Namespace == "" {
-		key.Namespace = ns
-	}
 
 	storage := migapi.MigStorage{}
 	err := r.Get(context.TODO(), key, &storage)
@@ -171,7 +169,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 	ref := plan.Spec.MigAssetCollectionRef
 
 	// NotSet
-	if ref == nil || (ref.Name == "") {
+	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    InvalidAssetCollectionRef,
 			Status:  True,
@@ -222,9 +220,6 @@ func (r ReconcileMigPlan) getAssetCollection(ref *kapi.ObjectReference, ns strin
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
 	}
-	if key.Namespace == "" {
-		key.Namespace = ns
-	}
 
 	assetCollection := migapi.MigAssetCollection{}
 	err := r.Get(context.TODO(), key, &assetCollection)
@@ -245,7 +240,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 	ref := plan.Spec.SrcMigClusterRef
 
 	// NotSet
-	if ref == nil || (ref.Name == "") {
+	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    InvalidSourceClusterRef,
 			Status:  True,
@@ -297,7 +292,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 	ref := plan.Spec.DestMigClusterRef
 
 	// NotSet
-	if ref == nil || (ref.Name == "") {
+	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    InvalidDestinationClusterRef,
 			Status:  True,
@@ -347,9 +342,6 @@ func (r ReconcileMigPlan) getCluster(ref *kapi.ObjectReference, ns string) (erro
 	key := types.NamespacedName{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
-	}
-	if key.Namespace == "" {
-		key.Namespace = ns
 	}
 
 	cluster := migapi.MigCluster{}

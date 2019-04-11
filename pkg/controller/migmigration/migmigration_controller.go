@@ -58,7 +58,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to MigMigration
-	err = c.Watch(&source.Kind{Type: &migapi.MigMigration{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigMigration{}},
+		&handler.EnqueueRequestForObject{},
+		&MigrationPredicate{})
 	if err != nil {
 		return err
 	}
@@ -67,7 +70,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigPlanToMigMigration),
+			ToRequests: handler.ToRequestsFunc(RefToMigration),
 		})
 	if err != nil {
 		return err
@@ -77,7 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigClusterToMigMigration),
+			ToRequests: handler.ToRequestsFunc(RefToMigration),
 		})
 	if err != nil {
 		return err
@@ -87,7 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStage{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigStageToMigMigration),
+			ToRequests: handler.ToRequestsFunc(RefToMigration),
 		})
 	if err != nil {
 		return err

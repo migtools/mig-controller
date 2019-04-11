@@ -17,31 +17,12 @@ limitations under the License.
 package migplan
 
 import (
-	"github.com/fusor/mig-controller/pkg/util"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// MigClusterToMigPlan ...
-func MigClusterToMigPlan(a handler.MapObject) []reconcile.Request {
-	childKind := util.KindMigCluster
-	parentKind := util.KindMigPlan
-
-	return util.MapChildToParents(a, childKind, parentKind)
-}
-
-// MigStorageToMigPlan ...
-func MigStorageToMigPlan(a handler.MapObject) []reconcile.Request {
-	childKind := util.KindMigStorage
-	parentKind := util.KindMigPlan
-
-	return util.MapChildToParents(a, childKind, parentKind)
-}
-
-// MigAssetCollectionToMigPlan ...
-func MigAssetCollectionToMigPlan(a handler.MapObject) []reconcile.Request {
-	childKind := util.KindMigAssetCollection
-	parentKind := util.KindMigPlan
-
-	return util.MapChildToParents(a, childKind, parentKind)
+func RefToPlan(a handler.MapObject) []reconcile.Request {
+	return migref.GetRequests(a, migapi.MigPlan{})
 }
