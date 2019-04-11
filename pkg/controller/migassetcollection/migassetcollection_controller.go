@@ -20,6 +20,7 @@ import (
 	"context"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigAssetCollection{}},
 		&handler.EnqueueRequestForObject{},
-		&UpdatedPredicate{})
+		&AssetCollectionPredicate{})
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Namespace{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(NamespaceToMigAssetCollection),
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigAssetCollection{})
+				}),
 		})
 	if err != nil {
 		return err

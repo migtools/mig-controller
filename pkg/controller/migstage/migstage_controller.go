@@ -20,6 +20,7 @@ import (
 	"context"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,7 +54,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to MigStage
-	err = c.Watch(&source.Kind{Type: &migapi.MigStage{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigStage{}},
+		&handler.EnqueueRequestForObject{},
+		&StagePredicate{})
 	if err != nil {
 		return err
 	}
@@ -62,7 +66,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigPlanToMigStage),
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigStage{})
+				}),
 		})
 	if err != nil {
 		return err
@@ -72,7 +79,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigClusterToMigStage),
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigStage{})
+				}),
 		})
 	if err != nil {
 		return err
