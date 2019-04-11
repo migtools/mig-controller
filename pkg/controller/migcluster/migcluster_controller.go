@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/util"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -73,7 +74,10 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &crapi.Cluster{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(RefToCluster),
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigCluster{})
+				}),
 		})
 	if err != nil {
 		return err
@@ -83,7 +87,10 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(RefToCluster),
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigCluster{})
+				}),
 		})
 	if err != nil {
 		return err
