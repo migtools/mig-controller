@@ -15,12 +15,13 @@ type RefOwner kapi.ObjectReference
 // The resource that is the target of an ObjectReference.
 type RefTarget kapi.ObjectReference
 
-// A mapping of reference RefSources to a RefTarget.
+// A 1-n mapping of RefTarget => [RefOwner, ...].
 type RefMap struct {
 	Content map[RefTarget][]RefOwner
 	mutex   sync.RWMutex
 }
 
+// Get the singleton.
 func GetMap() *RefMap {
 	create.Do(func() {
 		instance = &RefMap{
@@ -30,6 +31,7 @@ func GetMap() *RefMap {
 	return instance
 }
 
+// Add mapping of a ref-owner to a ref-target.
 func (r *RefMap) Add(refOwner RefOwner, refTarget RefTarget) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -47,6 +49,7 @@ func (r *RefMap) Add(refOwner RefOwner, refTarget RefTarget) {
 	r.Content[refTarget] = list
 }
 
+// Delete mapping of a ref-owner to a ref-target.
 func (r *RefMap) Delete(refOwner RefOwner, refTarget RefTarget) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -62,6 +65,7 @@ func (r *RefMap) Delete(refOwner RefOwner, refTarget RefTarget) {
 	}
 }
 
+// Find all refOwners for a refTarget.
 func (r *RefMap) Find(refTarget RefTarget, refOwner RefOwner) []RefOwner {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
