@@ -9,8 +9,6 @@ import (
 
 // Types
 const (
-	// Type
-	Ready                         = "Ready"
 	InvalidBackupStorageProvider  = "InvalidBackupStorageProvider"
 	InvalidVolumeSnapshotProvider = "InvalidVolumeSnapshotProvider"
 )
@@ -24,15 +22,17 @@ const (
 
 // Statuses
 const (
-	True  = "True"
-	False = "False"
+	True  = migapi.True
+	False = migapi.False
 )
 
 // Messages
 const (
-	ReadyMessage                        = "The storage is ready."
-	InvalidBackupStorageProviderMessage = "The `backupStorageProvider` must be: (aws|gcp|azure)."
-	InvalidSettingsMessage              = "The `backupStorageProvider` settings [%s] not valid."
+	ReadyMessage                         = "The storage is ready."
+	InvalidBackupStorageProviderMessage  = "The `backupStorageProvider` must be: (aws|gcp|azure)."
+	InvalidBackupSettingsMessage         = "The `backupStorageProvider` settings [%s] not valid."
+	InvalidVolumeSnapshotProviderMessage = "The `volumeSnapshotProvider` must be: (aws|gcp|azure)."
+	InvalidVolumeSnapshotSettingsMessage = "The `volumeSnapshotProvider` settings [%s] not valid."
 )
 
 // Validate the storage resource.
@@ -41,11 +41,21 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) (error, int) {
 	totalSet := 0
 
 	// Backup location provider.
-	err, nSet := r.validateStorageProvider(storage)
+	err, nSet := r.validateBackupStorage(storage)
 	if err != nil {
 		return err, 0
 	}
 	totalSet += nSet
+
+	// Volume snapshot location provider.
+	err, nSet = r.validateVolumeStorage(storage)
+	if err != nil {
+		return err, 0
+	}
+	totalSet += nSet
+
+	// Ready
+	storage.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
 	err = r.Update(context.TODO(), storage)
@@ -56,18 +66,17 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) (error, int) {
 	return nil, totalSet
 }
 
-func (r ReconcileMigStorage) validateStorageProvider(storage *migapi.MigStorage) (error, int) {
+func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) (error, int) {
 	provider := storage.Spec.BackupStorageProvider
 	var err error
 	nSet := 0
 
 	switch provider {
 	case "aws":
-		err, nSet = r.validateAwsProvider(storage)
-	case "gcp":
-		err, nSet = r.validateGcpProvider(storage)
+		err, nSet = r.validateAwsBackupStorage(storage)
 	case "azure":
-		err, nSet = r.validateAzureProvider(storage)
+		err, nSet = r.validateAzureBackupStorage(storage)
+	case "gcp":
 	case "":
 		err, nSet = nil, 0
 	default:
@@ -87,7 +96,7 @@ func (r ReconcileMigStorage) validateStorageProvider(storage *migapi.MigStorage)
 	return err, nSet
 }
 
-func (r ReconcileMigStorage) validateAwsProvider(storage *migapi.MigStorage) (error, int) {
+func (r ReconcileMigStorage) validateAwsBackupStorage(storage *migapi.MigStorage) (error, int) {
 	fields := make([]string, 0)
 	cfg := storage.Spec.BackupStorageConfig
 
@@ -110,7 +119,7 @@ func (r ReconcileMigStorage) validateAwsProvider(storage *migapi.MigStorage) (er
 
 	// Set condition.
 	if len(fields) > 0 {
-		message := fmt.Sprintf(InvalidSettingsMessage, strings.Join(fields, ", "))
+		message := fmt.Sprintf(InvalidBackupSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
 			Type:    InvalidBackupStorageProvider,
 			Status:  True,
@@ -123,10 +132,110 @@ func (r ReconcileMigStorage) validateAwsProvider(storage *migapi.MigStorage) (er
 	return nil, 0
 }
 
-func (r ReconcileMigStorage) validateGcpProvider(storage *migapi.MigStorage) (error, int) {
+func (r ReconcileMigStorage) validateAzureBackupStorage(storage *migapi.MigStorage) (error, int) {
+	fields := make([]string, 0)
+	cfg := storage.Spec.BackupStorageConfig
+
+	// Validate settings.
+	if cfg.AzureResourceGroup == "" {
+		fields = append(fields, "azureResourceGroup")
+	}
+	if cfg.AzureStorageAccount == "" {
+		fields = append(fields, "azureStorageAccount")
+	}
+
+	// Set condition.
+	if len(fields) > 0 {
+		message := fmt.Sprintf(InvalidBackupSettingsMessage, strings.Join(fields, ", "))
+		storage.Status.SetCondition(migapi.Condition{
+			Type:    InvalidBackupStorageProvider,
+			Status:  True,
+			Reason:  InvalidSetting,
+			Message: message,
+		})
+		return nil, 1
+	}
+
 	return nil, 0
 }
 
-func (r ReconcileMigStorage) validateAzureProvider(storage *migapi.MigStorage) (error, int) {
+func (r ReconcileMigStorage) validateVolumeStorage(storage *migapi.MigStorage) (error, int) {
+	provider := storage.Spec.VolumeSnapshotProvider
+	var err error
+	nSet := 0
+
+	switch provider {
+	case "aws":
+		err, nSet = r.validateAwsVolumeStorage(storage)
+	case "azure":
+		err, nSet = r.validateAzureVolumeStorage(storage)
+	case "gcp":
+	case "":
+		err, nSet = nil, 0
+	default:
+		storage.Status.SetCondition(migapi.Condition{
+			Type:    InvalidVolumeSnapshotProvider,
+			Status:  True,
+			Reason:  NotSupported,
+			Message: InvalidVolumeSnapshotProviderMessage,
+		})
+		return nil, 1
+	}
+
+	if err == nil && nSet == 0 {
+		storage.Status.DeleteCondition(InvalidVolumeSnapshotProvider)
+	}
+
+	return err, nSet
+}
+
+func (r ReconcileMigStorage) validateAwsVolumeStorage(storage *migapi.MigStorage) (error, int) {
+	fields := make([]string, 0)
+	cfg := storage.Spec.VolumeSnapshotConfig
+
+	// Validate settings.
+	if cfg.AwsRegion == "" {
+		fields = append(fields, "awsRegion")
+	}
+
+	// Set condition.
+	if len(fields) > 0 {
+		message := fmt.Sprintf(InvalidVolumeSnapshotSettingsMessage, strings.Join(fields, ", "))
+		storage.Status.SetCondition(migapi.Condition{
+			Type:    InvalidVolumeSnapshotProvider,
+			Status:  True,
+			Reason:  InvalidSetting,
+			Message: message,
+		})
+		return nil, 1
+	}
+
+	return nil, 0
+}
+
+func (r ReconcileMigStorage) validateAzureVolumeStorage(storage *migapi.MigStorage) (error, int) {
+	fields := make([]string, 0)
+	cfg := storage.Spec.VolumeSnapshotConfig
+
+	// Validate settings.
+	if cfg.AzureResourceGroup == "" {
+		fields = append(fields, "azureResourceGroup")
+	}
+	if cfg.AzureAPITimeout == "" {
+		fields = append(fields, "azureAPITimeout")
+	}
+
+	// Set condition.
+	if len(fields) > 0 {
+		message := fmt.Sprintf(InvalidVolumeSnapshotSettingsMessage, strings.Join(fields, ", "))
+		storage.Status.SetCondition(migapi.Condition{
+			Type:    InvalidVolumeSnapshotProvider,
+			Status:  True,
+			Reason:  InvalidSetting,
+			Message: message,
+		})
+		return nil, 1
+	}
+
 	return nil, 0
 }

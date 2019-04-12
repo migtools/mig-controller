@@ -5,6 +5,17 @@ import (
 	"time"
 )
 
+// Types
+const (
+	Ready = "Ready"
+)
+
+// Status
+const (
+	True  = "True"
+	False = "False"
+)
+
 // Condition
 type Condition struct {
 	Type               string      `json:"type"`
@@ -77,4 +88,23 @@ func (r *Conditions) DeleteCondition(cndTypes ...string) {
 			r.Conditions = append(r.Conditions[:i], r.Conditions[i+1:]...)
 		}
 	}
+}
+
+// Set `Ready` condition.
+func (r *Conditions) SetReady(ready bool, message string) {
+	if ready {
+		r.SetCondition(Condition{
+			Type:    Ready,
+			Status:  True,
+			Message: message,
+		})
+	} else {
+		r.DeleteCondition(Ready)
+	}
+}
+
+// Get if `Ready` condition is `True`.
+func (r *Conditions) IsReady() bool {
+	_, condition := r.FindCondition(Ready)
+	return condition != nil && condition.Status == True
 }

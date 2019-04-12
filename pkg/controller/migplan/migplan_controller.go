@@ -133,26 +133,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validations.
-	// The 'nSet' is the number of conditions set during validation.
-	err, nSet := r.validate(plan)
+	err, _ = r.validate(plan)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Set the Ready condition
-	if nSet == 0 {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:    Ready,
-			Status:  True,
-			Message: ReadyMessage,
-		})
-	} else {
-		plan.Status.DeleteCondition(Ready)
-	}
-	err = r.Update(context.TODO(), plan)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//
+	// ADD LOGIC HERE
+	//
 
 	// Done
 	return reconcile.Result{}, nil

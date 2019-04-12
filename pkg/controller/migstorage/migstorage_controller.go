@@ -96,26 +96,14 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Validations.
-	// The 'nSet' is the number of conditions set during validation.
-	err, nSet := r.validate(storage)
+	err, _ = r.validate(storage)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Set the Ready condition
-	if nSet == 0 {
-		storage.Status.SetCondition(migapi.Condition{
-			Type:    Ready,
-			Status:  True,
-			Message: ReadyMessage,
-		})
-	} else {
-		storage.Status.DeleteCondition(Ready)
-	}
-	err = r.Update(context.TODO(), storage)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//
+	// ADD LOGIC HERE
+	//
 
 	// Done
 	return reconcile.Result{}, nil

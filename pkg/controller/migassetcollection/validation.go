@@ -12,7 +12,6 @@ import (
 
 // Types
 const (
-	Ready              = "Ready"
 	EmptyCollection    = "EmptyCollection"
 	NamespacesNotFound = "NamespacesNotFound"
 )
@@ -24,8 +23,8 @@ const (
 
 // Statuses
 const (
-	True  = "True"
-	False = "False"
+	True  = migapi.True
+	False = migapi.False
 )
 
 // Messages
@@ -53,6 +52,9 @@ func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCo
 		return err, 0
 	}
 	totalSet += nSet
+
+	// Ready
+	assetCollection.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes
 	err = r.Update(context.TODO(), assetCollection)
