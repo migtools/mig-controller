@@ -23,8 +23,6 @@ import (
 	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/controller/migassetcollection"
-	"github.com/fusor/mig-controller/pkg/controller/migplan"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,8 +172,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Check for 'Ready' condition on referenced MigPlan
-	_, migPlanReady := migPlan.Status.FindCondition(migplan.Ready)
-	if migPlanReady == nil {
+	if !migPlan.Status.IsReady() {
 		log.Info(fmt.Sprintf("[mMigration] Referenced MigPlan [%s/%s] was not ready.", migPlanRef.Namespace, migPlanRef.Name))
 		return reconcile.Result{}, nil // don't requeue
 	}
@@ -197,8 +194,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Check for 'Ready' condition on referenced MigAssetCollection
-	_, assetsReady := assets.Status.FindCondition(migassetcollection.Ready)
-	if assetsReady == nil {
+	if !assets.Status.IsReady() {
 		log.Info(fmt.Sprintf("[mMigration] Referenced MigAssetCollection [%s/%s] was not ready.", assetsRef.Namespace, assetsRef.Name))
 		return reconcile.Result{}, nil // don't requeue
 	}
@@ -216,7 +212,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Info(fmt.Sprintf("[mMigration] Started MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
 	}
 
-	// ###########################################
+	// *****************************
 	// Get the srcCluster MigCluster
 	srcClusterRef := migPlan.Spec.SrcMigClusterRef
 	srcCluster := &migapi.MigCluster{}
@@ -234,7 +230,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Error(err, "Failed to GET srcClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
-	// ###########################################
 
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
 	backupNamespaces := assets.Spec.Namespaces
@@ -271,11 +266,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Info("[mMigration] Velero Backup EXISTS on source cluster")
 	}
 
-	// Monitor changes to Velero Backup state on srcCluster, wait for completion (watch MigCluster)
-
-	// Create Velero Restore on dstCluster pointing at Velero Backup unique name
-
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	// ******************************
 	// Get the destCluster MigCluster
 	destClusterRef := migPlan.Spec.DestMigClusterRef
 	destCluster := &migapi.MigCluster{}
@@ -293,8 +284,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Error(err, "Failed to GET destClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
+	// Create Velero Restore on dstCluster pointing at Velero Backup unique name
 	restoreUniqueName := fmt.Sprintf("%s-velero-restore", migMigration.Name)
 	vRestoreNew := util.BuildVeleroRestore(veleroNs, restoreUniqueName, backupUniqueName)
 
@@ -307,7 +298,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			err2 := destClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}, vBackupDestCluster)
 			if err2 != nil {
 				if errors.IsNotFound(err2) {
-					log.Info(fmt.Sprintf("[mMigration] Velero Backup doesn't yet exist on destination cluster [%s/%s]", veleroNs, backupUniqueName))
+					log.Info(fmt.Sprintf("[mMigration] Velero Backup doesn't yet exist on destination cluster [%s/%s], waiting...", veleroNs, backupUniqueName))
 					return reconcile.Result{}, nil // don't requeue
 				}
 			}
@@ -327,7 +318,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			log.Info("[mMigration] Velero Restore CREATED successfully on destination cluster")
 		}
 		// Error reading the 'Backup' object - requeue the request.
-		log.Error(err, "[mMigration] Exit 4: Requeueing")
 		return reconcile.Result{}, err
 	}
 

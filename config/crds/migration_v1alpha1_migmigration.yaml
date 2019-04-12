@@ -37,12 +37,10 @@ spec:
               format: date-time
               type: string
             migrationCompleted:
-              description: 'TODO: should this be a condition, phase?'
               type: boolean
             migrationStarted:
               type: boolean
             startTimestamp:
-              description: 'TODO: should this be a condition, phase?'
               format: date-time
               type: string
           type: object
