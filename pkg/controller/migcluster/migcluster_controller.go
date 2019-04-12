@@ -129,6 +129,12 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
+	// Validations.
+	err, _ = r.validate(migCluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Check if this cluster is also hosting the controller
 	isHostCluster := migCluster.Spec.IsHostCluster
 	log.Info(fmt.Sprintf("[mCluster] isHostCluster: [%v]", isHostCluster))
@@ -191,28 +197,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			ParentResource:   migCluster,
 		})
 		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
-	}
-
-	// Validations.
-	// The 'nSet' is the number of conditions set during validation.
-	err, nSet := r.validate(migCluster)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	// Set the Ready condition
-	if nSet == 0 {
-		migCluster.Status.SetCondition(migapi.Condition{
-			Type:    Ready,
-			Status:  True,
-			Message: ReadyMessage,
-		})
-	} else {
-		migCluster.Status.DeleteCondition(Ready)
-	}
-	err = r.Update(context.TODO(), migCluster)
-	if err != nil {
-		return reconcile.Result{}, err
 	}
 
 	// Done

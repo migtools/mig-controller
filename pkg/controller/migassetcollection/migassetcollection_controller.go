@@ -112,27 +112,15 @@ func (r *ReconcileMigAssetCollection) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	}
 
-	// Validations.
-	// The 'nSet' is the number of conditions set during validation.
-	err, nSet := r.validate(assetCollection)
+	// Validations
+	err, _ = r.validate(assetCollection)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Set the Ready condition
-	if nSet == 0 {
-		assetCollection.Status.SetCondition(migapi.Condition{
-			Type:    Ready,
-			Status:  True,
-			Message: ReadyMessage,
-		})
-	} else {
-		assetCollection.Status.DeleteCondition(Ready)
-	}
-	err = r.Update(context.TODO(), assetCollection)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
+	//
+	// ADD LOGIC HERE
+	//
 
 	// Done
 	return reconcile.Result{}, nil

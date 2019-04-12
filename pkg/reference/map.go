@@ -57,11 +57,15 @@ func (r *RefMap) Delete(refOwner RefOwner, refTarget RefTarget) {
 	if !found {
 		return
 	}
+	newList := []RefOwner{}
 	for i := range list {
 		if list[i] == refOwner {
-			list = append(list[:i], list[i+1:]...)
-			r.Content[refTarget] = list
+			continue
 		}
+		newList = append(newList, list[i])
+	}
+	if len(newList) < len(list) {
+		r.Content[refTarget] = newList
 	}
 }
 

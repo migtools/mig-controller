@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+	"reflect"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -12,7 +13,6 @@ import (
 
 // Types
 const (
-	Ready                        = "Ready"
 	InvalidSourceClusterRef      = "InvalidSourceClusterRef"
 	InvalidDestinationClusterRef = "InvalidDestinationClusterRef"
 	InvalidStorageRef            = "InvalidStorageRef"
@@ -21,18 +21,20 @@ const (
 	DestinationClusterNotReady   = "DestinationClusterNotReady"
 	StorageNotReady              = "StorageNotReady"
 	AssetCollectionNotReady      = "AssetCollectionNotReady"
+	InvalidDestinationCluster    = "InvalidDestinationCluster"
 )
 
 // Reasons
 const (
-	NotSet   = "NotSet"
-	NotFound = "NotFound"
+	NotSet      = "NotSet"
+	NotFound    = "NotFound"
+	NotDistinct = "NotDistinct"
 )
 
 // Statuses
 const (
-	True  = "True"
-	False = "False"
+	True  = migapi.True
+	False = migapi.False
 )
 
 // Messages
@@ -46,6 +48,7 @@ const (
 	DestinationClusterNotReadyMessage   = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
+	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 )
 
 // Validate the plan resource.
@@ -83,6 +86,9 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (error, int) {
 	}
 	totalSet += nSet
 
+	// Ready
+	plan.Status.SetReady(totalSet == 0, ReadyMessage)
+
 	// Apply changes.
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
@@ -109,7 +115,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 		return nil, 1
 	}
 
-	err, storage := r.getStorage(ref, plan.Namespace)
+	err, storage := r.getStorage(ref)
 	if err != nil {
 		return err, 0
 	}
@@ -129,8 +135,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 	}
 
 	// NotReady
-	_, ready := storage.Status.FindCondition(Ready)
-	if ready == nil {
+	if !storage.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    StorageNotReady,
 			Status:  True,
@@ -144,7 +149,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 	return nil, 0
 }
 
-func (r ReconcileMigPlan) getStorage(ref *kapi.ObjectReference, ns string) (error, *migapi.MigStorage) {
+func (r ReconcileMigPlan) getStorage(ref *kapi.ObjectReference) (error, *migapi.MigStorage) {
 	key := types.NamespacedName{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
@@ -180,7 +185,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 		return nil, 1
 	}
 
-	err, assetCollection := r.getAssetCollection(ref, plan.Namespace)
+	err, assetCollection := r.getAssetCollection(ref)
 	if err != nil {
 		return err, 0
 	}
@@ -200,8 +205,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 	}
 
 	// NotReady
-	_, ready := assetCollection.Status.FindCondition(Ready)
-	if ready == nil {
+	if !assetCollection.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    AssetCollectionNotReady,
 			Status:  True,
@@ -215,7 +219,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 	return nil, 0
 }
 
-func (r ReconcileMigPlan) getAssetCollection(ref *kapi.ObjectReference, ns string) (error, *migapi.MigAssetCollection) {
+func (r ReconcileMigPlan) getAssetCollection(ref *kapi.ObjectReference) (error, *migapi.MigAssetCollection) {
 	key := types.NamespacedName{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
@@ -251,7 +255,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 		return nil, 1
 	}
 
-	err, cluster := r.getCluster(ref, plan.Namespace)
+	err, cluster := r.getCluster(ref)
 	if err != nil {
 		return err, 0
 	}
@@ -271,8 +275,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 	}
 
 	// NotReady
-	_, ready := cluster.Status.FindCondition(Ready)
-	if ready == nil {
+	if !cluster.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    SourceClusterNotReady,
 			Status:  True,
@@ -299,11 +302,26 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 			Reason:  NotSet,
 			Message: InvalidDestinationClusterRefMessage,
 		})
+		plan.Status.DeleteCondition(InvalidDestinationCluster)
 		plan.Status.DeleteCondition(DestinationClusterNotReady)
 		return nil, 1
 	}
 
-	err, cluster := r.getCluster(ref, plan.Namespace)
+	// NotDistinct
+	if reflect.DeepEqual(ref, plan.Spec.SrcMigClusterRef) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    InvalidDestinationCluster,
+			Status:  True,
+			Reason:  NotDistinct,
+			Message: InvalidDestinationClusterMessage,
+		})
+		plan.Status.DeleteCondition(DestinationClusterNotReady)
+		return nil, 1
+	} else {
+		plan.Status.DeleteCondition(InvalidDestinationCluster)
+	}
+
+	err, cluster := r.getCluster(ref)
 	if err != nil {
 		return err, 0
 	}
@@ -323,8 +341,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 	}
 
 	// NotReady
-	_, ready := cluster.Status.FindCondition(Ready)
-	if ready == nil {
+	if !cluster.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:    DestinationClusterNotReady,
 			Status:  True,
@@ -338,7 +355,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 	return nil, 0
 }
 
-func (r ReconcileMigPlan) getCluster(ref *kapi.ObjectReference, ns string) (error, *migapi.MigCluster) {
+func (r ReconcileMigPlan) getCluster(ref *kapi.ObjectReference) (error, *migapi.MigCluster) {
 	key := types.NamespacedName{
 		Namespace: ref.Namespace,
 		Name:      ref.Name,
