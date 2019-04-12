@@ -32,6 +32,19 @@ spec:
               type: object
           type: object
         status:
+          properties:
+            completionTimestamp:
+              format: date-time
+              type: string
+            migrationCompleted:
+              description: 'TODO: should this be a condition, phase?'
+              type: boolean
+            migrationStarted:
+              type: boolean
+            startTimestamp:
+              description: 'TODO: should this be a condition, phase?'
+              format: date-time
+              type: string
           type: object
   version: v1alpha1
 status:

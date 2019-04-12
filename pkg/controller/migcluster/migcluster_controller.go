@@ -100,8 +100,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 
 var _ reconcile.Reconciler = &ReconcileMigCluster{}
 
-// var _ remoteWatchMap = GetRemoteWatchMap()
-
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	client.Client
@@ -116,7 +114,7 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("[mCluster] RECONCILE [nsName=%s/%s]", request.Namespace, request.Name))
+	log.Info(fmt.Sprintf("[mCluster] RECONCILE [%s/%s]", request.Namespace, request.Name))
 
 	// Fetch the MigCluster
 	migCluster := &migapi.MigCluster{}

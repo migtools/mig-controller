@@ -20,12 +20,15 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/controller/migassetcollection"
 	"github.com/fusor/mig-controller/pkg/controller/migplan"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,17 +138,13 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Info(fmt.Sprintf("[mMigration] RECONCILE [%s/%s]", request.Namespace, request.Name))
 	// TODO: instead of individually getting each piece of the data model, see if it's
 	// possible to write a function that will compile one struct with all of the info
-	// we need to perform a stage operation in one place. Would make this reconcile function
-	// much cleaner.
+	// we need to perform a Migration operation in one place.
 
 	// Hardcode Velero namespace for now
 	veleroNs := "velero"
-
-	// Set up ResourceParentsMap to manage parent-child mapping
-	rpm := util.GetResourceParentsMap()
-	parentMigMigration := util.KubeResource{Kind: util.KindMigMigration, NsName: request.NamespacedName}
 
 	// Fetch the MigMigration migMigration
 	migMigration := &migapi.MigMigration{}
@@ -155,6 +154,11 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
+	}
+
+	// Don't do any more work if Migration is complete
+	if migMigration.Status.MigrationCompleted == true {
+		return reconcile.Result{}, nil // don't requeue
 	}
 
 	// Retrieve MigPlan from ref
@@ -168,16 +172,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		}
 		return reconcile.Result{}, err // requeue
 	}
-
-	// Valid MigPlan found, add MigMigration as parent to receive reconciliation events
-	childMigPlan := util.KubeResource{
-		Kind: util.KindMigPlan,
-		NsName: types.NamespacedName{
-			Name:      migPlanRef.Name,
-			Namespace: migPlanRef.Namespace,
-		},
-	}
-	rpm.AddChildToParent(childMigPlan, parentMigMigration)
 
 	// Check for 'Ready' condition on referenced MigPlan
 	_, migPlanReady := migPlan.Status.FindCondition(migplan.Ready)
@@ -209,9 +203,19 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil // don't requeue
 	}
 
-	// ###########################################
-	// ###########################################
-	// ###########################################
+	// If all references are marked as ready, set StartTimestamp and mark as running
+	if migMigration.Status.MigrationCompleted == false && migMigration.Status.MigrationRunning == false {
+		migMigration.Status.MigrationRunning = true
+		migMigration.Status.MigrationCompleted = false
+		migMigration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+		err = r.Update(context.TODO(), migMigration)
+		if err != nil {
+			log.Error(err, "[mMigration] Failed to UPDATE MigMigration with 'StartTimestamp'")
+			return reconcile.Result{}, err // requeue
+		}
+		log.Info(fmt.Sprintf("[mMigration] Started MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
+	}
+
 	// ###########################################
 	// Get the srcCluster MigCluster
 	srcClusterRef := migPlan.Spec.SrcMigClusterRef
@@ -230,9 +234,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Error(err, "Failed to GET srcClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
-	// ###########################################
-	// ###########################################
-	// ###########################################
 	// ###########################################
 
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
@@ -267,16 +268,13 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		}
 		log.Info("[mMigration] Velero Backup UPDATED successfully on source cluster")
 	} else {
-		log.Info("[mMigration] Velero Backup EXISTS already on source cluster")
+		log.Info("[mMigration] Velero Backup EXISTS on source cluster")
 	}
 
 	// Monitor changes to Velero Backup state on srcCluster, wait for completion (watch MigCluster)
 
 	// Create Velero Restore on dstCluster pointing at Velero Backup unique name
 
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	// Get the destCluster MigCluster
 	destClusterRef := migPlan.Spec.DestMigClusterRef
@@ -295,9 +293,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Error(err, "Failed to GET destClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	// &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
 	restoreUniqueName := fmt.Sprintf("%s-velero-restore", migMigration.Name)
@@ -346,12 +341,26 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		}
 		log.Info("[mMigration] Velero Restore UPDATED successfully on destination cluster")
 	} else {
-		log.Info("[mMigration] Velero Restore EXISTS already on destination cluster")
+		log.Info("[mMigration] Velero Restore EXISTS on destination cluster")
 	}
 
 	// Monitor changes to Velero Restore state on dstCluster, wait for completion (watch MigCluster)
 
 	// Mark MigMigration as complete
+	// If all references are marked as ready, set StartTimestamp and mark as running
+	if vRestoreExisting.Status.Phase == velerov1.RestorePhaseCompleted {
+		if migMigration.Status.MigrationRunning == true && migMigration.Status.MigrationCompleted == false {
+			migMigration.Status.MigrationRunning = false
+			migMigration.Status.MigrationCompleted = true
+			migMigration.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+			err = r.Update(context.TODO(), migMigration)
+			if err != nil {
+				log.Error(err, "[mMigration] Failed to UPDATE MigMigration with 'CompletionTimestamp'")
+				return reconcile.Result{}, err // requeue
+			}
+			log.Info(fmt.Sprintf("[mMigration] Finished MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
+		}
+	}
 
 	return reconcile.Result{}, nil
 }
