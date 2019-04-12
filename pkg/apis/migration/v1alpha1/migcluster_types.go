@@ -93,7 +93,7 @@ func (m *MigCluster) BuildRestConfig(c client.Client) (*rest.Config, error) {
 		return nil, err // TODO: introspect error type
 	}
 
-	if cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints != nil {
+	if cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints == nil {
 		return nil, fmt.Errorf("MigCluster [%s/%s] references Cluster [%s/%s] with nil ServerEndpoints",
 			m.Namespace, m.Name, clusterRef.Namespace, clusterRef.Name)
 	}

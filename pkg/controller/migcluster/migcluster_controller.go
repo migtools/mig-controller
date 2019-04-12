@@ -25,7 +25,6 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -129,6 +128,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
+<<<<<<< HEAD
 	// Validations.
 	err, _ = r.validate(migCluster)
 	if err != nil {
@@ -172,6 +172,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
+=======
+>>>>>>> Bugfix in MigCluster.BuildRestConfig
 	// Create a Remote Watch for this MigCluster if one doesn't exist
 	remoteWatchMap := GetRemoteWatchMap()
 	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
@@ -183,6 +185,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		restCfg, err := migCluster.BuildRestConfig(r.Client)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("[mCluster] Error during BuildRestConfig for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
+			return reconcile.Result{}, nil // don't requeue
 		}
 
 		StartRemoteWatch(r, RemoteManagerConfig{
