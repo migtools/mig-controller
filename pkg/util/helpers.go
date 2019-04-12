@@ -21,31 +21,7 @@ import (
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// BuildRestConfig creates an insecure REST config from a clusterURL and bearerToken
-// TODO: add support for creating a secure rest.Config
-func BuildRestConfig(clusterURL string, bearerToken string) *rest.Config {
-	clusterConfig := &rest.Config{
-		Host:        clusterURL,
-		BearerToken: bearerToken,
-	}
-	clusterConfig.Insecure = true
-	return clusterConfig
-}
-
-// BuildControllerRuntimeClient builds a controller-runtime client for interacting with
-// a K8s cluster.
-func BuildControllerRuntimeClient(config *rest.Config) (c client.Client, err error) {
-	c, err = client.New(config, client.Options{Scheme: scheme.Scheme})
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
-}
 
 // BuildVeleroBackup creates a Velero backup with default values for most fields
 // TODO: Remove placeholder 'app: ngninx' LabelSelector
@@ -63,11 +39,11 @@ func BuildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 			TTL:                metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces: backupNamespaces,
 			// Unused but defaulted fields
-			ExcludedNamespaces:      []string{},
-			IncludedResources:       []string{},
-			ExcludedResources:       []string{},
-			Hooks:                   velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
-			VolumeSnapshotLocations: []string{},
+			ExcludedNamespaces: []string{},
+			IncludedResources:  []string{},
+			ExcludedResources:  []string{},
+			Hooks:              velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
+			// VolumeSnapshotLocations: []string{},
 		},
 	}
 	return backup

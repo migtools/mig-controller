@@ -32,6 +32,17 @@ spec:
               type: object
           type: object
         status:
+          properties:
+            completionTimestamp:
+              format: date-time
+              type: string
+            migrationCompleted:
+              type: boolean
+            migrationStarted:
+              type: boolean
+            startTimestamp:
+              format: date-time
+              type: string
           type: object
   version: v1alpha1
 status:

@@ -28,8 +28,10 @@ type MigMigrationSpec struct {
 
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	MigrationRunning    bool         `json:"migrationStarted,omitempty"`
+	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
+	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 }
 
 // +genclient
