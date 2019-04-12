@@ -89,32 +89,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to MigClusters referenced by MigMigrations
-	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigMigration{})
-				}),
-		})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to MigStages referenced by MigMigrations
-	err = c.Watch(
-		&source.Kind{Type: &migapi.MigMigration{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigMigration{})
-				}),
-		})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -126,10 +100,6 @@ type ReconcileMigMigration struct {
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a MigMigration object and makes changes based on the state read
-// and what is in the MigMigration.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
@@ -154,9 +124,20 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
+	// Validate
+	err, _ = r.validate(migMigration)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Don't do any more work if Migration is complete
 	if migMigration.Status.MigrationCompleted == true {
 		return reconcile.Result{}, nil // don't requeue
+	}
+
+	// Don't continue if not ready.
+	if !migMigration.Status.IsReady() {
+		return reconcile.Result{}, nil
 	}
 
 	// Retrieve MigPlan from ref
@@ -169,12 +150,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
-	}
-
-	// Check for 'Ready' condition on referenced MigPlan
-	if !migPlan.Status.IsReady() {
-		log.Info(fmt.Sprintf("[mMigration] Referenced MigPlan [%s/%s] was not ready.", migPlanRef.Namespace, migPlanRef.Name))
-		return reconcile.Result{}, nil // don't requeue
 	}
 
 	// [TODO] Create Velero BackupStorageLocation if needed
@@ -191,12 +166,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
-	}
-
-	// Check for 'Ready' condition on referenced MigAssetCollection
-	if !assets.Status.IsReady() {
-		log.Info(fmt.Sprintf("[mMigration] Referenced MigAssetCollection [%s/%s] was not ready.", assetsRef.Namespace, assetsRef.Name))
-		return reconcile.Result{}, nil // don't requeue
 	}
 
 	// If all references are marked as ready, set StartTimestamp and mark as running
