@@ -28,6 +28,7 @@ type MigMigrationSpec struct {
 
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
+	Conditions
 	MigrationRunning    bool         `json:"migrationStarted,omitempty"`
 	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
