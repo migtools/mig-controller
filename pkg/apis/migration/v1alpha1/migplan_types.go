@@ -17,8 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigPlanSpec defines the desired state of MigPlan
@@ -58,4 +63,40 @@ type MigPlanList struct {
 
 func init() {
 	SchemeBuilder.Register(&MigPlan{}, &MigPlanList{})
+}
+
+// GetMigAssetCollection gets a referenced MigAssetCollection from a MigPlan
+func (m *MigPlan) GetMigAssetCollection(c client.Client) (*MigAssetCollection, error) {
+	assetsRef := m.Spec.MigAssetCollectionRef
+	assets := &MigAssetCollection{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: assetsRef.Name, Namespace: assetsRef.Namespace}, assets)
+	if err != nil {
+		clog.Info(fmt.Sprintf("[mPlan] Error getting MigAssetCollection [%s/%s]", assetsRef.Namespace, assetsRef.Name))
+		return nil, err
+	}
+	return assets, nil
+}
+
+// GetSrcMigCluster gets a referenced MigAssetCollection from a MigPlan
+func (m *MigPlan) GetSrcMigCluster(c client.Client) (*MigCluster, error) {
+	migClusterRef := m.Spec.SrcMigClusterRef
+	migCluster := &MigCluster{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: migClusterRef.Name, Namespace: migClusterRef.Namespace}, migCluster)
+	if err != nil {
+		clog.Info(fmt.Sprintf("[mPlan] Error getting SrcMigCluster [%s/%s]", migClusterRef.Namespace, migClusterRef.Name))
+		return nil, err
+	}
+	return migCluster, nil
+}
+
+// GetDestMigCluster gets a referenced MigAssetCollection from a MigPlan
+func (m *MigPlan) GetDestMigCluster(c client.Client) (*MigCluster, error) {
+	migClusterRef := m.Spec.DestMigClusterRef
+	migCluster := &MigCluster{}
+	err := c.Get(context.TODO(), types.NamespacedName{Name: migClusterRef.Name, Namespace: migClusterRef.Namespace}, migCluster)
+	if err != nil {
+		clog.Info(fmt.Sprintf("[mPlan] Error getting DestMigCluster [%s/%s]", migClusterRef.Namespace, migClusterRef.Name))
+		return nil, err
+	}
+	return migCluster, nil
 }
