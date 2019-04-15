@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/util"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -137,57 +135,37 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Don't continue if not ready.
 	if !migMigration.Status.IsReady() {
-		return reconcile.Result{}, nil
+		return reconcile.Result{}, nil //don't requeue
 	}
 
-	// Retrieve MigPlan from ref
-	migPlanRef := migMigration.Spec.MigPlanRef
-	migPlan := &migapi.MigPlan{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: migPlanRef.Name, Namespace: migPlanRef.Namespace}, migPlan)
+	// Retrieve MigPlan from reference on MigMigration
+	migPlan, err := migMigration.GetMigPlan(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Error getting MigPlan [%s/%s]", migPlanRef.Namespace, migPlanRef.Name))
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
 	}
-
-	// [TODO] Create Velero BackupStorageLocation if needed
-
-	// [TODO] Create Velero VolumeSnapshotLocation if needed
 
 	// Retrieve MigAssetCollection from ref
-	assetsRef := migPlan.Spec.MigAssetCollectionRef
-	assets := &migapi.MigAssetCollection{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: assetsRef.Name, Namespace: assetsRef.Namespace}, assets)
+	assets, err := migPlan.GetMigAssetCollection(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Error getting MigAssetCollection [%s/%s]", assetsRef.Namespace, assetsRef.Name))
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
 	}
 
-	// If all references are marked as ready, set StartTimestamp and mark as running
-	if migMigration.Status.MigrationCompleted == false && migMigration.Status.MigrationRunning == false {
-		migMigration.Status.MigrationRunning = true
-		migMigration.Status.MigrationCompleted = false
-		migMigration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
-		err = r.Update(context.TODO(), migMigration)
-		if err != nil {
-			log.Error(err, "[mMigration] Failed to UPDATE MigMigration with 'StartTimestamp'")
-			return reconcile.Result{}, err // requeue
-		}
-		log.Info(fmt.Sprintf("[mMigration] Started MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
+	// If all references are marked as ready, run MarkAsRunning() to set this Migration into "Running" state
+	err = migMigration.MarkAsRunning(r.Client)
+	if err != nil {
+		return reconcile.Result{}, err // requeue
 	}
 
 	// *****************************
 	// Get the srcCluster MigCluster
-	srcClusterRef := migPlan.Spec.SrcMigClusterRef
-	srcCluster := &migapi.MigCluster{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: srcClusterRef.Name, Namespace: srcClusterRef.Namespace}, srcCluster)
+	srcCluster, err := migPlan.GetSrcMigCluster(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Error getting srcCluster MigCluster [%s/%s]", srcClusterRef.Namespace, srcClusterRef.Name))
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
 		}
@@ -237,11 +215,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// ******************************
 	// Get the destCluster MigCluster
-	destClusterRef := migPlan.Spec.DestMigClusterRef
-	destCluster := &migapi.MigCluster{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: destClusterRef.Name, Namespace: destClusterRef.Namespace}, destCluster)
+	destCluster, err := migPlan.GetDestMigCluster(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Error getting destCluster MigCluster [%s/%s]", destClusterRef.Name, destClusterRef.Namespace))
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
 		}
@@ -308,16 +283,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Mark MigMigration as complete
 	// If all references are marked as ready, set StartTimestamp and mark as running
 	if vRestoreExisting.Status.Phase == velerov1.RestorePhaseCompleted {
-		if migMigration.Status.MigrationRunning == true && migMigration.Status.MigrationCompleted == false {
-			migMigration.Status.MigrationRunning = false
-			migMigration.Status.MigrationCompleted = true
-			migMigration.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-			err = r.Update(context.TODO(), migMigration)
-			if err != nil {
-				log.Error(err, "[mMigration] Failed to UPDATE MigMigration with 'CompletionTimestamp'")
-				return reconcile.Result{}, err // requeue
-			}
-			log.Info(fmt.Sprintf("[mMigration] Finished MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
+		err = migMigration.MarkAsCompleted(r.Client)
+		if err != nil {
+			return reconcile.Result{}, err // requeue
 		}
 	}
 

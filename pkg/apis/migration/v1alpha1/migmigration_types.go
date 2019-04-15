@@ -17,10 +17,17 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var clog = logf.Log.WithName("controller")
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
@@ -62,8 +69,42 @@ func init() {
 	SchemeBuilder.Register(&MigMigration{}, &MigMigrationList{})
 }
 
-// Get the migration plan.
+// GetPlan - Get the migration plan.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigMigration) GetPlan(client k8sclient.Client) (*MigPlan, error) {
 	return GetPlan(client, r.Spec.MigPlanRef)
+}
+
+// MarkAsRunning marks the MigMigration status as 'Running'
+func (r *MigMigration) MarkAsRunning(c k8sclient.Client) error {
+	if r.Status.MigrationCompleted == true || r.Status.MigrationRunning == true {
+		return nil
+	}
+	r.Status.MigrationRunning = true
+	r.Status.MigrationCompleted = false
+	r.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+	err := c.Update(context.TODO(), r)
+	if err != nil {
+		clog.Info("[mMigration] Failed to mark MigMigration [%s/%s] as running", r.Namespace, r.Name)
+		return err
+	}
+	clog.Info(fmt.Sprintf("[mMigration] Started MigMigration [%s/%s]", r.Namespace, r.Name))
+	return nil
+}
+
+// MarkAsCompleted marks the MigMigration status as 'Completed'
+func (r *MigMigration) MarkAsCompleted(c k8sclient.Client) error {
+	if r.Status.MigrationRunning == false || r.Status.MigrationCompleted == true {
+		return nil
+	}
+	r.Status.MigrationRunning = false
+	r.Status.MigrationCompleted = true
+	r.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+	err := c.Update(context.TODO(), r)
+	if err != nil {
+		clog.Info("[mMigration] Failed to mark MigMigration [%s/%s] as completed", r.Namespace, r.Name)
+		return err
+	}
+	clog.Info(fmt.Sprintf("[mMigration] Finished MigMigration [%s/%s]", r.Namespace, r.Name))
+	return nil
 }

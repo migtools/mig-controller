@@ -61,25 +61,25 @@ func init() {
 	SchemeBuilder.Register(&MigPlan{}, &MigPlanList{})
 }
 
-// Get the referenced source cluster.
+// GetSourceCluster - Get the referenced source cluster.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
 	return GetCluster(client, r.Spec.SrcMigClusterRef)
 }
 
-// Get the referenced destination cluster.
+// GetDestinationCluster - Get the referenced destination cluster.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (*MigCluster, error) {
 	return GetCluster(client, r.Spec.DestMigClusterRef)
 }
 
-// Get the referenced storage..
+// GetStorage - Get the referenced storage..
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
 }
 
-// Get the referenced asset-collection.
+// GetAssetCollection - Get the referenced asset-collection.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetAssetCollection(client k8sclient.Client) (*MigAssetCollection, error) {
 	return GetAssetCollection(client, r.Spec.MigAssetCollectionRef)
