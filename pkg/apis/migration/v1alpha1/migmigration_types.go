@@ -64,6 +64,6 @@ func init() {
 
 // Get the migration plan.
 // Returns `nil` when the reference cannot be resolved.
-func (r *MigMigration) GetPlan(client k8sclient.Client) (error, *MigPlan) {
+func (r *MigMigration) GetPlan(client k8sclient.Client) (*MigPlan, error) {
 	return GetPlan(client, r.Spec.MigPlanRef)
 }

@@ -127,7 +127,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Validations.
-	err, _ = r.validate(migCluster)
+	_, err = r.validate(migCluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

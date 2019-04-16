@@ -133,7 +133,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validations.
-	err, _ = r.validate(plan)
+	_, err = r.validate(plan)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

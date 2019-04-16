@@ -96,7 +96,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Validations.
-	err, _ = r.validate(storage)
+	_, err = r.validate(storage)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

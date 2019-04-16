@@ -113,7 +113,7 @@ func (r *ReconcileMigAssetCollection) Reconcile(request reconcile.Request) (reco
 	}
 
 	// Validations
-	err, _ = r.validate(assetCollection)
+	_, err = r.validate(assetCollection)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
