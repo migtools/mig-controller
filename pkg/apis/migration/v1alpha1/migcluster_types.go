@@ -19,14 +19,13 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -67,8 +66,14 @@ func init() {
 	SchemeBuilder.Register(&MigCluster{}, &MigClusterList{})
 }
 
+// Get the service account secret.
+// Returns `nil` when the reference cannot be resolved.
+func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (error, *kapi.Secret) {
+	return GetSecret(client, m.Spec.ServiceAccountSecretRef)
+}
+
 // BuildControllerRuntimeClient builds a remote client using a MigCluster and an existing client
-func (m *MigCluster) BuildControllerRuntimeClient(c client.Client) (client.Client, error) {
+func (m *MigCluster) BuildControllerRuntimeClient(c k8sclient.Client) (k8sclient.Client, error) {
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
@@ -83,7 +88,7 @@ func (m *MigCluster) BuildControllerRuntimeClient(c client.Client) (client.Clien
 }
 
 // BuildRestConfig creates a remote cluster RestConfig from a MigCluster and a local client
-func (m *MigCluster) BuildRestConfig(c client.Client) (*rest.Config, error) {
+func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	// Get first K8s endpoint from ClusterRef
 	clusterRef := m.Spec.ClusterRef
 	cluster := &crapi.Cluster{}
@@ -147,8 +152,8 @@ func buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
 
 // buildControllerRuntimeClient builds a controller-runtime client for interacting with
 // a K8s cluster.
-func buildControllerRuntimeClient(config *rest.Config) (client.Client, error) {
-	c, err := client.New(config, client.Options{Scheme: scheme.Scheme})
+func buildControllerRuntimeClient(config *rest.Config) (k8sclient.Client, error) {
+	c, err := k8sclient.New(config, k8sclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		return nil, err
 	}

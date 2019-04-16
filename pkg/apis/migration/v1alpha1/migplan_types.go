@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigPlanSpec defines the desired state of MigPlan
@@ -58,4 +59,28 @@ type MigPlanList struct {
 
 func init() {
 	SchemeBuilder.Register(&MigPlan{}, &MigPlanList{})
+}
+
+// Get the referenced source cluster.
+// Returns `nil` when the reference cannot be resolved.
+func (r *MigPlan) GetSourceCluster(client k8sclient.Client) (error, *MigCluster) {
+	return GetCluster(client, r.Spec.SrcMigClusterRef)
+}
+
+// Get the referenced destination cluster.
+// Returns `nil` when the reference cannot be resolved.
+func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (error, *MigCluster) {
+	return GetCluster(client, r.Spec.DestMigClusterRef)
+}
+
+// Get the referenced storage..
+// Returns `nil` when the reference cannot be resolved.
+func (r *MigPlan) GetStorage(client k8sclient.Client) (error, *MigStorage) {
+	return GetStorage(client, r.Spec.MigStorageRef)
+}
+
+// Get the referenced asset-collection.
+// Returns `nil` when the reference cannot be resolved.
+func (r *MigPlan) GetAssetCollection(client k8sclient.Client) (error, *MigAssetCollection) {
+	return GetAssetCollection(client, r.Spec.MigAssetCollectionRef)
 }

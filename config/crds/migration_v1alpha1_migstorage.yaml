@@ -46,6 +46,8 @@ spec:
                   type: string
                 azureStorageAccount:
                   type: string
+                credsSecretRef:
+                  type: object
               type: object
             backupStorageProvider:
               type: string
@@ -57,6 +59,8 @@ spec:
                   type: string
                 azureResourceGroup:
                   type: string
+                credsSecretRef:
+                  type: object
               type: object
             volumeSnapshotProvider:
               type: string
