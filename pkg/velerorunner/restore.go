@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// RunRestore ...
+// RunRestore runs a Velero Restore if it hasn't been run already
 func RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Restore, error) {
 
 	vRestoreNew := util.BuildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)

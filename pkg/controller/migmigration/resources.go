@@ -18,7 +18,6 @@ package migmigration
 
 import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 // reconcileResources holds the data needed for MigMigration to reconcile.
@@ -30,12 +29,9 @@ type reconcileResources struct {
 	srcMigCluster  *migapi.MigCluster
 	destMigCluster *migapi.MigCluster
 	migStage       *migapi.MigStage
-
-	backup  *velerov1.Backup
-	restore *velerov1.Restore
 }
 
-// getReconcileResources gets all of the information needed to perform a reconcile
+// getReconcileResources puts together a struct with all resources needed to perform a MigMigration reconcile
 func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMigration) (*reconcileResources, error) {
 	resources := &reconcileResources{}
 
@@ -66,10 +62,6 @@ func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMi
 		return nil, err
 	}
 	resources.destMigCluster = destMigCluster
-
-	// TODO - MigStage
-	// TODO - Backup
-	// TODO - Restore
 
 	return resources, nil
 }
