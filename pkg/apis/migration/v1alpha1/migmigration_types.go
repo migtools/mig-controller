@@ -155,8 +155,8 @@ func (r *MigMigration) EnsureBackupExists(c k8sclient.Client, backupNsName types
 	return vBackupExisting, nil
 }
 
-// RunRestore ...
-func (m *MigMigration) RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName) (*velerov1.Restore, error) {
+// RunRestore waits for a Backup to complete, then creates a Velero Restore if one doesn't exist
+func (r *MigMigration) RunRestore(c k8sclient.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName) (*velerov1.Restore, error) {
 
 	vRestoreNew := util.BuildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)
 	vRestoreExisting := &velerov1.Restore{}

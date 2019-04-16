@@ -22,6 +22,7 @@ import (
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +39,8 @@ import (
 )
 
 var log = logf.Log.WithName("controller")
+
+const logPrefix = "mMigration"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -94,20 +97,6 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 type ReconcileMigMigration struct {
 	client.Client
 	scheme *runtime.Scheme
-}
-
-// reconcileResources holds the data needed for MigMigration to reconcile.
-// At the beginning of a reconcile, this data will be compiled by fetching
-// information from each cluster involved in the migration.
-type reconcileResources struct {
-	migPlan        *migapi.MigPlan
-	migAssets      *migapi.MigAssetCollection
-	srcMigCluster  *migapi.MigCluster
-	destMigCluster *migapi.MigCluster
-	migStage       *migapi.MigStage
-
-	backup  *velerov1.Backup
-	restore *velerov1.Restore
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
@@ -176,7 +165,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
 	backupUniqueName := fmt.Sprintf("%s-velero-backup", migMigration.Name)
 	backupNsName := types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}
-	srcBackup, err := migMigration.RunBackup(srcClusterK8sClient, backupNsName, rres.migAssets)
+	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, rres.migAssets, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -199,7 +188,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
 	restoreUniqueName := fmt.Sprintf("%s-velero-restore", migMigration.Name)
 	restoreNsName := types.NamespacedName{Name: restoreUniqueName, Namespace: veleroNs}
-	destRestore, err := migMigration.RunRestore(destClusterK8sClient, restoreNsName, backupNsName)
+	destRestore, err := vrunner.RunRestore(destClusterK8sClient, restoreNsName, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -220,43 +209,4 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	return reconcile.Result{}, nil
-}
-
-// getReconcileResources gets all of the information needed to perform a reconcile
-func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMigration) (*reconcileResources, error) {
-	resources := &reconcileResources{}
-
-	// MigPlan
-	migPlan, err := migMigration.GetMigPlan(r.Client)
-	if err != nil {
-		return nil, err
-	}
-	resources.migPlan = migPlan
-
-	// MigAssetCollection
-	migAssets, err := migPlan.GetMigAssetCollection(r.Client)
-	if err != nil {
-		return nil, err
-	}
-	resources.migAssets = migAssets
-
-	// SrcMigCluster
-	srcMigCluster, err := migPlan.GetSrcMigCluster(r.Client)
-	if err != nil {
-		return nil, err
-	}
-	resources.srcMigCluster = srcMigCluster
-
-	// DestMigCluster
-	destMigCluster, err := migPlan.GetDestMigCluster(r.Client)
-	if err != nil {
-		return nil, err
-	}
-	resources.destMigCluster = destMigCluster
-
-	// TODO - MigStage
-	// TODO - Backup
-	// TODO - Restore
-
-	return resources, nil
 }
