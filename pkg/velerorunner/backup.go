@@ -32,16 +32,22 @@ import (
 
 var clog = logf.Log.WithName("controller")
 
-// RunBackup ...
+// RunBackup runs a Velero Backup if it hasn't been run already
 func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string) (*velerov1.Backup, error) {
 
 	vBackupExisting := &velerov1.Backup{}
 	vBackupNew := util.BuildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
 
+	// Switch over to using a generated name if we are creating
+	// if createNew {
+	// 	vBackupNew.ObjectMeta.Name = ""
+	// 	vBackupNew.ObjectMeta.GenerateName = backupNsName.Name
+	// }
+
 	err := c.Get(context.TODO(), backupNsName, vBackupExisting)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Backup not found, create
+			// Backup not found, 'Create'
 			err = c.Create(context.TODO(), vBackupNew)
 			if err != nil {
 				clog.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup on source cluster", logPrefix))
@@ -54,7 +60,7 @@ func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migap
 	}
 
 	if !reflect.DeepEqual(vBackupNew.Spec, vBackupExisting.Spec) {
-		// Send "Create" action for Velero Backup to K8s API
+		// Backup doesn't match desired spec, 'Update'
 		vBackupExisting.Spec = vBackupNew.Spec
 		err = c.Update(context.TODO(), vBackupExisting)
 		if err != nil {
