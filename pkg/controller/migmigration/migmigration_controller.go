@@ -153,8 +153,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil //don't requeue
 	}
 
-	// Build ReconcileResources containing data needed for rest of reconcile process
-	res, err := r.getReconcileResources(migMigration)
+	// Build ReconcileResources for MigMigration containing data needed for rest of reconcile process
+	rres, err := r.getReconcileResources(migMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -170,48 +170,27 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// ******************************
 	// Build controller-runtime client for srcMigCluster
-	srcClusterK8sClient, err := res.srcMigCluster.BuildControllerRuntimeClient(r.Client)
+	srcClusterK8sClient, err := rres.srcMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET srcClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
 
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
-	backupNamespaces := res.migAssets.Spec.Namespaces
 	backupUniqueName := fmt.Sprintf("%s-velero-backup", migMigration.Name)
-	vBackupNew := util.BuildVeleroBackup(veleroNs, backupUniqueName, backupNamespaces)
-
-	vBackupExisting := &velerov1.Backup{}
-	err = srcClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: vBackupNew.Name, Namespace: vBackupNew.Namespace}, vBackupExisting)
+	backupNsName := types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}
+	srcBackup, err := migMigration.EnsureBackupExists(srcClusterK8sClient, backupNsName, rres.migAssets)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Backup not found, create
-			err = srcClusterK8sClient.Create(context.TODO(), vBackupNew)
-			if err != nil {
-				log.Error(err, "[mMigration] Failed to CREATE Velero Backup on source cluster")
-				return reconcile.Result{}, nil
-			}
-			log.Info("[mMigration] Velero Backup CREATED successfully on source cluster")
+			return reconcile.Result{}, nil // don't requeue
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, err // requeue
 	}
-
-	if !reflect.DeepEqual(vBackupNew.Spec, vBackupExisting.Spec) {
-		// Send "Create" action for Velero Backup to K8s API
-		vBackupExisting.Spec = vBackupNew.Spec
-		err = srcClusterK8sClient.Update(context.TODO(), vBackupExisting)
-		if err != nil {
-			log.Error(err, "[mMigration] Failed to UPDATE Velero Backup on src cluster")
-			return reconcile.Result{}, nil
-		}
-		log.Info("[mMigration] Velero Backup UPDATED successfully on source cluster")
-	} else {
-		log.Info("[mMigration] Velero Backup EXISTS on source cluster")
-	}
+	rres.backup = srcBackup
 
 	// ******************************
 	// Build controller-runtime client for destMigCluster
-	destClusterK8sClient, err := res.destMigCluster.BuildControllerRuntimeClient(r.Client)
+	destClusterK8sClient, err := rres.destMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET destClusterK8sClient")
 		return reconcile.Result{}, nil
