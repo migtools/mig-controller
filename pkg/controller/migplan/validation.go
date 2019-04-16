@@ -6,9 +6,6 @@ import (
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Types
@@ -115,7 +112,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 		return nil, 1
 	}
 
-	err, storage := r.getStorage(ref)
+	err, storage := migapi.GetStorage(r, ref)
 	if err != nil {
 		return err, 0
 	}
@@ -149,25 +146,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 	return nil, 0
 }
 
-func (r ReconcileMigPlan) getStorage(ref *kapi.ObjectReference) (error, *migapi.MigStorage) {
-	key := types.NamespacedName{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-
-	storage := migapi.MigStorage{}
-	err := r.Get(context.TODO(), key, &storage)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return err, nil
-		}
-	}
-
-	return nil, &storage
-}
-
 // Validate the referenced assetCollection.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, int) {
@@ -185,7 +163,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 		return nil, 1
 	}
 
-	err, assetCollection := r.getAssetCollection(ref)
+	err, assetCollection := migapi.GetAssetCollection(r, ref)
 	if err != nil {
 		return err, 0
 	}
@@ -219,25 +197,6 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 	return nil, 0
 }
 
-func (r ReconcileMigPlan) getAssetCollection(ref *kapi.ObjectReference) (error, *migapi.MigAssetCollection) {
-	key := types.NamespacedName{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-
-	assetCollection := migapi.MigAssetCollection{}
-	err := r.Get(context.TODO(), key, &assetCollection)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return err, nil
-		}
-	}
-
-	return nil, &assetCollection
-}
-
 // Validate the referenced source cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, int) {
@@ -255,7 +214,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 		return nil, 1
 	}
 
-	err, cluster := r.getCluster(ref)
+	err, cluster := migapi.GetCluster(r, ref)
 	if err != nil {
 		return err, 0
 	}
@@ -321,7 +280,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 		plan.Status.DeleteCondition(InvalidDestinationCluster)
 	}
 
-	err, cluster := r.getCluster(ref)
+	err, cluster := migapi.GetCluster(r, ref)
 	if err != nil {
 		return err, 0
 	}
@@ -353,23 +312,4 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 	}
 
 	return nil, 0
-}
-
-func (r ReconcileMigPlan) getCluster(ref *kapi.ObjectReference) (error, *migapi.MigCluster) {
-	key := types.NamespacedName{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-
-	cluster := migapi.MigCluster{}
-	err := r.Get(context.TODO(), key, &cluster)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return err, nil
-		}
-	}
-
-	return nil, &cluster
 }

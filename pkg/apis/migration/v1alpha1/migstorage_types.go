@@ -17,11 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
@@ -61,21 +59,23 @@ type MigStorageList struct {
 
 // VolumeSnapshotConfig defines config for taking Volume Snapshots
 type VolumeSnapshotConfig struct {
-	AwsRegion          string `json:"awsRegion,omitempty"`
-	AzureAPITimeout    string `json:"azureApiTimeout,omitempty"`
-	AzureResourceGroup string `json:"azureResourceGroup,omitempty"`
+	CredsSecretRef     *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
+	AwsRegion          string                `json:"awsRegion,omitempty"`
+	AzureAPITimeout    string                `json:"azureApiTimeout,omitempty"`
+	AzureResourceGroup string                `json:"azureResourceGroup,omitempty"`
 }
 
 // BackupStorageConfig defines config for creating and storing Backups
 type BackupStorageConfig struct {
-	AwsBucketName       string `json:"awsBucketName,omitempty"`
-	AwsRegion           string `json:"awsRegion,omitempty"`
-	AwsS3ForcePathStyle bool   `json:"awsS3ForcePathStyle,omitempty"`
-	AwsPublicURL        string `json:"awsPublicUrl,omitempty"`
-	AwsKmsKeyID         string `json:"awsKmsKeyId,omitempty"`
-	AwsSignatureVersion string `json:"awsSignatureVersion,omitempty"`
-	AzureStorageAccount string `json:"azureStorageAccount,omitempty"`
-	AzureResourceGroup  string `json:"azureResourceGroup,omitempty"`
+	CredsSecretRef      *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
+	AwsBucketName       string                `json:"awsBucketName,omitempty"`
+	AwsRegion           string                `json:"awsRegion,omitempty"`
+	AwsS3ForcePathStyle bool                  `json:"awsS3ForcePathStyle,omitempty"`
+	AwsPublicURL        string                `json:"awsPublicUrl,omitempty"`
+	AwsKmsKeyID         string                `json:"awsKmsKeyId,omitempty"`
+	AwsSignatureVersion string                `json:"awsSignatureVersion,omitempty"`
+	AzureStorageAccount string                `json:"azureStorageAccount,omitempty"`
+	AzureResourceGroup  string                `json:"azureResourceGroup,omitempty"`
 }
 
 func init() {

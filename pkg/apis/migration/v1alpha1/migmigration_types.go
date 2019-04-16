@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigMigrationSpec defines the desired state of MigMigration
@@ -59,4 +60,10 @@ type MigMigrationList struct {
 
 func init() {
 	SchemeBuilder.Register(&MigMigration{}, &MigMigrationList{})
+}
+
+// Get the migration plan.
+// Returns `nil` when the reference cannot be resolved.
+func (r *MigMigration) GetPlan(client k8sclient.Client) (error, *MigPlan) {
+	return GetPlan(client, r.Spec.MigPlanRef)
 }

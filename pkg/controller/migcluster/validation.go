@@ -106,13 +106,17 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 }
 
 func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (error, *crapi.Cluster) {
-	key := types.NamespacedName{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
+	if ref == nil {
+		return nil, nil
 	}
-
 	cluster := crapi.Cluster{}
-	err := r.Get(context.TODO(), key, &cluster)
+	err := r.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		},
+		&cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
@@ -145,7 +149,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 		return nil, 1
 	}
 
-	err, secret := r.getSecret(ref)
+	err, secret := migapi.GetSecret(r, ref)
 	if err != nil {
 		return err, 0
 	}
@@ -188,23 +192,4 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 	}
 
 	return nil, 0
-}
-
-func (r ReconcileMigCluster) getSecret(ref *kapi.ObjectReference) (error, *kapi.Secret) {
-	key := types.NamespacedName{
-		Namespace: ref.Namespace,
-		Name:      ref.Name,
-	}
-
-	secret := kapi.Secret{}
-	err := r.Get(context.TODO(), key, &secret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return err, nil
-		}
-	}
-
-	return nil, &secret
 }
