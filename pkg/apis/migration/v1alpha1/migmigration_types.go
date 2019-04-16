@@ -19,10 +19,15 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
+	"github.com/fusor/mig-controller/pkg/util"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
@@ -37,10 +42,15 @@ type MigMigrationSpec struct {
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
 	Conditions
-	MigrationRunning    bool         `json:"migrationStarted,omitempty"`
-	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
+
+	MigrationRunning   bool `json:"migrationStarted,omitempty"`
+	MigrationCompleted bool `json:"migrationCompleted,omitempty"`
+
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	SrcBackupRef   *kapi.ObjectReference `json:"srcBackupRef,omitempty"`
+	DestRestoreRef *kapi.ObjectReference `json:"destRestoreRef,omitempty"`
 }
 
 // +genclient
@@ -107,4 +117,40 @@ func (r *MigMigration) MarkAsCompleted(c k8sclient.Client) error {
 	}
 	clog.Info(fmt.Sprintf("[mMigration] Finished MigMigration [%s/%s]", r.Namespace, r.Name))
 	return nil
+}
+
+// EnsureBackupExists creates a Velero Backup if one doesn't already exist
+func (r *MigMigration) EnsureBackupExists(c k8sclient.Client, backupNsName types.NamespacedName, assets *MigAssetCollection) (*velerov1.Backup, error) {
+
+	vBackupExisting := &velerov1.Backup{}
+	vBackupNew := util.BuildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
+
+	err := c.Get(context.TODO(), backupNsName, vBackupExisting)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Backup not found, create
+			err = c.Create(context.TODO(), vBackupNew)
+			if err != nil {
+				clog.Info("[mMigration] Failed to CREATE Velero Backup on source cluster")
+				return nil, err
+			}
+			clog.Info("[mMigration] Velero Backup CREATED successfully on source cluster")
+			return vBackupNew, nil
+		}
+		return nil, err
+	}
+
+	if !reflect.DeepEqual(vBackupNew.Spec, vBackupExisting.Spec) {
+		// Send "Create" action for Velero Backup to K8s API
+		vBackupExisting.Spec = vBackupNew.Spec
+		err = c.Update(context.TODO(), vBackupExisting)
+		if err != nil {
+			clog.Error(err, "[mMigration] Failed to UPDATE Velero Backup on src cluster")
+			return nil, err
+		}
+		clog.Info("[mMigration] Velero Backup UPDATED successfully on source cluster")
+		return vBackupExisting, nil
+	}
+	clog.Info("[mMigration] Velero Backup EXISTS on source cluster")
+	return vBackupExisting, nil
 }

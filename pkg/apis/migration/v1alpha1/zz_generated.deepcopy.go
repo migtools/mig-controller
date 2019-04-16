@@ -382,6 +382,16 @@ func (in *MigMigrationStatus) DeepCopyInto(out *MigMigrationStatus) {
 		in, out := &in.CompletionTimestamp, &out.CompletionTimestamp
 		*out = (*in).DeepCopy()
 	}
+	if in.SrcBackupRef != nil {
+		in, out := &in.SrcBackupRef, &out.SrcBackupRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
+	if in.DestRestoreRef != nil {
+		in, out := &in.DestRestoreRef, &out.DestRestoreRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
 	return
 }
 
