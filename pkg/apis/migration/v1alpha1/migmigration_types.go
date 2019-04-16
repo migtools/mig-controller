@@ -125,8 +125,8 @@ func (m *MigMigration) GetMigPlan(c client.Client) (*MigPlan, error) {
 	return migPlan, nil
 }
 
-// EnsureBackupExists ...
-func (m *MigMigration) EnsureBackupExists(c client.Client, backupNsName types.NamespacedName, assets *MigAssetCollection) (*velerov1.Backup, error) {
+// RunBackup ...
+func (m *MigMigration) RunBackup(c client.Client, backupNsName types.NamespacedName, assets *MigAssetCollection) (*velerov1.Backup, error) {
 
 	vBackupExisting := &velerov1.Backup{}
 	vBackupNew := util.BuildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
@@ -159,4 +159,59 @@ func (m *MigMigration) EnsureBackupExists(c client.Client, backupNsName types.Na
 	}
 	clog.Info("[mMigration] Velero Backup EXISTS on source cluster")
 	return vBackupExisting, nil
+}
+
+// RunRestore ...
+func (m *MigMigration) RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName) (*velerov1.Restore, error) {
+
+	vRestoreNew := util.BuildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)
+	vRestoreExisting := &velerov1.Restore{}
+
+	err := c.Get(context.TODO(), restoreNsName, vRestoreExisting)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Restore not found, we need to check if the Backup we want to use has completed
+			vBackupDest := &velerov1.Backup{}
+			err = c.Get(context.TODO(), backupNsName, vBackupDest)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					clog.Info(fmt.Sprintf("[mMigration] Velero Backup doesn't yet exist on destination cluster [%s/%s], waiting...",
+						backupNsName.Namespace, backupNsName.Name))
+					return nil, nil // don't requeue
+				}
+			}
+
+			if vBackupDest.Status.Phase != velerov1.BackupPhaseCompleted {
+				clog.Info(fmt.Sprintf("[mMigration] Velero Backup on destination cluster in unusable phase [%s] [%s/%s]",
+					vBackupDest.Status.Phase, backupNsName.Namespace, backupNsName.Name))
+				return nil, fmt.Errorf("Backup phase unusable") // don't requeue
+			}
+
+			clog.Info(fmt.Sprintf("[mMigration] Found completed Backup on destination cluster [%s/%s], creating Restore on destination cluster",
+				backupNsName.Namespace, backupNsName.Name))
+			// Create a restore once we're certain that the required Backup exists
+			err = c.Create(context.TODO(), vRestoreNew)
+			if err != nil {
+				clog.Info("[mMigration] Failed to CREATE Velero Restore on destination cluster")
+				return nil, err
+			}
+			clog.Info("[mMigration] Velero Restore CREATED successfully on destination cluster")
+			return vRestoreNew, nil
+		}
+		return nil, err // requeue
+	}
+
+	if !reflect.DeepEqual(vRestoreNew.Spec, vRestoreExisting.Spec) {
+		// Send "Create" action for Velero Backup to K8s API
+		vRestoreExisting.Spec = vRestoreNew.Spec
+		err = c.Update(context.TODO(), vRestoreExisting)
+		if err != nil {
+			clog.Info("[mMigration] Failed to UPDATE Velero Restore")
+			return nil, err
+		}
+		clog.Info("[mMigration] Velero Restore UPDATED successfully on destination cluster")
+		return vRestoreExisting, nil
+	}
+	clog.Info("[mMigration] Velero Restore EXISTS on destination cluster")
+	return vRestoreExisting, nil
 }
