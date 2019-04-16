@@ -98,6 +98,21 @@ type ReconcileMigMigration struct {
 	scheme *runtime.Scheme
 }
 
+// reconcileResources holds the data needed for MigMigration to reconcile.
+// At the beginning of a reconcile, this data will be compiled by fetching
+// information from each cluster involved in the migration.
+type reconcileResources struct {
+	migPlan        *migapi.MigPlan
+	migAssets      *migapi.MigAssetCollection
+	srcMigCluster  *migapi.MigCluster
+	destMigCluster *migapi.MigCluster
+	migStage       *migapi.MigStage
+
+	backup  *velerov1.Backup
+	restore *velerov1.Restore
+}
+
+// Reconcile performs Migrations based on the data in MigMigration
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
@@ -112,7 +127,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Hardcode Velero namespace for now
 	veleroNs := "velero"
 
-	// Fetch the MigMigration migMigration
+	// Retrieve the MigMigration being reconciled
 	migMigration := &migapi.MigMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, migMigration)
 	if err != nil {
@@ -125,30 +140,21 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Validate
 	_, err = r.validate(migMigration)
 	if err != nil {
-		return reconcile.Result{}, err
+		return reconcile.Result{}, err // requeue
 	}
 
-	// Don't do any more work if Migration is complete
+	// Stop if Migration is complete
 	if migMigration.Status.MigrationCompleted == true {
 		return reconcile.Result{}, nil // don't requeue
 	}
 
-	// Don't continue if not ready.
+	// Stop if MigMigration isn't ready
 	if !migMigration.Status.IsReady() {
 		return reconcile.Result{}, nil //don't requeue
 	}
 
-	// Retrieve MigPlan from reference on MigMigration
-	migPlan, err := migMigration.GetMigPlan(r.Client)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-
-	// Retrieve MigAssetCollection from ref
-	assets, err := migPlan.GetMigAssetCollection(r.Client)
+	// Build ReconcileResources containing data needed for rest of reconcile process
+	res, err := r.getReconcileResources(migMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -162,24 +168,16 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	// *****************************
-	// Get the srcCluster MigCluster
-	srcCluster, err := migPlan.GetSrcMigCluster(r.Client)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-
-	srcClusterK8sClient, err := srcCluster.BuildControllerRuntimeClient(r.Client)
+	// ******************************
+	// Build controller-runtime client for srcMigCluster
+	srcClusterK8sClient, err := res.srcMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET srcClusterK8sClient")
 		return reconcile.Result{}, nil
 	}
 
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
-	backupNamespaces := assets.Spec.Namespaces
+	backupNamespaces := res.migAssets.Spec.Namespaces
 	backupUniqueName := fmt.Sprintf("%s-velero-backup", migMigration.Name)
 	vBackupNew := util.BuildVeleroBackup(veleroNs, backupUniqueName, backupNamespaces)
 
@@ -187,7 +185,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	err = srcClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: vBackupNew.Name, Namespace: vBackupNew.Namespace}, vBackupExisting)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Backup not found
+			// Backup not found, create
 			err = srcClusterK8sClient.Create(context.TODO(), vBackupNew)
 			if err != nil {
 				log.Error(err, "[mMigration] Failed to CREATE Velero Backup on source cluster")
@@ -195,8 +193,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			}
 			log.Info("[mMigration] Velero Backup CREATED successfully on source cluster")
 		}
-		// Error reading the 'Backup' object - requeue the request.
-		log.Error(err, "[mMigration] Exit 4: Requeueing")
 		return reconcile.Result{}, err
 	}
 
@@ -214,16 +210,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// ******************************
-	// Get the destCluster MigCluster
-	destCluster, err := migPlan.GetDestMigCluster(r.Client)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
-		}
-		return reconcile.Result{}, err // requeue
-	}
-
-	destClusterK8sClient, err := destCluster.BuildControllerRuntimeClient(r.Client)
+	// Build controller-runtime client for destMigCluster
+	destClusterK8sClient, err := res.destMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "Failed to GET destClusterK8sClient")
 		return reconcile.Result{}, nil
@@ -261,8 +249,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			}
 			log.Info("[mMigration] Velero Restore CREATED successfully on destination cluster")
 		}
-		// Error reading the 'Backup' object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{}, err // requeue
 	}
 
 	if !reflect.DeepEqual(vRestoreNew.Spec, vRestoreExisting.Spec) {
@@ -278,10 +265,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Info("[mMigration] Velero Restore EXISTS on destination cluster")
 	}
 
-	// Monitor changes to Velero Restore state on dstCluster, wait for completion (watch MigCluster)
-
-	// Mark MigMigration as complete
-	// If all references are marked as ready, set StartTimestamp and mark as running
+	// Mark MigMigration as complete if Velero Restore has completed
 	if vRestoreExisting.Status.Phase == velerov1.RestorePhaseCompleted {
 		err = migMigration.MarkAsCompleted(r.Client)
 		if err != nil {
@@ -290,4 +274,43 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// getReconcileResources gets all of the information needed to perform a reconcile
+func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMigration) (*reconcileResources, error) {
+	resources := &reconcileResources{}
+
+	// MigPlan
+	migPlan, err := migMigration.GetMigPlan(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	resources.migPlan = migPlan
+
+	// MigAssetCollection
+	migAssets, err := migPlan.GetMigAssetCollection(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	resources.migAssets = migAssets
+
+	// SrcMigCluster
+	srcMigCluster, err := migPlan.GetSrcMigCluster(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	resources.srcMigCluster = srcMigCluster
+
+	// DestMigCluster
+	destMigCluster, err := migPlan.GetDestMigCluster(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	resources.destMigCluster = destMigCluster
+
+	// TODO - MigStage
+	// TODO - Backup
+	// TODO - Restore
+
+	return resources, nil
 }
