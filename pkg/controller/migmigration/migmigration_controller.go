@@ -19,11 +19,9 @@ package migmigration
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	"github.com/fusor/mig-controller/pkg/util"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -143,12 +141,11 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	// Stop if Migration is complete
+	// Return if Migration is complete
 	if migMigration.Status.MigrationCompleted == true {
 		return reconcile.Result{}, nil // don't requeue
 	}
-
-	// Stop if MigMigration isn't ready
+	// Return if MigMigration isn't ready
 	if !migMigration.Status.IsReady() {
 		return reconcile.Result{}, nil //don't requeue
 	}
@@ -179,12 +176,15 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection referenced by MigPlan
 	backupUniqueName := fmt.Sprintf("%s-velero-backup", migMigration.Name)
 	backupNsName := types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}
-	srcBackup, err := migMigration.EnsureBackupExists(srcClusterK8sClient, backupNsName, rres.migAssets)
+	srcBackup, err := migMigration.RunBackup(srcClusterK8sClient, backupNsName, rres.migAssets)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
+	}
+	if srcBackup == nil {
+		return reconcile.Result{}, nil // don't requeue
 	}
 	rres.backup = srcBackup
 
@@ -196,56 +196,23 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	// Create Velero Restore on dstCluster pointing at Velero Backup unique name
+	// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
 	restoreUniqueName := fmt.Sprintf("%s-velero-restore", migMigration.Name)
-	vRestoreNew := util.BuildVeleroRestore(veleroNs, restoreUniqueName, backupUniqueName)
-
-	vRestoreExisting := &velerov1.Restore{}
-	err = destClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: vRestoreNew.Name, Namespace: vRestoreNew.Namespace}, vRestoreExisting)
+	restoreNsName := types.NamespacedName{Name: restoreUniqueName, Namespace: veleroNs}
+	destRestore, err := migMigration.RunRestore(destClusterK8sClient, restoreNsName, backupNsName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Restore not found, we need to check if the Backup we want to use has completed
-			vBackupDestCluster := &velerov1.Backup{}
-			err2 := destClusterK8sClient.Get(context.TODO(), types.NamespacedName{Name: backupUniqueName, Namespace: veleroNs}, vBackupDestCluster)
-			if err2 != nil {
-				if errors.IsNotFound(err2) {
-					log.Info(fmt.Sprintf("[mMigration] Velero Backup doesn't yet exist on destination cluster [%s/%s], waiting...", veleroNs, backupUniqueName))
-					return reconcile.Result{}, nil // don't requeue
-				}
-			}
-
-			if vBackupDestCluster.Status.Phase != velerov1.BackupPhaseCompleted {
-				log.Info(fmt.Sprintf("[mMigration] Velero Backup on destination cluster in unusable phase [%s] [%s/%s]", vBackupDestCluster.Status.Phase, veleroNs, backupUniqueName))
-				return reconcile.Result{}, nil // don't requeue
-			}
-
-			log.Info(fmt.Sprintf("[mMigration] Found completed Backup on destination cluster [%s/%s], creating Restore on destination cluster", veleroNs, backupUniqueName))
-			// Create a restore once we're certain that the required Backup exists
-			err = destClusterK8sClient.Create(context.TODO(), vRestoreNew)
-			if err != nil {
-				log.Error(err, "[mMigration] Failed to CREATE Velero Restore on destination cluster")
-				return reconcile.Result{}, nil
-			}
-			log.Info("[mMigration] Velero Restore CREATED successfully on destination cluster")
+			return reconcile.Result{}, nil // don't requeue
 		}
 		return reconcile.Result{}, err // requeue
 	}
-
-	if !reflect.DeepEqual(vRestoreNew.Spec, vRestoreExisting.Spec) {
-		// Send "Create" action for Velero Backup to K8s API
-		vRestoreExisting.Spec = vRestoreNew.Spec
-		err = destClusterK8sClient.Update(context.TODO(), vRestoreExisting)
-		if err != nil {
-			log.Error(err, "[mMigration] Failed to UPDATE Velero Restore")
-			return reconcile.Result{}, nil
-		}
-		log.Info("[mMigration] Velero Restore UPDATED successfully on destination cluster")
-	} else {
-		log.Info("[mMigration] Velero Restore EXISTS on destination cluster")
+	if destRestore == nil {
+		return reconcile.Result{}, nil // don't requeue
 	}
+	rres.restore = destRestore
 
 	// Mark MigMigration as complete if Velero Restore has completed
-	if vRestoreExisting.Status.Phase == velerov1.RestorePhaseCompleted {
+	if rres.restore.Status.Phase == velerov1.RestorePhaseCompleted {
 		err = migMigration.MarkAsCompleted(r.Client)
 		if err != nil {
 			return reconcile.Result{}, err // requeue
