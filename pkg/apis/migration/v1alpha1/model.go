@@ -14,20 +14,20 @@ import (
 
 // List MigPlans
 // Returns and empty list when none found.
-func ListPlans(client k8sclient.Client, ns string) (error, []MigPlan) {
+func ListPlans(client k8sclient.Client, ns string) ([]MigPlan, error) {
 	list := MigPlanList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), options, &list)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
-	return nil, list.Items
+	return list.Items, err
 }
 
 // Get a referenced MigPlan.
 // Returns `nil` when the reference cannot be resolved.
-func GetPlan(client k8sclient.Client, ref *kapi.ObjectReference) (error, *MigPlan) {
+func GetPlan(client k8sclient.Client, ref *kapi.ObjectReference) (*MigPlan, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -43,16 +43,16 @@ func GetPlan(client k8sclient.Client, ref *kapi.ObjectReference) (error, *MigPla
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &object
+	return &object, err
 }
 
 // Get a referenced MigCluster.
 // Returns `nil` when the reference cannot be resolved.
-func GetCluster(client k8sclient.Client, ref *kapi.ObjectReference) (error, *MigCluster) {
+func GetCluster(client k8sclient.Client, ref *kapi.ObjectReference) (*MigCluster, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -68,16 +68,16 @@ func GetCluster(client k8sclient.Client, ref *kapi.ObjectReference) (error, *Mig
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &object
+	return &object, err
 }
 
 // Get a referenced MigStorage.
 // Returns `nil` when the reference cannot be resolved.
-func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (error, *MigStorage) {
+func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (*MigStorage, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -93,16 +93,16 @@ func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (error, *Mig
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &object
+	return &object, err
 }
 
 // Get a referenced MigAssetCollection.
 // Returns `nil` when the reference cannot be resolved.
-func GetAssetCollection(client k8sclient.Client, ref *kapi.ObjectReference) (error, *MigAssetCollection) {
+func GetAssetCollection(client k8sclient.Client, ref *kapi.ObjectReference) (*MigAssetCollection, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -118,16 +118,16 @@ func GetAssetCollection(client k8sclient.Client, ref *kapi.ObjectReference) (err
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &object
+	return &object, err
 }
 
 // Get a referenced Secret.
 // Returns `nil` when the reference cannot be resolved.
-func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (error, *kapi.Secret) {
+func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -143,9 +143,9 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (error, *kapi
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &object
+	return &object, err
 }

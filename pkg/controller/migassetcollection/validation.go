@@ -36,20 +36,20 @@ const (
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCollection) (error, int) {
+func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCollection) (int, error) {
 	totalSet := 0
 
 	// Empty collection
-	err, nSet := r.validateEmpty(assetCollection)
+	nSet, err := r.validateEmpty(assetCollection)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
 	// Validate listed assets
-	err, nSet = r.validateAssets(assetCollection)
+	nSet, err = r.validateAssets(assetCollection)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
@@ -59,28 +59,28 @@ func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCo
 	// Apply changes
 	err = r.Update(context.TODO(), assetCollection)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
-	return err, totalSet
+	return totalSet, err
 }
 
-func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAssetCollection) (error, int) {
+func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAssetCollection) (int, error) {
 	if len(assetCollection.Spec.Namespaces) == 0 {
 		assetCollection.Status.SetCondition(migapi.Condition{
 			Type:    EmptyCollection,
 			Status:  True,
 			Message: EmptyCollectionMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		assetCollection.Status.DeleteCondition(EmptyCollection)
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
-func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigAssetCollection) (error, int) {
+func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigAssetCollection) (int, error) {
 	notFound := make([]string, 0)
 	ns := kapi.Namespace{}
 	for _, name := range assetCollection.Spec.Namespaces {
@@ -92,7 +92,7 @@ func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigA
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			return err, 0
+			return 0, err
 		}
 	}
 
@@ -104,10 +104,10 @@ func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigA
 			Reason:  NotFound,
 			Message: message,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		assetCollection.Status.DeleteCondition(NamespacesNotFound)
 	}
 
-	return nil, 0
+	return 0, nil
 }

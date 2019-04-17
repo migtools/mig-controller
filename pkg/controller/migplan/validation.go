@@ -50,36 +50,36 @@ const (
 
 // Validate the plan resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (error, int) {
+func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
 	totalSet := 0
 	var err error
 	nSet := 0
 
 	// Source cluster
-	err, nSet = r.validateSourceCluster(plan)
+	nSet, err = r.validateSourceCluster(plan)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
 	// Destination cluster
-	err, nSet = r.validateDestinationCluster(plan)
+	nSet, err = r.validateDestinationCluster(plan)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
 	// Storage
-	err, nSet = r.validateStorage(plan)
+	nSet, err = r.validateStorage(plan)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
 	// AssetCollection
-	err, nSet = r.validateAssetCollection(plan)
+	nSet, err = r.validateAssetCollection(plan)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
@@ -89,15 +89,15 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (error, int) {
 	// Apply changes.
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
-	return err, totalSet
+	return totalSet, err
 }
 
 // Validate the referenced storage.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
+func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (int, error) {
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
@@ -109,12 +109,12 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 			Message: InvalidStorageRefMessage,
 		})
 		plan.Status.DeleteCondition(StorageNotReady)
-		return nil, 1
+		return 1, nil
 	}
 
-	err, storage := migapi.GetStorage(r, ref)
+	storage, err := migapi.GetStorage(r, ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -126,7 +126,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 			Message: InvalidStorageRefMessage,
 		})
 		plan.Status.DeleteCondition(StorageNotReady)
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(InvalidStorageRef)
 	}
@@ -138,17 +138,17 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (error, int) {
 			Status:  True,
 			Message: StorageNotReadyMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(StorageNotReady)
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
 // Validate the referenced assetCollection.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, int) {
+func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, error) {
 	ref := plan.Spec.MigAssetCollectionRef
 
 	// NotSet
@@ -160,12 +160,12 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 			Message: InvalidAssetCollectionRefMessage,
 		})
 		plan.Status.DeleteCondition(AssetCollectionNotReady)
-		return nil, 1
+		return 1, nil
 	}
 
-	err, assetCollection := migapi.GetAssetCollection(r, ref)
+	assetCollection, err := migapi.GetAssetCollection(r, ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -177,7 +177,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 			Message: InvalidAssetCollectionRefMessage,
 		})
 		plan.Status.DeleteCondition(AssetCollectionNotReady)
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(InvalidAssetCollectionRef)
 	}
@@ -189,17 +189,17 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (error, 
 			Status:  True,
 			Message: AssetCollectionNotReadyMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(AssetCollectionNotReady)
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
 // Validate the referenced source cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, int) {
+func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (int, error) {
 	ref := plan.Spec.SrcMigClusterRef
 
 	// NotSet
@@ -211,12 +211,12 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 			Message: InvalidSourceClusterRefMessage,
 		})
 		plan.Status.DeleteCondition(SourceClusterNotReady)
-		return nil, 1
+		return 1, nil
 	}
 
-	err, cluster := migapi.GetCluster(r, ref)
+	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -228,7 +228,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 			Message: InvalidSourceClusterRefMessage,
 		})
 		plan.Status.DeleteCondition(SourceClusterNotReady)
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(InvalidSourceClusterRef)
 	}
@@ -240,17 +240,17 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (error, in
 			Status:  True,
 			Message: SourceClusterNotReadyMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(SourceClusterNotReady)
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
 // Validate the referenced source cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (error, int) {
+func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int, error) {
 	ref := plan.Spec.DestMigClusterRef
 
 	// NotSet
@@ -263,7 +263,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 		})
 		plan.Status.DeleteCondition(InvalidDestinationCluster)
 		plan.Status.DeleteCondition(DestinationClusterNotReady)
-		return nil, 1
+		return 1, nil
 	}
 
 	// NotDistinct
@@ -275,14 +275,14 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 			Message: InvalidDestinationClusterMessage,
 		})
 		plan.Status.DeleteCondition(DestinationClusterNotReady)
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(InvalidDestinationCluster)
 	}
 
-	err, cluster := migapi.GetCluster(r, ref)
+	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -294,7 +294,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 			Message: InvalidDestinationClusterRefMessage,
 		})
 		plan.Status.DeleteCondition(DestinationClusterNotReady)
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(InvalidDestinationClusterRef)
 	}
@@ -306,10 +306,10 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (erro
 			Status:  True,
 			Message: DestinationClusterNotReadyMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		plan.Status.DeleteCondition(DestinationClusterNotReady)
 	}
 
-	return nil, 0
+	return 0, nil
 }

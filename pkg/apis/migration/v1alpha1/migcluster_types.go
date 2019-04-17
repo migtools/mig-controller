@@ -68,7 +68,7 @@ func init() {
 
 // Get the service account secret.
 // Returns `nil` when the reference cannot be resolved.
-func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (error, *kapi.Secret) {
+func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	return GetSecret(client, m.Spec.ServiceAccountSecretRef)
 }
 

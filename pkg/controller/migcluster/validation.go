@@ -39,22 +39,22 @@ const (
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (error, int) {
+func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 	totalSet := 0
 	var err error
 	nSet := 0
 
 	// registry cluster
-	err, nSet = r.validateRegistryCluster(cluster)
+	nSet, err = r.validateRegistryCluster(cluster)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
 	// SA secret
-	err, nSet = r.validateSaSecret(cluster)
+	nSet, err = r.validateSaSecret(cluster)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 	totalSet += nSet
 
@@ -64,13 +64,13 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (error, int) {
 	// Apply changes.
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
-	return err, totalSet
+	return totalSet, err
 }
 
-func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) (error, int) {
+func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) (int, error) {
 	ref := cluster.Spec.ClusterRef
 
 	// NotSet
@@ -81,12 +81,12 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 			Reason:  NotSet,
 			Message: InvalidClusterRefMessage,
 		})
-		return nil, 1
+		return 1, nil
 	}
 
-	err, storage := r.getCluster(ref)
+	storage, err := r.getCluster(ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -97,15 +97,15 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 			Reason:  NotFound,
 			Message: InvalidClusterRefMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		cluster.Status.DeleteCondition(InvalidClusterRef)
 	}
 
-	return nil, 0
+	return 0, nil
 }
 
-func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (error, *crapi.Cluster) {
+func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (*crapi.Cluster, error) {
 	if ref == nil {
 		return nil, nil
 	}
@@ -121,20 +121,20 @@ func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (error, *crap
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return err, nil
+			return nil, err
 		}
 	}
 
-	return nil, &cluster
+	return &cluster, err
 }
 
-func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error, int) {
+func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, error) {
 	ref := cluster.Spec.ServiceAccountSecretRef
 
 	if cluster.Spec.IsHostCluster {
 		cluster.Status.DeleteCondition(InvalidSaSecretRef)
 		cluster.Status.DeleteCondition(InvalidSaToken)
-		return nil, 0
+		return 0, nil
 	}
 
 	// NotSet
@@ -146,12 +146,12 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 			Message: InvalidSaSecretRefMessage,
 		})
 		cluster.Status.DeleteCondition(InvalidSaToken)
-		return nil, 1
+		return 1, nil
 	}
 
-	err, secret := migapi.GetSecret(r, ref)
+	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	// NotFound
@@ -163,7 +163,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 			Message: InvalidSaSecretRefMessage,
 		})
 		cluster.Status.DeleteCondition(InvalidSaToken)
-		return nil, 1
+		return 1, nil
 	} else {
 		cluster.Status.DeleteCondition(InvalidSaSecretRef)
 	}
@@ -177,7 +177,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 			Reason:  NotFound,
 			Message: InvalidSaTokenMessage,
 		})
-		return nil, 1
+		return 1, nil
 	}
 	if len(token) == 0 {
 		cluster.Status.SetCondition(migapi.Condition{
@@ -186,10 +186,10 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (error
 			Reason:  NotSet,
 			Message: InvalidSaTokenMessage,
 		})
-		return nil, 1
+		return 1, nil
 	} else {
 		cluster.Status.DeleteCondition(InvalidSaToken)
 	}
 
-	return nil, 0
+	return 0, nil
 }
