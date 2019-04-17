@@ -17,6 +17,8 @@ limitations under the License.
 package migmigration
 
 import (
+	"fmt"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
@@ -36,29 +38,37 @@ func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMi
 	resources := &reconcileResources{}
 
 	// MigPlan
-	migPlan, err := migMigration.GetMigPlan(r.Client)
+	migPlan, err := migMigration.GetPlan(r.Client)
 	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Failed to GET MigPlan referenced by MigMigration [%s/%s]",
+			migMigration.Namespace, migMigration.Name))
 		return nil, err
 	}
 	resources.migPlan = migPlan
 
 	// MigAssetCollection
-	migAssets, err := migPlan.GetMigAssetCollection(r.Client)
+	migAssets, err := migPlan.GetAssetCollection(r.Client)
 	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Failed to GET MigAssetCollection referenced by MigPlan [%s/%s]",
+			migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.migAssets = migAssets
 
 	// SrcMigCluster
-	srcMigCluster, err := migPlan.GetSrcMigCluster(r.Client)
+	srcMigCluster, err := migPlan.GetSourceCluster(r.Client)
 	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Failed to GET SrcMigCluster referenced by MigPlan [%s/%s]",
+			migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.srcMigCluster = srcMigCluster
 
 	// DestMigCluster
-	destMigCluster, err := migPlan.GetDestMigCluster(r.Client)
+	destMigCluster, err := migPlan.GetDestinationCluster(r.Client)
 	if err != nil {
+		log.Info(fmt.Sprintf("[mMigration] Failed to GET DestMigCluster referenced by MigPlan [%s/%s]",
+			migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.destMigCluster = destMigCluster
