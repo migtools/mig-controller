@@ -28,8 +28,8 @@ import (
 func BuildVeleroBackup(ns string, name string, backupNamespaces []string) *velerov1.Backup {
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			GenerateName: name,
+			Namespace:    ns,
 		},
 		Spec: velerov1.BackupSpec{
 			LabelSelector: &metav1.LabelSelector{
@@ -56,8 +56,8 @@ func BuildVeleroRestore(ns string, name string, backupUniqueName string) *velero
 	restorePVs := true
 	restore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			GenerateName: name,
+			Namespace:    ns,
 		},
 		Spec: velerov1.RestoreSpec{
 			BackupName: backupUniqueName,

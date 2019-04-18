@@ -17,10 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
+
+var log = logf.Log.WithName("controller")
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
@@ -30,10 +35,15 @@ type MigMigrationSpec struct {
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
 	Conditions
-	MigrationRunning    bool         `json:"migrationStarted,omitempty"`
-	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
+
+	MigrationRunning   bool `json:"migrationStarted,omitempty"`
+	MigrationCompleted bool `json:"migrationCompleted,omitempty"`
+
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	SrcBackupRef   *kapi.ObjectReference `json:"srcBackupRef,omitempty"`
+	DestRestoreRef *kapi.ObjectReference `json:"destRestoreRef,omitempty"`
 }
 
 // +genclient
@@ -62,8 +72,30 @@ func init() {
 	SchemeBuilder.Register(&MigMigration{}, &MigMigrationList{})
 }
 
-// Get the migration plan.
+// GetPlan - Get the migration plan.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigMigration) GetPlan(client k8sclient.Client) (*MigPlan, error) {
 	return GetPlan(client, r.Spec.MigPlanRef)
+}
+
+// MarkAsRunning marks the MigMigration status as 'Running'. Returns true if changed.
+func (r *MigMigration) MarkAsRunning() bool {
+	if r.Status.MigrationCompleted == true || r.Status.MigrationRunning == true {
+		return false
+	}
+	r.Status.MigrationRunning = true
+	r.Status.MigrationCompleted = false
+	r.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
+	return true
+}
+
+// MarkAsCompleted marks the MigMigration status as 'Completed'. Returns true if changed.
+func (r *MigMigration) MarkAsCompleted() bool {
+	if r.Status.MigrationRunning == false || r.Status.MigrationCompleted == true {
+		return false
+	}
+	r.Status.MigrationRunning = false
+	r.Status.MigrationCompleted = true
+	r.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
+	return true
 }
