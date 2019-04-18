@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	kapi "k8s.io/api/core/v1"
@@ -80,36 +78,24 @@ func (r *MigMigration) GetPlan(client k8sclient.Client) (*MigPlan, error) {
 	return GetPlan(client, r.Spec.MigPlanRef)
 }
 
-// MarkAsRunning marks the MigMigration status as 'Running'
-func (r *MigMigration) MarkAsRunning(c k8sclient.Client) error {
+// MarkAsRunning marks the MigMigration status as 'Running'. Returns true if changed.
+func (r *MigMigration) MarkAsRunning() bool {
 	if r.Status.MigrationCompleted == true || r.Status.MigrationRunning == true {
-		return nil
+		return false
 	}
 	r.Status.MigrationRunning = true
 	r.Status.MigrationCompleted = false
 	r.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
-	err := c.Update(context.TODO(), r)
-	if err != nil {
-		log.Info("[mMigration] Failed to mark MigMigration [%s/%s] as running", r.Namespace, r.Name)
-		return err
-	}
-	log.Info(fmt.Sprintf("[mMigration] Started MigMigration [%s/%s]", r.Namespace, r.Name))
-	return nil
+	return true
 }
 
-// MarkAsCompleted marks the MigMigration status as 'Completed'
-func (r *MigMigration) MarkAsCompleted(c k8sclient.Client) error {
+// MarkAsCompleted marks the MigMigration status as 'Completed'. Returns true if changed.
+func (r *MigMigration) MarkAsCompleted() bool {
 	if r.Status.MigrationRunning == false || r.Status.MigrationCompleted == true {
-		return nil
+		return false
 	}
 	r.Status.MigrationRunning = false
 	r.Status.MigrationCompleted = true
 	r.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
-	err := c.Update(context.TODO(), r)
-	if err != nil {
-		log.Info("[mMigration] Failed to mark MigMigration [%s/%s] as completed", r.Namespace, r.Name)
-		return err
-	}
-	log.Info(fmt.Sprintf("[mMigration] Finished MigMigration [%s/%s]", r.Namespace, r.Name))
-	return nil
+	return true
 }

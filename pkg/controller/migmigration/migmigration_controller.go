@@ -146,11 +146,15 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// If all references are marked as ready, run MarkAsRunning() to set this Migration into "Running" state
-	err = migMigration.MarkAsRunning(r.Client)
-	if err != nil {
-		return reconcile.Result{}, err // requeue
+	changed := migMigration.MarkAsRunning()
+	if changed {
+		err = r.Update(context.TODO(), migMigration)
+		if err != nil {
+			log.Info("[mMigration] Failed to mark MigMigration [%s/%s] as running", migMigration.Namespace, migMigration.Name)
+			return reconcile.Result{}, err // requeue
+		}
+		log.Info(fmt.Sprintf("[mMigration] STARTED MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
 	}
-
 	// ******************************
 	// Build controller-runtime client for srcMigCluster
 	srcClusterK8sClient, err := rres.srcMigCluster.BuildControllerRuntimeClient(r.Client)
@@ -233,9 +237,14 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Mark MigMigration as complete if Velero Restore has completed
 	if destRestore.Status.Phase == velerov1.RestorePhaseCompleted {
-		err = migMigration.MarkAsCompleted(r.Client)
-		if err != nil {
-			return reconcile.Result{}, err // requeue
+		changed = migMigration.MarkAsCompleted()
+		if changed {
+			err = r.Update(context.TODO(), migMigration)
+			if err != nil {
+				log.Info("[mMigration] Failed to mark MigMigration [%s/%s] as completed", migMigration.Namespace, migMigration.Name)
+				return reconcile.Result{}, err // requeue
+			}
+			log.Info(fmt.Sprintf("[mMigration] FINISHED MigMigration [%s/%s]", migMigration.Namespace, migMigration.Name))
 		}
 	}
 
