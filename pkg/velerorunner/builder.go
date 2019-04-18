@@ -31,9 +31,6 @@ func buildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 			Namespace:    ns,
 		},
 		Spec: velerov1.BackupSpec{
-			// LabelSelector: &metav1.LabelSelector{
-			// 	MatchLabels: map[string]string{"app": "nginx"},
-			// },
 			StorageLocation:    "default",
 			TTL:                metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces: backupNamespaces,
