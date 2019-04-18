@@ -22,7 +22,6 @@ import (
 	"reflect"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/util"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,7 +35,7 @@ var log = logf.Log.WithName("controller")
 func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string) (*velerov1.Backup, error) {
 
 	vBackupExisting := &velerov1.Backup{}
-	vBackupNew := util.BuildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
+	vBackupNew := buildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
 
 	// Switch over to using a generated name if we are creating
 	// if createNew {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/fusor/mig-controller/pkg/util"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +30,7 @@ import (
 // RunRestore runs a Velero Restore if it hasn't been run already
 func RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Restore, error) {
 
-	vRestoreNew := util.BuildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)
+	vRestoreNew := buildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)
 	vRestoreExisting := &velerov1.Restore{}
 
 	err := c.Get(context.TODO(), restoreNsName, vRestoreExisting)
