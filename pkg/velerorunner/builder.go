@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package velerorunner
 
 import (
 	"time"
@@ -23,9 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BuildVeleroBackup creates a Velero backup with default values for most fields
+// buildVeleroBackup creates a Velero backup with default values for most fields
 // TODO: Remove placeholder 'app: ngninx' LabelSelector
-func BuildVeleroBackup(ns string, name string, backupNamespaces []string) *velerov1.Backup {
+func buildVeleroBackup(ns string, name string, backupNamespaces []string) *velerov1.Backup {
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name,
@@ -49,10 +49,10 @@ func BuildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 	return backup
 }
 
-// BuildVeleroRestore creates a mostly blank Velero Restore in a specified ns/name, with the
+// buildVeleroRestore creates a mostly blank Velero Restore in a specified ns/name, with the
 // ability to specify a unique Velero Backup resource name to restore from.
 // TODO: offer more customization
-func BuildVeleroRestore(ns string, name string, backupUniqueName string) *velerov1.Restore {
+func buildVeleroRestore(ns string, name string, backupUniqueName string) *velerov1.Restore {
 	restorePVs := true
 	restore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
