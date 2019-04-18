@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
-var clog = logf.Log.WithName("controller")
+var log = logf.Log.WithName("controller")
 
 // RunBackup runs a Velero Backup if it hasn't been run already
 func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string) (*velerov1.Backup, error) {
@@ -50,10 +50,10 @@ func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migap
 			// Backup not found, 'Create'
 			err = c.Create(context.TODO(), vBackupNew)
 			if err != nil {
-				clog.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup on source cluster", logPrefix))
+				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup on source cluster", logPrefix))
 				return nil, err
 			}
-			clog.Info(fmt.Sprintf("[%s] Velero Backup CREATED successfully on source cluster", logPrefix))
+			log.Info(fmt.Sprintf("[%s] Velero Backup CREATED successfully on source cluster", logPrefix))
 			return vBackupNew, nil
 		}
 		return nil, err
@@ -64,12 +64,12 @@ func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migap
 		vBackupExisting.Spec = vBackupNew.Spec
 		err = c.Update(context.TODO(), vBackupExisting)
 		if err != nil {
-			clog.Error(err, fmt.Sprintf("[%s] Failed to UPDATE Velero Backup on src cluster", logPrefix))
+			log.Error(err, fmt.Sprintf("[%s] Failed to UPDATE Velero Backup on src cluster", logPrefix))
 			return nil, err
 		}
-		clog.Info(fmt.Sprintf("[%s] Velero Backup UPDATED successfully on source cluster", logPrefix))
+		log.Info(fmt.Sprintf("[%s] Velero Backup UPDATED successfully on source cluster", logPrefix))
 		return vBackupExisting, nil
 	}
-	clog.Info(fmt.Sprintf("[%s] Velero Backup EXISTS on source cluster", logPrefix))
+	log.Info(fmt.Sprintf("[%s] Velero Backup EXISTS on source cluster", logPrefix))
 	return vBackupExisting, nil
 }

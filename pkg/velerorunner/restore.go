@@ -42,27 +42,27 @@ func RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsNam
 			err = c.Get(context.TODO(), backupNsName, vBackupDest)
 			if err != nil {
 				if errors.IsNotFound(err) {
-					clog.Info(fmt.Sprintf("[%s] Velero Backup doesn't yet exist on destination cluster [%s/%s], waiting...",
+					log.Info(fmt.Sprintf("[%s] Velero Backup doesn't yet exist on destination cluster [%s/%s], waiting...",
 						logPrefix, backupNsName.Namespace, backupNsName.Name))
 					return nil, nil // don't requeue
 				}
 			}
 
 			if vBackupDest.Status.Phase != velerov1.BackupPhaseCompleted {
-				clog.Info(fmt.Sprintf("[%s] Velero Backup on destination cluster in unusable phase [%s] [%s/%s]",
+				log.Info(fmt.Sprintf("[%s] Velero Backup on destination cluster in unusable phase [%s] [%s/%s]",
 					logPrefix, vBackupDest.Status.Phase, backupNsName.Namespace, backupNsName.Name))
 				return nil, fmt.Errorf("Backup phase unusable") // don't requeue
 			}
 
-			clog.Info(fmt.Sprintf("[%s] Found completed Backup on destination cluster [%s/%s], creating Restore on destination cluster",
+			log.Info(fmt.Sprintf("[%s] Found completed Backup on destination cluster [%s/%s], creating Restore on destination cluster",
 				logPrefix, backupNsName.Namespace, backupNsName.Name))
 			// Create a restore once we're certain that the required Backup exists
 			err = c.Create(context.TODO(), vRestoreNew)
 			if err != nil {
-				clog.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Restore on destination cluster", logPrefix))
+				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Restore on destination cluster", logPrefix))
 				return nil, err
 			}
-			clog.Info(fmt.Sprintf("[%s] Velero Restore CREATED successfully on destination cluster", logPrefix))
+			log.Info(fmt.Sprintf("[%s] Velero Restore CREATED successfully on destination cluster", logPrefix))
 			return vRestoreNew, nil
 		}
 		return nil, err // requeue
@@ -73,12 +73,12 @@ func RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsNam
 		vRestoreExisting.Spec = vRestoreNew.Spec
 		err = c.Update(context.TODO(), vRestoreExisting)
 		if err != nil {
-			clog.Info(fmt.Sprintf("[%s] Failed to UPDATE Velero Restore", logPrefix))
+			log.Info(fmt.Sprintf("[%s] Failed to UPDATE Velero Restore", logPrefix))
 			return nil, err
 		}
-		clog.Info(fmt.Sprintf("[%s] Velero Restore UPDATED successfully on destination cluster", logPrefix))
+		log.Info(fmt.Sprintf("[%s] Velero Restore UPDATED successfully on destination cluster", logPrefix))
 		return vRestoreExisting, nil
 	}
-	clog.Info(fmt.Sprintf("[%s] Velero Restore EXISTS on destination cluster", logPrefix))
+	log.Info(fmt.Sprintf("[%s] Velero Restore EXISTS on destination cluster", logPrefix))
 	return vRestoreExisting, nil
 }
