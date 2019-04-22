@@ -47,7 +47,7 @@ func (r *ReconcileMigMigration) initReconcile(migMigration *migapi.MigMigration)
 	}
 
 	r.resources = rres
-	return true, nil
+	return true, nil // continue
 }
 
 func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration) (bool, error) {
@@ -61,7 +61,7 @@ func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigrat
 		}
 		log.Info(fmt.Sprintf("[%s] STARTED MigMigration [%s/%s]", logPrefix, migMigration.Namespace, migMigration.Name))
 	}
-	return true, nil
+	return true, nil // continue
 }
 
 func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration) (bool, error) {
@@ -105,7 +105,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 		return false, err // requeue
 	}
 
-	return true, nil
+	return true, nil // continue
 }
 
 func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration) (bool, error) {
@@ -156,7 +156,7 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 		return false, err // requeue
 	}
 
-	return true, nil
+	return true, nil // continue
 }
 
 func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration) (bool, error) {
@@ -172,5 +172,5 @@ func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigra
 			log.Info(fmt.Sprintf("[%s] FINISHED MigMigration [%s/%s]", logPrefix, migMigration.Namespace, migMigration.Name))
 		}
 	}
-	return true, nil
+	return true, nil // continue
 }
