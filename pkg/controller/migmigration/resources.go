@@ -20,28 +20,36 @@ import (
 	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 // reconcileResources holds the data needed for MigMigration to reconcile.
 // At the beginning of a reconcile, this data will be compiled by fetching
 // information from each cluster involved in the migration.
 type reconcileResources struct {
+	migMigration   *migapi.MigMigration
 	migPlan        *migapi.MigPlan
 	migAssets      *migapi.MigAssetCollection
 	srcMigCluster  *migapi.MigCluster
 	destMigCluster *migapi.MigCluster
-	migStage       *migapi.MigStage
+
+	srcBackup   *velerov1.Backup
+	destRestore *velerov1.Restore
 }
 
-// getReconcileResources puts together a struct with all resources needed to perform a MigMigration reconcile
+// getReconcileResources puts together a struct with all resources needed to perform a MigMigration reconcile.
+// The slots for Velero Backup and Restore are left empty for later use, as they can't be filled  yet.
 func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMigration) (*reconcileResources, error) {
 	resources := &reconcileResources{}
+
+	// MigMigration
+	resources.migMigration = migMigration
 
 	// MigPlan
 	migPlan, err := migMigration.GetPlan(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Failed to GET MigPlan referenced by MigMigration [%s/%s]",
-			migMigration.Namespace, migMigration.Name))
+		log.Info(fmt.Sprintf("[%s] Failed to GET MigPlan referenced by MigMigration [%s/%s]",
+			logPrefix, migMigration.Namespace, migMigration.Name))
 		return nil, err
 	}
 	resources.migPlan = migPlan
@@ -49,8 +57,8 @@ func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMi
 	// MigAssetCollection
 	migAssets, err := migPlan.GetAssetCollection(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Failed to GET MigAssetCollection referenced by MigPlan [%s/%s]",
-			migPlan.Namespace, migPlan.Name))
+		log.Info(fmt.Sprintf("[%s] Failed to GET MigAssetCollection referenced by MigPlan [%s/%s]",
+			logPrefix, migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.migAssets = migAssets
@@ -58,8 +66,8 @@ func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMi
 	// SrcMigCluster
 	srcMigCluster, err := migPlan.GetSourceCluster(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Failed to GET SrcMigCluster referenced by MigPlan [%s/%s]",
-			migPlan.Namespace, migPlan.Name))
+		log.Info(fmt.Sprintf("[%s] Failed to GET SrcMigCluster referenced by MigPlan [%s/%s]",
+			logPrefix, migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.srcMigCluster = srcMigCluster
@@ -67,8 +75,8 @@ func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMi
 	// DestMigCluster
 	destMigCluster, err := migPlan.GetDestinationCluster(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[mMigration] Failed to GET DestMigCluster referenced by MigPlan [%s/%s]",
-			migPlan.Namespace, migPlan.Name))
+		log.Info(fmt.Sprintf("[%s] Failed to GET DestMigCluster referenced by MigPlan [%s/%s]",
+			logPrefix, migPlan.Namespace, migPlan.Name))
 		return nil, err
 	}
 	resources.destMigCluster = destMigCluster
