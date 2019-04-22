@@ -68,7 +68,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 	// Build controller-runtime client for srcMigCluster
 	srcClusterK8sClient, err := r.resources.srcMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
-		log.Error(err, "Failed to GET srcClusterK8sClient")
+		log.Error(err, "[%s] Failed to GET srcClusterK8sClient", logPrefix)
 		return false, nil // don't requeue
 	}
 
@@ -160,7 +160,6 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 }
 
 func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration) (bool, error) {
-
 	if r.resources.destRestore.Status.Phase == velerov1.RestorePhaseCompleted {
 		changed := migMigration.MarkAsCompleted()
 		if changed {

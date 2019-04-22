@@ -42,11 +42,6 @@ const logPrefix = "mMigration"
 // TODO: don't hard-code veleroNs
 const veleroNs = "velero"
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new MigMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -145,7 +140,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 
-	// Ensure source cluster has a Velero Backup
+	// Ensure destination cluster has a Velero Backup + Restore
 	completed, err = r.ensureDestinationClusterRestore(migMigration)
 	if !completed {
 		return reconcile.Result{}, err
