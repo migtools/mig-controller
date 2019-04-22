@@ -28,48 +28,47 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *ReconcileMigMigration) initReconcile(migMigration *migapi.MigMigration) (bool, error) {
+func (r *ReconcileMigMigration) initReconcile(migMigration *migapi.MigMigration) (*reconcileResources, error) {
 	// Return if MigMigration is complete
 	if migMigration.Status.MigrationCompleted == true {
-		return false, nil // don't requeue
+		return nil, nil // don't requeue
 	}
 	// Return if MigMigration isn't ready
 	if !migMigration.Status.IsReady() {
-		return false, nil //don't requeue
+		return nil, nil //don't requeue
 	}
 	// Build ReconcileResources for MigMigration containing data needed for rest of reconcile process
 	rres, err := r.getReconcileResources(migMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, nil // don't requeue
+			return nil, nil // don't requeue
 		}
-		return false, err // requeue
+		return nil, err // requeue
 	}
 
-	r.resources = rres
-	return true, nil // continue
+	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration) (bool, error) {
+func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
 	// If all references are marked as ready, run MarkAsRunning() to set this Migration into "Running" state
 	changed := migMigration.MarkAsRunning()
 	if changed {
 		err := r.Update(context.TODO(), migMigration)
 		if err != nil {
 			log.Info("[%s] Failed to mark MigMigration [%s/%s] as running", logPrefix, migMigration.Namespace, migMigration.Name)
-			return false, err // requeue
+			return nil, err // requeue
 		}
 		log.Info(fmt.Sprintf("[%s] STARTED MigMigration [%s/%s]", logPrefix, migMigration.Namespace, migMigration.Name))
 	}
-	return true, nil // continue
+	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration) (bool, error) {
+func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
 	// Build controller-runtime client for srcMigCluster
-	srcClusterK8sClient, err := r.resources.srcMigCluster.BuildControllerRuntimeClient(r.Client)
+	srcClusterK8sClient, err := rres.srcMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET srcClusterK8sClient", logPrefix)
-		return false, nil // don't requeue
+		return nil, nil // don't requeue
 	}
 
 	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection
@@ -85,35 +84,35 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 			Namespace: migMigration.Status.SrcBackupRef.Namespace,
 		}
 	}
-	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, r.resources.migAssets, logPrefix)
+	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, rres.migAssets, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, nil // don't requeue
+			return nil, nil // don't requeue
 		}
-		return false, err // requeue
+		return nil, err // requeue
 	}
 	if srcBackup == nil {
-		return false, nil // don't requeue
+		return nil, nil // don't requeue
 	}
-	r.resources.srcBackup = srcBackup
+	rres.srcBackup = srcBackup
 
 	// Update MigMigration with reference to Velero Backup
 	migMigration.Status.SrcBackupRef = &kapi.ObjectReference{Name: srcBackup.Name, Namespace: srcBackup.Namespace}
 	err = r.Update(context.TODO(), migMigration)
 	if err != nil {
 		log.Info(fmt.Sprintf("[%s] Failed to UPDATE MigMigration with Velero Backup reference", logPrefix))
-		return false, err // requeue
+		return nil, err // requeue
 	}
 
-	return true, nil // continue
+	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration) (bool, error) {
+func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
 	// Build controller-runtime client for destMigCluster
-	destClusterK8sClient, err := r.resources.destMigCluster.BuildControllerRuntimeClient(r.Client)
+	destClusterK8sClient, err := rres.destMigCluster.BuildControllerRuntimeClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET destClusterK8sClient", logPrefix)
-		return false, nil // don't requeue
+		return nil, nil // don't requeue
 	}
 
 	// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
@@ -139,37 +138,37 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 	destRestore, err := vrunner.RunRestore(destClusterK8sClient, restoreNsName, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, nil // don't requeue
+			return nil, nil // don't requeue
 		}
-		return false, err // requeue
+		return nil, err // requeue
 	}
 	if destRestore == nil {
-		return false, nil // don't requeue
+		return nil, nil // don't requeue
 	}
-	r.resources.destRestore = destRestore
+	rres.destRestore = destRestore
 
 	// Update MigMigration with reference to Velero Retore
 	migMigration.Status.DestRestoreRef = &kapi.ObjectReference{Name: destRestore.Name, Namespace: destRestore.Namespace}
 	err = r.Update(context.TODO(), migMigration)
 	if err != nil {
 		log.Info(fmt.Sprintf("[%s] Failed to UPDATE MigMigration with Velero Restore reference", logPrefix))
-		return false, err // requeue
+		return nil, err // requeue
 	}
 
-	return true, nil // continue
+	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration) (bool, error) {
-	if r.resources.destRestore.Status.Phase == velerov1.RestorePhaseCompleted {
+func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
+	if rres.destRestore.Status.Phase == velerov1.RestorePhaseCompleted {
 		changed := migMigration.MarkAsCompleted()
 		if changed {
 			err := r.Update(context.TODO(), migMigration)
 			if err != nil {
 				log.Info("[%s] Failed to mark MigMigration [%s/%s] as completed", logPrefix, migMigration.Namespace, migMigration.Name)
-				return false, err // requeue
+				return nil, err // requeue
 			}
 			log.Info(fmt.Sprintf("[%s] FINISHED MigMigration [%s/%s]", logPrefix, migMigration.Namespace, migMigration.Name))
 		}
 	}
-	return true, nil // continue
+	return rres, nil // continue
 }

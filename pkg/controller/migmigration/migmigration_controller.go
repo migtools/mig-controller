@@ -91,8 +91,7 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
 	client.Client
-	scheme    *runtime.Scheme
-	resources *reconcileResources
+	scheme *runtime.Scheme
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
@@ -120,35 +119,35 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	var completed bool
+	var rres *reconcileResources
 
 	// Perform prechecks and gather resources needed for reconcile
-	completed, err = r.initReconcile(migMigration)
-	if !completed {
+	rres, err = r.initReconcile(migMigration)
+	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Mark the MigMigration as started once prechecks are passed
-	completed, err = r.startMigMigration(migMigration)
-	if !completed {
+	rres, err = r.startMigMigration(migMigration, rres)
+	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Ensure source cluster has a Velero Backup
-	completed, err = r.ensureSourceClusterBackup(migMigration)
-	if !completed {
+	rres, err = r.ensureSourceClusterBackup(migMigration, rres)
+	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Ensure destination cluster has a Velero Backup + Restore
-	completed, err = r.ensureDestinationClusterRestore(migMigration)
-	if !completed {
+	rres, err = r.ensureDestinationClusterRestore(migMigration, rres)
+	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Mark MigMigration as complete if Velero Restore has completed
-	completed, err = r.finishMigMigration(migMigration)
-	if !completed {
+	rres, err = r.finishMigMigration(migMigration, rres)
+	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
