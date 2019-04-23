@@ -48,7 +48,7 @@ const (
 	InvalidBSLCredsSecretMessage    = "The `backupStorageConfig.credsSecretRef` secret has invalid content."
 	InvalidVSLProviderMessage       = "The `volumeSnapshotProvider` must be: (aws|gcp|azure)."
 	InvalidVSLSettingsMessage       = "The `volumeSnapshotConfig` settings [%s] not valid."
-	InvalidVSLCredsSecretRefMessage = "The `backupStorageConfig.credsSecretRef` must reference a `secret`."
+	InvalidVSLCredsSecretRefMessage = "The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`."
 	InvalidVSLCredsSecretMessage    = "The `volumeSnapshotConfig.credsSecretRef` secret has invalid content."
 )
 
@@ -117,6 +117,12 @@ func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) (int, error
 		return 0, err
 	}
 	totalSet += nSet
+
+	// Update
+	err = r.Update(context.TODO(), storage)
+	if err != nil {
+		return 0, err
+	}
 
 	return totalSet, err
 }
@@ -221,7 +227,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 		storage.Status.DeleteCondition(InvalidBSLCredsSecret)
 		return 1, nil
 	} else {
-		storage.Status.DeleteCondition(InvalidBSLCredsSecret)
+		storage.Status.DeleteCondition(InvalidBSLCredsSecretRef)
 	}
 
 	// secret content
@@ -233,6 +239,8 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 			Message: InvalidBSLCredsSecretMessage,
 		})
 		return 1, nil
+	} else {
+		storage.Status.DeleteCondition(InvalidBSLCredsSecret)
 	}
 
 	return 0, nil
@@ -364,7 +372,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 		storage.Status.DeleteCondition(InvalidVSLCredsSecret)
 		return 1, nil
 	} else {
-		storage.Status.DeleteCondition(InvalidVSLCredsSecret)
+		storage.Status.DeleteCondition(InvalidVSLCredsSecretRef)
 	}
 
 	// secret content
@@ -376,11 +384,14 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 			Message: InvalidVSLCredsSecretMessage,
 		})
 		return 1, nil
+	} else {
+		storage.Status.DeleteCondition(InvalidVSLCredsSecret)
 	}
 
 	return 0, nil
 }
 
 func (r ReconcileMigStorage) validCredsSecret(secret *kapi.Secret) bool {
+	// TODO: waiting on secret layout.
 	return true
 }

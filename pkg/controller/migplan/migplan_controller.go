@@ -133,14 +133,38 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validations.
-	_, err = r.validate(plan)
+	// nSet - The number of error conditions raised.
+	nSet, err := r.validate(plan)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+	if nSet > 0 {
+		plan.Status.SetReady(false, ReadyMessage)
+		err = r.Update(context.TODO(), plan)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		// done
+		return reconcile.Result{}, nil
+	}
 
-	//
-	// ADD LOGIC HERE
-	//
+	// Storage
+	// nSet - The number of error conditions raised.
+	nSet, err = r.createStorage(plan)
+	if nSet > 0 {
+		plan.Status.SetReady(false, ReadyMessage)
+		err = r.Update(context.TODO(), plan)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Ready
+	plan.Status.SetReady(true, ReadyMessage)
+	err = r.Update(context.TODO(), plan)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
 	// Done
 	return reconcile.Result{}, nil

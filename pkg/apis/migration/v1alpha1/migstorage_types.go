@@ -17,17 +17,20 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
-	VolumeSnapshotProvider string `json:"volumeSnapshotProvider"`
-	VolumeSnapshotConfig   `json:"volumeSnapshotConfig"`
-
-	BackupStorageProvider string `json:"backupStorageProvider"`
-	BackupStorageConfig   `json:"backupStorageConfig"`
+	BackupStorageProvider  string `json:"backupStorageProvider"`
+	BackupStorageConfig    `json:"backupStorageConfig"`
+	VolumeSnapshotProvider string `json:"volumeSnapshotProvider,omitempty"`
+	VolumeSnapshotConfig   `json:"volumeSnapshotConfig,omitempty"`
 }
 
 // MigStorageStatus defines the observed state of MigStorage
@@ -80,4 +83,74 @@ type BackupStorageConfig struct {
 
 func init() {
 	SchemeBuilder.Register(&MigStorage{}, &MigStorageList{})
+}
+
+// Determine if two BSLs are equal based on relevant fields in the Spec.
+// Returns `true` when equal.
+func (r *MigStorage) Equals(a, b *velero.BackupStorageLocation) bool {
+	return a.Spec.Provider == b.Spec.Provider &&
+		reflect.DeepEqual(a.Spec.Config, b.Spec.Config) &&
+		reflect.DeepEqual(
+			a.Spec.ObjectStorage,
+			b.Spec.ObjectStorage)
+}
+
+// Build a velero backup storage location.
+func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
+	location := &velero.BackupStorageLocation{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       CorrelationLabels(r, r.Namespace, r.Name),
+			Namespace:    "velero",
+			GenerateName: r.Name + "-",
+		},
+		Spec: velero.BackupStorageLocationSpec{
+			Provider: r.Spec.BackupStorageProvider,
+		},
+	}
+	r.UpdateBSL(location)
+	return location
+}
+
+// Update a velero backup storage location.
+func (r *MigStorage) UpdateBSL(location *velero.BackupStorageLocation) {
+	location.Spec.Provider = r.Spec.BackupStorageProvider
+	switch r.Spec.BackupStorageProvider {
+	case "aws":
+		r.updateAwsBSL(location)
+	case "azure":
+	case "gcp":
+	case "":
+	}
+}
+
+// Update a velero backup storage location for the AWS provider.
+func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
+	config := r.Spec.BackupStorageConfig
+	location.Spec.StorageType = velero.StorageType{
+		ObjectStorage: &velero.ObjectStorageLocation{
+			Bucket: config.AwsBucketName,
+		},
+	}
+	location.Spec.Config = map[string]string{
+		"region": config.AwsRegion,
+	}
+}
+
+// Get existing backup-storage-location by Label search.
+// Returns `nil` when not found.
+func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
+	list := velero.BackupStorageLocationList{}
+	labels := CorrelationLabels(r, r.Namespace, r.Name)
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
 }

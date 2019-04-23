@@ -65,8 +65,6 @@ spec:
             volumeSnapshotProvider:
               type: string
           required:
-          - volumeSnapshotProvider
-          - volumeSnapshotConfig
           - backupStorageProvider
           - backupStorageConfig
           type: object

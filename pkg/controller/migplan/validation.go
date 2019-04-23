@@ -19,6 +19,8 @@ const (
 	StorageNotReady              = "StorageNotReady"
 	AssetCollectionNotReady      = "AssetCollectionNotReady"
 	InvalidDestinationCluster    = "InvalidDestinationCluster"
+	CreateBSLFailed              = "CreateBackupStorageLocationFailed"
+	CreateVSLFailed              = "CreateVolumeSnapshotLocationFailed"
 )
 
 // Reasons
@@ -46,6 +48,8 @@ const (
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
 	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
+	CreateBSLFailedMessage              = "Create BSL failed."
+	CreateVSLFailedMessage              = "Create BSL failed."
 )
 
 // Validate the plan resource.
@@ -82,9 +86,6 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
 		return 0, err
 	}
 	totalSet += nSet
-
-	// Ready
-	plan.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
 	err = r.Update(context.TODO(), plan)
