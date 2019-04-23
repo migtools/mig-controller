@@ -114,8 +114,6 @@ type ReconcileMigPlan struct {
 }
 
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {

@@ -88,9 +88,6 @@ type ReconcileMigMigration struct {
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
