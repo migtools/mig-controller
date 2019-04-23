@@ -13,17 +13,14 @@ func GetRequests(a handler.MapObject, source interface{}) []reconcile.Request {
 		Name:      a.Meta.GetName(),
 		Namespace: a.Meta.GetNamespace(),
 	}
-	refOwner := RefOwner{
-		Kind: ToKind(source),
-	}
 	requests := []reconcile.Request{}
-	sources := refMap.Find(refTarget, refOwner)
-	for i := range sources {
-		refSource := sources[i]
+	owners := refMap.Find(refTarget, RefOwner{Kind: ToKind(source)})
+	for i := range owners {
+		refOwner := owners[i]
 		r := reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Namespace: refSource.Namespace,
-				Name:      refSource.Name,
+				Namespace: refOwner.Namespace,
+				Name:      refOwner.Name,
 			},
 		}
 		requests = append(requests, r)

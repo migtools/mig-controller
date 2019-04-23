@@ -2,10 +2,13 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 //
@@ -16,6 +19,19 @@ import (
 // Returns and empty list when none found.
 func ListPlans(client k8sclient.Client, ns string) ([]MigPlan, error) {
 	list := MigPlanList{}
+	options := k8sclient.InNamespace(ns)
+	err := client.List(context.TODO(), options, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
+}
+
+// List MigCluster
+// Returns and empty list when none found.
+func ListClusters(client k8sclient.Client, ns string) ([]MigCluster, error) {
+	list := MigClusterList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), options, &list)
 	if err != nil {
@@ -148,4 +164,14 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 	}
 
 	return &object, err
+}
+
+// Build  labels used to correlate CRs.
+// Format: <kind>: <namespace>:<name>
+func CorrelationLabels(kind interface{}, namespace, name string) map[string]string {
+	ref := fmt.Sprintf("%s.%s", namespace, name)
+	key := strings.ToLower(migref.ToKind(kind))
+	return map[string]string{
+		key: ref,
+	}
 }

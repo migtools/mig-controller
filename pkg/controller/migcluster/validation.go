@@ -2,6 +2,7 @@ package migcluster
 
 import (
 	"context"
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
@@ -15,12 +16,14 @@ const (
 	InvalidClusterRef  = "InvalidClusterRef"
 	InvalidSaSecretRef = "InvalidSaSecretRef"
 	InvalidSaToken     = "InvalidSaToken"
+	TestConnectFailed  = "TestConnectFailed"
 )
 
 // Reasons
 const (
-	NotSet   = "NotSet"
-	NotFound = "NotFound"
+	NotSet        = "NotSet"
+	NotFound      = "NotFound"
+	ConnectFailed = "ConnectFailed"
 )
 
 // Statuses
@@ -35,6 +38,7 @@ const (
 	InvalidClusterRefMessage  = "The `clusterRef` must reference a `cluster`."
 	InvalidSaSecretRefMessage = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage     = "The `saToken` not found in `serviceAccountSecretRef` secret."
+	TestConnectFailedMessage  = "Test connect failed: %s"
 )
 
 // Validate the asset collection resource.
@@ -53,6 +57,13 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 
 	// SA secret
 	nSet, err = r.validateSaSecret(cluster)
+	if err != nil {
+		return 0, err
+	}
+	totalSet += nSet
+
+	// Test Connection
+	nSet, err = r.testConnection(cluster)
 	if err != nil {
 		return 0, err
 	}
@@ -189,6 +200,28 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 		return 1, nil
 	} else {
 		cluster.Status.DeleteCondition(InvalidSaToken)
+	}
+
+	return 0, nil
+}
+
+// Test the connection.
+func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) (int, error) {
+	if cluster.Spec.IsHostCluster {
+		return 0, nil
+	}
+	_, err := cluster.BuildControllerRuntimeClient(r)
+	if err != nil {
+		message := fmt.Sprintf(TestConnectFailedMessage, err)
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:    TestConnectFailed,
+			Status:  True,
+			Reason:  ConnectFailed,
+			Message: message,
+		})
+		return 1, nil
+	} else {
+		cluster.Status.DeleteCondition(TestConnectFailed)
 	}
 
 	return 0, nil

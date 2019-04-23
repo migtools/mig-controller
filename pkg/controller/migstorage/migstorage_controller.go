@@ -82,6 +82,8 @@ type ReconcileMigStorage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages/status,verbs=get;update;patch
 func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Info("[mStorage] RECONCILE() ", "request", request)
+
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
 	err := r.Get(context.TODO(), request.NamespacedName, storage)
@@ -100,10 +102,6 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	//
-	// ADD LOGIC HERE
-	//
 
 	// Done
 	return reconcile.Result{}, nil
