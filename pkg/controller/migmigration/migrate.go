@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *ReconcileMigMigration) initReconcile(migMigration *migapi.MigMigration) (*reconcileResources, error) {
+func (r *ReconcileMigMigration) initMigration(migMigration *migapi.MigMigration) (*reconcileResources, error) {
 	// Return if MigMigration is complete
 	if migMigration.Status.MigrationCompleted == true {
 		return nil, nil // don't requeue

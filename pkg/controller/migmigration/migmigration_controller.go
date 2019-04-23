@@ -122,7 +122,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	var rres *reconcileResources
 
 	// Perform prechecks and gather resources needed for reconcile
-	rres, err = r.initReconcile(migMigration)
+	rres, err = r.initMigration(migMigration)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}
