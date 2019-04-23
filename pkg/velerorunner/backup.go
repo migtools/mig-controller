@@ -49,10 +49,12 @@ func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migap
 			// Backup not found, 'Create'
 			err = c.Create(context.TODO(), vBackupNew)
 			if err != nil {
-				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup on source cluster", logPrefix))
+				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup [%s/%s] on source cluster",
+					logPrefix, vBackupNew.Namespace, vBackupNew.Name))
 				return nil, err
 			}
-			log.Info(fmt.Sprintf("[%s] Velero Backup CREATED successfully on source cluster", logPrefix))
+			log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] CREATED successfully on source cluster",
+				logPrefix, vBackupNew.Namespace, vBackupNew.Name))
 			return vBackupNew, nil
 		}
 		return nil, err
@@ -63,12 +65,15 @@ func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migap
 		vBackupExisting.Spec = vBackupNew.Spec
 		err = c.Update(context.TODO(), vBackupExisting)
 		if err != nil {
-			log.Error(err, fmt.Sprintf("[%s] Failed to UPDATE Velero Backup on src cluster", logPrefix))
+			log.Error(err, fmt.Sprintf("[%s] Failed to UPDATE Velero Backup [%s/%s] on src cluster",
+				logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
 			return nil, err
 		}
-		log.Info(fmt.Sprintf("[%s] Velero Backup UPDATED successfully on source cluster", logPrefix))
+		log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] UPDATED successfully on source cluster",
+			logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
 		return vBackupExisting, nil
 	}
-	log.Info(fmt.Sprintf("[%s] Velero Backup EXISTS on source cluster", logPrefix))
+	log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] EXISTS on source cluster",
+		logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
 	return vBackupExisting, nil
 }
