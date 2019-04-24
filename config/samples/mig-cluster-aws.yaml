@@ -1,0 +1,17 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigCluster
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: migcluster-aws
+  namespace: mig
+spec:
+  isHostCluster: false
+
+  clusterRef:
+    name: aws-cluster
+    namespace: mig
+
+  serviceAccountSecretRef:
+    name: sa-token-aws
+    namespace: mig

@@ -1,0 +1,25 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigPlan
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: migplan-sample
+  namespace: mig
+spec:
+
+  srcMigClusterRef:
+    name: migcluster-local
+    namespace: mig
+
+  destMigClusterRef:
+    name: migcluster-aws
+    namespace: mig
+
+  migStorageRef:
+    name: migstorage-sample
+    namespace: mig
+
+  migAssetCollectionRef:
+    name: migassets-sample
+    namespace: mig
+

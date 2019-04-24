@@ -1,9 +1,10 @@
 apiVersion: migration.openshift.io/v1alpha1
-kind: MigStorage
+kind: MigAssetCollection
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: migstorage-sample
+  name: migassets-sample
+  namespace: mig
 spec:
-  # Add fields here
-  foo: bar
+  namespaces: ['nginx-example']
+

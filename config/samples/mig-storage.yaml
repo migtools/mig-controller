@@ -1,0 +1,29 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigStorage
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: migstorage-sample
+  namespace: mig
+spec:
+  backupStorageProvider: aws
+  volumeSnapshotProvider: aws
+
+  backupStorageConfig:
+    awsBucketName: foo
+    awsKmsKeyId: foo
+    awsPublicUrl: foo
+    awsRegion: foo
+    awsSignatureVersion: foo
+    credsSecretRef:
+      namespace: velero
+      name: cloud-credentials
+
+
+  volumeSnapshotConfig:
+    awsRegion: foo
+    credsSecretRef:
+      namespace: velero
+      name: cloud-credentials
+
+

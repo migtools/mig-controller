@@ -1,0 +1,17 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigCluster
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: migcluster-local
+  namespace: mig
+spec:
+  isHostCluster: true
+
+  clusterRef:
+    name: local-cluster
+    namespace: mig
+
+  serviceAccountSecretRef:
+    name: sa-token-local
+    namespace: mig

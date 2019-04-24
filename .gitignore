@@ -24,5 +24,6 @@ bin
 *~
 .vscode
 
-# dir for user symlinking of testing files
+# ignored dirs for sample resources
 migstuff
+migsamples
