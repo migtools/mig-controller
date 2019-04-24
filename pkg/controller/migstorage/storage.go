@@ -29,7 +29,7 @@ func (r ReconcileMigStorage) deleteBSLs(storage *migapi.MigStorage) error {
 	}
 	for _, cluster := range clusters {
 		if !cluster.Spec.IsHostCluster {
-			client, err = cluster.BuildControllerRuntimeClient(r)
+			client, err = cluster.GetClient(r)
 			if err != nil {
 				return err
 			}

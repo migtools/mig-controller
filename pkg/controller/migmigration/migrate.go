@@ -65,7 +65,7 @@ func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigrat
 
 func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
 	// Build controller-runtime client for srcMigCluster
-	srcClusterK8sClient, err := rres.srcMigCluster.BuildControllerRuntimeClient(r.Client)
+	srcClusterK8sClient, err := rres.srcMigCluster.GetClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET srcClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue
@@ -109,7 +109,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 
 func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
 	// Build controller-runtime client for destMigCluster
-	destClusterK8sClient, err := rres.destMigCluster.BuildControllerRuntimeClient(r.Client)
+	destClusterK8sClient, err := rres.destMigCluster.GetClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET destClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue

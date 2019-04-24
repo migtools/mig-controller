@@ -72,14 +72,17 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 	return GetSecret(client, m.Spec.ServiceAccountSecretRef)
 }
 
-// BuildControllerRuntimeClient builds a remote client using a MigCluster and an existing client
-func (m *MigCluster) BuildControllerRuntimeClient(c k8sclient.Client) (k8sclient.Client, error) {
+// GetClient get a local or remote client using a MigCluster and an existing client
+func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
+	if m.Spec.IsHostCluster {
+		return c, nil
+	}
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := buildControllerRuntimeClient(restConfig)
+	client, err := buildClient(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +153,9 @@ func buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
 	return clusterConfig
 }
 
-// buildControllerRuntimeClient builds a controller-runtime client for interacting with
+// buildClient builds a controller-runtime client for interacting with
 // a K8s cluster.
-func buildControllerRuntimeClient(config *rest.Config) (k8sclient.Client, error) {
+func buildClient(config *rest.Config) (k8sclient.Client, error) {
 	c, err := k8sclient.New(config, k8sclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		return nil, err
