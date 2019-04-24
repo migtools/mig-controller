@@ -29,6 +29,11 @@ deploy: manifests
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
 
+# Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
+samples:
+	mkdir -p migsamples
+	cp -v config/samples/* migsamples
+
 # Run go fmt against code
 fmt:
 	go fmt ./pkg/... ./cmd/...

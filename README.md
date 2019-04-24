@@ -16,10 +16,10 @@ Do this on the cluster where you'll be running the controller.
 
 ```
 # Create 'Mig' CRDs
-$ oc create -f config/crds
+$ oc apply -f config/crds
 
 # Create 'Cluster' CRD
-$ oc create -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
+$ oc apply -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
 ```
 
 ---
@@ -63,30 +63,44 @@ Before mig-controller can run a Migration, you'll need to provide:
 
 
 ```
-# Source cluster coordinates & auth details
-oc create -f cluster-src.yaml
-oc create -f cluster-src-sa-secret.yaml
-oc create -f mig-cluster-src.yaml
-
-# Destination cluster coordinates & auth details
-oc create -f cluster-dest.yaml
-oc create -f cluster-dest-sa-secret.yaml
-oc create -f mig-cluster-dest.yaml
-
-# Describes where to store data during Migration
-oc create -f mig-storage.yaml
-
-# Describes which resources should be Migrated
-oc create -f mig-assets.yaml
-
-# Describes which clusters, storage, and namespaces should be to run a Migration
-oc create -f mig-plan.yaml
-
-# Declares that a Stage operation should be run
-oc create -f mig-stage.yaml
-
-# Declares that a Migration operation should be run 
-oc create -f mig-migration.yaml
+make samples
+# [... sample CR content will be copied to 'migsamples' dir]
 ```
 
-- See [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) for blank CR samples
+Inspect and edit each of the files in the 'migsamples' directory, making changes as needed. After this is done, create the resources on the cluster your controller is running on.
+
+```
+# Option 1: Create everything in a single command
+oc apply -f migsamples
+
+# Option 2: Create resources individually
+
+cd migsamples
+
+# Source cluster coordinates & auth details
+oc apply -f cluster-local.yaml
+oc apply -f sa-secret-local.yaml
+oc apply -f mig-cluster-local.yaml
+
+# Destination cluster coordinates & auth details
+oc apply -f cluster-aws.yaml
+oc apply -f sa-secret-aws.yaml
+oc apply -f mig-cluster-aws.yaml
+
+# Describes where to store data during Migration
+oc apply -f mig-storage.yaml
+
+# Describes which resources should be Migrated
+oc apply -f mig-assets.yaml
+
+# Describes which clusters, storage, and namespaces should be to run a Migration
+oc apply -f mig-plan.yaml
+
+# Declares that a Stage operation should be run
+oc apply -f mig-stage.yaml
+
+# Declares that a Migration operation should be run 
+oc apply -f mig-migration.yaml
+```
+
+- See [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) CR samples. It is _highly_ recommended to run `make samples` to copy these to the .gitignore'd 'migsamples' before filling out cluster details (URLs + SA tokens).
