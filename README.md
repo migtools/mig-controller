@@ -19,7 +19,7 @@ Do this on the cluster where you'll be running the controller.
 $ oc create -f config/crds
 
 # Create 'Cluster' CRD
-$ oc create -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/pkg/apis/clusterregistry/v1alpha1/types.go
+$ oc create -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
 ```
 
 ---
