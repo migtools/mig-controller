@@ -129,6 +129,7 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 	location.Spec.StorageType = velero.StorageType{
 		ObjectStorage: &velero.ObjectStorageLocation{
 			Bucket: config.AwsBucketName,
+			Prefix: "velero",
 		},
 	}
 	location.Spec.Config = map[string]string{
