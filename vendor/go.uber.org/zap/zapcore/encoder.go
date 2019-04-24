@@ -91,8 +91,8 @@ type TimeEncoder func(time.Time, PrimitiveArrayEncoder)
 // since the Unix epoch.
 func EpochTimeEncoder(t time.Time, enc PrimitiveArrayEncoder) {
 	nanos := t.UnixNano()
-	sec := float64(nanos) / float64(time.Second)
-	enc.AppendFloat64(sec)
+	sec := int64(float64(nanos) / float64(time.Second))
+	enc.AppendInt64(sec)
 }
 
 // EpochMillisTimeEncoder serializes a time.Time to a floating-point number of
