@@ -99,7 +99,7 @@ func (r *MigStorage) Equals(a, b *velero.BackupStorageLocation) bool {
 func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 	location := &velero.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       CorrelationLabels(r, r.Namespace, r.Name),
+			Labels:       CorrelationLabels(r, r.UID),
 			Namespace:    "velero",
 			GenerateName: r.Name + "-",
 		},
@@ -140,7 +140,7 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 // Returns `nil` when not found.
 func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
 	list := velero.BackupStorageLocationList{}
-	labels := CorrelationLabels(r, r.Namespace, r.Name)
+	labels := CorrelationLabels(r, r.UID)
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),

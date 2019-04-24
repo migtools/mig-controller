@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -167,11 +166,10 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 }
 
 // Build  labels used to correlate CRs.
-// Format: <kind>: <namespace>:<name>
-func CorrelationLabels(kind interface{}, namespace, name string) map[string]string {
-	ref := fmt.Sprintf("%s.%s", namespace, name)
+// Format: <kind>: <uid>.  The <uid> should be the ObjectMeta.UID
+func CorrelationLabels(kind interface{}, uid types.UID) map[string]string {
 	key := strings.ToLower(migref.ToKind(kind))
 	return map[string]string{
-		key: ref,
+		key: string(uid),
 	}
 }
