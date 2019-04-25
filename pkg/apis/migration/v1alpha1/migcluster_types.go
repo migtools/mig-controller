@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,6 +96,10 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	// Get first K8s endpoint from ClusterRef
 	clusterRef := m.Spec.ClusterRef
 	cluster := &crapi.Cluster{}
+	if clusterRef == nil {
+		err := errors.New("ClusterRef is nil.")
+		return nil, err
+	}
 
 	err := c.Get(context.TODO(), types.NamespacedName{Name: clusterRef.Name, Namespace: clusterRef.Namespace}, cluster)
 	if err != nil {
@@ -121,6 +126,10 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	// Get SA token attached to this MigCluster
 	saSecretRef := m.Spec.ServiceAccountSecretRef
 	saSecret := &kapi.Secret{}
+	if saSecretRef == nil {
+		err := errors.New("ServiceAccountSecretRef not set.")
+		return nil, err
+	}
 
 	err = c.Get(context.TODO(), types.NamespacedName{Name: saSecretRef.Name, Namespace: saSecretRef.Namespace}, saSecret)
 	if err != nil {

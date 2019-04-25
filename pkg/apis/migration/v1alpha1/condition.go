@@ -50,6 +50,7 @@ type Conditions struct {
 	Conditions []Condition `json:"conditions"`
 }
 
+// Find a condition by type.
 func (r *Conditions) FindCondition(cndType string) (int, *Condition) {
 	if r.Conditions == nil {
 		return 0, nil
