@@ -25,8 +25,10 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -136,27 +138,34 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Create a Remote Watch for this MigCluster if one doesn't exist
-	if !migCluster.Spec.IsHostCluster {
-		remoteWatchMap := GetRemoteWatchMap()
-		remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
+	remoteWatchMap := GetRemoteWatchMap()
+	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
 
-		if remoteWatchCluster == nil {
-			log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
+	if remoteWatchCluster == nil {
+		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
 
-			// restCfg := util.BuildRestConfig(remoteClusterURL, saToken)
-			restCfg, err := migCluster.BuildRestConfig(r.Client)
+		var restCfg *rest.Config
+
+		if migCluster.Spec.IsHostCluster {
+			restCfg, err = config.GetConfig()
 			if err != nil {
-				log.Error(err, fmt.Sprintf("[mCluster] Error during BuildRestConfig for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
+				log.Error(err, fmt.Sprintf("[mCluster] Error during config.GetConfig() for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
+				return reconcile.Result{}, err
+			}
+		} else {
+			restCfg, err = migCluster.BuildRestConfig(r.Client)
+			if err != nil {
+				log.Error(err, fmt.Sprintf("[mCluster] Error during BuildRestConfig() for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
 				return reconcile.Result{}, nil // don't requeue
 			}
-
-			StartRemoteWatch(r, RemoteManagerConfig{
-				RemoteRestConfig: restCfg,
-				ParentNsName:     request.NamespacedName,
-				ParentResource:   migCluster,
-			})
-			log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
 		}
+
+		StartRemoteWatch(r, RemoteManagerConfig{
+			RemoteRestConfig: restCfg,
+			ParentNsName:     request.NamespacedName,
+			ParentResource:   migCluster,
+		})
+		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
 	}
 
 	// Done
