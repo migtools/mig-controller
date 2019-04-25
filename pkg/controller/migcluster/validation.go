@@ -63,7 +63,7 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 	totalSet += nSet
 
 	// Test Connection
-	nSet, err = r.testConnection(cluster)
+	nSet, err = r.testConnection(cluster, totalSet)
 	if err != nil {
 		return 0, err
 	}
@@ -83,6 +83,12 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 
 func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) (int, error) {
 	ref := cluster.Spec.ClusterRef
+
+	// Not needed.
+	if cluster.Spec.IsHostCluster {
+		cluster.Status.DeleteCondition(InvalidClusterRef)
+		return 0, nil
+	}
 
 	// NotSet
 	if !migref.RefSet(ref) {
@@ -142,6 +148,7 @@ func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (*crapi.Clust
 func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, error) {
 	ref := cluster.Spec.ServiceAccountSecretRef
 
+	// Not needed.
 	if cluster.Spec.IsHostCluster {
 		cluster.Status.DeleteCondition(InvalidSaSecretRef)
 		cluster.Status.DeleteCondition(InvalidSaToken)
@@ -206,8 +213,12 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 }
 
 // Test the connection.
-func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) (int, error) {
+func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster, totalSet int) (int, error) {
 	if cluster.Spec.IsHostCluster {
+		cluster.Status.DeleteCondition(TestConnectFailed)
+		return 0, nil
+	}
+	if totalSet > 0 {
 		return 0, nil
 	}
 	_, err := cluster.GetClient(r)
