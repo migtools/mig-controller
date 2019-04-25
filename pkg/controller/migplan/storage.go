@@ -48,14 +48,7 @@ func (r ReconcileMigPlan) createBSLs(plan *migapi.MigPlan) error {
 		return err
 	}
 	for _, cluster := range clusters {
-		if !cluster.Spec.IsHostCluster {
-			client, err = cluster.BuildControllerRuntimeClient(r)
-			if err != nil {
-				return err
-			}
-		} else {
-			client = r
-		}
+		client, err = cluster.GetClient(r)
 		newLocation := storage.BuildBSL()
 		location, err := storage.GetBSL(client)
 		if err != nil {

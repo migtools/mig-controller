@@ -210,7 +210,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) (int, er
 	if cluster.Spec.IsHostCluster {
 		return 0, nil
 	}
-	_, err := cluster.BuildControllerRuntimeClient(r)
+	_, err := cluster.GetClient(r)
 	if err != nil {
 		message := fmt.Sprintf(TestConnectFailedMessage, err)
 		cluster.Status.SetCondition(migapi.Condition{
