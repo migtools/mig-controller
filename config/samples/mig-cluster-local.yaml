@@ -7,11 +7,3 @@ metadata:
   namespace: mig
 spec:
   isHostCluster: true
-
-  clusterRef:
-    name: local-cluster
-    namespace: mig
-
-  serviceAccountSecretRef:
-    name: sa-token-local
-    namespace: mig

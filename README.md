@@ -77,12 +77,11 @@ oc apply -f migsamples
 
 cd migsamples
 
-# Source cluster coordinates & auth details
-oc apply -f cluster-local.yaml
-oc apply -f sa-secret-local.yaml
+# Source cluster definition 
+# Note: no coordinates/auth needed when MigCluster has 'isHostCluster: true'
 oc apply -f mig-cluster-local.yaml
 
-# Destination cluster coordinates & auth details
+# Destination cluster definition, coordinates, auth details
 oc apply -f cluster-aws.yaml
 oc apply -f sa-secret-aws.yaml
 oc apply -f mig-cluster-aws.yaml
