@@ -135,16 +135,11 @@ func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) 
 	if cfg.AwsRegion == "" {
 		fields = append(fields, "awsRegion")
 	}
-	if cfg.AwsPublicURL == "" {
-		fields = append(fields, "awsPublicUrl")
-	}
 	if cfg.AwsBucketName == "" {
 		fields = append(fields, "awsBucketName")
 	}
-	if cfg.AwsKmsKeyID == "" {
-		fields = append(fields, "awsKmsKeyId")
-	}
-	if cfg.AwsSignatureVersion == "" {
+	v := cfg.AwsSignatureVersion
+	if !(v == "" || v == "1" || v == "4") {
 		fields = append(fields, "awsSignatureVersion")
 	}
 

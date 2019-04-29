@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,6 +75,7 @@ type BackupStorageConfig struct {
 	AwsBucketName       string                `json:"awsBucketName,omitempty"`
 	AwsRegion           string                `json:"awsRegion,omitempty"`
 	AwsS3ForcePathStyle bool                  `json:"awsS3ForcePathStyle,omitempty"`
+	AwsS3URL            string                `json:"awsS3Url,omitempty"`
 	AwsPublicURL        string                `json:"awsPublicUrl,omitempty"`
 	AwsKmsKeyID         string                `json:"awsKmsKeyId,omitempty"`
 	AwsSignatureVersion string                `json:"awsSignatureVersion,omitempty"`
@@ -133,7 +135,20 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 		},
 	}
 	location.Spec.Config = map[string]string{
-		"region": config.AwsRegion,
+		"s3ForcePathStyle": fmt.Sprintf("%t", config.AwsS3ForcePathStyle),
+		"region":           config.AwsRegion,
+	}
+	if config.AwsS3URL != "" {
+		location.Spec.Config["s3Url"] = config.AwsS3URL
+	}
+	if config.AwsPublicURL != "" {
+		location.Spec.Config["publicUrl"] = config.AwsPublicURL
+	}
+	if config.AwsKmsKeyID != "" {
+		location.Spec.Config["kmsKeyId"] = config.AwsKmsKeyID
+	}
+	if config.AwsSignatureVersion != "" {
+		location.Spec.Config["signatureVersion"] = config.AwsSignatureVersion
 	}
 }
 
