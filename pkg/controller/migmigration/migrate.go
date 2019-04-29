@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/migshared"
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
@@ -28,15 +29,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *ReconcileMigMigration) initMigration(migMigration *migapi.MigMigration) (*reconcileResources, error) {
-	// Return if MigMigration is complete
+func (r *ReconcileMigMigration) precheck(migMigration *migapi.MigMigration) bool {
+	// Return false if MigMigration is already complete
 	if migMigration.Status.MigrationCompleted == true {
-		return nil, nil // don't requeue
+		return false
 	}
-	// Return if MigMigration isn't ready
+	// Return false if MigMigration isn't ready
 	if !migMigration.Status.IsReady() {
-		return nil, nil //don't requeue
+		return false
 	}
+	// Return true is everything looks ready to run
+	return true
+}
+
+func (r *ReconcileMigMigration) getResources(migMigration *migapi.MigMigration) (*migshared.ReconcileResources, error) {
 	// Build ReconcileResources for MigMigration containing data needed for rest of reconcile process
 	rres, err := r.getReconcileResources(migMigration)
 	if err != nil {
@@ -49,7 +55,7 @@ func (r *ReconcileMigMigration) initMigration(migMigration *migapi.MigMigration)
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
+func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
 	// If all references are marked as ready, run MarkAsRunning() to set this Migration into "Running" state
 	changed := migMigration.MarkAsRunning()
 	if changed {
@@ -63,9 +69,9 @@ func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigrat
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
+func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
 	// Build controller-runtime client for srcMigCluster
-	srcClusterK8sClient, err := rres.srcMigCluster.GetClient(r.Client)
+	srcClusterK8sClient, err := rres.SrcMigCluster.GetClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET srcClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue
@@ -85,7 +91,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 		}
 	}
 
-	vBackup := vrunner.BuildVeleroBackup(backupNsName, rres.migAssets.Spec.Namespaces, false)
+	vBackup := vrunner.BuildVeleroBackup(backupNsName, rres.MigAssets.Spec.Namespaces, false)
 	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, vBackup, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -96,7 +102,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 	if srcBackup == nil {
 		return nil, nil // don't requeue
 	}
-	rres.srcBackup = srcBackup
+	rres.SrcBackup = srcBackup
 
 	// Update MigMigration with reference to Velero Backup
 	migMigration.Status.SrcBackupRef = &kapi.ObjectReference{Name: srcBackup.Name, Namespace: srcBackup.Namespace}
@@ -109,9 +115,9 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
+func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
 	// Build controller-runtime client for destMigCluster
-	destClusterK8sClient, err := rres.destMigCluster.GetClient(r.Client)
+	destClusterK8sClient, err := rres.DestMigCluster.GetClient(r.Client)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET destClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue
@@ -148,7 +154,7 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 	if destRestore == nil {
 		return nil, nil // don't requeue
 	}
-	rres.destRestore = destRestore
+	rres.DestRestore = destRestore
 
 	// Update MigMigration with reference to Velero Retore
 	migMigration.Status.DestRestoreRef = &kapi.ObjectReference{Name: destRestore.Name, Namespace: destRestore.Namespace}
@@ -161,8 +167,8 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration, rres *reconcileResources) (*reconcileResources, error) {
-	if rres.destRestore.Status.Phase == velerov1.RestorePhaseCompleted {
+func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
+	if rres.DestRestore.Status.Phase == velerov1.RestorePhaseCompleted {
 		changed := migMigration.MarkAsCompleted()
 		if changed {
 			err := r.Update(context.TODO(), migMigration)

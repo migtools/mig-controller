@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/migshared"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -119,10 +120,17 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	var rres *reconcileResources
+	// Use rres to keep track of MigPlan, MigStorage, MigClusters, etc.
+	var rres *migshared.ReconcileResources
 
-	// Perform prechecks and gather resources needed for reconcile
-	rres, err = r.initMigration(migMigration)
+	// Check if validations passed and Migration ready to run, else exit
+	ok := r.precheck(migMigration)
+	if !ok {
+		return reconcile.Result{}, nil //don't requeue
+	}
+
+	// Gather resources needed for reconcile
+	rres, err = r.getReconcileResources(migMigration)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}

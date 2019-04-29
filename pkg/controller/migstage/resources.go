@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migmigration
+package migstage
 
 import (
 	"fmt"
@@ -23,12 +23,12 @@ import (
 	"github.com/fusor/mig-controller/pkg/migshared"
 )
 
-// getReconcileResources puts together a struct with all resources needed to perform a MigMigration reconcile.
-func (r *ReconcileMigMigration) getReconcileResources(migMigration *migapi.MigMigration) (*migshared.ReconcileResources, error) {
-	migPlan, err := migMigration.GetPlan(r.Client)
+// getReconcileResources puts together a struct with all resources needed to perform a MigStage reconcile.
+func (r *ReconcileMigStage) getReconcileResources(migStage *migapi.MigStage) (*migshared.ReconcileResources, error) {
+	migPlan, err := migStage.GetPlan(r.Client)
 	if err != nil {
-		log.Info(fmt.Sprintf("[%s] Failed to GET MigPlan referenced by MigMigration [%s/%s]",
-			logPrefix, migMigration.Namespace, migMigration.Name))
+		log.Info(fmt.Sprintf("[%s] Failed to GET MigPlan referenced by MigStage [%s/%s]",
+			logPrefix, migStage.Namespace, migStage.Name))
 		return nil, err
 	}
 

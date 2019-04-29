@@ -34,6 +34,11 @@ import (
 
 var log = logf.Log.WithName("controller")
 
+const logPrefix = "mMigration"
+
+// TODO: don't hard-code veleroNs
+const veleroNs = "velero"
+
 // Add creates a new MigStage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
