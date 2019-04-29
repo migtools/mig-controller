@@ -23,8 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
+
 // buildVeleroBackup creates a Velero backup with default values for most fields
-func buildVeleroBackup(ns string, name string, backupNamespaces []string) *velerov1.Backup {
+func buildVeleroBackup(ns string, name string, backupNamespaces []string, stageBackup bool) *velerov1.Backup {
+	includedResources := []string{}
+	if stageBackup {
+		includedResources = stageResources
+	}
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name,
@@ -36,7 +42,7 @@ func buildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 			IncludedNamespaces: backupNamespaces,
 			// Unused but defaulted fields
 			ExcludedNamespaces: []string{},
-			IncludedResources:  []string{},
+			IncludedResources:  includedResources,
 			ExcludedResources:  []string{},
 			Hooks:              velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
 			// VolumeSnapshotLocations: []string{},

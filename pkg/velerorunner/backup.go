@@ -32,10 +32,10 @@ import (
 var log = logf.Log.WithName("controller")
 
 // RunBackup runs a Velero Backup if it hasn't been run already
-func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string) (*velerov1.Backup, error) {
+func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string, stageBackup bool) (*velerov1.Backup, error) {
 
 	vBackupExisting := &velerov1.Backup{}
-	vBackupNew := buildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
+	vBackupNew := buildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces, stageBackup)
 
 	// Switch over to using a generated name if we are creating
 	// if createNew {
