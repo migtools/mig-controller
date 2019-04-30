@@ -27,9 +27,9 @@ import (
 var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
 
 // BuildVeleroBackup creates a Velero backup with default values for most fields
-func BuildVeleroBackup(nsName types.NamespacedName, backupNamespaces []string, stageBackup bool) *velerov1.Backup {
+func BuildVeleroBackup(nsName types.NamespacedName, backupNamespaces []string, isStageBackup bool) *velerov1.Backup {
 	includedResources := []string{}
-	if stageBackup {
+	if isStageBackup {
 		includedResources = stageResources
 	}
 	backup := &velerov1.Backup{
