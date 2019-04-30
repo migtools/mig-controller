@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,16 +31,8 @@ import (
 var log = logf.Log.WithName("controller")
 
 // RunBackup runs a Velero Backup if it hasn't been run already
-func RunBackup(c client.Client, backupNsName types.NamespacedName, assets *migapi.MigAssetCollection, logPrefix string) (*velerov1.Backup, error) {
-
+func RunBackup(c client.Client, vBackupNew *velerov1.Backup, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Backup, error) {
 	vBackupExisting := &velerov1.Backup{}
-	vBackupNew := buildVeleroBackup(backupNsName.Namespace, backupNsName.Name, assets.Spec.Namespaces)
-
-	// Switch over to using a generated name if we are creating
-	// if createNew {
-	// 	vBackupNew.ObjectMeta.Name = ""
-	// 	vBackupNew.ObjectMeta.GenerateName = backupNsName.Name
-	// }
 
 	err := c.Get(context.TODO(), backupNsName, vBackupExisting)
 	if err != nil {

@@ -28,9 +28,7 @@ import (
 )
 
 // RunRestore runs a Velero Restore if it hasn't been run already
-func RunRestore(c client.Client, restoreNsName types.NamespacedName, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Restore, error) {
-
-	vRestoreNew := buildVeleroRestore(restoreNsName.Namespace, restoreNsName.Name, backupNsName.Name)
+func RunRestore(c client.Client, vRestoreNew *velerov1.Restore, restoreNsName, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Restore, error) {
 	vRestoreExisting := &velerov1.Restore{}
 
 	err := c.Get(context.TODO(), restoreNsName, vRestoreExisting)

@@ -21,14 +21,21 @@ import (
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-// buildVeleroBackup creates a Velero backup with default values for most fields
-func buildVeleroBackup(ns string, name string, backupNamespaces []string) *velerov1.Backup {
+var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
+
+// BuildVeleroBackup creates a Velero backup with default values for most fields
+func BuildVeleroBackup(nsName types.NamespacedName, backupNamespaces []string, isStageBackup bool) *velerov1.Backup {
+	includedResources := []string{}
+	if isStageBackup {
+		includedResources = stageResources
+	}
 	backup := &velerov1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name,
-			Namespace:    ns,
+			GenerateName: nsName.Name,
+			Namespace:    nsName.Namespace,
 		},
 		Spec: velerov1.BackupSpec{
 			StorageLocation:    "default",
@@ -36,7 +43,7 @@ func buildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 			IncludedNamespaces: backupNamespaces,
 			// Unused but defaulted fields
 			ExcludedNamespaces: []string{},
-			IncludedResources:  []string{},
+			IncludedResources:  includedResources,
 			ExcludedResources:  []string{},
 			Hooks:              velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
 			// VolumeSnapshotLocations: []string{},
@@ -45,15 +52,15 @@ func buildVeleroBackup(ns string, name string, backupNamespaces []string) *veler
 	return backup
 }
 
-// buildVeleroRestore creates a mostly blank Velero Restore in a specified ns/name, with the
+// BuildVeleroRestore creates a mostly blank Velero Restore in a specified ns/name, with the
 // ability to specify a unique Velero Backup resource name to restore from.
 // TODO: offer more customization
-func buildVeleroRestore(ns string, name string, backupUniqueName string) *velerov1.Restore {
+func BuildVeleroRestore(nsName types.NamespacedName, backupUniqueName string) *velerov1.Restore {
 	restorePVs := true
 	restore := &velerov1.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name,
-			Namespace:    ns,
+			GenerateName: nsName.Name,
+			Namespace:    nsName.Namespace,
 		},
 		Spec: velerov1.RestoreSpec{
 			BackupName: backupUniqueName,
