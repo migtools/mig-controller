@@ -81,9 +81,6 @@ func getSrcBackupName(migMigration *migapi.MigMigration) types.NamespacedName {
 			Namespace: migMigration.Status.SrcBackupRef.Namespace,
 		}
 	}
-
-	vBackup := vrunner.BuildVeleroBackup(backupNsName, rres.MigAssets.Spec.Namespaces, false)
-	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, vBackup, backupNsName, logPrefix)
 	return backupNsName
 }
 
@@ -94,7 +91,7 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 	backupNsName := getSrcBackupName(migMigration)
 
 	// Ensure that a backup exists with backupNsName
-	rres, err := migshared.EnsureBackup(r.Client, backupNsName, rres, logPrefix)
+	rres, err := migshared.EnsureBackup(r.Client, backupNsName, rres, false, logPrefix)
 	if err != nil {
 		return nil, err // requeue
 	}

@@ -23,7 +23,8 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *ReconcileResources, logPrefix string) (*ReconcileResources, error) {
+// EnsureBackup ensures that a source cluster Velero Backup exists
+func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *ReconcileResources, isStageBackup bool, logPrefix string) (*ReconcileResources, error) {
 	// Build controller-runtime client for srcMigCluster
 	srcClusterK8sClient, err := rres.SrcMigCluster.GetClient(c)
 	if err != nil {
@@ -31,7 +32,9 @@ func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *R
 		return nil, nil // don't requeue
 	}
 
-	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, rres.MigAssets, logPrefix)
+	assetNamespaces := rres.MigAssets.Spec.Namespaces
+	vBackupNew := vrunner.BuildVeleroBackup(backupNsName, assetNamespaces, isStageBackup)
+	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, vBackupNew, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil // don't requeue
@@ -45,6 +48,7 @@ func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *R
 	return rres, nil
 }
 
+// EnsureRestore ensures that a destination cluster Velero Backup + Restore exists
 func EnsureRestore(c k8sclient.Client, backupNsName types.NamespacedName, restoreNsName types.NamespacedName, rres *ReconcileResources, logPrefix string) (*ReconcileResources, error) {
 	// Build controller-runtime client for destMigCluster
 	destClusterK8sClient, err := rres.DestMigCluster.GetClient(c)
