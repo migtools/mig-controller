@@ -69,29 +69,15 @@ make samples
 
 Inspect and edit each of the files in the 'migsamples' directory, making changes as needed.
 
-To configure the sa token, run the following on the remote cluster:
-```bash
-# Create a new service account in the mig ns
-oc create namespace mig
-oc create sa -n mig mig
-# Grant it cluster-admin (cluster level root privileges, use with caution!)
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:mig
-# Dump the ServiceAccount's token which can be used as a Bearer token 
-oc sa get-token -n mig mig
-#to get the ServiceAccount's token in a base64-encoded format for the controller yaml file
-oc sa get-token -n mig mig|base64 -w 0
-
-```
-Use the base64-encoded sa token to fill in `migsamples/sa-secret-aws.yaml`
-
-After this is done, create the resources on the cluster your controller is running on.
+After modifying resource yaml, create the resources on the OpenShift cluster where the controller is running.
 
 ```
 # Option 1: Create everything in a single command
 oc apply -f migsamples
 
-# Option 2: Create resources individually
+# ------------------------------------------------
 
+# Option 2: Create resources individually
 cd migsamples
 
 # Source cluster definition 
@@ -120,3 +106,23 @@ oc apply -f mig-migration.yaml
 ```
 
 - See [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) CR samples. It is _highly_ recommended to run `make samples` to copy these to the .gitignore'd 'migsamples' before filling out cluster details (URLs + SA tokens).
+
+### Creating a Service Account (SA) token
+
+For mig-controller to perform migration actions on a remote cluster, you'll need to provide:
+- The remote OpenShift cluster URL
+- A valid Service Account (SA) token granting 'cluster-admin' access to the remote cluster
+
+
+To configure the SA token, run the following on the remote cluster:
+```bash
+# Create a new service account in the mig ns
+oc create namespace mig
+oc create sa -n mig mig
+# Grant the 'mig' service account cluster-admin (cluster level root privileges, use with caution!)
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:mig
+# Get the ServiceAccount token in a base64-encoded format to put in the remote MigCluster spec
+oc sa get-token -n mig mig|base64 -w 0
+
+```
+Use the base64-encoded SA token from the last command output to fill in `migsamples/sa-secret-aws.yaml`
