@@ -84,7 +84,9 @@ func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.M
 			Namespace: migMigration.Status.SrcBackupRef.Namespace,
 		}
 	}
-	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, rres.migAssets, logPrefix, false)
+
+	vBackup := vrunner.BuildVeleroBackup(backupNsName.Namespace, backupNsName.Name, rres.migAssets.Spec.Namespaces, false)
+	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, backupNsName, vBackup, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil // don't requeue
