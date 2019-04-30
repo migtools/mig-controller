@@ -31,8 +31,7 @@ import (
 var log = logf.Log.WithName("controller")
 
 // RunBackup runs a Velero Backup if it hasn't been run already
-func RunBackup(c client.Client, vBackupNew *velerov1.Backup, logPrefix string) (*velerov1.Backup, error) {
-	backupNsName := types.NamespacedName{Namespace: vBackupNew.Namespace, Name: vBackupNew.Name}
+func RunBackup(c client.Client, vBackupNew *velerov1.Backup, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Backup, error) {
 	vBackupExisting := &velerov1.Backup{}
 
 	err := c.Get(context.TODO(), backupNsName, vBackupExisting)
