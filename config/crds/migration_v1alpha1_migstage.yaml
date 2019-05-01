@@ -32,6 +32,21 @@ spec:
               type: object
           type: object
         status:
+          properties:
+            completionTimestamp:
+              format: date-time
+              type: string
+            destRestoreRef:
+              type: object
+            srcBackupRef:
+              type: object
+            stageCompleted:
+              type: boolean
+            stageStarted:
+              type: boolean
+            startTimestamp:
+              format: date-time
+              type: string
           type: object
   version: v1alpha1
 status:

@@ -41,7 +41,7 @@ func RunRestore(c client.Client, vRestoreNew *velerov1.Restore, restoreNsName, b
 				if errors.IsNotFound(err) {
 					log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] doesn't yet exist on destination cluster, waiting...",
 						logPrefix, backupNsName.Namespace, backupNsName.Name))
-					return nil, nil // don't requeue
+					return nil, err // don't requeue
 				}
 			}
 

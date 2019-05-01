@@ -119,10 +119,17 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
-	var rres *reconcileResources
+	// Use rres to keep track of MigPlan, MigStorage, MigClusters, etc.
+	var rres *migapi.PlanRefResources
 
-	// Perform prechecks and gather resources needed for reconcile
-	rres, err = r.initMigration(migMigration)
+	// Check if validations passed and Migration ready to run, else exit
+	ok := r.precheck(migMigration)
+	if !ok {
+		return reconcile.Result{}, nil //don't requeue
+	}
+
+	// Gather resources needed for reconcile
+	rres, err = r.getResources(migMigration)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}
@@ -134,13 +141,13 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Ensure source cluster has a Velero Backup
-	rres, err = r.ensureSourceClusterBackup(migMigration, rres)
+	rres, err = r.ensureSrcBackup(migMigration, rres)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Ensure destination cluster has a Velero Backup + Restore
-	rres, err = r.ensureDestinationClusterRestore(migMigration, rres)
+	rres, err = r.ensureDestRestore(migMigration, rres)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}

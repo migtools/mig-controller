@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,4 +86,53 @@ func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetAssetCollection(client k8sclient.Client) (*MigAssetCollection, error) {
 	return GetAssetCollection(client, r.Spec.MigAssetCollectionRef)
+}
+
+// PlanRefResources holds structs for the resources MigPlans reference.
+// This data is passed to functions within MigStage and MigMigration reconcile.
+type PlanRefResources struct {
+	MigPlan        *MigPlan
+	MigAssets      *MigAssetCollection
+	SrcMigCluster  *MigCluster
+	DestMigCluster *MigCluster
+
+	SrcBackup   *velerov1.Backup
+	DestRestore *velerov1.Restore
+}
+
+// GetRefResources gets referenced resources from a MigPlan and loads them into a ReferencedResources struct
+func (r *MigPlan) GetRefResources(client k8sclient.Client, logPrefix string) (*PlanRefResources, error) {
+	resources := &PlanRefResources{}
+
+	// MigPlan
+	resources.MigPlan = r
+
+	// MigAssetCollection
+	migAssets, err := r.GetAssetCollection(client)
+	if err != nil {
+		log.Info(fmt.Sprintf("[%s] Failed to GET MigAssetCollection referenced by MigPlan [%s/%s]",
+			logPrefix, r.Namespace, r.Name))
+		return nil, err
+	}
+	resources.MigAssets = migAssets
+
+	// SrcMigCluster
+	srcMigCluster, err := r.GetSourceCluster(client)
+	if err != nil {
+		log.Info(fmt.Sprintf("[%s] Failed to GET SrcMigCluster referenced by MigPlan [%s/%s]",
+			logPrefix, r.Namespace, r.Name))
+		return nil, err
+	}
+	resources.SrcMigCluster = srcMigCluster
+
+	// DestMigCluster
+	destMigCluster, err := r.GetDestinationCluster(client)
+	if err != nil {
+		log.Info(fmt.Sprintf("[%s] Failed to GET DestMigCluster referenced by MigPlan [%s/%s]",
+			logPrefix, r.Namespace, r.Name))
+		return nil, err
+	}
+	resources.DestMigCluster = destMigCluster
+
+	return resources, nil
 }
