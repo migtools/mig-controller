@@ -21,10 +21,9 @@ import (
 	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/migshared"
+	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -41,20 +40,20 @@ func (r *ReconcileMigMigration) precheck(migMigration *migapi.MigMigration) bool
 	return true
 }
 
-func (r *ReconcileMigMigration) getResources(migMigration *migapi.MigMigration) (*migshared.ReconcileResources, error) {
+func (r *ReconcileMigMigration) getResources(migMigration *migapi.MigMigration) (*migapi.PlanRefResources, error) {
 	// Build ReconcileResources for MigMigration containing data needed for rest of reconcile process
-	rres, err := r.getReconcileResources(migMigration)
+	migPlan, err := migMigration.GetPlan(r.Client)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil // don't requeue
-		}
-		return nil, err // requeue
+		log.Info(fmt.Sprintf("[%s] Failed to GET MigPlan referenced by MigMigration [%s/%s]",
+			logPrefix, migMigration.Namespace, migMigration.Name))
+		return nil, err
 	}
 
+	rres, err := migPlan.GetRefResources(r.Client, logPrefix)
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
+func (r *ReconcileMigMigration) startMigMigration(migMigration *migapi.MigMigration, rres *migapi.PlanRefResources) (*migapi.PlanRefResources, error) {
 	// If all references are marked as ready, run MarkAsRunning() to set this Migration into "Running" state
 	changed := migMigration.MarkAsRunning()
 	if changed {
@@ -84,14 +83,13 @@ func getSrcBackupName(migMigration *migapi.MigMigration) types.NamespacedName {
 	return backupNsName
 }
 
-func (r *ReconcileMigMigration) ensureSourceClusterBackup(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
-	// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection
-
+// Create Velero Backup on srcCluster looking at namespaces in MigAssetCollection
+func (r *ReconcileMigMigration) ensureSrcBackup(migMigration *migapi.MigMigration, rres *migapi.PlanRefResources) (*migapi.PlanRefResources, error) {
 	// Determine appropriate backupNsName to use in ensureBackup
 	backupNsName := getSrcBackupName(migMigration)
 
 	// Ensure that a backup exists with backupNsName
-	rres, err := migshared.EnsureBackup(r.Client, backupNsName, rres, false, logPrefix)
+	rres, err := vrunner.EnsureBackup(r.Client, backupNsName, rres, false, logPrefix)
 	if err != nil {
 		return nil, err // requeue
 	}
@@ -123,14 +121,17 @@ func getDestRestoreName(migMigration *migapi.MigMigration) types.NamespacedName 
 	return restoreNsName
 }
 
-func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
+// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
+func (r *ReconcileMigMigration) ensureDestRestore(migMigration *migapi.MigMigration, rres *migapi.PlanRefResources) (*migapi.PlanRefResources, error) {
 	backupNsName := getSrcBackupName(migMigration)
 	restoreNsName := getDestRestoreName(migMigration)
 
-	// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
-	rres, err := migshared.EnsureRestore(r.Client, backupNsName, restoreNsName, rres, logPrefix)
+	rres, err := vrunner.EnsureRestore(r.Client, backupNsName, restoreNsName, rres, logPrefix)
 	if err != nil {
 		return nil, err // requeue
+	}
+	if rres == nil {
+		return nil, nil // don't requeue
 	}
 
 	// Update MigMigration with reference to Velero Retore
@@ -144,7 +145,7 @@ func (r *ReconcileMigMigration) ensureDestinationClusterRestore(migMigration *mi
 	return rres, nil // continue
 }
 
-func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration, rres *migshared.ReconcileResources) (*migshared.ReconcileResources, error) {
+func (r *ReconcileMigMigration) finishMigMigration(migMigration *migapi.MigMigration, rres *migapi.PlanRefResources) (*migapi.PlanRefResources, error) {
 	if rres.DestRestore.Status.Phase == velerov1.RestorePhaseCompleted {
 		changed := migMigration.MarkAsCompleted()
 		if changed {

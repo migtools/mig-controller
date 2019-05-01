@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/migshared"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -121,7 +120,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Use rres to keep track of MigPlan, MigStorage, MigClusters, etc.
-	var rres *migshared.ReconcileResources
+	var rres *migapi.PlanRefResources
 
 	// Check if validations passed and Migration ready to run, else exit
 	ok := r.precheck(migMigration)
@@ -130,7 +129,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Gather resources needed for reconcile
-	rres, err = r.getReconcileResources(migMigration)
+	rres, err = r.getResources(migMigration)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}
@@ -142,13 +141,13 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Ensure source cluster has a Velero Backup
-	rres, err = r.ensureSourceClusterBackup(migMigration, rres)
+	rres, err = r.ensureSrcBackup(migMigration, rres)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}
 
 	// Ensure destination cluster has a Velero Backup + Restore
-	rres, err = r.ensureDestinationClusterRestore(migMigration, rres)
+	rres, err = r.ensureDestRestore(migMigration, rres)
 	if rres == nil {
 		return reconcile.Result{}, err
 	}

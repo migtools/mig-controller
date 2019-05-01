@@ -14,27 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migshared
+package velerorunner
 
 import (
-	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EnsureBackup ensures that a source cluster Velero Backup exists
-func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *ReconcileResources, isStageBackup bool, logPrefix string) (*ReconcileResources, error) {
+func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *migapi.PlanRefResources, isStageBackup bool, logPrefix string) (*migapi.PlanRefResources, error) {
 	// Build controller-runtime client for srcMigCluster
-	srcClusterK8sClient, err := rres.SrcMigCluster.GetClient(c)
+	srcClient, err := rres.SrcMigCluster.GetClient(c)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET srcClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue
 	}
 
 	assetNamespaces := rres.MigAssets.Spec.Namespaces
-	vBackupNew := vrunner.BuildVeleroBackup(backupNsName, assetNamespaces, isStageBackup)
-	srcBackup, err := vrunner.RunBackup(srcClusterK8sClient, vBackupNew, backupNsName, logPrefix)
+	vBackupNew := BuildVeleroBackup(backupNsName, assetNamespaces, isStageBackup)
+	srcBackup, err := RunBackup(srcClient, vBackupNew, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil // don't requeue
@@ -49,17 +49,17 @@ func EnsureBackup(c k8sclient.Client, backupNsName types.NamespacedName, rres *R
 }
 
 // EnsureRestore ensures that a destination cluster Velero Backup + Restore exists
-func EnsureRestore(c k8sclient.Client, backupNsName types.NamespacedName, restoreNsName types.NamespacedName, rres *ReconcileResources, logPrefix string) (*ReconcileResources, error) {
+func EnsureRestore(c k8sclient.Client, backupNsName types.NamespacedName, restoreNsName types.NamespacedName, rres *migapi.PlanRefResources, logPrefix string) (*migapi.PlanRefResources, error) {
 	// Build controller-runtime client for destMigCluster
-	destClusterK8sClient, err := rres.DestMigCluster.GetClient(c)
+	destClient, err := rres.DestMigCluster.GetClient(c)
 	if err != nil {
 		log.Error(err, "[%s] Failed to GET destClusterK8sClient", logPrefix)
 		return nil, nil // don't requeue
 	}
 
 	// Create Velero Restore on destMigCluster pointing at Velero Backup unique name
-	vRestoreNew := vrunner.BuildVeleroRestore(restoreNsName, backupNsName.Name)
-	destRestore, err := vrunner.RunRestore(destClusterK8sClient, vRestoreNew, restoreNsName, backupNsName, logPrefix)
+	vRestoreNew := BuildVeleroRestore(restoreNsName, backupNsName.Name)
+	destRestore, err := RunRestore(destClient, vRestoreNew, restoreNsName, backupNsName, logPrefix)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil // don't requeue
