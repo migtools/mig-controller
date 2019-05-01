@@ -19,8 +19,7 @@ const (
 	StorageNotReady              = "StorageNotReady"
 	AssetCollectionNotReady      = "AssetCollectionNotReady"
 	InvalidDestinationCluster    = "InvalidDestinationCluster"
-	CreateBSLFailed              = "CreateBackupStorageLocationFailed"
-	CreateVSLFailed              = "CreateVolumeSnapshotLocationFailed"
+	EnsureStorageFailed          = "EnsureStorageFailed"
 )
 
 // Reasons
@@ -48,8 +47,7 @@ const (
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
 	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	CreateBSLFailedMessage              = "Create BSL failed."
-	CreateVSLFailedMessage              = "Create BSL failed."
+	EnsureStorageFailedMessage          = "Failed to create/validate backup and volume snapshot storage."
 )
 
 // Validate the plan resource.

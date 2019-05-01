@@ -6,81 +6,122 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Create velero CRs on referenced MigClusters.
-func (r ReconcileMigPlan) createStorage(plan *migapi.MigPlan) (int, error) {
-	nSet := 0
-	err := r.createBSLs(plan)
-	if err != nil {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:    CreateBSLFailed,
-			Status:  True,
-			Message: CreateBSLFailedMessage,
-		})
-	} else {
-		plan.Status.DeleteCondition(CreateBSLFailed)
-	}
-	err = r.createVSLs(plan)
-	if err != nil {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:    CreateVSLFailed,
-			Status:  True,
-			Message: CreateVSLFailedMessage,
-		})
-	} else {
-		plan.Status.DeleteCondition(CreateBSLFailed)
-	}
-
-	return nSet, nil
-}
-
-// Create the velero BackupStorageLocation(s).
-func (r ReconcileMigPlan) createBSLs(plan *migapi.MigPlan) error {
+// Create the velero BackupStorageLocation(s) and VolumeSnapshotLocation(s)
+// have been created on both the source and destination clusters associated
+// with the migration plan.
+// Returns `true` when ensured.
+func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) (bool, error) {
 	var client k8sclient.Client
+	nEnsured := 0
 	storage, err := plan.GetStorage(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if storage == nil {
-		return nil
+		return false, nil
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
-		return err
+		return false, err
 	}
+
 	for _, cluster := range clusters {
 		if !cluster.Status.IsReady() {
 			continue
 		}
 		client, err = cluster.GetClient(r)
-		newLocation := storage.BuildBSL()
-		location, err := storage.GetBSL(client)
+		// BSL
+		ensured, err := r.ensureBSL(client, storage)
 		if err != nil {
-			return err
+			return false, err
 		}
-		if location == nil {
-			err = client.Create(context.TODO(), newLocation)
-			if err != nil {
-				return err
-			}
-			continue
+		if ensured {
+			nEnsured += 1
 		}
-		if storage.Equals(location, newLocation) {
-			continue
-		}
-		storage.UpdateBSL(location)
-		err = client.Update(context.TODO(), location)
+		// VSL
+		ensured, err = r.ensureVSL(client, storage)
 		if err != nil {
-			return err
+			return false, err
+		}
+		if ensured {
+			nEnsured += 1
 		}
 	}
 
-	return err
+	// Condition
+	ensured := nEnsured == 4 // BSL,VSL x2 clusters
+	if !ensured {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    EnsureStorageFailed,
+			Status:  True,
+			Message: EnsureStorageFailedMessage,
+		})
+	} else {
+		plan.Status.DeleteCondition(EnsureStorageFailed)
+	}
+	err = r.Update(context.TODO(), plan)
+	if err != nil {
+		return false, err
+	}
+
+	return ensured, err
 }
 
-// Create the velero VolumeSnapshotLocation(s).
-func (r ReconcileMigPlan) createVSLs(plan *migapi.MigPlan) error {
-	// TODO:
-	return nil
+// Create the velero BackupStorageLocation has been created.
+// Returns `true` when ensured.
+func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
+	newBSL := storage.BuildBSL()
+	foundBSL, err := storage.GetBSL(client)
+	if err != nil {
+		return false, err
+	}
+	if foundBSL == nil {
+		err = client.Create(context.TODO(), newBSL)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if storage.EqualsBSL(foundBSL, newBSL) {
+		return true, nil
+	}
+	storage.UpdateBSL(foundBSL)
+	err = client.Update(context.TODO(), foundBSL)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// Create the velero VolumeSnapshotLocation has been created.
+// Returns `true` when ensured.
+func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
+	if storage.Spec.VolumeSnapshotProvider == "" {
+		return true, nil
+	}
+	newVSL := storage.BuildVSL()
+	foundVSL, err := storage.GetVSL(client)
+	if err != nil {
+		return false, err
+	}
+	if foundVSL == nil {
+		err = client.Create(context.TODO(), newVSL)
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if storage.EqualsVSL(foundVSL, newVSL) {
+		return true, nil
+	}
+	storage.UpdateVSL(foundVSL)
+	err = client.Update(context.TODO(), foundVSL)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // Get clusters referenced by the plan.

@@ -89,12 +89,19 @@ func init() {
 
 // Determine if two BSLs are equal based on relevant fields in the Spec.
 // Returns `true` when equal.
-func (r *MigStorage) Equals(a, b *velero.BackupStorageLocation) bool {
+func (r *MigStorage) EqualsBSL(a, b *velero.BackupStorageLocation) bool {
 	return a.Spec.Provider == b.Spec.Provider &&
 		reflect.DeepEqual(a.Spec.Config, b.Spec.Config) &&
 		reflect.DeepEqual(
 			a.Spec.ObjectStorage,
 			b.Spec.ObjectStorage)
+}
+
+// Determine if two VSLs are equal based on relevant fields in the Spec.
+// Returns `true` when equal.
+func (r *MigStorage) EqualsVSL(a, b *velero.VolumeSnapshotLocation) bool {
+	return a.Spec.Provider == b.Spec.Provider &&
+		reflect.DeepEqual(a.Spec.Config, b.Spec.Config)
 }
 
 // Build a velero backup storage location.
@@ -156,6 +163,61 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 // Returns `nil` when not found.
 func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
 	list := velero.BackupStorageLocationList{}
+	labels := CorrelationLabels(r, r.UID)
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
+}
+
+// Build a velero volume snapshot location.
+func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
+	location := &velero.VolumeSnapshotLocation{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       CorrelationLabels(r, r.UID),
+			Namespace:    "velero",
+			GenerateName: r.Name + "-",
+		},
+		Spec: velero.VolumeSnapshotLocationSpec{
+			Provider: r.Spec.VolumeSnapshotProvider,
+		},
+	}
+	r.UpdateVSL(location)
+	return location
+}
+
+// Update a velero volume snapshot location.
+func (r *MigStorage) UpdateVSL(location *velero.VolumeSnapshotLocation) {
+	location.Spec.Provider = r.Spec.VolumeSnapshotProvider
+	switch r.Spec.VolumeSnapshotProvider {
+	case "aws":
+		r.updateAwsVSL(location)
+	case "azure":
+	case "gcp":
+	case "":
+	}
+}
+
+// Update a velero volume snapshot location for the AWS provider.
+func (r *MigStorage) updateAwsVSL(location *velero.VolumeSnapshotLocation) {
+	config := r.Spec.VolumeSnapshotConfig
+	location.Spec.Config = map[string]string{
+		"region": config.AwsRegion,
+	}
+}
+
+// Get existing volume snapshot location by Label search.
+// Returns `nil` when not found.
+func (r *MigStorage) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocation, error) {
+	list := velero.VolumeSnapshotLocationList{}
 	labels := CorrelationLabels(r, r.UID)
 	err := client.List(
 		context.TODO(),

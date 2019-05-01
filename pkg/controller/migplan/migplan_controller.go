@@ -148,19 +148,19 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
+	ready := true
+
 	// Storage
-	// nSet - The number of error conditions raised.
-	nSet, err = r.createStorage(plan)
-	if nSet > 0 {
-		plan.Status.SetReady(false, ReadyMessage)
-		err = r.Update(context.TODO(), plan)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+	ensured, err := r.ensureStorage(plan)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	if !ensured {
+		ready = false
 	}
 
 	// Ready
-	plan.Status.SetReady(true, ReadyMessage)
+	plan.Status.SetReady(ready, ReadyMessage)
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return reconcile.Result{}, err
