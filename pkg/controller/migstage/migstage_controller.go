@@ -18,6 +18,7 @@ package migstage
 
 import (
 	"context"
+	"fmt"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -34,7 +35,7 @@ import (
 
 var log = logf.Log.WithName("controller")
 
-const logPrefix = "mMigration"
+const logPrefix = "mStage"
 
 // TODO: don't hard-code veleroNs
 const veleroNs = "velero"
@@ -114,9 +115,10 @@ type ReconcileMigStage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages/status,verbs=get;update;patch
 func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Info(fmt.Sprintf("[%s] RECONCILE [%s/%s]", logPrefix, request.Namespace, request.Name))
 	// Fetch the MigStage instance
-	instance := &migapi.MigStage{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	migStage := &migapi.MigStage{}
+	err := r.Get(context.TODO(), request.NamespacedName, migStage)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -124,6 +126,12 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+
+	// Validate
+	_, err = r.validate(migStage)
+	if err != nil {
 		return reconcile.Result{}, err
 	}
 

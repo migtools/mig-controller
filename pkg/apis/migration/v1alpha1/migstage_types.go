@@ -31,6 +31,8 @@ type MigStageSpec struct {
 
 // MigStageStatus defines the observed state of MigStage
 type MigStageStatus struct {
+	Conditions
+
 	StageRunning   bool `json:"stageStarted,omitempty"`
 	StageCompleted bool `json:"stageCompleted,omitempty"`
 
