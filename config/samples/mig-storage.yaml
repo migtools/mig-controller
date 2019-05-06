@@ -8,22 +8,18 @@ metadata:
 spec:
   backupStorageProvider: aws
   volumeSnapshotProvider: aws
-
   backupStorageConfig:
     awsBucketName: foo
     awsKmsKeyId: foo
     awsPublicUrl: foo
     awsRegion: foo
-    awsSignatureVersion: foo
+    awsSignatureVersion: "4"
     credsSecretRef:
-      namespace: velero
-      name: cloud-credentials
-
-
+      namespace: mig
+      name: cloud-creds
   volumeSnapshotConfig:
     awsRegion: foo
     credsSecretRef:
-      namespace: velero
-      name: cloud-credentials
-
+      namespace: mig
+      name: cloud-creds
 

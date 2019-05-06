@@ -15,8 +15,8 @@ package remotewatcher
 
 import (
 	"fmt"
-
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,6 +59,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 	err = c.Watch(&source.Kind{Type: &velerov1.VolumeSnapshotLocation{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Kind{Type: &kapi.Secret{}}, &handler.EnqueueRequestForObject{}, &SecretPredicate{})
 	if err != nil {
 		return err
 	}

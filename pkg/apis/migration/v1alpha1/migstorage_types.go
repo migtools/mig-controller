@@ -20,11 +20,28 @@ import (
 	"context"
 	"fmt"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/pkg/errors"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// Cloud Secret Format
+const AwsCloudSecretContent = `
+[default]
+aws_access_key_id=%s
+aws_secret_access_key=%s
+`
+
+// Cred Secret Fields
+const (
+	AwsAccessKeyId     = "aws-access-key-id"
+	AwsSecretAccessKey = "aws-secret-access-key"
+)
+
+// Error
+var CredSecretNotFound = errors.New("Cred secret not found.")
 
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
@@ -231,4 +248,63 @@ func (r *MigStorage) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLoca
 	}
 
 	return nil, nil
+}
+
+// Determine if two secrets cloud secrets are equal.
+// Returns `true` when equal.
+func (r *MigStorage) EqualsCloudSecret(a, b *kapi.Secret) bool {
+	return reflect.DeepEqual(a.Data, b.Data)
+}
+
+// Get the cloud credentials secret by labels.
+func (r *MigStorage) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	return GetSecret(
+		client,
+		&kapi.ObjectReference{
+			Namespace: "velero",
+			Name:      "cloud-credentials",
+		})
+}
+
+// Build the cloud credentials secret.
+func (r *MigStorage) BuildCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	secret := &kapi.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    CorrelationLabels(r, r.ObjectMeta.UID),
+			Namespace: "velero",
+			Name:      "cloud-credentials",
+		},
+	}
+	err := r.UpdateCloudSecret(client, secret)
+	return secret, err
+}
+
+// Update the cloud credentials secret.
+func (r *MigStorage) UpdateCloudSecret(client k8sclient.Client, secret *kapi.Secret) error {
+	credSecret, err := r.Spec.BackupStorageConfig.GetCredsSecret(client)
+	if err != nil {
+		return err
+	}
+	if credSecret == nil {
+		return CredSecretNotFound
+	}
+	secret.Data = map[string][]byte{
+		"cloud": []byte(
+			fmt.Sprintf(
+				AwsCloudSecretContent,
+				credSecret.Data[AwsAccessKeyId],
+				credSecret.Data[AwsSecretAccessKey]),
+		),
+	}
+	return nil
+}
+
+// Get the referenced Cred secret.
+func (r *BackupStorageConfig) GetCredsSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	return GetSecret(client, r.CredsSecretRef)
+}
+
+// Get the referenced Cred secret.
+func (r *VolumeSnapshotConfig) GetCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	return GetSecret(client, r.CredsSecretRef)
 }

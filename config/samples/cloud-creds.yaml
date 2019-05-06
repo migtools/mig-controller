@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: mig
+  name: cloud-creds
+type: Opaque
+data:
+  aws-access-key-id: aGVsbG8K
+  aws-secret-access-key: aGVsbG8K
+  azure-client-secret: aGVsbG8K
+  azure-subscription-id: aGVsbG8K
+  azure-tenant-id: aGVsbG8K
+  azure-client-id: aGVsbG8K
