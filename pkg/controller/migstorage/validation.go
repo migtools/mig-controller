@@ -226,7 +226,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 	}
 
 	// secret content
-	if !r.validCredsSecret(secret) {
+	if !r.validCredSecret(secret) {
 		storage.Status.SetCondition(migapi.Condition{
 			Type:    InvalidBSLCredsSecret,
 			Status:  True,
@@ -371,7 +371,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 	}
 
 	// secret content
-	if !r.validCredsSecret(secret) {
+	if !r.validCredSecret(secret) {
 		storage.Status.SetCondition(migapi.Condition{
 			Type:    InvalidVSLCredsSecret,
 			Status:  True,
@@ -386,7 +386,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 	return 0, nil
 }
 
-func (r ReconcileMigStorage) validCredsSecret(secret *kapi.Secret) bool {
+func (r ReconcileMigStorage) validCredSecret(secret *kapi.Secret) bool {
 	// TODO: waiting on secret layout.
 	return true
 }

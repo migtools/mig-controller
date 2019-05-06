@@ -165,11 +165,15 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 	return &object, err
 }
 
+// Get a label (key) for the specified CR kind.
+func Label(r interface{}) string {
+	return strings.ToLower(migref.ToKind(r))
+}
+
 // Build  labels used to correlate CRs.
 // Format: <kind>: <uid>.  The <uid> should be the ObjectMeta.UID
-func CorrelationLabels(kind interface{}, uid types.UID) map[string]string {
-	key := strings.ToLower(migref.ToKind(kind))
+func CorrelationLabels(r interface{}, uid types.UID) map[string]string {
 	return map[string]string{
-		key: string(uid),
+		Label(r): string(uid),
 	}
 }

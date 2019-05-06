@@ -19,6 +19,8 @@ package migstorage
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +62,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStorage{}},
 		&handler.EnqueueRequestForObject{},
-		&UpdatedPredicate{})
+		&StoragePredicate{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to Secrets referenced by MigStorage.
+	err = c.Watch(
+		&source.Kind{Type: &kapi.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(
+				func(a handler.MapObject) []reconcile.Request {
+					return migref.GetRequests(a, migapi.MigStorage{})
+				}),
+		})
 	if err != nil {
 		return err
 	}
