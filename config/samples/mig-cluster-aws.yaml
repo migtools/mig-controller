@@ -6,6 +6,8 @@ metadata:
   name: migcluster-aws
   namespace: mig
 spec:
+  # [!] Change isHostCluster to 'true' if you'll be running the controller on the AWS cluster.
+  #     Setting 'isHostCluster' to true will bypass using the clusterRef and serviceAccountSecretRef below.
   isHostCluster: false
 
   clusterRef:
