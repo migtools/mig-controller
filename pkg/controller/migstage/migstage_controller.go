@@ -135,5 +135,41 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 
+	// Check if validations passed and Stage Migration is ready to run
+	ok := r.precheck(migStage)
+	if !ok {
+		return reconcile.Result{}, nil
+	}
+
+	// Gather resources needed for reconcile
+	rres, err := r.getResources(migStage)
+	if rres == nil {
+		return reconcile.Result{}, nil
+	}
+
+	// Mark MigStage as started once prechecks are passed
+	rres, err = r.startMigStage(migStage, rres)
+	if rres == nil {
+		return reconcile.Result{}, nil
+	}
+
+	// Ensure source cluster has a Velero Backup
+	rres, err = r.ensureSrcBackup(migStage, rres)
+	if rres == nil {
+		return reconcile.Result{}, nil
+	}
+
+	// Ensure destination cluster has a Velero Backup + Restore
+	rres, err = r.ensureDestRestore(migStage, rres)
+	if rres == nil {
+		return reconcile.Result{}, nil
+	}
+
+	// Mark MigStage as complete if Velero Restore has completed
+	rres, err = r.finishMigStage(migStage, rres)
+	if rres == nil {
+		return reconcile.Result{}, nil
+	}
+
 	return reconcile.Result{}, nil
 }
