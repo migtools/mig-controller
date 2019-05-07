@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   namespace: mig
-  name: cloud-creds
+  name: migstorage-creds
 type: Opaque
 data:
   aws-access-key-id: aGVsbG8K

@@ -8,18 +8,20 @@ metadata:
 spec:
   backupStorageProvider: aws
   volumeSnapshotProvider: aws
+  
   backupStorageConfig:
     awsBucketName: foo
-    awsKmsKeyId: foo
-    awsPublicUrl: foo
     awsRegion: foo
-    awsSignatureVersion: "4"
     credsSecretRef:
       namespace: mig
-      name: cloud-creds
+      name: migstorage-creds
+    #awsKmsKeyId: foo
+    #awsPublicUrl: foo
+    #awsSignatureVersion: "4"
+
   volumeSnapshotConfig:
     awsRegion: foo
     credsSecretRef:
       namespace: mig
-      name: cloud-creds
+      name: migstorage-creds
 
