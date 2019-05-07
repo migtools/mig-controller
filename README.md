@@ -89,7 +89,9 @@ oc apply -f cluster-aws.yaml
 oc apply -f sa-secret-aws.yaml
 oc apply -f mig-cluster-aws.yaml
 
-# Describes where to store data during Migration
+# Describes where to store data during Migration, storage auth details
+# Note: the contents of mig-storage-creds.yaml will be used to overwrite Velero cloud-credentials
+oc apply -f mig-storage-creds.yaml
 oc apply -f mig-storage.yaml
 
 # Describes which resources should be Migrated
