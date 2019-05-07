@@ -6,5 +6,6 @@ metadata:
   name: migassets-sample
   namespace: mig
 spec:
+  # [!] Change namespaces to contain the list of namespaces that should be migrated
   namespaces: ['nginx-example']
 

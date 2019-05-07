@@ -10,16 +10,21 @@ spec:
   volumeSnapshotProvider: aws
   
   backupStorageConfig:
+    # [!] Change awsBucketName to contain the S3 bucket name to be used for migration
     awsBucketName: foo
+    # [!] Change awsRegion to contain the region name (e.g. 'us-east-1') where the S3 bucket presides
     awsRegion: foo
     credsSecretRef:
       namespace: mig
       name: migstorage-creds
+
+    # Optional backupStorageConfig parameters
     #awsKmsKeyId: foo
     #awsPublicUrl: foo
     #awsSignatureVersion: "4"
 
   volumeSnapshotConfig:
+    # [!] Change awsRegion to contain the region name (e.g. 'us-east-1') where Volume Snapshots should take place
     awsRegion: foo
     credsSecretRef:
       namespace: mig
