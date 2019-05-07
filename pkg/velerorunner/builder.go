@@ -42,11 +42,11 @@ func BuildVeleroBackup(nsName types.NamespacedName, backupNamespaces []string, i
 			TTL:                metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces: backupNamespaces,
 			// Unused but defaulted fields
-			ExcludedNamespaces: []string{},
-			IncludedResources:  includedResources,
-			ExcludedResources:  []string{},
-			Hooks:              velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
-			// VolumeSnapshotLocations: []string{},
+			ExcludedNamespaces:      []string{},
+			IncludedResources:       includedResources,
+			ExcludedResources:       []string{},
+			Hooks:                   velerov1.BackupHooks{Resources: []velerov1.BackupResourceHookSpec{}},
+			VolumeSnapshotLocations: []string{"aws-default"},
 		},
 	}
 	return backup
