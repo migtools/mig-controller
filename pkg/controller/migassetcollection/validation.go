@@ -57,6 +57,7 @@ func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCo
 	assetCollection.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes
+	assetCollection.Status.CommitConditions()
 	err = r.Update(context.TODO(), assetCollection)
 	if err != nil {
 		return 0, err
@@ -73,8 +74,6 @@ func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAs
 			Message: EmptyCollectionMessage,
 		})
 		return 1, nil
-	} else {
-		assetCollection.Status.DeleteCondition(EmptyCollection)
 	}
 
 	return 0, nil
@@ -105,8 +104,6 @@ func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigA
 			Message: message,
 		})
 		return 1, nil
-	} else {
-		assetCollection.Status.DeleteCondition(NamespacesNotFound)
 	}
 
 	return 0, nil
