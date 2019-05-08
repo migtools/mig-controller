@@ -383,16 +383,6 @@ func (in *MigMigrationStatus) DeepCopyInto(out *MigMigrationStatus) {
 		in, out := &in.CompletionTimestamp, &out.CompletionTimestamp
 		*out = (*in).DeepCopy()
 	}
-	if in.SrcBackupRef != nil {
-		in, out := &in.SrcBackupRef, &out.SrcBackupRef
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
-	if in.DestRestoreRef != nil {
-		in, out := &in.DestRestoreRef, &out.DestRestoreRef
-		*out = new(v1.ObjectReference)
-		**out = **in
-	}
 	return
 }
 
@@ -744,6 +734,11 @@ func (in *PlanRefResources) DeepCopyInto(out *PlanRefResources) {
 	if in.MigAssets != nil {
 		in, out := &in.MigAssets, &out.MigAssets
 		*out = new(MigAssetCollection)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MigStorage != nil {
+		in, out := &in.MigStorage, &out.MigStorage
+		*out = new(MigStorage)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.SrcMigCluster != nil {

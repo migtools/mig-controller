@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("cluster")
 
 // Add creates a new MigCluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -116,7 +116,7 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("[mCluster] RECONCILE [%s/%s]", request.Namespace, request.Name))
+	log.Info("Reconcile", "request", request.Name)
 
 	// Fetch the MigCluster
 	migCluster := &migapi.MigCluster{}
@@ -131,7 +131,11 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	nSet, err := r.validate(migCluster)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 	if nSet > 0 {
 		return reconcile.Result{}, nil

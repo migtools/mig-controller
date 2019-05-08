@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("remote-watch")
 
 // Add creates a new RemoteWatcher Controller with a forwardChannel
 func Add(mgr manager.Manager, forwardChannel chan event.GenericEvent, fowardEvent event.GenericEvent) error {
@@ -83,7 +83,7 @@ type ReconcileRemoteWatcher struct {
 
 // Reconcile reads that state of the cluster for a RemoteWatcher object and makes changes
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("[rWatch] Forward reconcile to MigCluster: [%s/%s] <= [%s/%s]",
+	log.Info(fmt.Sprintf("Forward reconcile to MigCluster: [%s/%s] <= [%s/%s]",
 		r.ForwardEvent.Meta.GetNamespace(), r.ForwardEvent.Meta.GetName(), request.Namespace, request.Name))
 
 	// Forward a known Event back to the parent controller

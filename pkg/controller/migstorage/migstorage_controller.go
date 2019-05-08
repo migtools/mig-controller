@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("storage")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -97,7 +97,7 @@ type ReconcileMigStorage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages/status,verbs=get;update;patch
 func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("[mStorage] RECONCILE() ", "request", request)
+	log.Info("Reconcile", "request", request)
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
@@ -115,7 +115,11 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	_, err = r.validate(storage)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Done

@@ -18,8 +18,6 @@ package migmigration
 
 import (
 	"context"
-	"fmt"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 
@@ -35,12 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
-
-const logPrefix = "mMigration"
-
-// TODO: don't hard-code veleroNs
-const veleroNs = "velero"
+var log = logf.Log.WithName("migration")
 
 // Add creates a new MigMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -101,11 +94,11 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("[%s] RECONCILE [%s/%s]", logPrefix, request.Namespace, request.Name))
+	log.Info("Reconcile", "request", request)
 
 	// Retrieve the MigMigration being reconciled
-	migMigration := &migapi.MigMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, migMigration)
+	migration := &migapi.MigMigration{}
+	err := r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -114,48 +107,28 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Validate
-	_, err = r.validate(migMigration)
+	_, err = r.validate(migration)
 	if err != nil {
-		return reconcile.Result{}, err // requeue
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 
-	// Use rres to keep track of MigPlan, MigStorage, MigClusters, etc.
-	var rres *migapi.PlanRefResources
-
-	// Check if validations passed and Migration ready to run, else exit
-	ok := r.precheck(migMigration)
-	if !ok {
-		return reconcile.Result{}, nil //don't requeue
+	// Ready
+	if !migration.Status.IsReady() {
+		return reconcile.Result{}, nil
 	}
 
-	// Gather resources needed for reconcile
-	rres, err = r.getResources(migMigration)
-	if rres == nil {
-		return reconcile.Result{}, err
-	}
-
-	// Mark the MigMigration as started once prechecks are passed
-	rres, err = r.startMigMigration(migMigration, rres)
-	if rres == nil {
-		return reconcile.Result{}, err
-	}
-
-	// Ensure source cluster has a Velero Backup
-	rres, err = r.ensureSrcBackup(migMigration, rres)
-	if rres == nil {
-		return reconcile.Result{}, err
-	}
-
-	// Ensure destination cluster has a Velero Backup + Restore
-	rres, err = r.ensureDestRestore(migMigration, rres)
-	if rres == nil {
-		return reconcile.Result{}, err
-	}
-
-	// Mark MigMigration as complete if Velero Restore has completed
-	rres, err = r.finishMigMigration(migMigration, rres)
-	if rres == nil {
-		return reconcile.Result{}, err
+	// Do the migration.
+	err = r.migrate(migration)
+	if err != nil {
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 
 	return reconcile.Result{}, nil
