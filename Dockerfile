@@ -11,7 +11,7 @@ COPY vendor/ vendor/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/fusor/mig-controller/cmd/manager
 
 # Copy the controller-manager into a thin image
-FROM ubuntu:latest
+FROM centos:7
 WORKDIR /
 COPY --from=builder /go/src/github.com/fusor/mig-controller/manager .
 ENTRYPOINT ["/manager"]
