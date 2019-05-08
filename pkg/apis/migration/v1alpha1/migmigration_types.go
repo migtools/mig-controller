@@ -35,15 +35,10 @@ type MigMigrationSpec struct {
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
 	Conditions
-
-	MigrationRunning   bool `json:"migrationStarted,omitempty"`
-	MigrationCompleted bool `json:"migrationCompleted,omitempty"`
-
+	MigrationRunning    bool         `json:"migrationStarted,omitempty"`
+	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
-
-	SrcBackupRef   *kapi.ObjectReference `json:"srcBackupRef,omitempty"`
-	DestRestoreRef *kapi.ObjectReference `json:"destRestoreRef,omitempty"`
 }
 
 // +genclient
@@ -98,4 +93,9 @@ func (r *MigMigration) MarkAsCompleted() bool {
 	r.Status.MigrationCompleted = true
 	r.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 	return true
+}
+
+// Get whether the the migration has completed.
+func (r *MigMigration) IsCompleted() bool {
+	return r.Status.MigrationCompleted
 }

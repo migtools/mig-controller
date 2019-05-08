@@ -7,16 +7,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// Correlation labels.
-var labels = map[string]bool{
-	migapi.Label(migapi.MigPlan{}):            true,
-	migapi.Label(migapi.MigCluster{}):         true,
-	migapi.Label(migapi.MigStorage{}):         true,
-	migapi.Label(migapi.MigAssetCollection{}): true,
-	migapi.Label(migapi.MigMigration{}):       true,
-	migapi.Label(migapi.MigStage{}):           true,
-}
-
 type SecretPredicate struct {
 	predicate.Funcs
 }
@@ -42,7 +32,7 @@ func (r SecretPredicate) Delete(e event.DeleteEvent) bool {
 // The watched object has a correlation label.
 func hasCorrelationLabel(secret *kapi.Secret) bool {
 	for label := range secret.Labels {
-		_, found := labels[label]
+		_, found := migapi.KnownLabels[label]
 		if found {
 			return true
 		}

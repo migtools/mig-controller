@@ -125,7 +125,7 @@ func (r *MigStorage) EqualsVSL(a, b *velero.VolumeSnapshotLocation) bool {
 func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 	location := &velero.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       CorrelationLabels(r, r.UID),
+			Labels:       r.GetCorrelationLabels(),
 			Namespace:    "velero",
 			GenerateName: r.Name + "-",
 		},
@@ -180,7 +180,7 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 // Returns `nil` when not found.
 func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
 	list := velero.BackupStorageLocationList{}
-	labels := CorrelationLabels(r, r.UID)
+	labels := r.GetCorrelationLabels()
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -199,7 +199,7 @@ func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocat
 func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
 	location := &velero.VolumeSnapshotLocation{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       CorrelationLabels(r, r.UID),
+			Labels:       r.GetCorrelationLabels(),
 			Namespace:    "velero",
 			GenerateName: r.Name + "-",
 		},
@@ -235,7 +235,7 @@ func (r *MigStorage) updateAwsVSL(location *velero.VolumeSnapshotLocation) {
 // Returns `nil` when not found.
 func (r *MigStorage) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocation, error) {
 	list := velero.VolumeSnapshotLocationList{}
-	labels := CorrelationLabels(r, r.UID)
+	labels := r.GetCorrelationLabels()
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -270,7 +270,7 @@ func (r *MigStorage) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, erro
 func (r *MigStorage) BuildCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    CorrelationLabels(r, r.ObjectMeta.UID),
+			Labels:    r.GetCorrelationLabels(),
 			Namespace: "velero",
 			Name:      "cloud-credentials",
 		},

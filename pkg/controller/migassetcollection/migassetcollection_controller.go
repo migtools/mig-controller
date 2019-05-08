@@ -34,7 +34,7 @@ import (
 	kapi "k8s.io/api/core/v1"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("asset-collection")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller

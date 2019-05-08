@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("plan")
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -136,13 +136,21 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// nSet - The number of error conditions raised.
 	nSet, err := r.validate(plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 	if nSet > 0 {
 		plan.Status.SetReady(false, ReadyMessage)
 		err = r.Update(context.TODO(), plan)
 		if err != nil {
-			return reconcile.Result{}, err
+			if errors.IsConflict(err) {
+				return reconcile.Result{Requeue: true}, nil
+			} else {
+				return reconcile.Result{}, err
+			}
 		}
 		// done
 		return reconcile.Result{}, nil
@@ -153,7 +161,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Storage
 	ensured, err := r.ensureStorage(plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 	if !ensured {
 		ready = false
@@ -163,7 +175,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.Status.SetReady(ready, ReadyMessage)
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Done

@@ -18,8 +18,6 @@ package migstage
 
 import (
 	"context"
-	"fmt"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("controller")
+var log = logf.Log.WithName("stage")
 
 const logPrefix = "mStage"
 
@@ -115,7 +113,8 @@ type ReconcileMigStage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages/status,verbs=get;update;patch
 func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("[%s] RECONCILE [%s/%s]", logPrefix, request.Namespace, request.Name))
+	log.Info("Reconcile", "request", request)
+
 	// Fetch the MigStage instance
 	migStage := &migapi.MigStage{}
 	err := r.Get(context.TODO(), request.NamespacedName, migStage)
@@ -132,7 +131,11 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 	// Validate
 	_, err = r.validate(migStage)
 	if err != nil {
-		return reconcile.Result{}, err
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Check if validations passed and Stage Migration is ready to run
