@@ -36,11 +36,6 @@ import (
 
 var log = logf.Log.WithName("asset-collection")
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new MigAssetCollection Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -94,8 +89,8 @@ type ReconcileMigAssetCollection struct {
 }
 
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=namespaces/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migassetcollections,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migassetcollections/status,verbs=get;update;patch
 func (r *ReconcileMigAssetCollection) Reconcile(request reconcile.Request) (reconcile.Result, error) {
