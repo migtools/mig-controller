@@ -2,7 +2,12 @@ package migplan
 
 import (
 	"context"
+	"fmt"
+	kapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
+	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -18,6 +23,7 @@ const (
 	DestinationClusterNotReady   = "DestinationClusterNotReady"
 	StorageNotReady              = "StorageNotReady"
 	AssetCollectionNotReady      = "AssetCollectionNotReady"
+	AssetNamespacesNotFound      = "AssetNamespacesNotFound"
 	InvalidDestinationCluster    = "InvalidDestinationCluster"
 	EnsureStorageFailed          = "EnsureStorageFailed"
 )
@@ -46,6 +52,7 @@ const (
 	DestinationClusterNotReadyMessage   = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
+	AssetNamespaceNotFoundMessage       = "The following asset `namespaces` [%s] not found on the source cluster."
 	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	EnsureStorageFailedMessage          = "Failed to create/validate backup and volume snapshot storage."
 )
@@ -178,6 +185,43 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 			Type:    AssetCollectionNotReady,
 			Status:  True,
 			Message: AssetCollectionNotReadyMessage,
+		})
+		return 1, nil
+	}
+
+	// Namespaces
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return 0, err
+	}
+	if cluster == nil {
+		return 0, nil
+	}
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		return 0, err
+	}
+	notFound := make([]string, 0)
+	ns := kapi.Namespace{}
+	for _, name := range assetCollection.Spec.Namespaces {
+		key := types.NamespacedName{Name: name}
+		err := client.Get(context.TODO(), key, &ns)
+		if err == nil {
+			continue
+		}
+		if errors.IsNotFound(err) {
+			notFound = append(notFound, name)
+		} else {
+			return 0, err
+		}
+	}
+	if len(notFound) > 0 {
+		message := fmt.Sprintf(AssetNamespaceNotFoundMessage, strings.Join(notFound, ", "))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    AssetNamespacesNotFound,
+			Status:  True,
+			Reason:  NotFound,
+			Message: message,
 		})
 		return 1, nil
 	}
