@@ -30,6 +30,9 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) (bool, error) {
 			continue
 		}
 		client, err = cluster.GetClient(r)
+		if err != nil {
+			return false, err
+		}
 		// BSL
 		ensured, err := r.ensureBSL(client, storage)
 		if err != nil {
