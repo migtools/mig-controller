@@ -50,7 +50,7 @@ func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) error {
 	}
 
 	// Run
-	planResources, err := plan.GetRefResources(r, "deprecated")
+	planResources, err := plan.GetRefResources(r)
 	if err != nil {
 		return err
 	}

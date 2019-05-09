@@ -1,70 +1,169 @@
-/*
-Copyright 2019 Red Hat Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package velerorunner
 
 import (
 	"context"
-	"fmt"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
-
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
 
-var log = logf.Log.WithName("controller")
-
-// RunBackup runs a Velero Backup if it hasn't been run already
-func RunBackup(c client.Client, vBackupNew *velerov1.Backup, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Backup, error) {
-	vBackupExisting := &velerov1.Backup{}
-
-	err := c.Get(context.TODO(), backupNsName, vBackupExisting)
+// Ensure the backup on the source cluster has been created
+// and has the proper settings.
+func (t *Task) ensureBackup() error {
+	newBackup, err := t.buildBackup()
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Backup not found, 'Create'
-			err = c.Create(context.TODO(), vBackupNew)
-			if err != nil {
-				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Backup [%s/%s] on source cluster",
-					logPrefix, vBackupNew.Namespace, vBackupNew.Name))
-				return nil, err
-			}
-			log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] CREATED successfully on source cluster",
-				logPrefix, vBackupNew.Namespace, vBackupNew.Name))
-			return vBackupNew, nil
+		return err
+	}
+	foundBackup, err := t.getBackup()
+	if err != nil {
+		return err
+	}
+	if foundBackup == nil {
+		t.Backup = newBackup
+		client, err := t.getSourceClient()
+		if err != nil {
+			return err
 		}
+		err = client.Create(context.TODO(), newBackup)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	t.Backup = foundBackup
+	if !t.equalsBackup(newBackup, foundBackup) {
+		client, err := t.getSourceClient()
+		if err != nil {
+			return err
+		}
+		t.updateBackup(foundBackup)
+		err = client.Update(context.TODO(), foundBackup)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Get whether the two Backups are equal.
+func (t *Task) equalsBackup(a, b *velero.Backup) bool {
+	match := a.Spec.StorageLocation == b.Spec.StorageLocation &&
+		reflect.DeepEqual(a.Spec.VolumeSnapshotLocations, b.Spec.VolumeSnapshotLocations) &&
+		reflect.DeepEqual(a.Spec.IncludedNamespaces, b.Spec.IncludedNamespaces) &&
+		reflect.DeepEqual(a.Spec.IncludedResources, b.Spec.IncludedResources) &&
+		a.Spec.TTL == b.Spec.TTL
+	return match
+}
+
+// Get an existing Backup on the source cluster.
+func (t Task) getBackup() (*velero.Backup, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+	list := velero.BackupList{}
+	labels := t.Owner.GetCorrelationLabels()
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
+}
+
+// Get the existing BackupStorageLocation on the source cluster.
+func (t *Task) getBSL() (*velero.BackupStorageLocation, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+	storage := t.PlanResources.MigStorage
+	location, err := storage.GetBSL(client)
+	if err != nil {
 		return nil, err
 	}
 
-	if !reflect.DeepEqual(vBackupNew.Spec, vBackupExisting.Spec) {
-		// Backup doesn't match desired spec, 'Update'
-		vBackupExisting.Spec = vBackupNew.Spec
-		err = c.Update(context.TODO(), vBackupExisting)
-		if err != nil {
-			log.Error(err, fmt.Sprintf("[%s] Failed to UPDATE Velero Backup [%s/%s] on src cluster",
-				logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
-			return nil, err
-		}
-		log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] UPDATED successfully on source cluster",
-			logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
-		return vBackupExisting, nil
+	return location, nil
+}
+
+// Get the existing VolumeSnapshotLocation on the source cluster
+func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
 	}
-	log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] EXISTS on source cluster",
-		logPrefix, vBackupExisting.Namespace, vBackupExisting.Name))
-	return vBackupExisting, nil
+	storage := t.PlanResources.MigStorage
+	location, err := storage.GetVSL(client)
+	if err != nil {
+		return nil, err
+	}
+
+	return location, nil
+}
+
+// Build a Backups as desired for the source cluster.
+func (t *Task) buildBackup() (*velero.Backup, error) {
+	backup := &velero.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       t.Owner.GetCorrelationLabels(),
+			GenerateName: t.Owner.GetName() + "-",
+			Namespace:    VeleroNamespace,
+		},
+	}
+	err := t.updateBackup(backup)
+	return backup, err
+}
+
+// Update a Backups as desired for the source cluster.
+func (t *Task) updateBackup(backup *velero.Backup) error {
+	namespaces := t.PlanResources.MigAssets.Spec.Namespaces
+	backupLocation, err := t.getBSL()
+	if err != nil {
+		return err
+	}
+	backup.Spec = velero.BackupSpec{
+		StorageLocation:         backupLocation.Name,
+		VolumeSnapshotLocations: []string{"aws-default"},
+		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces:      namespaces,
+		ExcludedNamespaces:      []string{},
+		IncludedResources:       t.BackupResources,
+		ExcludedResources:       []string{},
+		Hooks: velero.BackupHooks{
+			Resources: []velero.BackupResourceHookSpec{},
+		},
+	}
+
+	return nil
+}
+
+// Get a Backup that has been replicated by velero on the destination cluster.
+func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+	list := velero.BackupList{}
+	labels := t.Owner.GetCorrelationLabels()
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
 }

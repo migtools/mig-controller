@@ -1,86 +1,95 @@
-/*
-Copyright 2019 Red Hat Inc.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package velerorunner
 
 import (
 	"context"
-	"fmt"
-	"reflect"
-
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// RunRestore runs a Velero Restore if it hasn't been run already
-func RunRestore(c client.Client, vRestoreNew *velerov1.Restore, restoreNsName, backupNsName types.NamespacedName, logPrefix string) (*velerov1.Restore, error) {
-	vRestoreExisting := &velerov1.Restore{}
-
-	err := c.Get(context.TODO(), restoreNsName, vRestoreExisting)
+// Ensure the restore on the destination cluster has been
+// created  and has the proper settings.
+func (t *Task) ensureRestore() error {
+	newRestore := t.buildRestore()
+	foundRestore, err := t.getRestore()
 	if err != nil {
-		if errors.IsNotFound(err) {
-			// Restore not found, we need to check if the Backup we want to use has completed
-			vBackupDest := &velerov1.Backup{}
-			err = c.Get(context.TODO(), backupNsName, vBackupDest)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] doesn't yet exist on destination cluster, waiting...",
-						logPrefix, backupNsName.Namespace, backupNsName.Name))
-					return nil, err // don't requeue
-				}
-			}
-
-			if vBackupDest.Status.Phase != velerov1.BackupPhaseCompleted {
-				log.Info(fmt.Sprintf("[%s] Velero Backup [%s/%s] in unusable phase [%s] on destination cluster",
-					logPrefix, backupNsName.Namespace, backupNsName.Name, vBackupDest.Status.Phase))
-				return nil, fmt.Errorf("Backup phase unusable") // don't requeue
-			}
-
-			log.Info(fmt.Sprintf("[%s] Found completed Velero Backup [%s/%s] on destination cluster, creating Restore on destination cluster",
-				logPrefix, backupNsName.Namespace, backupNsName.Name))
-			// Create a restore once we're certain that the required Backup exists
-			err = c.Create(context.TODO(), vRestoreNew)
-			if err != nil {
-				log.Info(fmt.Sprintf("[%s] Failed to CREATE Velero Restore [%s/%s] on destination cluster",
-					logPrefix, vRestoreNew.Namespace, vRestoreNew.Name))
-				return nil, err
-			}
-			log.Info(fmt.Sprintf("[%s] Velero Restore [%s/%s] CREATED successfully on destination cluster",
-				logPrefix, vRestoreNew.Namespace, vRestoreNew.Name))
-			return vRestoreNew, nil
-		}
-		return nil, err // requeue
+		return err
 	}
-
-	if !reflect.DeepEqual(vRestoreNew.Spec, vRestoreExisting.Spec) {
-		// Send "Create" action for Velero Backup to K8s API
-		vRestoreExisting.Spec = vRestoreNew.Spec
-		err = c.Update(context.TODO(), vRestoreExisting)
+	if foundRestore == nil {
+		t.Restore = newRestore
+		client, err := t.getDestinationClient()
 		if err != nil {
-			log.Info(fmt.Sprintf("[%s] Failed to UPDATE Velero Restore [%s/%s]",
-				logPrefix, vRestoreExisting.Namespace, vRestoreExisting.Name))
-			return nil, err
+			return err
 		}
-		log.Info(fmt.Sprintf("[%s] Velero Restore [%s/%s] UPDATED successfully on destination cluster",
-			logPrefix, vRestoreExisting.Namespace, vRestoreExisting.Name))
-		return vRestoreExisting, nil
+		err = client.Create(context.TODO(), newRestore)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
-	log.Info(fmt.Sprintf("[%s] Velero Restore [%s/%s] EXISTS on destination cluster",
-		logPrefix, vRestoreNew.Namespace, vRestoreNew.Name))
-	return vRestoreExisting, nil
+	t.Restore = foundRestore
+	if !t.equalsRestore(newRestore, foundRestore) {
+		t.updateRestore(foundRestore)
+		client, err := t.getDestinationClient()
+		if err != nil {
+			return err
+		}
+		err = client.Update(context.TODO(), foundRestore)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Get whether the two Restores are equal.
+func (t *Task) equalsRestore(a, b *velero.Restore) bool {
+	match := a.Spec.BackupName == b.Spec.BackupName &&
+		*a.Spec.RestorePVs == *b.Spec.RestorePVs
+	return match
+}
+
+// Get an existing Restore on the destination cluster.
+func (t Task) getRestore() (*velero.Restore, error) {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+	list := velero.RestoreList{}
+	labels := t.Owner.GetCorrelationLabels()
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
+}
+
+// Build a Restore as desired for the destination cluster.
+func (t *Task) buildRestore() *velero.Restore {
+	restore := &velero.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       t.Owner.GetCorrelationLabels(),
+			GenerateName: t.Owner.GetName() + "-",
+			Namespace:    VeleroNamespace,
+		},
+	}
+	t.updateRestore(restore)
+	return restore
+}
+
+// Update a Restore as desired for the destination cluster.
+func (t *Task) updateRestore(restore *velero.Restore) {
+	restorePVs := true
+	restore.Spec = velero.RestoreSpec{
+		BackupName: t.Backup.Name,
+		RestorePVs: &restorePVs,
+	}
 }

@@ -48,7 +48,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) error {
 	}
 
 	// Run
-	planResources, err := plan.GetRefResources(r, "deprecated")
+	planResources, err := plan.GetRefResources(r)
 	if err != nil {
 		return err
 	}
