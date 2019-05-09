@@ -96,3 +96,8 @@ func (r *MigStage) MarkAsCompleted() bool {
 	r.Status.CompletionTimestamp = &metav1.Time{Time: time.Now()}
 	return true
 }
+
+// Get whether the stage has completed
+func (r *MigStage) IsCompleted() bool {
+	return r.Status.StageCompleted
+}
