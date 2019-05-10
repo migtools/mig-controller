@@ -73,7 +73,7 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 	cluster.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
-	cluster.Status.CommitConditions()
+	cluster.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		return 0, err

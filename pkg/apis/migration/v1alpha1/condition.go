@@ -21,7 +21,7 @@ const (
 // Status - The condition status.
 // Reason - The reason for the condition.
 // Message - The human readable description of the condition.
-// staged - The condition is staged for commit.
+// staged - A condition has been explicitly set/updated.
 type Condition struct {
 	Type               string      `json:"type"`
 	Status             string      `json:"status"`
@@ -103,7 +103,7 @@ func (r *Conditions) DeleteCondition(cndTypes ...string) {
 	r.Conditions = kept
 }
 
-// Un-stage all conditions.
+// Mark all conditions as not staged.
 func (r *Conditions) UnstageConditions() {
 	if r.Conditions == nil {
 		return
@@ -114,8 +114,8 @@ func (r *Conditions) UnstageConditions() {
 	}
 }
 
-// Commit staged conditions. Un-staged conditions are deleted.
-func (r *Conditions) CommitConditions() {
+// Delete un-staged conditions.
+func (r *Conditions) DeleteUnstagedConditions() {
 	if r.Conditions == nil {
 		return
 	}
