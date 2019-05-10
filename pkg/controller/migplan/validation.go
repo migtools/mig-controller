@@ -2,7 +2,12 @@ package migplan
 
 import (
 	"context"
+	"fmt"
+	kapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
+	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -18,6 +23,7 @@ const (
 	DestinationClusterNotReady   = "DestinationClusterNotReady"
 	StorageNotReady              = "StorageNotReady"
 	AssetCollectionNotReady      = "AssetCollectionNotReady"
+	AssetNamespacesNotFound      = "AssetNamespacesNotFound"
 	InvalidDestinationCluster    = "InvalidDestinationCluster"
 	EnsureStorageFailed          = "EnsureStorageFailed"
 )
@@ -46,6 +52,7 @@ const (
 	DestinationClusterNotReadyMessage   = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
 	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
 	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
+	AssetNamespaceNotFoundMessage       = "The following asset `namespaces` [%s] not found on the source cluster."
 	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	EnsureStorageFailedMessage          = "Failed to create/validate backup and volume snapshot storage."
 )
@@ -86,6 +93,7 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
 	totalSet += nSet
 
 	// Apply changes.
+	plan.Status.CommitConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return 0, err
@@ -107,7 +115,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (int, error) {
 			Reason:  NotSet,
 			Message: InvalidStorageRefMessage,
 		})
-		plan.Status.DeleteCondition(StorageNotReady)
 		return 1, nil
 	}
 
@@ -124,10 +131,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (int, error) {
 			Reason:  NotFound,
 			Message: InvalidStorageRefMessage,
 		})
-		plan.Status.DeleteCondition(StorageNotReady)
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(InvalidStorageRef)
 	}
 
 	// NotReady
@@ -138,8 +142,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (int, error) {
 			Message: StorageNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(StorageNotReady)
 	}
 
 	return 0, nil
@@ -158,7 +160,6 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 			Reason:  NotSet,
 			Message: InvalidAssetCollectionRefMessage,
 		})
-		plan.Status.DeleteCondition(AssetCollectionNotReady)
 		return 1, nil
 	}
 
@@ -175,10 +176,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 			Reason:  NotFound,
 			Message: InvalidAssetCollectionRefMessage,
 		})
-		plan.Status.DeleteCondition(AssetCollectionNotReady)
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(InvalidAssetCollectionRef)
 	}
 
 	// NotReady
@@ -189,8 +187,43 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 			Message: AssetCollectionNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(AssetCollectionNotReady)
+	}
+
+	// Namespaces
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return 0, err
+	}
+	if cluster == nil {
+		return 0, nil
+	}
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		return 0, err
+	}
+	notFound := make([]string, 0)
+	ns := kapi.Namespace{}
+	for _, name := range assetCollection.Spec.Namespaces {
+		key := types.NamespacedName{Name: name}
+		err := client.Get(context.TODO(), key, &ns)
+		if err == nil {
+			continue
+		}
+		if errors.IsNotFound(err) {
+			notFound = append(notFound, name)
+		} else {
+			return 0, err
+		}
+	}
+	if len(notFound) > 0 {
+		message := fmt.Sprintf(AssetNamespaceNotFoundMessage, strings.Join(notFound, ", "))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    AssetNamespacesNotFound,
+			Status:  True,
+			Reason:  NotFound,
+			Message: message,
+		})
+		return 1, nil
 	}
 
 	return 0, nil
@@ -209,7 +242,6 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (int, erro
 			Reason:  NotSet,
 			Message: InvalidSourceClusterRefMessage,
 		})
-		plan.Status.DeleteCondition(SourceClusterNotReady)
 		return 1, nil
 	}
 
@@ -226,10 +258,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (int, erro
 			Reason:  NotFound,
 			Message: InvalidSourceClusterRefMessage,
 		})
-		plan.Status.DeleteCondition(SourceClusterNotReady)
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(InvalidSourceClusterRef)
 	}
 
 	// NotReady
@@ -240,8 +269,6 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (int, erro
 			Message: SourceClusterNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(SourceClusterNotReady)
 	}
 
 	return 0, nil
@@ -260,8 +287,6 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int,
 			Reason:  NotSet,
 			Message: InvalidDestinationClusterRefMessage,
 		})
-		plan.Status.DeleteCondition(InvalidDestinationCluster)
-		plan.Status.DeleteCondition(DestinationClusterNotReady)
 		return 1, nil
 	}
 
@@ -273,10 +298,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int,
 			Reason:  NotDistinct,
 			Message: InvalidDestinationClusterMessage,
 		})
-		plan.Status.DeleteCondition(DestinationClusterNotReady)
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(InvalidDestinationCluster)
 	}
 
 	cluster, err := migapi.GetCluster(r, ref)
@@ -292,10 +314,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int,
 			Reason:  NotFound,
 			Message: InvalidDestinationClusterRefMessage,
 		})
-		plan.Status.DeleteCondition(DestinationClusterNotReady)
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(InvalidDestinationClusterRef)
 	}
 
 	// NotReady
@@ -306,8 +325,6 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int,
 			Message: DestinationClusterNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		plan.Status.DeleteCondition(DestinationClusterNotReady)
 	}
 
 	return 0, nil

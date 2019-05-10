@@ -17,16 +17,23 @@ const (
 )
 
 // Condition
+// Type - The condition type.
+// Status - The condition status.
+// Reason - The reason for the condition.
+// Message - The human readable description of the condition.
+// staged - The condition is staged for commit.
 type Condition struct {
 	Type               string      `json:"type"`
 	Status             string      `json:"status"`
 	Reason             string      `json:"reason,omitempty"`
 	Message            string      `json:"message,omitempty"`
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	staged             bool
 }
 
 // Update this condition with another's fields.
 func (r *Condition) Update(other Condition) {
+	r.staged = true
 	if r.Equal(other) {
 		return
 	}
@@ -69,6 +76,7 @@ func (r *Conditions) SetCondition(condition Condition) {
 	if r.Conditions == nil {
 		r.Conditions = []Condition{}
 	}
+	condition.staged = true
 	_, found := r.FindCondition(condition.Type)
 	if found == nil {
 		condition.LastTransitionTime = metav1.NewTime(time.Now())
@@ -83,12 +91,42 @@ func (r *Conditions) DeleteCondition(cndTypes ...string) {
 	if r.Conditions == nil {
 		return
 	}
+	kept := []Condition{}
 	for _, name := range cndTypes {
-		i, condition := r.FindCondition(name)
-		if condition != nil {
-			r.Conditions = append(r.Conditions[:i], r.Conditions[i+1:]...)
+		for index := range r.Conditions {
+			condition := r.Conditions[index]
+			if condition.Type != name {
+				kept = append(kept, condition)
+			}
 		}
 	}
+	r.Conditions = kept
+}
+
+// Un-stage all conditions.
+func (r *Conditions) UnstageConditions() {
+	if r.Conditions == nil {
+		return
+	}
+	for index := range r.Conditions {
+		condition := &r.Conditions[index]
+		condition.staged = false
+	}
+}
+
+// Commit staged conditions. Un-staged conditions are deleted.
+func (r *Conditions) CommitConditions() {
+	if r.Conditions == nil {
+		return
+	}
+	kept := []Condition{}
+	for index := range r.Conditions {
+		condition := r.Conditions[index]
+		if condition.staged {
+			kept = append(kept, condition)
+		}
+	}
+	r.Conditions = kept
 }
 
 // Set `Ready` condition.
