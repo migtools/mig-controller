@@ -50,7 +50,7 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) (int, er
 	migration.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
-	migration.Status.CommitConditions()
+	migration.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		return 0, err

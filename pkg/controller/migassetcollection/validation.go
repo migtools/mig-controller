@@ -43,7 +43,7 @@ func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCo
 	assetCollection.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes
-	assetCollection.Status.CommitConditions()
+	assetCollection.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), assetCollection)
 	if err != nil {
 		return 0, err

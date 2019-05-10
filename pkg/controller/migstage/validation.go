@@ -50,7 +50,7 @@ func (r ReconcileMigStage) validate(stage *migapi.MigStage) (int, error) {
 	stage.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
-	stage.Status.CommitConditions()
+	stage.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), stage)
 	if err != nil {
 		return 0, err

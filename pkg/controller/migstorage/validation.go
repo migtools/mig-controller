@@ -75,7 +75,7 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) (int, error) {
 	storage.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
-	storage.Status.CommitConditions()
+	storage.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		return 0, err

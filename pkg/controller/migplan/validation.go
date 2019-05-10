@@ -93,7 +93,7 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
 	totalSet += nSet
 
 	// Apply changes.
-	plan.Status.CommitConditions()
+	plan.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return 0, err
