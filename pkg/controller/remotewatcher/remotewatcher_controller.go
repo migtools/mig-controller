@@ -14,7 +14,6 @@ limitations under the License.
 package remotewatcher
 
 import (
-	"fmt"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,11 +82,7 @@ type ReconcileRemoteWatcher struct {
 
 // Reconcile reads that state of the cluster for a RemoteWatcher object and makes changes
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info(fmt.Sprintf("Forward reconcile to MigCluster: [%s/%s] <= [%s/%s]",
-		r.ForwardEvent.Meta.GetNamespace(), r.ForwardEvent.Meta.GetName(), request.Namespace, request.Name))
-
 	// Forward a known Event back to the parent controller
 	r.ForwardChannel <- r.ForwardEvent
-
 	return reconcile.Result{}, nil
 }
