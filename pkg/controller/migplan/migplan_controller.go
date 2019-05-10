@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -119,6 +120,8 @@ type ReconcileMigPlan struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("plan|"))
+
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
 	err := r.Get(context.TODO(), request.NamespacedName, plan)

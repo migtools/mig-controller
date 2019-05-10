@@ -20,6 +20,7 @@ import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"k8s.io/apiserver/pkg/storage/names"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +95,7 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("Reconcile", "request", request)
+	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("migration|"))
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}

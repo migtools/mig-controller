@@ -18,6 +18,7 @@ package migassetcollection
 
 import (
 	"context"
+	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -99,6 +100,8 @@ type ReconcileMigAssetCollection struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migassetcollections,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migassetcollections/status,verbs=get;update;patch
 func (r *ReconcileMigAssetCollection) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("asset-collection|"))
+
 	// Fetch the MigAssetCollection instance
 	assetCollection := &migapi.MigAssetCollection{}
 	err := r.Get(context.TODO(), request.NamespacedName, assetCollection)
