@@ -130,9 +130,13 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	if err != nil {
 		return err
 	}
+	snapshotLocation, err := t.getVSL()
+	if err != nil {
+		return err
+	}
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
-		VolumeSnapshotLocations: []string{"aws-default"},
+		VolumeSnapshotLocations: []string{snapshotLocation.Name},
 		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
 		IncludedNamespaces:      namespaces,
 		ExcludedNamespaces:      []string{},

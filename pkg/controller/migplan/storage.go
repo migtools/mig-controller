@@ -108,9 +108,7 @@ func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.Mig
 // Create the velero VolumeSnapshotLocation has been created.
 // Returns `true` when ensured.
 func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
-	if storage.Spec.VolumeSnapshotProvider == "" {
-		return true, nil
-	}
+	storage.DefaultVSLSettings()
 	newVSL := storage.BuildVSL()
 	foundVSL, err := storage.GetVSL(client)
 	if err != nil {
