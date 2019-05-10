@@ -32,7 +32,7 @@ manifests:
 # Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
 samples:
 	mkdir -p migsamples
-	cp -v config/samples/* migsamples
+	cp --interactive -v config/samples/* migsamples
 
 # Run go fmt against code
 fmt:
