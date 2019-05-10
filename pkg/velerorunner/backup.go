@@ -3,6 +3,7 @@ package velerorunner
 import (
 	"context"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -91,6 +92,9 @@ func (t *Task) getBSL() (*velero.BackupStorageLocation, error) {
 	if err != nil {
 		return nil, err
 	}
+	if location == nil {
+		return nil, errors.New("BSL not found")
+	}
 
 	return location, nil
 }
@@ -105,6 +109,9 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 	location, err := storage.GetVSL(client)
 	if err != nil {
 		return nil, err
+	}
+	if location == nil {
+		return nil, errors.New("VSL not found")
 	}
 
 	return location, nil
