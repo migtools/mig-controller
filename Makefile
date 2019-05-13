@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/djwhatle/mig-controller:latest
+IMG ?= quay.io/ocpmigrate/mig-controller:latest
 
 all: test manager
 
