@@ -3,6 +3,7 @@ package migplan
 import (
 	"context"
 	"fmt"
+	"github.com/fusor/mig-controller/pkg/velerorunner"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,17 +16,19 @@ import (
 
 // Types
 const (
-	InvalidSourceClusterRef      = "InvalidSourceClusterRef"
-	InvalidDestinationClusterRef = "InvalidDestinationClusterRef"
-	InvalidStorageRef            = "InvalidStorageRef"
-	InvalidAssetCollectionRef    = "InvalidAssetCollectionRef"
-	SourceClusterNotReady        = "SourceClusterNotReady"
-	DestinationClusterNotReady   = "DestinationClusterNotReady"
-	StorageNotReady              = "StorageNotReady"
-	AssetCollectionNotReady      = "AssetCollectionNotReady"
-	AssetNamespacesNotFound      = "AssetNamespacesNotFound"
-	InvalidDestinationCluster    = "InvalidDestinationCluster"
-	EnsureStorageFailed          = "EnsureStorageFailed"
+	InvalidSourceClusterRef        = "InvalidSourceClusterRef"
+	InvalidDestinationClusterRef   = "InvalidDestinationClusterRef"
+	InvalidStorageRef              = "InvalidStorageRef"
+	InvalidAssetCollectionRef      = "InvalidAssetCollectionRef"
+	SourceClusterNotReady          = "SourceClusterNotReady"
+	DestinationClusterNotReady     = "DestinationClusterNotReady"
+	StorageNotReady                = "StorageNotReady"
+	AssetCollectionNotReady        = "AssetCollectionNotReady"
+	AssetNamespaceNotFound         = "AssetNamespaceNotFound"
+	InvalidDestinationCluster      = "InvalidDestinationCluster"
+	EnsureStorageFailed            = "EnsureStorageFailed"
+	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
+	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
 )
 
 // Reasons
@@ -43,18 +46,20 @@ const (
 
 // Messages
 const (
-	ReadyMessage                        = "The migration plan is ready."
-	InvalidSourceClusterRefMessage      = "The `srcMigClusterRef` must reference a `migcluster`."
-	InvalidDestinationClusterRefMessage = "The `dstMigClusterRef` must reference a `migcluster`."
-	InvalidStorageRefMessage            = "The `migStorageRef` must reference a `migstorage`."
-	InvalidAssetCollectionRefMessage    = "The `migAssetCollectionRef` must reference a `migassetcollection`."
-	SourceClusterNotReadyMessage        = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
-	DestinationClusterNotReadyMessage   = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
-	StorageNotReadyMessage              = "The referenced `migStorageRef` does not have a `Ready` condition."
-	AssetCollectionNotReadyMessage      = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
-	AssetNamespaceNotFoundMessage       = "The following asset `namespaces` [%s] not found on the source cluster."
-	InvalidDestinationClusterMessage    = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	EnsureStorageFailedMessage          = "Failed to create/validate backup and volume snapshot storage."
+	ReadyMessage                          = "The migration plan is ready."
+	InvalidSourceClusterRefMessage        = "The `srcMigClusterRef` must reference a `migcluster`."
+	InvalidDestinationClusterRefMessage   = "The `dstMigClusterRef` must reference a `migcluster`."
+	InvalidStorageRefMessage              = "The `migStorageRef` must reference a `migstorage`."
+	InvalidAssetCollectionRefMessage      = "The `migAssetCollectionRef` must reference a `migassetcollection`."
+	SourceClusterNotReadyMessage          = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
+	DestinationClusterNotReadyMessage     = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
+	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
+	AssetCollectionNotReadyMessage        = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
+	AssetNamespaceNotFoundMessage         = "The following asset `namespaces` [%s] not found on the source cluster."
+	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
+	EnsureStorageFailedMessage            = "Failed to create/validate backup and volume snapshot storage."
+	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
+	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
 )
 
 // Validate the plan resource.
@@ -87,6 +92,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
 
 	// AssetCollection
 	nSet, err = r.validateAssetCollection(plan)
+	if err != nil {
+		return 0, err
+	}
+	totalSet += nSet
+
+	// Required namespaces.
+	nSet, err = r.validateRequiredNamespaces(plan)
 	if err != nil {
 		return 0, err
 	}
@@ -218,7 +230,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 	if len(notFound) > 0 {
 		message := fmt.Sprintf(AssetNamespaceNotFoundMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    AssetNamespacesNotFound,
+			Type:    AssetNamespaceNotFound,
 			Status:  True,
 			Reason:  NotFound,
 			Message: message,
@@ -323,6 +335,114 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int,
 			Type:    DestinationClusterNotReady,
 			Status:  True,
 			Message: DestinationClusterNotReadyMessage,
+		})
+		return 1, nil
+	}
+
+	return 0, nil
+}
+
+// Validate required namespaces.
+// Returns error and the total error conditions set.
+func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) (int, error) {
+	totalSet := 0
+
+	// Source
+	nSet, err := r.validateSourceNamespaces(plan)
+	if err != nil {
+		return 0, err
+	}
+	totalSet += nSet
+
+	// Destination
+	nSet, err = r.validateDestinationNamespaces(plan)
+	if err != nil {
+		return 0, err
+	}
+	totalSet += nSet
+
+	return totalSet, nil
+}
+
+// Validate required namespaces on the source cluster.
+// Returns error and the total error conditions set.
+func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) (int, error) {
+	namespaces := []string{velerorunner.VeleroNamespace}
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return 0, err
+	}
+	if cluster == nil {
+		return 0, nil
+	}
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		return 0, err
+	}
+	ns := kapi.Namespace{}
+	notFound := make([]string, 0)
+	for _, name := range namespaces {
+		key := types.NamespacedName{Name: name}
+		err := client.Get(context.TODO(), key, &ns)
+		if err == nil {
+			continue
+		}
+		if errors.IsNotFound(err) {
+			notFound = append(notFound, name)
+		} else {
+			return 0, err
+		}
+	}
+	if len(notFound) > 0 {
+		message := fmt.Sprintf(NsNotFoundOnSourceClusterMessage, strings.Join(notFound, ", "))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    NsNotFoundOnSourceCluster,
+			Status:  True,
+			Reason:  NotFound,
+			Message: message,
+		})
+		return 1, nil
+	}
+
+	return 0, nil
+}
+
+// Validate required namespaces on the destination cluster.
+// Returns error and the total error conditions set.
+func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) (int, error) {
+	namespaces := []string{velerorunner.VeleroNamespace}
+	cluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return 0, err
+	}
+	if cluster == nil {
+		return 0, nil
+	}
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		return 0, err
+	}
+	ns := kapi.Namespace{}
+	notFound := make([]string, 0)
+	for _, name := range namespaces {
+		key := types.NamespacedName{Name: name}
+		err := client.Get(context.TODO(), key, &ns)
+		if err == nil {
+			continue
+		}
+		if errors.IsNotFound(err) {
+			notFound = append(notFound, name)
+		} else {
+			return 0, err
+		}
+	}
+	if len(notFound) > 0 {
+		message := fmt.Sprintf(NsNotFoundOnDestinationClusterMessage, strings.Join(notFound, ", "))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:    NsNotFoundOnDestinationCluster,
+			Status:  True,
+			Reason:  NotFound,
+			Message: message,
 		})
 		return 1, nil
 	}
