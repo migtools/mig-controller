@@ -34,23 +34,24 @@ const (
 
 // Validate the plan resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigStage) validate(migration *migapi.MigStage) (int, error) {
+func (r ReconcileMigStage) validate(stage *migapi.MigStage) (int, error) {
 	totalSet := 0
 	var err error
 	nSet := 0
 
 	// Plan
-	nSet, err = r.validatePlan(migration)
+	nSet, err = r.validatePlan(stage)
 	if err != nil {
 		return 0, err
 	}
 	totalSet += nSet
 
 	// Ready
-	migration.Status.SetReady(totalSet == 0, ReadyMessage)
+	stage.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
-	err = r.Update(context.TODO(), migration)
+	stage.Status.DeleteUnstagedConditions()
+	err = r.Update(context.TODO(), stage)
 	if err != nil {
 		return 0, err
 	}
@@ -60,18 +61,17 @@ func (r ReconcileMigStage) validate(migration *migapi.MigStage) (int, error) {
 
 // Validate the referenced plan.
 // Returns error and the total error conditions set.
-func (r ReconcileMigStage) validatePlan(migration *migapi.MigStage) (int, error) {
-	ref := migration.Spec.MigPlanRef
+func (r ReconcileMigStage) validatePlan(stage *migapi.MigStage) (int, error) {
+	ref := stage.Spec.MigPlanRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
-		migration.Status.SetCondition(migapi.Condition{
+		stage.Status.SetCondition(migapi.Condition{
 			Type:    InvalidPlanRef,
 			Status:  True,
 			Reason:  NotSet,
 			Message: InvalidPlanRefMessage,
 		})
-		migration.Status.DeleteCondition(PlanNotReady)
 		return 1, nil
 	}
 
@@ -82,28 +82,23 @@ func (r ReconcileMigStage) validatePlan(migration *migapi.MigStage) (int, error)
 
 	// NotFound
 	if plan == nil {
-		migration.Status.SetCondition(migapi.Condition{
+		stage.Status.SetCondition(migapi.Condition{
 			Type:    InvalidPlanRef,
 			Status:  True,
 			Reason:  NotFound,
 			Message: InvalidPlanRefMessage,
 		})
-		migration.Status.DeleteCondition(PlanNotReady)
 		return 1, nil
-	} else {
-		migration.Status.DeleteCondition(InvalidPlanRef)
 	}
 
 	// NotReady
 	if !plan.Status.IsReady() {
-		migration.Status.SetCondition(migapi.Condition{
+		stage.Status.SetCondition(migapi.Condition{
 			Type:    PlanNotReady,
 			Status:  True,
 			Message: PlanNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		migration.Status.DeleteCondition(PlanNotReady)
 	}
 
 	return 0, nil

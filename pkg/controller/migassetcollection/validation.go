@@ -2,18 +2,12 @@ package migassetcollection
 
 import (
 	"context"
-	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"strings"
 )
 
 // Types
 const (
-	EmptyCollection    = "EmptyCollection"
-	NamespacesNotFound = "NamespacesNotFound"
+	EmptyCollection = "EmptyCollection"
 )
 
 // Reasons
@@ -29,9 +23,8 @@ const (
 
 // Messages
 const (
-	ReadyMessage             = "The asset-collection is ready."
-	NamespaceNotFoundMessage = "The following `namespaces` [%s] not found on the source cluster."
-	EmptyCollectionMessage   = "The `namespaces` list may not be empty."
+	ReadyMessage           = "The asset-collection is ready."
+	EmptyCollectionMessage = "The `namespaces` list may not be empty."
 )
 
 // Validate the asset collection resource.
@@ -46,17 +39,11 @@ func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCo
 	}
 	totalSet += nSet
 
-	// Validate listed assets
-	nSet, err = r.validateAssets(assetCollection)
-	if err != nil {
-		return 0, err
-	}
-	totalSet += nSet
-
 	// Ready
 	assetCollection.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes
+	assetCollection.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), assetCollection)
 	if err != nil {
 		return 0, err
@@ -73,40 +60,6 @@ func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAs
 			Message: EmptyCollectionMessage,
 		})
 		return 1, nil
-	} else {
-		assetCollection.Status.DeleteCondition(EmptyCollection)
-	}
-
-	return 0, nil
-}
-
-func (r ReconcileMigAssetCollection) validateAssets(assetCollection *migapi.MigAssetCollection) (int, error) {
-	notFound := make([]string, 0)
-	ns := kapi.Namespace{}
-	for _, name := range assetCollection.Spec.Namespaces {
-		key := types.NamespacedName{Name: name}
-		err := r.Get(context.TODO(), key, &ns) // TODO: query source cluster instead.
-		if err == nil {
-			continue
-		}
-		if errors.IsNotFound(err) {
-			notFound = append(notFound, name)
-		} else {
-			return 0, err
-		}
-	}
-
-	if len(notFound) > 0 {
-		message := fmt.Sprintf(NamespaceNotFoundMessage, strings.Join(notFound, ", "))
-		assetCollection.Status.SetCondition(migapi.Condition{
-			Type:    NamespacesNotFound,
-			Status:  True,
-			Reason:  NotFound,
-			Message: message,
-		})
-		return 1, nil
-	} else {
-		assetCollection.Status.DeleteCondition(NamespacesNotFound)
 	}
 
 	return 0, nil

@@ -73,6 +73,7 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
 	cluster.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
+	cluster.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		return 0, err
@@ -86,7 +87,6 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
-		cluster.Status.DeleteCondition(InvalidClusterRef)
 		return 0, nil
 	}
 
@@ -115,8 +115,6 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 			Message: InvalidClusterRefMessage,
 		})
 		return 1, nil
-	} else {
-		cluster.Status.DeleteCondition(InvalidClusterRef)
 	}
 
 	return 0, nil
@@ -150,8 +148,6 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
-		cluster.Status.DeleteCondition(InvalidSaSecretRef)
-		cluster.Status.DeleteCondition(InvalidSaToken)
 		return 0, nil
 	}
 
@@ -163,7 +159,6 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 			Reason:  NotSet,
 			Message: InvalidSaSecretRefMessage,
 		})
-		cluster.Status.DeleteCondition(InvalidSaToken)
 		return 1, nil
 	}
 
@@ -180,10 +175,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 			Reason:  NotFound,
 			Message: InvalidSaSecretRefMessage,
 		})
-		cluster.Status.DeleteCondition(InvalidSaToken)
 		return 1, nil
-	} else {
-		cluster.Status.DeleteCondition(InvalidSaSecretRef)
 	}
 
 	// saToken
@@ -205,8 +197,6 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 			Message: InvalidSaTokenMessage,
 		})
 		return 1, nil
-	} else {
-		cluster.Status.DeleteCondition(InvalidSaToken)
 	}
 
 	return 0, nil
@@ -215,7 +205,6 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, 
 // Test the connection.
 func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster, totalSet int) (int, error) {
 	if cluster.Spec.IsHostCluster {
-		cluster.Status.DeleteCondition(TestConnectFailed)
 		return 0, nil
 	}
 	if totalSet > 0 {
@@ -231,8 +220,6 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster, totalSet
 			Message: message,
 		})
 		return 1, nil
-	} else {
-		cluster.Status.DeleteCondition(TestConnectFailed)
 	}
 
 	return 0, nil

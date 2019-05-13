@@ -715,6 +715,7 @@
     "pkg/util/mergepatch",
     "pkg/util/naming",
     "pkg/util/net",
+    "pkg/util/rand",
     "pkg/util/runtime",
     "pkg/util/sets",
     "pkg/util/strategicpatch",
@@ -731,6 +732,14 @@
   pruneopts = "T"
   revision = "2b1284ed4c93a43499e781493253e2ac5959c4fd"
   version = "kubernetes-1.13.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:29f9d9e064d80ae5a39c7d403b0371e9e38bf29c9d606a50917188b30b39c784"
+  name = "k8s.io/apiserver"
+  packages = ["pkg/storage/names"]
+  pruneopts = "T"
+  revision = "32059931b4c930e5c9bab8f663101f0c4d6a75f1"
 
 [[projects]]
   digest = "1:c43437141e0905409008e6a82e3574eff11d10af3db49d7ac9932cbbaab5035b"
@@ -952,6 +961,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/emicklei/go-restful",
+    "github.com/go-logr/logr",
     "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
@@ -959,6 +969,7 @@
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/project/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/pkg/errors",
     "golang.org/x/net/context",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
@@ -968,6 +979,7 @@
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apiserver/pkg/storage/names",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",

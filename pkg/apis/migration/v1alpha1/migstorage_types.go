@@ -195,6 +195,22 @@ func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocat
 	return nil, nil
 }
 
+// Default the VSL settings (when not defined) using the BSL settings.
+func (r *MigStorage) DefaultVSLSettings() {
+	if r.Spec.VolumeSnapshotProvider != "" {
+		return
+	}
+	r.Spec.VolumeSnapshotProvider = r.Spec.BackupStorageProvider
+	r.Spec.VolumeSnapshotConfig.CredsSecretRef = r.Spec.BackupStorageConfig.CredsSecretRef
+	switch r.Spec.BackupStorageProvider {
+	case "aws":
+		r.Spec.VolumeSnapshotConfig.AwsRegion = r.Spec.BackupStorageConfig.AwsRegion
+	case "azure":
+	case "gcp":
+	case "":
+	}
+}
+
 // Build a velero volume snapshot location.
 func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
 	location := &velero.VolumeSnapshotLocation{

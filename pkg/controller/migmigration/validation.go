@@ -50,6 +50,7 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) (int, er
 	migration.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes.
+	migration.Status.DeleteUnstagedConditions()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		return 0, err
@@ -71,7 +72,6 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (int
 			Reason:  NotSet,
 			Message: InvalidPlanRefMessage,
 		})
-		migration.Status.DeleteCondition(PlanNotReady)
 		return 1, nil
 	}
 
@@ -88,10 +88,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (int
 			Reason:  NotFound,
 			Message: InvalidPlanRefMessage,
 		})
-		migration.Status.DeleteCondition(PlanNotReady)
 		return 1, nil
-	} else {
-		migration.Status.DeleteCondition(InvalidPlanRef)
 	}
 
 	// NotReady
@@ -102,8 +99,6 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (int
 			Message: PlanNotReadyMessage,
 		})
 		return 1, nil
-	} else {
-		migration.Status.DeleteCondition(PlanNotReady)
 	}
 
 	return 0, nil

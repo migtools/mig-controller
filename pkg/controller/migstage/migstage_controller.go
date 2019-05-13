@@ -22,6 +22,7 @@ import (
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -108,7 +109,7 @@ type ReconcileMigStage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstages/status,verbs=get;update;patch
 func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("Reconcile", "request", request)
+	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("stage|"))
 
 	// Fetch the MigStage instance
 	migStage := &migapi.MigStage{}
@@ -133,41 +134,17 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 		}
 	}
 
-	// Check if validations passed and Stage Migration is ready to run
-	ok := r.precheck(migStage)
-	if !ok {
-		return reconcile.Result{}, nil
+	if !migStage.Status.IsReady() {
+		return reconcile.Result{}, err
 	}
 
-	// Gather resources needed for reconcile
-	rres, err := r.getResources(migStage)
-	if rres == nil {
-		return reconcile.Result{}, nil
+	err = r.stage(migStage)
+	if err != nil {
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
-
-	// Mark MigStage as started once prechecks are passed
-	rres, err = r.startMigStage(migStage, rres)
-	if rres == nil {
-		return reconcile.Result{}, nil
-	}
-
-	// Ensure source cluster has a Velero Backup
-	rres, err = r.ensureSrcBackup(migStage, rres)
-	if rres == nil {
-		return reconcile.Result{}, nil
-	}
-
-	// Ensure destination cluster has a Velero Backup + Restore
-	rres, err = r.ensureDestRestore(migStage, rres)
-	if rres == nil {
-		return reconcile.Result{}, nil
-	}
-
-	// Mark MigStage as complete if Velero Restore has completed
-	rres, err = r.finishMigStage(migStage, rres)
-	if rres == nil {
-		return reconcile.Result{}, nil
-	}
-
 	return reconcile.Result{}, nil
 }

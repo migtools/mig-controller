@@ -18,7 +18,7 @@ package migcluster
 
 import (
 	"context"
-	"fmt"
+	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -116,7 +116,7 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Info("Reconcile", "request", request.Name)
+	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("cluster|"))
 
 	// Fetch the MigCluster
 	migCluster := &migapi.MigCluster{}
@@ -146,20 +146,17 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
 
 	if remoteWatchCluster == nil {
-		log.Info(fmt.Sprintf("[mCluster] Starting RemoteWatch for MigCluster [%s/%s]", request.Namespace, request.Name))
+		log.Info("Starting remote watch.", "cluster", request.Name)
 
 		var restCfg *rest.Config
-
 		if migCluster.Spec.IsHostCluster {
 			restCfg, err = config.GetConfig()
 			if err != nil {
-				log.Error(err, fmt.Sprintf("[mCluster] Error during config.GetConfig() for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
 				return reconcile.Result{}, err
 			}
 		} else {
 			restCfg, err = migCluster.BuildRestConfig(r.Client)
 			if err != nil {
-				log.Error(err, fmt.Sprintf("[mCluster] Error during BuildRestConfig() for RemoteWatch on MigCluster [%s/%s]", request.Namespace, request.Name))
 				return reconcile.Result{}, nil // don't requeue
 			}
 		}
@@ -169,7 +166,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			ParentNsName:     request.NamespacedName,
 			ParentResource:   migCluster,
 		})
-		log.Info(fmt.Sprintf("[mCluster] RemoteWatch started successfully for MigCluster [%s/%s]", request.Namespace, request.Name))
+
+		log.Info("Remote watch started.", "cluster", request.Name)
 	}
 
 	// Done
