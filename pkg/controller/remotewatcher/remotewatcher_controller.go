@@ -81,6 +81,7 @@ type ReconcileRemoteWatcher struct {
 }
 
 // Reconcile reads that state of the cluster for a RemoteWatcher object and makes changes
+// +kubebuilder:rbac:groups=velero.io,resources=*,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Forward a known Event back to the parent controller
 	r.ForwardChannel <- r.ForwardEvent

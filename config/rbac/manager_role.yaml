@@ -5,9 +5,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - apps
+  - ""
   resources:
-  - deployments
+  - namespaces
   verbs:
   - get
   - list
@@ -17,9 +17,9 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - apps
+  - ""
   resources:
-  - deployments/status
+  - namespaces/status
   verbs:
   - get
   - update
@@ -45,26 +45,6 @@ rules:
   - update
   - patch
 - apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
   - migration.openshift.io
   resources:
   - migclusters
@@ -85,9 +65,9 @@ rules:
   - update
   - patch
 - apiGroups:
-  - apps
+  - clusterregistry.k8s.io
   resources:
-  - deployments
+  - clusters
   verbs:
   - get
   - list
@@ -97,9 +77,9 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - apps
+  - clusterregistry.k8s.io
   resources:
-  - deployments/status
+  - clusters/status
   verbs:
   - get
   - update
@@ -125,26 +105,6 @@ rules:
   - update
   - patch
 - apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
   - migration.openshift.io
   resources:
   - migplans
@@ -160,26 +120,6 @@ rules:
   - migration.openshift.io
   resources:
   - migplans/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
   verbs:
   - get
   - update
@@ -205,26 +145,6 @@ rules:
   - update
   - patch
 - apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
   - migration.openshift.io
   resources:
   - migstorages
@@ -244,6 +164,18 @@ rules:
   - get
   - update
   - patch
+- apiGroups:
+  - velero.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
