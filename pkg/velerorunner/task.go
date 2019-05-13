@@ -17,7 +17,6 @@ var VeleroNamespace = "velero"
 // BackupResources - Resource types to be included in the backup.
 // Backup - A Backup created on the source cluster.
 // Restore - A Restore created on the destination cluster.
-// ClientCache - Client cache keyed by cluster.
 type Task struct {
 	Log             logr.Logger
 	Client          k8sclient.Client
@@ -26,7 +25,6 @@ type Task struct {
 	BackupResources []string
 	Backup          *velero.Backup
 	Restore         *velero.Restore
-	ClientCache     map[*migapi.MigCluster]k8sclient.Client
 }
 
 // Reconcile() Example:
@@ -102,31 +100,12 @@ func (t *Task) Run() (bool, error) {
 	return true, nil
 }
 
-// Get a client for the source cluster using the cache.
+// Get a client for the source cluster.
 func (t *Task) getSourceClient() (k8sclient.Client, error) {
-	return t.getClient(t.PlanResources.SrcMigCluster)
+	return t.PlanResources.SrcMigCluster.GetClient(t.Client)
 }
 
-// Get a client for the destination cluster using the cache.
+// Get a client for the destination cluster.
 func (t *Task) getDestinationClient() (k8sclient.Client, error) {
-	return t.getClient(t.PlanResources.DestMigCluster)
-}
-
-// Get a client for the cluster using the cache.
-func (t *Task) getClient(cluster *migapi.MigCluster) (k8sclient.Client, error) {
-	if t.ClientCache == nil {
-		t.ClientCache = map[*migapi.MigCluster]k8sclient.Client{}
-	}
-	client, found := t.ClientCache[cluster]
-	if found {
-		return client, nil
-	}
-	client, err := cluster.GetClient(t.Client)
-	if err != nil {
-		return nil, err
-	} else {
-		t.ClientCache[cluster] = client
-	}
-
-	return client, nil
+	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
