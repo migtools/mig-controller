@@ -2,13 +2,18 @@ package velerorunner
 
 import (
 	"context"
+	"reflect"
+	"strings"
+	"time"
+
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
+
+var resticPodPrefix = "restic-"
 
 // Ensure the backup on the source cluster has been created
 // and has the proper settings.
@@ -144,11 +149,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -177,4 +182,65 @@ func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
 	}
 
 	return nil, nil
+}
+
+// Delete the running restic pod in velero namespace
+// This function is used to get around mount propagation requirements
+func (t *Task) bounceResticPod() error {
+	// If restart already completed, return
+	if t.Phase != WaitOnResticRestart && t.Phase != Started {
+		return nil
+	} else if t.Phase == WaitOnResticRestart {
+		t.Log.Info("Waiting for restic pod to be ready")
+	}
+
+	// Get client of source cluster
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+
+	// List all pods in velero namespace
+	list := corev1.PodList{}
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace: VeleroNamespace,
+		},
+		&list)
+	if err != nil {
+		return err
+	}
+
+	// Loop through all pods in velero namespace
+	for _, pod := range list.Items {
+		if !strings.HasPrefix(pod.Name, resticPodPrefix) {
+			continue
+		}
+		// Check if pod is running
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		// If restart already started, mark it as completed
+		if t.Phase == WaitOnResticRestart {
+			t.Phase = ResticRestartCompleted
+			t.Log.Info("Restic pod successfully restarted")
+			return nil
+		}
+		// Delete pod since restart never started
+		t.Log.Info(
+			"Deleting restic pod",
+			"name",
+			pod.Name)
+		err = client.Delete(
+			context.TODO(),
+			&pod)
+		if err != nil {
+			return err
+		}
+		t.Phase = WaitOnResticRestart
+		return nil
+	}
+
+	return nil
 }
