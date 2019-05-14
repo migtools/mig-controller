@@ -5,6 +5,7 @@
  - golang compiler (tested @ 1.11.5)
  - kubebuilder (tested @ 1.0.7)
  - dep (tested @ v0.5.0)
+ - velero (tested @ v0.11.0) installed on both clusters involved in migration
 
 ---
 
