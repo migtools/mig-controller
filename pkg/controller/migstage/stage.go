@@ -24,19 +24,19 @@ import (
 
 var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
 
-func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) error {
+func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) (bool, error) {
 	if stageMigration.IsCompleted() {
-		return nil
+		return false, nil
 	}
 
 	// Ready
 	plan, err := stageMigration.GetPlan(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !plan.Status.IsReady() {
 		log.Info("Plan not ready.", "name", stageMigration.Name)
-		return err
+		return false, err
 	}
 
 	// Started
@@ -45,36 +45,43 @@ func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) error {
 		stageMigration.MarkAsRunning()
 		err = r.Update(context.TODO(), stageMigration)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// Run
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	task := vrunner.Task{
 		Log:             log,
 		Client:          r,
 		Owner:           stageMigration,
 		PlanResources:   planResources,
+		Phase:           stageMigration.Status.TaskPhase,
 		BackupResources: stageResources,
 	}
-	completed, err := task.Run()
+	err = task.Run()
 	if err != nil {
-		return err
+		return false, err
 	}
-
-	// Completed
-	if completed {
+	stageMigration.Status.TaskPhase = task.Phase
+	err = r.Update(context.TODO(), stageMigration)
+	if err != nil {
+		return false, err
+	}
+	switch task.Phase {
+	case vrunner.Completed:
 		log.Info("Stage completed.", "name", stageMigration.Name)
 		stageMigration.MarkAsCompleted()
 		err = r.Update(context.TODO(), stageMigration)
 		if err != nil {
-			return err
+			return false, err
 		}
+	case vrunner.WaitOnResticRestart:
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }

@@ -39,6 +39,7 @@ type MigMigrationStatus struct {
 	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+	TaskPhase           string       `json:"taskPhase,omitempty"`
 }
 
 // +genclient

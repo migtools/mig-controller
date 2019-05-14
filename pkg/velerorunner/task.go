@@ -9,12 +9,29 @@ import (
 
 var VeleroNamespace = "velero"
 
+// Phases
+const (
+	Started                 = ""
+	WaitOnResticRestart     = "WaitOnResticRestart"
+	ResticRestartCompleted  = "ResticRestartCompleted"
+	BackupStarted           = "BackupStarted"
+	BackupCompleted         = "BackupCompleted"
+	BackupFailed            = "BackupFailed"
+	WaitOnBackupReplication = "WaitOnBackupReplication"
+	BackupReplicated        = "BackupReplicated"
+	RestoreStarted          = "RestoreStarted"
+	RestoreCompleted        = "RestoreCompleted"
+	RestoreFailed           = "RestoreFailed"
+	Completed               = "Completed"
+)
+
 // A Velero task that provides the complete backup & restore workflow.
 // Log - A controller's logger.
 // Client - A controller's (local) client.
 // Owner - A MigStage or MigMigration resource.
 // PlanResources - A PlanRefResources.
 // BackupResources - Resource types to be included in the backup.
+// Phase - The task phase.
 // Backup - A Backup created on the source cluster.
 // Restore - A Restore created on the destination cluster.
 type Task struct {
@@ -23,6 +40,7 @@ type Task struct {
 	Owner           migapi.MigResource
 	PlanResources   *migapi.PlanResources
 	BackupResources []string
+	Phase           string
 	Backup          *velero.Backup
 	Restore         *velero.Restore
 }
@@ -36,68 +54,59 @@ type Task struct {
 //     PlanResources: plan.GetPlanResources(),
 // }
 //
-// completed, err := task.Run()
+// err := task.Run()
+// switch task.Phase {
+//     case Complete:
+//         ...
+// }
 //
 
 // Run the task.
 // Return `true` when run to completion.
-func (t *Task) Run() (bool, error) {
+func (t *Task) Run() error {
+	t.logEnter()
+	defer t.logExit()
+
 	// Backup
 	err := t.ensureBackup()
 	if err != nil {
-		return false, err
+		return err
 	}
 	if t.Backup.Status.Phase != velero.BackupPhaseCompleted {
-		t.Log.Info(
-			"Waiting for backup to complete.",
-			"owner",
-			t.Owner.GetName(),
-			"backup",
-			t.Backup.Name)
-		return false, nil
+		t.Phase = BackupStarted
+		return nil
+	} else {
+		t.Phase = BackupCompleted
 	}
-	t.Log.Info(
-		"Backup has completed.",
-		"owner",
-		t.Owner.GetName(),
-		"backup",
-		t.Backup.Name)
 
+	// Wait on Backup replication.
+	t.Phase = WaitOnBackupReplication
 	backup, err := t.getReplicatedBackup()
 	if err != nil {
-		return false, err
+		return err
 	}
-	if backup == nil {
-		t.Log.Info(
-			"Waiting for backup to be replicated to the destination.",
-			"owner",
-			t.Owner.GetName(),
-			"backup",
-			t.Backup.Name)
-		return false, nil
+	if backup != nil {
+		t.Phase = BackupReplicated
+	} else {
+		return nil
 	}
+
 	// Restore
 	err = t.ensureRestore()
 	if err != nil {
-		return false, err
+		return err
 	}
 	if t.Restore.Status.Phase != velero.RestorePhaseCompleted {
-		t.Log.Info(
-			"Waiting for restore to complete.",
-			"owner",
-			t.Owner.GetName(),
-			"restore",
-			t.Restore.Name)
-		return false, nil
+		t.Phase = RestoreStarted
+		return nil
+	} else {
+		t.Phase = RestoreCompleted
 	}
-	t.Log.Info(
-		"Restore has completed.",
-		"owner",
-		t.Owner.GetName(),
-		"restore",
-		t.Restore.Name)
 
-	return true, nil
+	// Done
+	t.Phase = Completed
+
+	return nil
 }
 
 // Get a client for the source cluster.
@@ -108,4 +117,36 @@ func (t *Task) getSourceClient() (k8sclient.Client, error) {
 // Get a client for the destination cluster.
 func (t *Task) getDestinationClient() (k8sclient.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
+}
+
+// Log task start/resumed.
+func (t *Task) logEnter() {
+	if t.Phase == Started {
+		t.Log.Info("Task started.")
+		return
+	}
+	t.Log.Info("Task resumed.", "phase", t.Phase)
+}
+
+// Log task exit/interrupted.
+func (t *Task) logExit() {
+	if t.Phase == Completed {
+		t.Log.Info("Task completed.")
+		return
+	}
+	backup := ""
+	restore := ""
+	if t.Backup != nil {
+		backup = t.Backup.Name
+	}
+	if t.Restore != nil {
+		restore = t.Restore.Name
+	}
+	t.Log.Info(
+		"Task interrupted.",
+		"phase", t.Phase,
+		"backup",
+		backup,
+		"restore",
+		restore)
 }
