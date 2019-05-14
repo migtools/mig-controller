@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
 var log = logf.Log.WithName("stage")
@@ -138,7 +139,7 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 		return reconcile.Result{}, err
 	}
 
-	err = r.stage(migStage)
+	requeue, err := r.stage(migStage)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -146,5 +147,10 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 			return reconcile.Result{}, err
 		}
 	}
+	if requeue {
+		delay := time.Second * 5
+		return reconcile.Result{RequeueAfter: delay}, nil
+	}
+
 	return reconcile.Result{}, nil
 }

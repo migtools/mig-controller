@@ -22,19 +22,19 @@ import (
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
-func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) error {
+func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
 	if migration.IsCompleted() {
-		return nil
+		return false, nil
 	}
 
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !plan.Status.IsReady() {
 		log.Info("Plan not ready.", "name", migration.Name)
-		return err
+		return false, err
 	}
 
 	// Started
@@ -43,35 +43,42 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) error {
 		migration.MarkAsRunning()
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
 	// Run
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	task := vrunner.Task{
 		Log:           log,
 		Client:        r,
 		Owner:         migration,
 		PlanResources: planResources,
+		Phase:         migration.Status.TaskPhase,
 	}
-	completed, err := task.Run()
+	err = task.Run()
 	if err != nil {
-		return err
+		return false, err
 	}
-
-	// Completed
-	if completed {
+	migration.Status.TaskPhase = task.Phase
+	err = r.Update(context.TODO(), migration)
+	if err != nil {
+		return false, err
+	}
+	switch task.Phase {
+	case vrunner.Completed:
 		log.Info("Migration completed.", "name", migration.Name)
 		migration.MarkAsCompleted()
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
-			return err
+			return false, err
 		}
+	case vrunner.WaitOnResticRestart:
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }

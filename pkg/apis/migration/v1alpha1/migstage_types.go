@@ -32,15 +32,11 @@ type MigStageSpec struct {
 // MigStageStatus defines the observed state of MigStage
 type MigStageStatus struct {
 	Conditions
-
-	StageRunning   bool `json:"stageStarted,omitempty"`
-	StageCompleted bool `json:"stageCompleted,omitempty"`
-
+	StageRunning        bool         `json:"stageStarted,omitempty"`
+	StageCompleted      bool         `json:"stageCompleted,omitempty"`
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
-
-	SrcBackupRef   *kapi.ObjectReference `json:"srcBackupRef,omitempty"`
-	DestRestoreRef *kapi.ObjectReference `json:"destRestoreRef,omitempty"`
+	TaskPhase           string       `json:"taskPhase,omitempty"`
 }
 
 // +genclient

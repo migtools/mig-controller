@@ -21,6 +21,7 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apiserver/pkg/storage/names"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -120,13 +121,17 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Do the migration.
-	err = r.migrate(migration)
+	requeue, err := r.migrate(migration)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
 		} else {
 			return reconcile.Result{}, err
 		}
+	}
+	if requeue {
+		delay := time.Second * 5
+		return reconcile.Result{RequeueAfter: delay}, nil
 	}
 
 	return reconcile.Result{}, nil
