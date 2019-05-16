@@ -23,9 +23,12 @@ import (
 )
 
 var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
-var stageAnnotationKey = "openshift.io/migrate-copy-phase"
-var pvAnnotationKey = "openshift.io/migrate-type"
-var stageAnnotationValue = "stage"
+
+const (
+	pvAnnotationKey      = "openshift.io/migrate-type"
+	stageAnnotationValue = "stage"
+	stageAnnotationKey   = "openshift.io/migrate-copy-phase"
+)
 
 func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) (bool, error) {
 	if stageMigration.IsCompleted() {

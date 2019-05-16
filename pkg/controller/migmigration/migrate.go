@@ -22,9 +22,11 @@ import (
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
-var migrateAnnotationKey = "openshift.io/migrate-copy-phase"
-var pvAnnotationKey = "openshift.io/migrate-type"
-var migrateAnnotationValue = "final"
+const (
+	pvAnnotationKey        = "openshift.io/migrate-type"
+	migrateAnnotationValue = "final"
+	migrateAnnotationKey   = "openshift.io/migrate-copy-phase"
+)
 
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
 	if migration.IsCompleted() {
