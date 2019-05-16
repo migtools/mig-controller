@@ -22,6 +22,9 @@ import (
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
+var migrateAnnotationKey = "openshift.io/migrate-copy-phase"
+var migrateAnnotationValue = "final"
+
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
 	if migration.IsCompleted() {
 		return false, nil
@@ -47,6 +50,10 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		}
 	}
 
+	// Build annotations
+	annotations := make(map[string]string)
+	annotations[migrateAnnotationKey] = migrateAnnotationValue
+
 	// Run
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
@@ -58,6 +65,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		Owner:         migration,
 		PlanResources: planResources,
 		Phase:         migration.Status.TaskPhase,
+		Annotations:   annotations,
 	}
 	err = task.Run()
 	if err != nil {

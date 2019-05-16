@@ -124,6 +124,7 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
 			Namespace:    VeleroNamespace,
+			Annotations:  t.Annotations,
 		},
 	}
 	err := t.updateBackup(backup)
@@ -144,11 +145,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},

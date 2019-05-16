@@ -79,6 +79,7 @@ func (t *Task) buildRestore() *velero.Restore {
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
 			Namespace:    VeleroNamespace,
+			Annotations:  t.Annotations,
 		},
 	}
 	t.updateRestore(restore)

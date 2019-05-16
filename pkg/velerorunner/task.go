@@ -43,6 +43,7 @@ type Task struct {
 	Phase           string
 	Backup          *velero.Backup
 	Restore         *velero.Restore
+	Annotations     map[string]string
 }
 
 // Reconcile() Example:
