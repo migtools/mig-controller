@@ -59,7 +59,7 @@ func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) (bool, error)
 	// 1. We are properly setting this annotation from user input to the UI
 	// 2. We fix the plugin to operate migration specific behavior on the
 	// migrateAnnnotationKey
-	annotations[pvAnnotationKey] = "swing"
+	annotations[pvAnnotationKey] = "custom"
 
 	// Run
 	planResources, err := plan.GetRefResources(r)
