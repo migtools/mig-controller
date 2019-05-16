@@ -18,10 +18,12 @@ package migcluster
 
 import (
 	"context"
+
 	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"github.com/fusor/mig-controller/pkg/remote"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -142,7 +144,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Create a Remote Watch for this MigCluster if one doesn't exist
-	remoteWatchMap := GetRemoteWatchMap()
+	remoteWatchMap := remote.GetWatchMap()
 	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
 
 	if remoteWatchCluster == nil {
@@ -161,10 +163,11 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			}
 		}
 
-		StartRemoteWatch(r, RemoteManagerConfig{
+		StartRemoteWatch(r, remote.ManagerConfig{
 			RemoteRestConfig: restCfg,
 			ParentNsName:     request.NamespacedName,
-			ParentResource:   migCluster,
+			ParentMeta:       migCluster.GetObjectMeta(),
+			ParentObject:     migCluster,
 		})
 
 		log.Info("Remote watch started.", "cluster", request.Name)

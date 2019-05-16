@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/fusor/mig-controller/pkg/remote"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,9 +77,18 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
+	// If MigCluster isHostCluster, reuse client
 	if m.Spec.IsHostCluster {
 		return c, nil
 	}
+	// If RemoteWatch exists for this cluster, reuse the remote manager's client
+	remoteWatchMap := remote.GetWatchMap()
+	remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
+	if remoteWatchCluster != nil {
+		return remoteWatchCluster.RemoteManager.GetClient(), nil
+	}
+
+	// If can't reuse a client from anywhere, build one from scratch without a cache
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
