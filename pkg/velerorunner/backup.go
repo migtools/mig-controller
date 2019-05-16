@@ -129,6 +129,7 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
 			Namespace:    VeleroNamespace,
+			Annotations:  t.Annotations,
 		},
 	}
 	err := t.updateBackup(backup)

@@ -30,6 +30,7 @@ const (
 // Client - A controller's (local) client.
 // Owner - A MigStage or MigMigration resource.
 // PlanResources - A PlanRefResources.
+// Annotations - Map of annotations to applied to the backup & restore
 // BackupResources - Resource types to be included in the backup.
 // Phase - The task phase.
 // Backup - A Backup created on the source cluster.
@@ -39,6 +40,7 @@ type Task struct {
 	Client          k8sclient.Client
 	Owner           migapi.MigResource
 	PlanResources   *migapi.PlanResources
+	Annotations     map[string]string
 	BackupResources []string
 	Phase           string
 	Backup          *velero.Backup

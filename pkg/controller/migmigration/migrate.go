@@ -23,6 +23,12 @@ import (
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
+const (
+	pvAnnotationKey        = "openshift.io/migrate-type"
+	migrateAnnotationValue = "final"
+	migrateAnnotationKey   = "openshift.io/migrate-copy-phase"
+)
+
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
 	if migration.IsCompleted() {
 		return false, nil
@@ -48,6 +54,15 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		}
 	}
 
+	// Build annotations
+	annotations := make(map[string]string)
+	annotations[migrateAnnotationKey] = migrateAnnotationValue
+	// TODO: Revisit this. We are hardcoding this for now until 2 things occur.
+	// 1. We are properly setting this annotation from user input to the UI
+	// 2. We fix the plugin to operate migration specific behavior on the
+	// migrateAnnnotationKey
+	annotations[pvAnnotationKey] = "custom"
+
 	// Run
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
@@ -59,6 +74,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		Owner:         migration,
 		PlanResources: planResources,
 		Phase:         migration.Status.TaskPhase,
+		Annotations:   annotations,
 	}
 	err = task.Run()
 	if err != nil {
