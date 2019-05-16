@@ -40,6 +40,8 @@ spec:
                   type: string
                 awsS3ForcePathStyle:
                   type: boolean
+                awsS3Url:
+                  type: string
                 awsSignatureVersion:
                   type: string
                 azureResourceGroup:

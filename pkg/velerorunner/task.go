@@ -66,9 +66,21 @@ type Task struct {
 func (t *Task) Run() error {
 	t.logEnter()
 	defer t.logExit()
+	// Mount propagation workaround
+	// TODO: Only bounce restic pod if cluster version is 3.7-3.9,
+	// would require passing in cluster version to the controller.
+	err := t.bounceResticPod()
+	if err != nil {
+		return err
+	}
+
+	// Return unless restic restart has finished
+	if t.Phase == Started || t.Phase == WaitOnResticRestart {
+		return nil
+	}
 
 	// Backup
-	err := t.ensureBackup()
+	err = t.ensureBackup()
 	if err != nil {
 		return err
 	}
