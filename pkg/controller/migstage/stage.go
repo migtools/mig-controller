@@ -24,6 +24,7 @@ import (
 
 var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
 var stageAnnotationKey = "openshift.io/migrate-copy-phase"
+var pvAnnotationKey = "openshift.io/migrate-type"
 var stageAnnotationValue = "stage"
 
 func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) (bool, error) {
@@ -54,6 +55,11 @@ func (r *ReconcileMigStage) stage(stageMigration *migapi.MigStage) (bool, error)
 	// Build annotations
 	annotations := make(map[string]string)
 	annotations[stageAnnotationKey] = stageAnnotationValue
+	// TODO: Revisit this. We are hardcoding this for now until 2 things occur.
+	// 1. We are properly setting this annotation from user input to the UI
+	// 2. We fix the plugin to operate migration specific behavior on the
+	// migrateAnnnotationKey
+	annotations[pvAnnotationKey] = "swing"
 
 	// Run
 	planResources, err := plan.GetRefResources(r)

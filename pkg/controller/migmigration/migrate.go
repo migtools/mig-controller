@@ -23,6 +23,7 @@ import (
 )
 
 var migrateAnnotationKey = "openshift.io/migrate-copy-phase"
+var pvAnnotationKey = "openshift.io/migrate-type"
 var migrateAnnotationValue = "final"
 
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
@@ -53,6 +54,11 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 	// Build annotations
 	annotations := make(map[string]string)
 	annotations[migrateAnnotationKey] = migrateAnnotationValue
+	// TODO: Revisit this. We are hardcoding this for now until 2 things occur.
+	// 1. We are properly setting this annotation from user input to the UI
+	// 2. We fix the plugin to operate migration specific behavior on the
+	// migrateAnnnotationKey
+	annotations[pvAnnotationKey] = "swing"
 
 	// Run
 	planResources, err := plan.GetRefResources(r)
