@@ -10,7 +10,10 @@ import (
 // Ensure the restore on the destination cluster has been
 // created  and has the proper settings.
 func (t *Task) ensureRestore() error {
-	newRestore := t.buildRestore()
+	newRestore, err := t.buildRestore()
+	if err != nil {
+		return err
+	}
 	foundRestore, err := t.getRestore()
 	if err != nil {
 		return err
@@ -73,17 +76,21 @@ func (t Task) getRestore() (*velero.Restore, error) {
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore() *velero.Restore {
+func (t *Task) buildRestore() (*velero.Restore, error) {
+	annotations, err := t.getAnnotations(t.DestRegistryResources)
+	if err != nil {
+		return nil, err
+	}
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
 			Namespace:    VeleroNamespace,
-			Annotations:  t.Annotations,
+			Annotations:  annotations,
 		},
 	}
 	t.updateRestore(restore)
-	return restore
+	return restore, nil
 }
 
 // Update a Restore as desired for the destination cluster.

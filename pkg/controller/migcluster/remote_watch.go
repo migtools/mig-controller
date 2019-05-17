@@ -18,8 +18,10 @@ package migcluster
 
 import (
 	"github.com/fusor/mig-controller/pkg/controller/remotewatcher"
+	"github.com/fusor/mig-controller/pkg/imagescheme"
 	"github.com/fusor/mig-controller/pkg/remote"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -41,6 +43,16 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	log.Info("[rWatch] Adding Velero to scheme")
 	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "[rWatch] Unable add Velero APIs to scheme")
+		return err
+	}
+	log.Info("[rWatch] Adding OpenShift imagestream to scheme")
+	if err := imagescheme.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "[rWatch] Unable add OpenShift image APIs to scheme")
+		return err
+	}
+	log.Info("[rWatch] Adding OpenShift deploymentconfig to scheme")
+	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "[rWatch] Unable add OpenShift apps APIs to scheme")
 		return err
 	}
 
