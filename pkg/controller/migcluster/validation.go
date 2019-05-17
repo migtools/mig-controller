@@ -43,81 +43,80 @@ const (
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) (int, error) {
-	totalSet := 0
-	var err error
-	nSet := 0
+func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
+	cluster.Status.BeginStagingConditions()
 
 	// registry cluster
-	nSet, err = r.validateRegistryCluster(cluster)
+	err := r.validateRegistryCluster(cluster)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// SA secret
-	nSet, err = r.validateSaSecret(cluster)
+	err = r.validateSaSecret(cluster)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Test Connection
-	nSet, err = r.testConnection(cluster, totalSet)
+	err = r.testConnection(cluster)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Ready
-	cluster.Status.SetReady(totalSet == 0, ReadyMessage)
+	cluster.Status.SetReady(
+		!cluster.Status.HasBlockerCondition(),
+		ReadyMessage)
 
 	// Apply changes.
-	cluster.Status.DeleteUnstagedConditions()
+	cluster.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return nil
 }
 
-func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) (int, error) {
+func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) error {
 	ref := cluster.Spec.ClusterRef
 
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
-		return 0, nil
+		return nil
 	}
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidClusterRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidClusterRefMessage,
+			Type:     InvalidClusterRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	storage, err := r.getCluster(ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if storage == nil {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidClusterRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidClusterRefMessage,
+			Type:     InvalidClusterRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (*crapi.Cluster, error) {
@@ -143,84 +142,89 @@ func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (*crapi.Clust
 	return &cluster, err
 }
 
-func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) (int, error) {
+func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error {
 	ref := cluster.Spec.ServiceAccountSecretRef
 
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
-		return 0, nil
+		return nil
 	}
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSaSecretRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidSaSecretRefMessage,
+			Type:     InvalidSaSecretRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidSaSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if secret == nil {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSaSecretRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidSaSecretRefMessage,
+			Type:     InvalidSaSecretRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidSaSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// saToken
 	token, found := secret.Data["saToken"]
 	if !found {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSaToken,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidSaTokenMessage,
+			Type:     InvalidSaToken,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidSaTokenMessage,
 		})
-		return 1, nil
+		return nil
 	}
 	if len(token) == 0 {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSaToken,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidSaTokenMessage,
+			Type:     InvalidSaToken,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidSaTokenMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Test the connection.
-func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster, totalSet int) (int, error) {
+func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	if cluster.Spec.IsHostCluster {
-		return 0, nil
+		return nil
 	}
-	if totalSet > 0 {
-		return 0, nil
+	if cluster.Status.HasErrorCondition() {
+		return nil
 	}
 	_, err := cluster.GetClient(r)
 	if err != nil {
 		message := fmt.Sprintf(TestConnectFailedMessage, err)
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:    TestConnectFailed,
-			Status:  True,
-			Reason:  ConnectFailed,
-			Message: message,
+			Type:     TestConnectFailed,
+			Status:   True,
+			Reason:   ConnectFailed,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }

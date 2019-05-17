@@ -33,73 +33,73 @@ const (
 )
 
 // Validate the plan resource.
-// Returns error and the total error conditions set.
-func (r ReconcileMigStage) validate(stage *migapi.MigStage) (int, error) {
-	totalSet := 0
-	var err error
-	nSet := 0
+func (r ReconcileMigStage) validate(stage *migapi.MigStage) error {
+	stage.Status.BeginStagingConditions()
 
 	// Plan
-	nSet, err = r.validatePlan(stage)
+	err := r.validatePlan(stage)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Ready
-	stage.Status.SetReady(totalSet == 0, ReadyMessage)
+	stage.Status.SetReady(
+		!stage.Status.HasBlockerCondition(),
+		ReadyMessage)
 
 	// Apply changes.
-	stage.Status.DeleteUnstagedConditions()
+	stage.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), stage)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return nil
 }
 
 // Validate the referenced plan.
-// Returns error and the total error conditions set.
-func (r ReconcileMigStage) validatePlan(stage *migapi.MigStage) (int, error) {
+func (r ReconcileMigStage) validatePlan(stage *migapi.MigStage) error {
 	ref := stage.Spec.MigPlanRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		stage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidPlanRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidPlanRefMessage,
+			Type:     InvalidPlanRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidPlanRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	plan, err := migapi.GetPlan(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if plan == nil {
 		stage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidPlanRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidPlanRefMessage,
+			Type:     InvalidPlanRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidPlanRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !plan.Status.IsReady() {
 		stage.Status.SetCondition(migapi.Condition{
-			Type:    PlanNotReady,
-			Status:  True,
-			Message: PlanNotReadyMessage,
+			Type:     PlanNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  PlanNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }

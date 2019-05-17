@@ -131,7 +131,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Validations.
-	nSet, err := r.validate(migCluster)
+	err = r.validate(migCluster)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -139,7 +139,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{}, err
 		}
 	}
-	if nSet > 0 {
+	if !migCluster.Status.IsReady() {
 		return reconcile.Result{}, nil
 	}
 

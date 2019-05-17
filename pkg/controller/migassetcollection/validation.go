@@ -28,39 +28,48 @@ const (
 )
 
 // Validate the asset collection resource.
-// Returns error and the total error conditions set.
-func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCollection) (int, error) {
-	totalSet := 0
+func (r ReconcileMigAssetCollection) validate(assetCollection *migapi.MigAssetCollection) error {
+	assetCollection.Status.BeginStagingConditions()
 
 	// Empty collection
-	nSet, err := r.validateEmpty(assetCollection)
+	err := r.validateEmpty(assetCollection)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
-
-	// Ready
-	assetCollection.Status.SetReady(totalSet == 0, ReadyMessage)
 
 	// Apply changes
-	assetCollection.Status.DeleteUnstagedConditions()
+	assetCollection.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), assetCollection)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	// Ready
+	assetCollection.Status.SetReady(
+		!assetCollection.Status.HasBlockerCondition(),
+		ReadyMessage)
+
+	// Apply changes.
+	assetCollection.Status.EndStagingConditions()
+	err = r.Update(context.TODO(), assetCollection)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAssetCollection) (int, error) {
+// Validate that the namespaces list is not empty.
+func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAssetCollection) error {
 	if len(assetCollection.Spec.Namespaces) == 0 {
 		assetCollection.Status.SetCondition(migapi.Condition{
-			Type:    EmptyCollection,
-			Status:  True,
-			Message: EmptyCollectionMessage,
+			Type:     EmptyCollection,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  EmptyCollectionMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }

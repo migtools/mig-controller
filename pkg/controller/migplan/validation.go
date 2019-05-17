@@ -26,9 +26,9 @@ const (
 	AssetCollectionNotReady        = "AssetCollectionNotReady"
 	AssetNamespaceNotFound         = "AssetNamespaceNotFound"
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
-	EnsureStorageFailed            = "EnsureStorageFailed"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
+	StorageEnsured                 = "StorageEnsured"
 )
 
 // Reasons
@@ -57,161 +57,157 @@ const (
 	AssetCollectionNotReadyMessage        = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
 	AssetNamespaceNotFoundMessage         = "The following asset `namespaces` [%s] not found on the source cluster."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	EnsureStorageFailedMessage            = "Failed to create/validate backup and volume snapshot storage."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
+	StorageEnsuredMessage                 = "The storage resources have been created."
 )
 
 // Validate the plan resource.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) (int, error) {
-	totalSet := 0
-	var err error
-	nSet := 0
+func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
+	plan.Status.BeginStagingConditions()
 
 	// Source cluster
-	nSet, err = r.validateSourceCluster(plan)
+	err := r.validateSourceCluster(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Destination cluster
-	nSet, err = r.validateDestinationCluster(plan)
+	err = r.validateDestinationCluster(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Storage
-	nSet, err = r.validateStorage(plan)
+	err = r.validateStorage(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// AssetCollection
-	nSet, err = r.validateAssetCollection(plan)
+	err = r.validateAssetCollection(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Required namespaces.
-	nSet, err = r.validateRequiredNamespaces(plan)
+	err = r.validateRequiredNamespaces(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Apply changes.
-	plan.Status.DeleteUnstagedConditions()
+	plan.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return nil
 }
 
 // Validate the referenced storage.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidStorageRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidStorageRefMessage,
+			Type:     InvalidStorageRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidStorageRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	storage, err := migapi.GetStorage(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if storage == nil {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidStorageRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidStorageRefMessage,
+			Type:     InvalidStorageRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidStorageRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !storage.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    StorageNotReady,
-			Status:  True,
-			Message: StorageNotReadyMessage,
+			Type:     StorageNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  StorageNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Validate the referenced assetCollection.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
 	ref := plan.Spec.MigAssetCollectionRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidAssetCollectionRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidAssetCollectionRefMessage,
+			Type:     InvalidAssetCollectionRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidAssetCollectionRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	assetCollection, err := migapi.GetAssetCollection(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if assetCollection == nil {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidAssetCollectionRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidAssetCollectionRefMessage,
+			Type:     InvalidAssetCollectionRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidAssetCollectionRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !assetCollection.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    AssetCollectionNotReady,
-			Status:  True,
-			Message: AssetCollectionNotReadyMessage,
+			Type:     AssetCollectionNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  AssetCollectionNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// Namespaces
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	if cluster == nil {
-		return 0, nil
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	notFound := make([]string, 0)
 	ns := kapi.Namespace{}
@@ -224,160 +220,161 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) (int, er
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			return 0, err
+			return err
 		}
 	}
 	if len(notFound) > 0 {
 		message := fmt.Sprintf(AssetNamespaceNotFoundMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    AssetNamespaceNotFound,
-			Status:  True,
-			Reason:  NotFound,
-			Message: message,
+			Type:     AssetNamespaceNotFound,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Validate the referenced source cluster.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 	ref := plan.Spec.SrcMigClusterRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSourceClusterRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidSourceClusterRefMessage,
+			Type:     InvalidSourceClusterRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidSourceClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if cluster == nil {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidSourceClusterRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidSourceClusterRefMessage,
+			Type:     InvalidSourceClusterRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidSourceClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !cluster.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    SourceClusterNotReady,
-			Status:  True,
-			Message: SourceClusterNotReadyMessage,
+			Type:     SourceClusterNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  SourceClusterNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Validate the referenced source cluster.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error {
 	ref := plan.Spec.DestMigClusterRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidDestinationClusterRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidDestinationClusterRefMessage,
+			Type:     InvalidDestinationClusterRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidDestinationClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotDistinct
 	if reflect.DeepEqual(ref, plan.Spec.SrcMigClusterRef) {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidDestinationCluster,
-			Status:  True,
-			Reason:  NotDistinct,
-			Message: InvalidDestinationClusterMessage,
+			Type:     InvalidDestinationCluster,
+			Status:   True,
+			Reason:   NotDistinct,
+			Category: migapi.Error,
+			Message:  InvalidDestinationClusterMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if cluster == nil {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    InvalidDestinationClusterRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidDestinationClusterRefMessage,
+			Type:     InvalidDestinationClusterRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidDestinationClusterRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !cluster.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    DestinationClusterNotReady,
-			Status:  True,
-			Message: DestinationClusterNotReadyMessage,
+			Type:     DestinationClusterNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  DestinationClusterNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Validate required namespaces.
-// Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) (int, error) {
-	totalSet := 0
-
+func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error {
 	// Source
-	nSet, err := r.validateSourceNamespaces(plan)
+	err := r.validateSourceNamespaces(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Destination
-	nSet, err = r.validateDestinationNamespaces(plan)
+	err = r.validateDestinationNamespaces(plan)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
-	return totalSet, nil
+	return nil
 }
 
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{velerorunner.VeleroNamespace}
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	if cluster == nil {
-		return 0, nil
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
@@ -390,37 +387,38 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) (int, e
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			return 0, err
+			return err
 		}
 	}
 	if len(notFound) > 0 {
 		message := fmt.Sprintf(NsNotFoundOnSourceClusterMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    NsNotFoundOnSourceCluster,
-			Status:  True,
-			Reason:  NotFound,
-			Message: message,
+			Type:     NsNotFoundOnSourceCluster,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 // Validate required namespaces on the destination cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) (int, error) {
+func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{velerorunner.VeleroNamespace}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	if cluster == nil {
-		return 0, nil
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
@@ -433,19 +431,20 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) (i
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			return 0, err
+			return err
 		}
 	}
 	if len(notFound) > 0 {
 		message := fmt.Sprintf(NsNotFoundOnDestinationClusterMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    NsNotFoundOnDestinationCluster,
-			Status:  True,
-			Reason:  NotFound,
-			Message: message,
+			Type:     NsNotFoundOnDestinationCluster,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
