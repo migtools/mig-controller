@@ -23,7 +23,7 @@ import (
 	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
-var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags"}
+var stageResources = []string{"pods", "persistentvolumes", "persistentvolumeclaims", "imagestreams", "imagestreamtags", "secrets", "configmaps"}
 
 const (
 	pvAnnotationKey      = "openshift.io/migrate-type"
