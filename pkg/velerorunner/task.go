@@ -188,7 +188,7 @@ func (t *Task) logExit() {
 		restore = t.Restore.Name
 	}
 	t.Log.Info(
-		"Task interrupted.",
+		"Task waiting.",
 		"phase", t.Phase,
 		"backup",
 		backup,
