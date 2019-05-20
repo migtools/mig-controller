@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+
 	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -114,9 +115,15 @@ type ReconcileMigPlan struct {
 	scheme *runtime.Scheme
 }
 
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
+// Automatically generate RBAC rules
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=persistentvolumes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("plan|"))
 
