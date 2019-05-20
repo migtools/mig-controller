@@ -156,6 +156,12 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
+	// PV discovery
+	err = r.updatePvs(plan)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	// Storage
 	err = r.ensureStorage(plan)
 	if err != nil {
@@ -168,7 +174,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Ready
 	plan.Status.SetReady(
-		plan.Status.HasCondition(StorageEnsured) &&
+		plan.Status.HasCondition(StorageEnsured, PvsDiscovered) &&
 			!plan.Status.HasBlockerCondition(),
 		ReadyMessage)
 
