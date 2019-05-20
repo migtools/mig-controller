@@ -10,6 +10,11 @@ const (
 	EmptyCollection = "EmptyCollection"
 )
 
+// Categories
+const (
+	Critical = migapi.Critical
+)
+
 // Reasons
 const (
 	NotFound = "NotFound"
@@ -65,7 +70,7 @@ func (r ReconcileMigAssetCollection) validateEmpty(assetCollection *migapi.MigAs
 		assetCollection.Status.SetCondition(migapi.Condition{
 			Type:     EmptyCollection,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  EmptyCollectionMessage,
 		})
 		return nil

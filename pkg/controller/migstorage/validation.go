@@ -23,6 +23,11 @@ const (
 	InvalidVSLCredsSecret    = "InvalidVolumeSnapshotCredsSecret"
 )
 
+// Categories
+const (
+	Critical = migapi.Critical
+)
+
 // Reasons
 const (
 	Supported      = "Supported"
@@ -100,7 +105,7 @@ func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) error {
 			Type:     InvalidBSLProvider,
 			Status:   True,
 			Reason:   NotSupported,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidBSLProviderMessage,
 		})
 		return nil
@@ -142,7 +147,7 @@ func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) 
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidBSLProvider,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Reason:   InvalidSetting,
 			Message:  message,
 		})
@@ -170,7 +175,7 @@ func (r ReconcileMigStorage) validateAzureBSLSettings(storage *migapi.MigStorage
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidBSLProvider,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Reason:   InvalidSetting,
 			Message:  message,
 		})
@@ -193,7 +198,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidBSLCredsSecretRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidBSLCredsSecretRefMessage,
 		})
 		return nil
@@ -210,7 +215,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidBSLCredsSecretRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidBSLCredsSecretRefMessage,
 		})
 		return nil
@@ -222,7 +227,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidBSLCredsSecret,
 			Status:   True,
 			Reason:   KeyError,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidBSLCredsSecretMessage,
 		})
 		return nil
@@ -248,7 +253,7 @@ func (r ReconcileMigStorage) validateVSL(storage *migapi.MigStorage) error {
 			Type:     InvalidVSLProvider,
 			Status:   True,
 			Reason:   NotSupported,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidVSLProviderMessage,
 		})
 		return nil
@@ -278,7 +283,7 @@ func (r ReconcileMigStorage) validateAwsVSLSettings(storage *migapi.MigStorage) 
 			Type:     InvalidVSLProvider,
 			Status:   True,
 			Reason:   InvalidSetting,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil
@@ -306,7 +311,7 @@ func (r ReconcileMigStorage) validateAzureVSLSettings(storage *migapi.MigStorage
 			Type:     InvalidVSLProvider,
 			Status:   True,
 			Reason:   InvalidSetting,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil
@@ -328,7 +333,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidVSLCredsSecretRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidVSLCredsSecretRefMessage,
 		})
 		return nil
@@ -345,7 +350,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidVSLCredsSecretRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidVSLCredsSecretRefMessage,
 		})
 		return nil
@@ -357,7 +362,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 			Type:     InvalidVSLCredsSecret,
 			Status:   True,
 			Reason:   KeyError,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidVSLCredsSecretMessage,
 		})
 		return nil
