@@ -181,7 +181,7 @@ func (r *PersistentVolume) Update(pv PersistentVolume) {
 // plan.Spec.EndPvStaging()
 //
 type PersistentVolumes struct {
-	List    []PersistentVolume `json:"persistentVolumes"`
+	List    []PersistentVolume `json:"persistentVolumes,omitempty"`
 	index   map[string]int
 	staging bool
 }
