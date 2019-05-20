@@ -53,78 +53,74 @@ const (
 )
 
 // Validate the storage resource.
-// Returns error and the total error conditions set.
-func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) (int, error) {
-	totalSet := 0
+func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
+	storage.Status.BeginStagingConditions()
 
 	// Backup location provider.
-	nSet, err := r.validateBSL(storage)
+	err := r.validateBSL(storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Volume snapshot location provider.
-	nSet, err = r.validateVSL(storage)
+	err = r.validateVSL(storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Ready
-	storage.Status.SetReady(totalSet == 0, ReadyMessage)
+	storage.Status.SetReady(
+		!storage.Status.HasBlockerCondition(),
+		ReadyMessage)
 
 	// Apply changes.
-	storage.Status.DeleteUnstagedConditions()
+	storage.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return nil
 }
 
-func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) error {
 	provider := storage.Spec.BackupStorageProvider
 	var err error
-	totalSet := 0
-	nSet := 0
 
 	switch provider {
 	case "aws":
-		nSet, err = r.validateAwsBSLSettings(storage)
+		err = r.validateAwsBSLSettings(storage)
 	case "azure":
-		nSet, err = r.validateAzureBSLSettings(storage)
+		err = r.validateAzureBSLSettings(storage)
 	case "gcp":
 	case "":
-		nSet, err = 0, nil
+		err = nil
 	default:
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLProvider,
-			Status:  True,
-			Reason:  NotSupported,
-			Message: InvalidBSLProviderMessage,
+			Type:     InvalidBSLProvider,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: migapi.Error,
+			Message:  InvalidBSLProviderMessage,
 		})
-		return 1, nil
+		return nil
 	}
-	totalSet += nSet
 
-	nSet, err = r.validateBSLCredsSecret(storage)
+	err = r.validateBSLCredsSecret(storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Update
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return err
 }
 
-func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) error {
 	fields := make([]string, 0)
 	cfg := storage.Spec.BackupStorageConfig
 
@@ -144,18 +140,19 @@ func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) 
 	if len(fields) > 0 {
 		message := fmt.Sprintf(InvalidBSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLProvider,
-			Status:  True,
-			Reason:  InvalidSetting,
-			Message: message,
+			Type:     InvalidBSLProvider,
+			Status:   True,
+			Category: migapi.Error,
+			Reason:   InvalidSetting,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
-func (r ReconcileMigStorage) validateAzureBSLSettings(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateAzureBSLSettings(storage *migapi.MigStorage) error {
 	fields := make([]string, 0)
 	cfg := storage.Spec.BackupStorageConfig
 
@@ -171,20 +168,21 @@ func (r ReconcileMigStorage) validateAzureBSLSettings(storage *migapi.MigStorage
 	if len(fields) > 0 {
 		message := fmt.Sprintf(InvalidBSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLProvider,
-			Status:  True,
-			Reason:  InvalidSetting,
-			Message: message,
+			Type:     InvalidBSLProvider,
+			Status:   True,
+			Category: migapi.Error,
+			Reason:   InvalidSetting,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
-func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) error {
 	if storage.Spec.BackupStorageProvider == "" {
-		return 0, nil
+		return nil
 	}
 
 	ref := storage.Spec.BackupStorageConfig.CredsSecretRef
@@ -192,79 +190,79 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 	// NotSet
 	if !migref.RefSet(ref) {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLCredsSecretRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidBSLCredsSecretRefMessage,
+			Type:     InvalidBSLCredsSecretRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidBSLCredsSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if secret == nil {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLCredsSecretRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidBSLCredsSecretRefMessage,
+			Type:     InvalidBSLCredsSecretRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidBSLCredsSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// secret content
 	if !r.validCredSecret(secret) {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidBSLCredsSecret,
-			Status:  True,
-			Reason:  KeyError,
-			Message: InvalidBSLCredsSecretMessage,
+			Type:     InvalidBSLCredsSecret,
+			Status:   True,
+			Reason:   KeyError,
+			Category: migapi.Error,
+			Message:  InvalidBSLCredsSecretMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
-func (r ReconcileMigStorage) validateVSL(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateVSL(storage *migapi.MigStorage) error {
 	provider := storage.Spec.VolumeSnapshotProvider
 	var err error
-	totalSet := 0
-	nSet := 0
 
 	switch provider {
 	case "aws":
-		nSet, err = r.validateAwsVSLSettings(storage)
+		err = r.validateAwsVSLSettings(storage)
 	case "azure":
-		nSet, err = r.validateAzureVSLSettings(storage)
+		err = r.validateAzureVSLSettings(storage)
 	case "gcp":
 	case "":
-		nSet, err = 0, nil
+		err = nil
 	default:
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLProvider,
-			Status:  True,
-			Reason:  NotSupported,
-			Message: InvalidVSLProviderMessage,
+			Type:     InvalidVSLProvider,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: migapi.Error,
+			Message:  InvalidVSLProviderMessage,
 		})
-		return 1, nil
+		return nil
 	}
-	totalSet += nSet
 
-	nSet, err = r.validateVSLCredsSecret(storage)
+	err = r.validateVSLCredsSecret(storage)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
-	return totalSet, err
+	return err
 }
 
-func (r ReconcileMigStorage) validateAwsVSLSettings(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateAwsVSLSettings(storage *migapi.MigStorage) error {
 	fields := make([]string, 0)
 	cfg := storage.Spec.VolumeSnapshotConfig
 
@@ -277,18 +275,19 @@ func (r ReconcileMigStorage) validateAwsVSLSettings(storage *migapi.MigStorage) 
 	if len(fields) > 0 {
 		message := fmt.Sprintf(InvalidVSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLProvider,
-			Status:  True,
-			Reason:  InvalidSetting,
-			Message: message,
+			Type:     InvalidVSLProvider,
+			Status:   True,
+			Reason:   InvalidSetting,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
-func (r ReconcileMigStorage) validateAzureVSLSettings(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateAzureVSLSettings(storage *migapi.MigStorage) error {
 	fields := make([]string, 0)
 	cfg := storage.Spec.VolumeSnapshotConfig
 
@@ -304,20 +303,21 @@ func (r ReconcileMigStorage) validateAzureVSLSettings(storage *migapi.MigStorage
 	if len(fields) > 0 {
 		message := fmt.Sprintf(InvalidVSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLProvider,
-			Status:  True,
-			Reason:  InvalidSetting,
-			Message: message,
+			Type:     InvalidVSLProvider,
+			Status:   True,
+			Reason:   InvalidSetting,
+			Category: migapi.Error,
+			Message:  message,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
-func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) (int, error) {
+func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) error {
 	if storage.Spec.VolumeSnapshotProvider == "" {
-		return 0, nil
+		return nil
 	}
 
 	ref := storage.Spec.VolumeSnapshotConfig.CredsSecretRef
@@ -325,42 +325,45 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 	// NotSet
 	if !migref.RefSet(ref) {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLCredsSecretRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidVSLCredsSecretRefMessage,
+			Type:     InvalidVSLCredsSecretRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidVSLCredsSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if secret == nil {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLCredsSecretRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidVSLCredsSecretRefMessage,
+			Type:     InvalidVSLCredsSecretRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidVSLCredsSecretRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// secret content
 	if !r.validCredSecret(secret) {
 		storage.Status.SetCondition(migapi.Condition{
-			Type:    InvalidVSLCredsSecret,
-			Status:  True,
-			Reason:  KeyError,
-			Message: InvalidVSLCredsSecretMessage,
+			Type:     InvalidVSLCredsSecret,
+			Status:   True,
+			Reason:   KeyError,
+			Category: migapi.Error,
+			Message:  InvalidVSLCredsSecretMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }
 
 func (r ReconcileMigStorage) validCredSecret(secret *kapi.Secret) bool {

@@ -106,7 +106,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Validate
-	_, err = r.validate(migration)
+	err = r.validate(migration)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil

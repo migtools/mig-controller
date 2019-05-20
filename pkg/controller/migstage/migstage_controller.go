@@ -126,7 +126,7 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	// Validate
-	_, err = r.validate(migStage)
+	err = r.validate(migStage)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -136,7 +136,7 @@ func (r *ReconcileMigStage) Reconcile(request reconcile.Request) (reconcile.Resu
 	}
 
 	if !migStage.Status.IsReady() {
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	requeue, err := r.stage(migStage)

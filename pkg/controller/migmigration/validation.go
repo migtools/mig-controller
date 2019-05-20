@@ -34,72 +34,74 @@ const (
 
 // Validate the plan resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) (int, error) {
-	totalSet := 0
-	var err error
-	nSet := 0
+func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
+	migration.Status.BeginStagingConditions()
 
 	// Plan
-	nSet, err = r.validatePlan(migration)
+	err := r.validatePlan(migration)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	totalSet += nSet
 
 	// Ready
-	migration.Status.SetReady(totalSet == 0, ReadyMessage)
+	migration.Status.SetReady(
+		!migration.Status.HasBlockerCondition(),
+		ReadyMessage)
 
 	// Apply changes.
-	migration.Status.DeleteUnstagedConditions()
+	migration.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return totalSet, err
+	return nil
 }
 
 // Validate the referenced plan.
 // Returns error and the total error conditions set.
-func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (int, error) {
+func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) error {
 	ref := migration.Spec.MigPlanRef
 
 	// NotSet
 	if !migref.RefSet(ref) {
 		migration.Status.SetCondition(migapi.Condition{
-			Type:    InvalidPlanRef,
-			Status:  True,
-			Reason:  NotSet,
-			Message: InvalidPlanRefMessage,
+			Type:     InvalidPlanRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: migapi.Error,
+			Message:  InvalidPlanRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	plan, err := migapi.GetPlan(r, ref)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	// NotFound
 	if plan == nil {
 		migration.Status.SetCondition(migapi.Condition{
-			Type:    InvalidPlanRef,
-			Status:  True,
-			Reason:  NotFound,
-			Message: InvalidPlanRefMessage,
+			Type:     InvalidPlanRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: migapi.Error,
+			Message:  InvalidPlanRefMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
 	// NotReady
 	if !plan.Status.IsReady() {
 		migration.Status.SetCondition(migapi.Condition{
-			Type:    PlanNotReady,
-			Status:  True,
-			Message: PlanNotReadyMessage,
+			Type:     PlanNotReady,
+			Status:   True,
+			Category: migapi.Error,
+			Message:  PlanNotReadyMessage,
 		})
-		return 1, nil
+		return nil
 	}
 
-	return 0, nil
+	return nil
 }

@@ -134,8 +134,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validations.
-	// nSet - The number of error conditions raised.
-	nSet, err := r.validate(plan)
+	err = r.validate(plan)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -143,7 +142,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, err
 		}
 	}
-	if nSet > 0 {
+	if plan.Status.HasErrorCondition() {
 		plan.Status.SetReady(false, ReadyMessage)
 		err = r.Update(context.TODO(), plan)
 		if err != nil {
@@ -157,10 +156,8 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
-	ready := true
-
 	// Storage
-	ensured, err := r.ensureStorage(plan)
+	err = r.ensureStorage(plan)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -168,12 +165,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, err
 		}
 	}
-	if !ensured {
-		ready = false
-	}
 
 	// Ready
-	plan.Status.SetReady(ready, ReadyMessage)
+	plan.Status.SetReady(
+		plan.Status.HasCondition(StorageEnsured) &&
+			!plan.Status.HasBlockerCondition(),
+		ReadyMessage)
+
+	// Update
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		if errors.IsConflict(err) {

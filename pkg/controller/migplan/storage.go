@@ -9,20 +9,20 @@ import (
 // Create the velero BackupStorageLocation(s) and VolumeSnapshotLocation(s)
 // have been created on both the source and destination clusters associated
 // with the migration plan.
-// Returns `true` when ensured.
-func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) (bool, error) {
+func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	var client k8sclient.Client
 	nEnsured := 0
+
 	storage, err := plan.GetStorage(r)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if storage == nil {
-		return false, nil
+		return nil
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, cluster := range clusters {
@@ -31,136 +31,130 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) (bool, error) {
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
-			return false, err
+			return err
 		}
 		// BSL
-		ensured, err := r.ensureBSL(client, storage)
+		err := r.ensureBSL(client, storage)
 		if err != nil {
-			return false, err
+			return err
 		}
-		if ensured {
-			nEnsured += 1
-		}
+
 		// VSL
-		ensured, err = r.ensureVSL(client, storage)
+		err = r.ensureVSL(client, storage)
 		if err != nil {
-			return false, err
+			return err
 		}
-		if ensured {
-			nEnsured += 1
-		}
+
 		// Cloud Secret
-		ensured, err = r.ensureCloudSecret(client, storage)
+		err = r.ensureCloudSecret(client, storage)
 		if err != nil {
-			return false, err
+			return err
 		}
-		if ensured {
-			nEnsured += 1
-		}
+
+		nEnsured++
 	}
 
 	// Condition
-	ensured := nEnsured == 6 // BSL,VSL,cloud-secret x2 clusters
-	if !ensured {
+	ensured := nEnsured == 2 // Both clusters.
+	if ensured {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:    EnsureStorageFailed,
-			Status:  True,
-			Message: EnsureStorageFailedMessage,
+			Type:     StorageEnsured,
+			Status:   True,
+			Category: migapi.Required,
+			Message:  StorageEnsuredMessage,
 		})
 	} else {
-		plan.Status.DeleteCondition(EnsureStorageFailed)
+		plan.Status.DeleteCondition(StorageEnsured)
 	}
+	plan.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return ensured, err
+	return err
 }
 
 // Create the velero BackupStorageLocation has been created.
-// Returns `true` when ensured.
-func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
+func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.MigStorage) error {
 	newBSL := storage.BuildBSL()
 	foundBSL, err := storage.GetBSL(client)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if foundBSL == nil {
 		err = client.Create(context.TODO(), newBSL)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return true, nil
+		return nil
 	}
 	if storage.EqualsBSL(foundBSL, newBSL) {
-		return true, nil
+		return nil
 	}
 	storage.UpdateBSL(foundBSL)
 	err = client.Update(context.TODO(), foundBSL)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // Create the velero VolumeSnapshotLocation has been created.
-// Returns `true` when ensured.
-func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
+func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.MigStorage) error {
 	storage.DefaultVSLSettings()
 	newVSL := storage.BuildVSL()
 	foundVSL, err := storage.GetVSL(client)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if foundVSL == nil {
 		err = client.Create(context.TODO(), newVSL)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return true, nil
+		return nil
 	}
 	if storage.EqualsVSL(foundVSL, newVSL) {
-		return true, nil
+		return nil
 	}
 	storage.UpdateVSL(foundVSL)
 	err = client.Update(context.TODO(), foundVSL)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // Create the velero BSL cloud secret has been created.
-// Returns `true` when ensured.
-func (r ReconcileMigPlan) ensureCloudSecret(client k8sclient.Client, storage *migapi.MigStorage) (bool, error) {
+func (r ReconcileMigPlan) ensureCloudSecret(client k8sclient.Client, storage *migapi.MigStorage) error {
 	newSecret, err := storage.BuildCloudSecret(r)
 	if err != nil {
-		return false, err
+		return err
 	}
 	foundSecret, err := storage.GetCloudSecret(client)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if foundSecret == nil {
 		err = client.Create(context.TODO(), newSecret)
 		if err != nil {
-			return false, err
+			return err
 		}
-		return true, nil
+		return nil
 	}
 	if storage.EqualsCloudSecret(foundSecret, newSecret) {
-		return true, nil
+		return nil
 	}
 	storage.UpdateCloudSecret(r, foundSecret)
 	err = client.Update(context.TODO(), foundSecret)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
 // Get clusters referenced by the plan.
