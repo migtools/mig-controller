@@ -133,6 +133,66 @@ rules:
   - update
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
   - migration.openshift.io
   resources:
   - migstages
@@ -174,6 +234,30 @@ rules:
   - patch
 - apiGroups:
   - velero.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps.openshift.io
   resources:
   - '*'
   verbs:
@@ -296,10 +380,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 150Mi
+            memory: 300Mi
           requests:
             cpu: 100m
-            memory: 120Mi
+            memory: 250Mi
         volumeMounts:
         - mountPath: /tmp/cert
           name: cert
