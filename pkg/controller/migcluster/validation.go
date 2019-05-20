@@ -215,7 +215,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
-	if cluster.Status.HasErrorCondition() {
+	if cluster.Status.HasCriticalCondition() {
 		return nil
 	}
 	_, err := cluster.GetClient(r)

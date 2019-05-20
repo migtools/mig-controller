@@ -142,7 +142,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, err
 		}
 	}
-	if plan.Status.HasErrorCondition() {
+	if plan.Status.HasCriticalCondition() {
 		plan.Status.SetReady(false, ReadyMessage)
 		err = r.Update(context.TODO(), plan)
 		if err != nil {
