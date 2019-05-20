@@ -16,6 +16,7 @@ import (
 
 // Types
 const (
+	// Errors
 	InvalidSourceClusterRef        = "InvalidSourceClusterRef"
 	InvalidDestinationClusterRef   = "InvalidDestinationClusterRef"
 	InvalidStorageRef              = "InvalidStorageRef"
@@ -28,12 +29,17 @@ const (
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
-	StorageEnsured                 = "StorageEnsured"
+	// Warn
+	PvInvalidAction = "PvInvalidAction"
+	// Required
+	StorageEnsured = "StorageEnsured"
+	PvsDiscovered  = "PvsDiscovered"
 )
 
 // Categories
 const (
 	Critical = migapi.Critical
+	Error    = migapi.Error
 )
 
 // Reasons
@@ -41,6 +47,8 @@ const (
 	NotSet      = "NotSet"
 	NotFound    = "NotFound"
 	NotDistinct = "NotDistinct"
+	NotDone     = "NotDone"
+	Done        = "Done"
 )
 
 // Statuses
@@ -51,6 +59,7 @@ const (
 
 // Messages
 const (
+	// Errors
 	ReadyMessage                          = "The migration plan is ready."
 	InvalidSourceClusterRefMessage        = "The `srcMigClusterRef` must reference a `migcluster`."
 	InvalidDestinationClusterRefMessage   = "The `dstMigClusterRef` must reference a `migcluster`."
@@ -64,7 +73,11 @@ const (
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
-	StorageEnsuredMessage                 = "The storage resources have been created."
+	// Warn
+	PvInvalidActionMessage = "PV in `persistentVolumes` [%s] has invalid `action`. Must be (%s)."
+	// Required.
+	StorageEnsuredMessage = "The storage resources have been created."
+	PvsDiscoveredMessage  = "The `persistentVolumes` list has been updated with discovered PVs."
 )
 
 // Validate the plan resource.
@@ -97,6 +110,12 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
+	if err != nil {
+		return err
+	}
+
+	// PV list.
+	err = r.validatePvAction(plan)
 	if err != nil {
 		return err
 	}
@@ -446,6 +465,41 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
+			Message:  message,
+		})
+		return nil
+	}
+
+	return nil
+}
+
+// Validate PV actions.
+func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
+	invalid := []string{}
+	actions := map[string]bool{
+		migapi.PvCopyAction: true,
+		migapi.PvMoveAction: true,
+	}
+	for _, pv := range plan.Spec.PersistentVolumes.List {
+		_, found := actions[pv.Action]
+		if !found {
+			invalid = append(invalid, pv.Name)
+		}
+	}
+	if len(invalid) > 0 {
+		choices := []string{}
+		for key := range actions {
+			choices = append(choices, key)
+		}
+		message := fmt.Sprintf(
+			PvInvalidActionMessage,
+			strings.Join(invalid, ", "),
+			strings.Join(choices, "|"))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvInvalidAction,
+			Status:   True,
+			Reason:   NotDone,
+			Category: Error,
 			Message:  message,
 		})
 		return nil

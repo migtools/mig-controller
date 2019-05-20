@@ -25,6 +25,7 @@ import (
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
+	PersistentVolumes
 	SrcMigClusterRef      *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef     *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	MigStorageRef         *kapi.ObjectReference `json:"migStorageRef,omitempty"`
@@ -143,4 +144,122 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 	}
 
 	return resources, nil
+}
+
+// PV Actions.
+const (
+	PvMoveAction = "move"
+	PvCopyAction = "copy"
+)
+
+// Name - The PV name.
+// StorageClass - The PV storage class name.
+// Action - The PV migration action (move|copy)
+// staged - A PV has been explicitly added/updated.
+type PersistentVolume struct {
+	Name         string `json:"name,omitempty"`
+	StorageClass string `json:"storageClass,omitempty"`
+	Action       string `json:"action,omitempty"`
+	staged       bool
+}
+
+// Update the PV with another.
+func (r *PersistentVolume) Update(pv PersistentVolume) {
+	r.StorageClass = pv.StorageClass
+	r.staged = true
+}
+
+// Collection of PVs
+// List - The collection of PVs.
+// index - List index.
+// --------
+// Example:
+// plan.Spec.BeginPvStaging()
+// plan.Spec.AddPv(pvA)
+// plan.Spec.AddPv(pvB)
+// plan.Spec.AddPv(pvC)
+// plan.Spec.EndPvStaging()
+//
+type PersistentVolumes struct {
+	List    []PersistentVolume `json:"persistentVolumes"`
+	index   map[string]int
+	staging bool
+}
+
+// Allocate collections.
+func (r *PersistentVolumes) init() {
+	if r.List == nil {
+		r.List = []PersistentVolume{}
+	}
+	if r.index == nil {
+		r.buildIndex()
+	}
+}
+
+// Build the index.
+func (r *PersistentVolumes) buildIndex() {
+	r.index = map[string]int{}
+	for i, pv := range r.List {
+		r.index[pv.Name] = i
+	}
+}
+
+// Begin staging PVs.
+func (r *PersistentVolumes) BeginPvStaging() {
+	r.init()
+	r.staging = true
+	for i := range r.List {
+		pv := &r.List[i]
+		pv.staged = false
+	}
+}
+
+// End staging PVs and delete un-staged PVs from the list.
+func (r *PersistentVolumes) EndPvStaging() {
+	r.init()
+	r.staging = false
+	kept := []PersistentVolume{}
+	for _, pv := range r.List {
+		if pv.staged {
+			kept = append(kept, pv)
+		}
+	}
+	r.List = kept
+	r.buildIndex()
+}
+
+// Find a PV
+func (r *PersistentVolumes) FindPv(pv PersistentVolume) *PersistentVolume {
+	r.init()
+	i, found := r.index[pv.Name]
+	if found {
+		return &r.List[i]
+	}
+
+	return nil
+}
+
+// Add (or update) Pv to the collection.
+func (r *PersistentVolumes) AddPv(pv PersistentVolume) {
+	r.init()
+	pv.staged = true
+	foundPv := r.FindPv(pv)
+	if foundPv == nil {
+		r.List = append(r.List, pv)
+		r.index[pv.Name] = len(r.List) - 1
+	} else {
+		foundPv.Update(pv)
+	}
+}
+
+// Delete a PV from the collection.
+func (r *PersistentVolumes) DeletePv(names ...string) {
+	r.init()
+	for _, name := range names {
+		i, found := r.index[name]
+		if found {
+			r.List = append(r.List[:i], r.List[i+1:]...)
+			r.buildIndex()
+		}
+	}
 }
