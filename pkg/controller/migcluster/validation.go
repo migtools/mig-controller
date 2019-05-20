@@ -19,6 +19,11 @@ const (
 	TestConnectFailed  = "TestConnectFailed"
 )
 
+// Categories
+const (
+	Critical = migapi.Critical
+)
+
 // Reasons
 const (
 	NotSet        = "NotSet"
@@ -93,7 +98,7 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 			Type:     InvalidClusterRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidClusterRefMessage,
 		})
 		return nil
@@ -110,7 +115,7 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 			Type:     InvalidClusterRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidClusterRefMessage,
 		})
 		return nil
@@ -156,7 +161,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Type:     InvalidSaSecretRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSaSecretRefMessage,
 		})
 		return nil
@@ -173,7 +178,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Type:     InvalidSaSecretRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSaSecretRefMessage,
 		})
 		return nil
@@ -186,7 +191,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Type:     InvalidSaToken,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSaTokenMessage,
 		})
 		return nil
@@ -196,7 +201,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Type:     InvalidSaToken,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSaTokenMessage,
 		})
 		return nil
@@ -210,7 +215,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
-	if cluster.Status.HasErrorCondition() {
+	if cluster.Status.HasCriticalCondition() {
 		return nil
 	}
 	_, err := cluster.GetClient(r)
@@ -220,7 +225,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 			Type:     TestConnectFailed,
 			Status:   True,
 			Reason:   ConnectFailed,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil

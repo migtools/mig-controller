@@ -13,6 +13,11 @@ const (
 	PlanNotReady   = "PlanNotReady"
 )
 
+// Categories
+const (
+	Critical = migapi.Critical
+)
+
 // Reasons
 const (
 	NotSet   = "NotSet"
@@ -69,7 +74,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 			Type:     InvalidPlanRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidPlanRefMessage,
 		})
 		return nil
@@ -86,7 +91,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 			Type:     InvalidPlanRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidPlanRefMessage,
 		})
 		return nil
@@ -97,7 +102,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     PlanNotReady,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  PlanNotReadyMessage,
 		})
 		return nil

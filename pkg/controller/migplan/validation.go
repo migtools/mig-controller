@@ -31,6 +31,11 @@ const (
 	StorageEnsured                 = "StorageEnsured"
 )
 
+// Categories
+const (
+	Critical = migapi.Critical
+)
+
 // Reasons
 const (
 	NotSet      = "NotSet"
@@ -116,7 +121,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Type:     InvalidStorageRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidStorageRefMessage,
 		})
 		return nil
@@ -133,7 +138,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Type:     InvalidStorageRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidStorageRefMessage,
 		})
 		return nil
@@ -144,7 +149,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageNotReady,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  StorageNotReadyMessage,
 		})
 		return nil
@@ -163,7 +168,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
 			Type:     InvalidAssetCollectionRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidAssetCollectionRefMessage,
 		})
 		return nil
@@ -180,7 +185,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
 			Type:     InvalidAssetCollectionRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidAssetCollectionRefMessage,
 		})
 		return nil
@@ -191,7 +196,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     AssetCollectionNotReady,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  AssetCollectionNotReadyMessage,
 		})
 		return nil
@@ -229,7 +234,7 @@ func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
 			Type:     AssetNamespaceNotFound,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil
@@ -248,7 +253,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 			Type:     InvalidSourceClusterRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSourceClusterRefMessage,
 		})
 		return nil
@@ -265,7 +270,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 			Type:     InvalidSourceClusterRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidSourceClusterRefMessage,
 		})
 		return nil
@@ -276,7 +281,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     SourceClusterNotReady,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  SourceClusterNotReadyMessage,
 		})
 		return nil
@@ -295,7 +300,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Type:     InvalidDestinationClusterRef,
 			Status:   True,
 			Reason:   NotSet,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidDestinationClusterRefMessage,
 		})
 		return nil
@@ -307,7 +312,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Type:     InvalidDestinationCluster,
 			Status:   True,
 			Reason:   NotDistinct,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidDestinationClusterMessage,
 		})
 		return nil
@@ -324,7 +329,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Type:     InvalidDestinationClusterRef,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  InvalidDestinationClusterRefMessage,
 		})
 		return nil
@@ -335,7 +340,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     DestinationClusterNotReady,
 			Status:   True,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  DestinationClusterNotReadyMessage,
 		})
 		return nil
@@ -396,7 +401,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 			Type:     NsNotFoundOnSourceCluster,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil
@@ -440,7 +445,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 			Type:     NsNotFoundOnDestinationCluster,
 			Status:   True,
 			Reason:   NotFound,
-			Category: migapi.Error,
+			Category: Critical,
 			Message:  message,
 		})
 		return nil

@@ -17,13 +17,15 @@ const (
 )
 
 // Category
-// Required - Required for the `Ready` condition.
+// Critical - Errors that block Reconcile() and the `Ready` condition.
 // Error - Errors that block the `Ready` condition.
-// Warning - Warnings that block the `Ready` condition.
+// Warn - Warnings that do not block the `Ready` condition.
+// Required - Required for the `Ready` condition.
 const (
+	Critical = "Critical"
 	Error    = "Error"
-	Required = "Required"
 	Warn     = "Warn"
+	Required = "Required"
 )
 
 // Condition
@@ -201,6 +203,12 @@ func (r *Conditions) HasConditionCategory(names ...string) bool {
 	return false
 }
 
+// The collection contains a `Critical` error condition.
+// Resource reconcile() should not continue.
+func (r *Conditions) HasCriticalCondition(category ...string) bool {
+	return r.HasConditionCategory(Critical)
+}
+
 // The collection contains an `Error` condition.
 func (r *Conditions) HasErrorCondition(category ...string) bool {
 	return r.HasConditionCategory(Error)
@@ -208,12 +216,12 @@ func (r *Conditions) HasErrorCondition(category ...string) bool {
 
 // The collection contains a `Warn` condition.
 func (r *Conditions) HasWarnCondition(category ...string) bool {
-	return r.HasConditionCategory(Error)
+	return r.HasConditionCategory(Warn)
 }
 
 // The collection contains a `Ready` blocker condition.
 func (r *Conditions) HasBlockerCondition() bool {
-	return r.HasConditionCategory(Error, Warn)
+	return r.HasConditionCategory(Critical, Error)
 }
 
 // Set `Ready` condition.
