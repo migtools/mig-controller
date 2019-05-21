@@ -6,7 +6,7 @@ metadata:
   name: migmigration-sample
   namespace: mig
 spec:
-
+  stage: false
   migPlanRef:
     name: migplan-sample
     namespace: mig
