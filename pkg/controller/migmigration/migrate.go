@@ -18,17 +18,30 @@ package migmigration
 
 import (
 	"context"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	vrunner "github.com/fusor/mig-controller/pkg/velerorunner"
 )
 
+// Annotations
 const (
 	pvAnnotationKey        = "openshift.io/migrate-type"
 	migrateAnnotationValue = "final"
 	migrateAnnotationKey   = "openshift.io/migrate-copy-phase"
+	stageAnnotationValue   = "stage"
+	stageAnnotationKey     = "openshift.io/migrate-copy-phase"
 )
 
+// Backup resources.
+var stagingResources = []string{
+	"persistentvolumes",
+	"persistentvolumeclaims",
+	"imagestreams",
+	"imagestreamtags",
+	"secrets",
+	"configmaps",
+	"pods",
+}
+
+// Perform the migration.
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
 	if migration.IsCompleted() {
 		return false, nil
@@ -46,7 +59,6 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 
 	// Started
 	if !migration.Status.MigrationRunning {
-		log.Info("Migration started.", "name", migration.Name)
 		migration.MarkAsRunning()
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
@@ -54,27 +66,19 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		}
 	}
 
-	// Build annotations
-	annotations := make(map[string]string)
-	annotations[migrateAnnotationKey] = migrateAnnotationValue
-	// TODO: Revisit this. We are hardcoding this for now until 2 things occur.
-	// 1. We are properly setting this annotation from user input to the UI
-	// 2. We fix the plugin to operate migration specific behavior on the
-	// migrateAnnnotationKey
-	annotations[pvAnnotationKey] = "custom"
-
 	// Run
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
 		return false, err
 	}
-	task := vrunner.Task{
-		Log:           log,
-		Client:        r,
-		Owner:         migration,
-		PlanResources: planResources,
-		Phase:         migration.Status.TaskPhase,
-		Annotations:   annotations,
+	task := Task{
+		Log:             log,
+		Client:          r,
+		Owner:           migration,
+		PlanResources:   planResources,
+		Phase:           migration.Status.TaskPhase,
+		Annotations:     r.getAnnotations(migration),
+		BackupResources: r.getBackupResources(migration),
 	}
 	err = task.Run()
 	if err != nil {
@@ -86,16 +90,41 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		return false, err
 	}
 	switch task.Phase {
-	case vrunner.Completed:
-		log.Info("Migration completed.", "name", migration.Name)
+	case Completed:
 		migration.MarkAsCompleted()
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
 			return false, err
 		}
-	case vrunner.WaitOnResticRestart:
+	case WaitOnResticRestart:
 		return true, nil
 	}
 
 	return false, nil
+}
+
+// Get annotations.
+// TODO: Revisit this. We are hardcoding this for now until 2 things occur.
+// 1. We are properly setting this annotation from user input to the UI
+// 2. We fix the plugin to operate migration specific behavior on the
+// migrateAnnnotationKey
+func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
+	annotations := map[string]string{
+		pvAnnotationKey: "custom",
+	}
+	if migration.Spec.Stage {
+		annotations[stageAnnotationKey] = stageAnnotationValue
+	} else {
+		annotations[migrateAnnotationKey] = migrateAnnotationValue
+	}
+	return annotations
+}
+
+// Get the resources (kinds) to be included in the backup.
+func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigration) []string {
+	if migration.Spec.Stage {
+		return stagingResources
+	}
+
+	return []string{}
 }

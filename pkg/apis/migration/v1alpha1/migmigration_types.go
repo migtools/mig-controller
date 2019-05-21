@@ -30,6 +30,7 @@ var log = logf.Log.WithName("controller")
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
 	MigPlanRef *kapi.ObjectReference `json:"migPlanRef,omitempty"`
+	Stage      bool                  `json:"stage"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration
@@ -96,7 +97,7 @@ func (r *MigMigration) MarkAsCompleted() bool {
 	return true
 }
 
-// Get whether the the migration has completed.
+// Get whether the migration has completed.
 func (r *MigMigration) IsCompleted() bool {
 	return r.Status.MigrationCompleted
 }

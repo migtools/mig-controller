@@ -12,7 +12,6 @@ var KnownLabels = map[string]bool{
 	label(MigCluster{}):   true,
 	label(MigStorage{}):   true,
 	label(MigMigration{}): true,
-	label(MigStage{}):     true,
 }
 
 // Build  labels used to correlate CRs.

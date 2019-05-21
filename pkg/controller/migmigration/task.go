@@ -1,4 +1,4 @@
-package velerorunner
+package migmigration
 
 import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -31,7 +31,7 @@ const (
 // A Velero task that provides the complete backup & restore workflow.
 // Log - A controller's logger.
 // Client - A controller's (local) client.
-// Owner - A MigStage or MigMigration resource.
+// Owner - A MigMigration resource.
 // PlanResources - A PlanRefResources.
 // Annotations - Map of annotations to applied to the backup & restore
 // BackupResources - Resource types to be included in the backup.
@@ -41,7 +41,7 @@ const (
 type Task struct {
 	Log                   logr.Logger
 	Client                k8sclient.Client
-	Owner                 migapi.MigResource
+	Owner                 *migapi.MigMigration
 	PlanResources         *migapi.PlanResources
 	Annotations           map[string]string
 	BackupResources       []string
@@ -65,12 +65,9 @@ type MigRegistryResources struct {
 	Service          *kapi.Service
 }
 
-const MigRegistryAnnotationKey string = "openshift.io/migration-registry"
-const MigRegistryDirAnnotationKey string = "openshift.io/migration-registry-dir"
-
 // Reconcile() Example:
 //
-// task := velerorunner.Task{
+// task := Task{
 //     Log: log,
 //     Client: r,
 //     Owner: migration,
@@ -164,19 +161,34 @@ func (t *Task) getDestinationClient() (k8sclient.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
+// Get whether the migration is stage.
+func (t *Task) stage() bool {
+	return t.Owner.Spec.Stage
+}
+
 // Log task start/resumed.
 func (t *Task) logEnter() {
 	if t.Phase == Started {
-		t.Log.Info("Task started.")
+		t.Log.Info(
+			"Migration: started.",
+			"name",
+			t.Owner.Name,
+			"stage",
+			t.stage())
 		return
 	}
-	t.Log.Info("Task resumed.", "phase", t.Phase)
+	t.Log.Info(
+		"Migration: resumed.",
+		"name",
+		t.Owner.Name,
+		"phase",
+		t.Phase)
 }
 
 // Log task exit/interrupted.
 func (t *Task) logExit() {
 	if t.Phase == Completed {
-		t.Log.Info("Task completed.")
+		t.Log.Info("Migration completed.")
 		return
 	}
 	backup := ""
@@ -188,7 +200,9 @@ func (t *Task) logExit() {
 		restore = t.Restore.Name
 	}
 	t.Log.Info(
-		"Task waiting.",
+		"Migration: waiting.",
+		"name",
+		t.Owner.Name,
 		"phase", t.Phase,
 		"backup",
 		backup,

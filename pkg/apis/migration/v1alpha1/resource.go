@@ -58,16 +58,3 @@ func (r *MigMigration) GetNamespace() string {
 func (r *MigMigration) GetName() string {
 	return r.Name
 }
-
-// Stage
-func (r *MigStage) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
-}
-
-func (r *MigStage) GetNamespace() string {
-	return r.Namespace
-}
-
-func (r *MigStage) GetName() string {
-	return r.Name
-}

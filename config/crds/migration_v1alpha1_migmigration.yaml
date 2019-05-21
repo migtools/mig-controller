@@ -30,6 +30,10 @@ spec:
           properties:
             migPlanRef:
               type: object
+            stage:
+              type: boolean
+          required:
+          - stage
           type: object
         status:
           properties:

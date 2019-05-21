@@ -1,4 +1,4 @@
-package velerorunner
+package migmigration
 
 import (
 	"context"
@@ -14,6 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// Annotations
+const MigRegistryAnnotationKey string = "openshift.io/migration-registry"
+const MigRegistryDirAnnotationKey string = "openshift.io/migration-registry-dir"
 
 // Ensure the migration registry on the source cluster has been created
 // and has the proper settings.

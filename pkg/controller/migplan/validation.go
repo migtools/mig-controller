@@ -3,7 +3,7 @@ package migplan
 import (
 	"context"
 	"fmt"
-	"github.com/fusor/mig-controller/pkg/velerorunner"
+	"github.com/fusor/mig-controller/pkg/controller/migmigration"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -308,7 +308,7 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{velerorunner.VeleroNamespace}
+	namespaces := []string{migmigration.VeleroNamespace}
 	for _, ns := range plan.Spec.Namespaces {
 		namespaces = append(namespaces, ns)
 	}
@@ -355,7 +355,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 // Validate required namespaces on the destination cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{velerorunner.VeleroNamespace}
+	namespaces := []string{migmigration.VeleroNamespace}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		return err
