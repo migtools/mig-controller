@@ -35,26 +35,6 @@ rules:
 - apiGroups:
   - migration.openshift.io
   resources:
-  - migassetcollections
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - migration.openshift.io
-  resources:
-  - migassetcollections/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - migration.openshift.io
-  resources:
   - migclusters
   verbs:
   - get

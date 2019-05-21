@@ -20,19 +20,6 @@ func (r *MigPlan) GetName() string {
 	return r.Name
 }
 
-// AssetCollection
-func (r *MigAssetCollection) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
-}
-
-func (r *MigAssetCollection) GetNamespace() string {
-	return r.Namespace
-}
-
-func (r *MigAssetCollection) GetName() string {
-	return r.Name
-}
-
 // Storage
 func (r *MigStorage) GetCorrelationLabels() map[string]string {
 	return buildCorrelationLabels(r, r.UID)

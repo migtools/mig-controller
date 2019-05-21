@@ -74,16 +74,6 @@ func (r PlanPredicate) mapRefs(plan *migapi.MigPlan) {
 		})
 	}
 
-	// asset collection
-	ref = plan.Spec.MigAssetCollectionRef
-	if migref.RefSet(ref) {
-		refMap.Add(refOwner, migref.RefTarget{
-			Kind:      migref.ToKind(migapi.MigAssetCollection{}),
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		})
-	}
-
 	// storage
 	ref = plan.Spec.MigStorageRef
 	if migref.RefSet(ref) {
@@ -119,16 +109,6 @@ func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 	if migref.RefSet(ref) {
 		refMap.Delete(refOwner, migref.RefTarget{
 			Kind:      migref.ToKind(migapi.MigCluster{}),
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		})
-	}
-
-	// asset collection
-	ref = plan.Spec.MigAssetCollectionRef
-	if migref.RefSet(ref) {
-		refMap.Delete(refOwner, migref.RefTarget{
-			Kind:      migref.ToKind(migapi.MigAssetCollection{}),
 			Namespace: ref.Namespace,
 			Name:      ref.Name,
 		})

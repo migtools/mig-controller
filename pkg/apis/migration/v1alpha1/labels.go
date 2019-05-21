@@ -8,12 +8,11 @@ import (
 
 // All known correlation labels.
 var KnownLabels = map[string]bool{
-	label(MigPlan{}):            true,
-	label(MigCluster{}):         true,
-	label(MigStorage{}):         true,
-	label(MigAssetCollection{}): true,
-	label(MigMigration{}):       true,
-	label(MigStage{}):           true,
+	label(MigPlan{}):      true,
+	label(MigCluster{}):   true,
+	label(MigStorage{}):   true,
+	label(MigMigration{}): true,
+	label(MigStage{}):     true,
 }
 
 // Build  labels used to correlate CRs.

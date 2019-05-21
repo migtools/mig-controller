@@ -91,19 +91,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to MigAssetCollections referenced by MigPlans
-	err = c.Watch(
-		&source.Kind{Type: &migapi.MigAssetCollection{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigPlan{})
-				}),
-		})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

@@ -142,7 +142,7 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 
 // Update a Backups as desired for the source cluster.
 func (t *Task) updateBackup(backup *velero.Backup) error {
-	namespaces := t.PlanResources.MigAssets.Spec.Namespaces
+	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	backupLocation, err := t.getBSL()
 	if err != nil {
 		return err

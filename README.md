@@ -57,7 +57,6 @@ Before mig-controller can run a Migration, you'll need to provide:
 - [MigPlan](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migplan_types.go)
 - [MigCluster](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migcluster_types.go)
 - [MigStorage](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migstorage_types.go)
-- [MigAssetCollection](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migassetcollection_types.go)
 - [MigStage](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migstage_types.go)
 - [MigMigration](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migmigration_types.go)
 - [Cluster](https://github.com/kubernetes/cluster-registry/blob/master/pkg/apis/clusterregistry/v1alpha1/types.go)
