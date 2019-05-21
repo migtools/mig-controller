@@ -30,7 +30,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if err != nil {
 		return err
 	}
-	namespaces := planResources.MigAssets.Spec.Namespaces
+	namespaces := plan.Spec.Namespaces
 	claims, err := r.getClaims(client, namespaces)
 	if err != nil {
 		return err

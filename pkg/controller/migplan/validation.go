@@ -16,24 +16,19 @@ import (
 
 // Types
 const (
-	// Errors
 	InvalidSourceClusterRef        = "InvalidSourceClusterRef"
 	InvalidDestinationClusterRef   = "InvalidDestinationClusterRef"
 	InvalidStorageRef              = "InvalidStorageRef"
-	InvalidAssetCollectionRef      = "InvalidAssetCollectionRef"
 	SourceClusterNotReady          = "SourceClusterNotReady"
 	DestinationClusterNotReady     = "DestinationClusterNotReady"
 	StorageNotReady                = "StorageNotReady"
-	AssetCollectionNotReady        = "AssetCollectionNotReady"
-	AssetNamespaceNotFound         = "AssetNamespaceNotFound"
+	NsListEmpty                    = "NamespaceListEmpty"
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
-	// Warn
-	PvInvalidAction = "PvInvalidAction"
-	// Required
-	StorageEnsured = "StorageEnsured"
-	PvsDiscovered  = "PvsDiscovered"
+	PvInvalidAction                = "PvInvalidAction"
+	StorageEnsured                 = "StorageEnsured"
+	PvsDiscovered                  = "PvsDiscovered"
 )
 
 // Categories
@@ -59,25 +54,20 @@ const (
 
 // Messages
 const (
-	// Errors
 	ReadyMessage                          = "The migration plan is ready."
 	InvalidSourceClusterRefMessage        = "The `srcMigClusterRef` must reference a `migcluster`."
 	InvalidDestinationClusterRefMessage   = "The `dstMigClusterRef` must reference a `migcluster`."
 	InvalidStorageRefMessage              = "The `migStorageRef` must reference a `migstorage`."
-	InvalidAssetCollectionRefMessage      = "The `migAssetCollectionRef` must reference a `migassetcollection`."
 	SourceClusterNotReadyMessage          = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
 	DestinationClusterNotReadyMessage     = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
 	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
-	AssetCollectionNotReadyMessage        = "The referenced `migAssetCollectionRef` does not have a `Ready` condition."
-	AssetNamespaceNotFoundMessage         = "The following asset `namespaces` [%s] not found on the source cluster."
+	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
-	// Warn
-	PvInvalidActionMessage = "PV in `persistentVolumes` [%s] has invalid `action`. Must be (%s)."
-	// Required.
-	StorageEnsuredMessage = "The storage resources have been created."
-	PvsDiscoveredMessage  = "The `persistentVolumes` list has been updated with discovered PVs."
+	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has invalid `action`. Must be (%s)."
+	StorageEnsuredMessage                 = "The storage resources have been created."
+	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 )
 
 // Validate the plan resource.
@@ -102,8 +92,8 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 		return err
 	}
 
-	// AssetCollection
-	err = r.validateAssetCollection(plan)
+	// Migrated namespaces.
+	err = r.validateNamespaces(plan)
 	if err != nil {
 		return err
 	}
@@ -178,83 +168,13 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 }
 
 // Validate the referenced assetCollection.
-func (r ReconcileMigPlan) validateAssetCollection(plan *migapi.MigPlan) error {
-	ref := plan.Spec.MigAssetCollectionRef
-
-	// NotSet
-	if !migref.RefSet(ref) {
+func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
+	if len(plan.Spec.Namespaces) == 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     InvalidAssetCollectionRef,
-			Status:   True,
-			Reason:   NotSet,
-			Category: Critical,
-			Message:  InvalidAssetCollectionRefMessage,
-		})
-		return nil
-	}
-
-	assetCollection, err := migapi.GetAssetCollection(r, ref)
-	if err != nil {
-		return err
-	}
-
-	// NotFound
-	if assetCollection == nil {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     InvalidAssetCollectionRef,
-			Status:   True,
-			Reason:   NotFound,
-			Category: Critical,
-			Message:  InvalidAssetCollectionRefMessage,
-		})
-		return nil
-	}
-
-	// NotReady
-	if !assetCollection.Status.IsReady() {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     AssetCollectionNotReady,
+			Type:     NsListEmpty,
 			Status:   True,
 			Category: Critical,
-			Message:  AssetCollectionNotReadyMessage,
-		})
-		return nil
-	}
-
-	// Namespaces
-	cluster, err := plan.GetSourceCluster(r)
-	if err != nil {
-		return err
-	}
-	if cluster == nil || !cluster.Status.IsReady() {
-		return nil
-	}
-	client, err := cluster.GetClient(r)
-	if err != nil {
-		return err
-	}
-	notFound := make([]string, 0)
-	ns := kapi.Namespace{}
-	for _, name := range assetCollection.Spec.Namespaces {
-		key := types.NamespacedName{Name: name}
-		err := client.Get(context.TODO(), key, &ns)
-		if err == nil {
-			continue
-		}
-		if errors.IsNotFound(err) {
-			notFound = append(notFound, name)
-		} else {
-			return err
-		}
-	}
-	if len(notFound) > 0 {
-		message := fmt.Sprintf(AssetNamespaceNotFoundMessage, strings.Join(notFound, ", "))
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     AssetNamespaceNotFound,
-			Status:   True,
-			Reason:   NotFound,
-			Category: Critical,
-			Message:  message,
+			Message:  NsListEmptyMessage,
 		})
 		return nil
 	}
@@ -389,6 +309,9 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{velerorunner.VeleroNamespace}
+	for _, ns := range plan.Spec.Namespaces {
+		namespaces = append(namespaces, ns)
+	}
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
 		return err

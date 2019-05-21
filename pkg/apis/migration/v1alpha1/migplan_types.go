@@ -26,10 +26,10 @@ import (
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
 	PersistentVolumes
-	SrcMigClusterRef      *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
-	DestMigClusterRef     *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
-	MigStorageRef         *kapi.ObjectReference `json:"migStorageRef,omitempty"`
-	MigAssetCollectionRef *kapi.ObjectReference `json:"migAssetCollectionRef,omitempty"`
+	Namespaces        []string              `json:"namespaces,omitempty"`
+	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
@@ -81,17 +81,10 @@ func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
 }
 
-// GetAssetCollection - Get the referenced asset-collection.
-// Returns `nil` when the reference cannot be resolved.
-func (r *MigPlan) GetAssetCollection(client k8sclient.Client) (*MigAssetCollection, error) {
-	return GetAssetCollection(client, r.Spec.MigAssetCollectionRef)
-}
-
 // Resources referenced by the plan.
 // Contains all of the fetched referenced resources.
 type PlanResources struct {
 	MigPlan        *MigPlan
-	MigAssets      *MigAssetCollection
 	MigStorage     *MigStorage
 	SrcMigCluster  *MigCluster
 	DestMigCluster *MigCluster
@@ -99,15 +92,6 @@ type PlanResources struct {
 
 // GetRefResources gets referenced resources from a MigPlan.
 func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, error) {
-	// MigAssetCollection
-	migAssets, err := r.GetAssetCollection(client)
-	if err != nil {
-		return nil, err
-	}
-	if migAssets == nil {
-		return nil, errors.New("asset-collection not found")
-	}
-
 	// MigStorage
 	storage, err := r.GetStorage(client)
 	if err != nil {
@@ -137,7 +121,6 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 
 	resources := &PlanResources{
 		MigPlan:        r,
-		MigAssets:      migAssets,
 		MigStorage:     storage,
 		SrcMigCluster:  srcMigCluster,
 		DestMigCluster: destMigCluster,

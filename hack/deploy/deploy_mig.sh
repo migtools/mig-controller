@@ -5,7 +5,6 @@ echo "==========================="
 echo "Deploying mig-controller..."
 echo "==========================="
 # mig-controller CRDs
-oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/config/crds/migration_v1alpha1_migassetcollection.yaml
 oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/config/crds/migration_v1alpha1_migcluster.yaml
 oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/config/crds/migration_v1alpha1_migmigration.yaml
 oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/config/crds/migration_v1alpha1_migplan.yaml

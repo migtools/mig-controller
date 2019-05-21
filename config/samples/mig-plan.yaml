@@ -18,8 +18,5 @@ spec:
   migStorageRef:
     name: migstorage-sample
     namespace: mig
-
-  migAssetCollectionRef:
-    name: migassets-sample
-    namespace: mig
-
+  namespaces:
+  - nginx-example

@@ -113,31 +113,6 @@ func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (*MigStorage
 	return &object, err
 }
 
-// Get a referenced MigAssetCollection.
-// Returns `nil` when the reference cannot be resolved.
-func GetAssetCollection(client k8sclient.Client, ref *kapi.ObjectReference) (*MigAssetCollection, error) {
-	if ref == nil {
-		return nil, nil
-	}
-	object := MigAssetCollection{}
-	err := client.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		&object)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return nil, err
-		}
-	}
-
-	return &object, err
-}
-
 // Get a referenced Secret.
 // Returns `nil` when the reference cannot be resolved.
 func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret, error) {
