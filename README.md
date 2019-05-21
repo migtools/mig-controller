@@ -1,14 +1,5 @@
 # mig-controller
 
-## Prerequisites
-
- - golang compiler (tested @ 1.11.5)
- - kubebuilder (tested @ 1.0.7)
- - dep (tested @ v0.5.0)
- - velero (tested @ v0.11.0) installed on both clusters involved in migration
-
----
-
 ## Quick-start
 
 __1. Identify a pair of running OpenShift clusters to migrate workloads between__
@@ -41,15 +32,15 @@ Deploying Velero...
 
 ---
 
-__2. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
+__3. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
 
 ```
 # Download bash script to deploy latest mig-controller and mig-ui images
-wget https://github.com/fusor/mig-controller/blob/master/hack/deploy/deploy_mig.sh
+$ wget https://github.com/fusor/mig-controller/blob/master/hack/deploy/deploy_mig.sh
 
 # Login to cluster of your choice where controller + UI will run
-oc login https://my-cluster:8443
-bash deploy_mig.sh
+$ oc login https://my-cluster:8443
+$ bash deploy_mig.sh
 
 Deploying mig-controller...
 [...]
