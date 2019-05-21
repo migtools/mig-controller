@@ -84,11 +84,20 @@ make samples
 # [... sample CR content will be copied to 'migsamples' dir]
 ```
 
-**_Inspect and edit each of the files in the 'migsamples' directory, making changes as needed._** Much of the content in these sample files can stay unchanged, but you'll need to provide information such as:
- 
- - Remote cluster URL (in the `Cluster` resource)
- - S3 bucket coordinates and access/secret key
- - List of namespaces to be migrated from the source to the destination cluster
+**_Inspect and edit each of the files in the 'migsamples' directory, making changes as needed._** Much of the content in these sample files can stay unchanged. 
+
+As an example, you'll need to provide the following parameters to perform a Migration using an AWS S3 bucket as temporary migration storage:
+
+| Description | Param Name | Purpose | Sample CR File |
+| --- | --- | --- | --- |
+| Namespaces | `namespaces` | List of namespaces to migrate from source to destination cluster | `mig-plan.yaml` |
+| Remote OpenShift URL | `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-aws.yaml` | 
+| Service Account Token | `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-aws.yaml` | 
+| S3 Bucket Name | `awsBucketName` | Name of the S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
+| S3 Bucket Region | `awsRegion` | Region of S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
+| AWS Access Key | `aws-access-key-id` | AWS access key to auth with AWS services | `mig-storage-creds.yaml` |
+| AWS Secret Key | `aws-secret-access-key` | AWS secret access key to auth with AWS services | `mig-storage-creds.yaml` |
+
 
 After modifying resource yaml, create the resources on the OpenShift cluster where the controller is running.
 
