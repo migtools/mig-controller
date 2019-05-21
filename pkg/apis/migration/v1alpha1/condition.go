@@ -146,17 +146,20 @@ func (r *Conditions) SetCondition(condition Condition) {
 }
 
 // Delete conditions by type.
-func (r *Conditions) DeleteCondition(cndTypes ...string) {
+func (r *Conditions) DeleteCondition(types ...string) {
 	if r.List == nil {
 		return
 	}
+	filter := make(map[string]bool)
+	for _, t := range types {
+		filter[t] = true
+	}
 	kept := []Condition{}
-	for _, name := range cndTypes {
-		for i := range r.List {
-			condition := r.List[i]
-			if condition.Type != name {
-				kept = append(kept, condition)
-			}
+	for i := range r.List {
+		condition := r.List[i]
+		_, found := filter[condition.Type]
+		if !found {
+			kept = append(kept, condition)
 		}
 	}
 	r.List = kept
