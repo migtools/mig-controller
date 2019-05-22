@@ -55,7 +55,7 @@ Deploying mig-ui...
 
 ---
 
-__3. Create Mig CRs to describe the Migration that will be performed__
+__4. Create Mig CRs to describe the Migration that will be performed__
 
 Before mig-controller can run a Migration, you'll need to provide it with:
  - Coordinates & auth info for 2 OpenShift clusters (source + destination)

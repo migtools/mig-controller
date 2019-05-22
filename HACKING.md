@@ -12,6 +12,18 @@ __1. Install prerequisites__
 __2. Clone the project to your `$GOPATH`__
 After setting your `$GOPATH` environment variable, clone the mig-controller project to `$GOPATH/src/github.com/fusor/mig-controller` so that dependencies in `vendor` will be found at build time.
 
+```
+# Sample of setting $GOPATH, you can decide where to put this
+$ mkdir -p $HOME/code/go
+$ export GOPATH="$HOME/code/go"
+
+# Running 'go get -d' will clone the mig-controller repo into the proper location on your $GOPATH
+$ go get -d github.com/fusor/mig-controller
+
+# Take a peek at the newly cloned files
+$ ls -al $GOPATH/src/github.com/fusor/mig-controller
+```
+
 __3. Create required CRDs (MigMigration, MigPlan, MigCluster, Cluster...)__
 
 Do this on the cluster where you'll be running the controller.
