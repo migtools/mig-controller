@@ -4,7 +4,10 @@
 
 __1. Identify a pair of running OpenShift clusters to migrate workloads between__
 
-You'll be able to use mig-controller and mig-ui to move workloads from a _source_ to a _destination_ cluster. You'll need cluster-admin permissions on both clusters.
+mig-controller and mig-ui can help you move workloads from a _source_ to a _destination_ cluster. You'll need cluster-admin permissions on both clusters. 
+
+- **velero** will need to be installed on both clusters, and will be driven by mig-controller
+- **mig-controller** and **mig-ui** should only be installed on _one of the two_ clusters. You can decide which cluster will host these components. 
 
 ---
 
@@ -67,6 +70,7 @@ Before mig-controller can run a Migration, you'll need to provide it with:
 - [MigMigration](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migmigration_types.go)
 - [Cluster](https://github.com/kubernetes/cluster-registry/blob/master/pkg/apis/clusterregistry/v1alpha1/types.go)
 
+---
 
 *__To make it easier to run your first Migration with mig-controller__*, we've published a set of annotated sample CRs that you can walk through and fill out values on. The first step will be to run `make samples`.
 
@@ -75,19 +79,23 @@ make samples
 # [... sample CR content will be copied to 'migsamples' dir]
 ```
 
+These sample resources describe a migration where the _source_ cluster is running the controller, so a Service Account (SA) token and cluster URL must be provided for the _destination_ cluster only.
+
+---
+
 **_Inspect and edit each of the files in the 'migsamples' directory, making changes as needed._** Much of the content in these sample files can stay unchanged. 
 
 As an example, you'll need to provide the following parameters to perform a Migration using an AWS S3 bucket as temporary migration storage:
 
-| Description | Param Name | Purpose | Sample CR File |
-| --- | --- | --- | --- |
-| Namespaces | `namespaces` | List of namespaces to migrate from source to destination cluster | `mig-plan.yaml` |
-| Remote OpenShift URL | `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-aws.yaml` | 
-| Service Account Token | `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-aws.yaml` | 
-| S3 Bucket Name | `awsBucketName` | Name of the S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
-| S3 Bucket Region | `awsRegion` | Region of S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
-| AWS Access Key | `aws-access-key-id` | AWS access key to auth with AWS services | `mig-storage-creds.yaml` |
-| AWS Secret Key | `aws-secret-access-key` | AWS secret access key to auth with AWS services | `mig-storage-creds.yaml` |
+| Parameter | Purpose | Sample CR File |
+| --- | --- | --- |
+| `namespaces` | List of namespaces to migrate from source to destination cluster | `mig-plan.yaml` |
+| `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-aws.yaml` | 
+| `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-aws.yaml` | 
+| `awsBucketName` | Name of the S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
+| `awsRegion` | Region of S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
+| `aws-access-key-id` | AWS access key to auth with AWS services | `mig-storage-creds.yaml` |
+| `aws-secret-access-key` | AWS secret access key to auth with AWS services | `mig-storage-creds.yaml` |
 
 
 After modifying resource yaml, create the resources on the OpenShift cluster where the controller is running.
@@ -106,9 +114,9 @@ cd migsamples
 oc apply -f mig-cluster-local.yaml
 
 # Destination cluster definition, coordinates, auth details
-oc apply -f cluster-aws.yaml
-oc apply -f sa-secret-aws.yaml
-oc apply -f mig-cluster-aws.yaml
+oc apply -f cluster-remote.yaml
+oc apply -f sa-secret-remote.yaml
+oc apply -f mig-cluster-remote.yaml
 
 # Describes where to store data during Migration, storage auth details
 # Note: the contents of mig-storage-creds.yaml will be used to overwrite Velero cloud-credentials
@@ -123,6 +131,8 @@ oc apply -f mig-migration.yaml
 ```
 
 - See [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) CR samples. It is _highly_ recommended to run `make samples` to copy these to the .gitignore'd 'migsamples' before filling out cluster details (URLs + SA tokens).
+
+---
 
 ### Creating a Service Account (SA) token
 

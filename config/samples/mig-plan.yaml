@@ -12,11 +12,13 @@ spec:
     namespace: mig
 
   destMigClusterRef:
-    name: migcluster-aws
+    name: migcluster-remote
     namespace: mig
 
   migStorageRef:
     name: migstorage-sample
     namespace: mig
+
+  # [!] Change namespaces to adjust which OpenShift namespaces should be migrated from source to destination cluster
   namespaces:
   - nginx-example

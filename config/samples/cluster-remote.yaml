@@ -2,10 +2,10 @@ kind: Cluster
 apiVersion: clusterregistry.k8s.io/v1alpha1
 metadata:
   namespace: mig
-  name: aws-cluster
+  name: remote-cluster
 spec:
   kubernetesApiEndpoints:
     serverEndpoints:
       - clientCIDR: "0.0.0.0"
         # [!] Change serverAddress to point at your remote cluster login endpoint
-        serverAddress: "https://my-aws-cluster-ip.nip.io:8443"
+        serverAddress: "https://my-remote-cluster-ip.nip.io:8443"

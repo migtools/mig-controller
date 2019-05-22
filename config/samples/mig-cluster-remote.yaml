@@ -3,17 +3,17 @@ kind: MigCluster
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: migcluster-aws
+  name: migcluster-remote
   namespace: mig
 spec:
-  # [!] Change isHostCluster to 'true' if you'll be running the controller on the AWS cluster.
+  # [!] Change isHostCluster to 'true' if you'll be running the controller on this cluster.
   #     Setting 'isHostCluster' to true will bypass using the clusterRef and serviceAccountSecretRef below.
   isHostCluster: false
 
   clusterRef:
-    name: aws-cluster
+    name: remote-cluster
     namespace: mig
 
   serviceAccountSecretRef:
-    name: sa-token-aws
+    name: sa-token-remote
     namespace: mig
