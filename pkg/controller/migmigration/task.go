@@ -17,14 +17,20 @@ const (
 	Started                 = ""
 	WaitOnResticRestart     = "WaitOnResticRestart"
 	ResticRestartCompleted  = "ResticRestartCompleted"
+	SrcRegistryStarted      = "SrcRegistryStarted"
+	SrcRegistryCompleted    = "SrcRegistryCompleted"
 	BackupStarted           = "BackupStarted"
 	BackupCompleted         = "BackupCompleted"
 	BackupFailed            = "BackupFailed"
 	WaitOnBackupReplication = "WaitOnBackupReplication"
 	BackupReplicated        = "BackupReplicated"
+	DestRegistryStarted     = "DestRegistryStarted"
+	DestRegistryCompleted   = "DestRegistryCompleted"
 	RestoreStarted          = "RestoreStarted"
 	RestoreCompleted        = "RestoreCompleted"
 	RestoreFailed           = "RestoreFailed"
+	DeleteRegistryStarted   = "DeleteRegistryStarted"
+	DeleteRegistryCompleted = "DeleteRegistryCompleted"
 	Completed               = "Completed"
 )
 
@@ -98,11 +104,17 @@ func (t *Task) Run() error {
 	if t.Phase == Started || t.Phase == WaitOnResticRestart {
 		return nil
 	}
+	// If registry delete has already started (or migration is done), don't ensure migration registry creation
+	skipMigRegistry := t.Phase == DeleteRegistryStarted || t.Phase == DeleteRegistryCompleted || t.Phase == Completed
 
 	// Source Migration Registry
-	err = t.ensureSrcMigRegistry()
-	if err != nil {
-		return err
+	if !skipMigRegistry {
+		t.Phase = SrcRegistryStarted
+		err = t.ensureSrcMigRegistry()
+		if err != nil {
+			return err
+		}
+		t.Phase = SrcRegistryCompleted
 	}
 	// Backup
 	err = t.ensureBackup()
@@ -129,9 +141,13 @@ func (t *Task) Run() error {
 	}
 
 	// Destination Migration Registry
-	err = t.ensureDestMigRegistry()
-	if err != nil {
-		return err
+	if !skipMigRegistry {
+		t.Phase = DestRegistryStarted
+		err = t.ensureDestMigRegistry()
+		if err != nil {
+			return err
+		}
+		t.Phase = DestRegistryCompleted
 	}
 	// Restore
 	err = t.ensureRestore()
@@ -145,6 +161,15 @@ func (t *Task) Run() error {
 		t.Phase = RestoreCompleted
 	}
 
+	// Delete Migration Registry for final migration
+	if !t.stage() {
+		t.Phase = DeleteRegistryStarted
+		err = t.ensureMigRegistryDelete()
+		if err != nil {
+			return err
+		}
+		t.Phase = DeleteRegistryCompleted
+	}
 	// Done
 	t.Phase = Completed
 

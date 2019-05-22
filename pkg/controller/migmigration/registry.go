@@ -539,6 +539,10 @@ func (t *Task) equalsRegistryService(a, b *kapi.Service) bool {
 // Returns the right backup/restore annotations including registry-specific ones
 func (t *Task) getAnnotations(registryResources *MigRegistryResources) (map[string]string, error) {
 	annotations := t.Annotations
+	// registryResources will only be nil when reconcile is called after restore is complete
+	if registryResources == nil || registryResources.Service == nil {
+		return annotations, nil
+	}
 	if len(registryResources.Service.Spec.Ports) == 0 {
 		return nil, errors.New("Migration Registry service port not found")
 	}
@@ -552,4 +556,122 @@ func (t *Task) getAnnotations(registryResources *MigRegistryResources) (map[stri
 		}
 	}
 	return annotations, nil
+}
+
+// Ensure that the migration registry is deleted on src and dest clusters after restore
+func (t *Task) ensureMigRegistryDelete() error {
+	// Delete dest Registry
+	err := t.ensureDestMigRegistryDelete()
+	if err != nil {
+		return err
+	}
+	// Delete src Registry
+	err = t.ensureSrcMigRegistryDelete()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ensure that the migration registry is deleted on the src cluster after restore
+func (t *Task) ensureSrcMigRegistryDelete() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	return t.ensureSingleMigRegistryDelete(client)
+}
+
+// Ensure that the migration registry is deleted on the dest cluster after restore
+func (t *Task) ensureDestMigRegistryDelete() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+	return t.ensureSingleMigRegistryDelete(client)
+}
+
+// Ensure that the migration registry is deleted on the specified cluster after restore
+func (t *Task) ensureSingleMigRegistryDelete(client k8sclient.Client) error {
+	err := t.ensureRegistryServiceDelete(client)
+	if err != nil {
+		return err
+	}
+	err = t.ensureRegistryDCDelete(client)
+	if err != nil {
+		return err
+	}
+	err = t.ensureRegistryImageStreamDelete(client)
+	if err != nil {
+		return err
+	}
+	err = t.ensureRegistrySecretDelete(client)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ensure that the migration registry secret is deleted on the specified cluster after restore
+func (t *Task) ensureRegistrySecretDelete(client k8sclient.Client) error {
+	foundSecret, err := t.getRegistrySecret(client)
+	if err != nil {
+		return err
+	}
+	if foundSecret == nil {
+		return nil
+	}
+	err = client.Delete(context.TODO(), foundSecret)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ensure that the migration registry deploymentconfig is deleted on the specified cluster after restore
+func (t *Task) ensureRegistryImageStreamDelete(client k8sclient.Client) error {
+	foundImageStream, err := t.getRegistryImageStream(client)
+	if err != nil {
+		return err
+	}
+	if foundImageStream == nil {
+		return nil
+	}
+	err = client.Delete(context.TODO(), foundImageStream)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ensure that the migration registry deploymentconfig is deleted on the specified cluster after restore
+func (t *Task) ensureRegistryDCDelete(client k8sclient.Client) error {
+	foundDC, err := t.getRegistryDC(client)
+	if err != nil {
+		return err
+	}
+	if foundDC == nil {
+		return nil
+	}
+	err = client.Delete(context.TODO(), foundDC)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ensure that the migration registry service is deleted on the specified cluster after restore
+func (t *Task) ensureRegistryServiceDelete(client k8sclient.Client) error {
+	foundService, err := t.getRegistryService(client)
+	if err != nil {
+		return err
+	}
+	if foundService == nil {
+		return nil
+	}
+	err = client.Delete(context.TODO(), foundService)
+	if err != nil {
+		return err
+	}
+	return nil
 }
