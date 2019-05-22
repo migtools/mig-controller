@@ -65,7 +65,7 @@ const (
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
-	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has invalid `action`. Must be (%s)."
+	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has an unsupported `action`."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 )
@@ -399,25 +399,20 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 // Validate PV actions.
 func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 	invalid := []string{}
-	actions := map[string]bool{
-		migapi.PvCopyAction: true,
-		migapi.PvMoveAction: true,
-	}
 	for _, pv := range plan.Spec.PersistentVolumes.List {
+		actions := map[string]bool{}
+		for _, a := range pv.SupportedActions {
+			actions[a] = true
+		}
 		_, found := actions[pv.Action]
 		if !found {
 			invalid = append(invalid, pv.Name)
 		}
 	}
 	if len(invalid) > 0 {
-		choices := []string{}
-		for key := range actions {
-			choices = append(choices, key)
-		}
 		message := fmt.Sprintf(
 			PvInvalidActionMessage,
-			strings.Join(invalid, ", "),
-			strings.Join(choices, "|"))
+			strings.Join(invalid, ", "))
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAction,
 			Status:   True,

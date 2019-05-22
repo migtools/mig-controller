@@ -138,17 +138,23 @@ const (
 // Name - The PV name.
 // StorageClass - The PV storage class name.
 // Action - The PV migration action (move|copy)
+// SupportedActions - The list of supported actions.
 // staged - A PV has been explicitly added/updated.
 type PersistentVolume struct {
-	Name         string `json:"name,omitempty"`
-	StorageClass string `json:"storageClass,omitempty"`
-	Action       string `json:"action,omitempty"`
-	staged       bool
+	Name             string   `json:"name,omitempty"`
+	StorageClass     string   `json:"storageClass,omitempty"`
+	SupportedActions []string `json:"supportedActions"`
+	Action           string   `json:"action,omitempty"`
+	staged           bool
 }
 
 // Update the PV with another.
 func (r *PersistentVolume) Update(pv PersistentVolume) {
 	r.StorageClass = pv.StorageClass
+	r.SupportedActions = pv.SupportedActions
+	if len(r.SupportedActions) == 1 {
+		r.Action = r.SupportedActions[0]
+	}
 	r.staged = true
 }
 
