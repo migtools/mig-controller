@@ -45,26 +45,62 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &velerov1.Backup{}}, &handler.EnqueueRequestForObject{})
+
+	// Backup
+	err = c.Watch(
+		&source.Kind{
+			Type: &velerov1.Backup{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&BackupPredicate{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &velerov1.Restore{}}, &handler.EnqueueRequestForObject{})
+
+	// Restore
+	err = c.Watch(
+		&source.Kind{
+			Type: &velerov1.Restore{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&RestorePredicate{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &velerov1.BackupStorageLocation{}}, &handler.EnqueueRequestForObject{})
+
+	// BSL
+	err = c.Watch(
+		&source.Kind{
+			Type: &velerov1.BackupStorageLocation{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&BSLPredicate{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &velerov1.VolumeSnapshotLocation{}}, &handler.EnqueueRequestForObject{})
+
+	// VSL
+	err = c.Watch(
+		&source.Kind{
+			Type: &velerov1.VolumeSnapshotLocation{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&VSLPredicate{})
 	if err != nil {
 		return err
 	}
-	err = c.Watch(&source.Kind{Type: &kapi.Secret{}}, &handler.EnqueueRequestForObject{}, &SecretPredicate{})
+
+	// Secret
+	err = c.Watch(
+		&source.Kind{
+			Type: &kapi.Secret{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&SecretPredicate{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
