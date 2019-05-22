@@ -90,8 +90,8 @@ As an example, you'll need to provide the following parameters to perform a Migr
 | Parameter | Purpose | Sample CR File |
 | --- | --- | --- |
 | `namespaces` | List of namespaces to migrate from source to destination cluster | `mig-plan.yaml` |
-| `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-aws.yaml` | 
-| `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-aws.yaml` | 
+| `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-remote.yaml` | 
+| `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-remote.yaml` | 
 | `awsBucketName` | Name of the S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
 | `awsRegion` | Region of S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
 | `aws-access-key-id` | AWS access key to auth with AWS services | `mig-storage-creds.yaml` |
@@ -136,9 +136,7 @@ oc apply -f mig-migration.yaml
 
 ### Creating a Service Account (SA) token
 
-For mig-controller to perform migration actions on a remote cluster, you'll need to provide:
-- The remote OpenShift cluster URL
-- A valid Service Account (SA) token granting 'cluster-admin' access to the remote cluster
+For mig-controller to perform migration actions on a remote cluster, you'll need to provide a valid Service Account (SA) token granting 'cluster-admin' access to the remote cluster.
 
 
 To configure the SA token, run the following on the remote cluster:
@@ -152,4 +150,4 @@ oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:m
 oc sa get-token -n mig mig|base64 -w 0
 
 ```
-Use the base64-encoded SA token from the last command output to fill in `migsamples/sa-secret-aws.yaml`
+Use the base64-encoded SA token from the last command output to fill in `migsamples/sa-secret-remote.yaml`
