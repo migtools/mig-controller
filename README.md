@@ -16,7 +16,7 @@ __2. Deploy Velero to both the _source_ and _destination_ OpenShift clusters__
 ```
 
 # Download bash script to deploy Velero along with required plugins
-$ wget https://github.com/fusor/mig-controller/blob/master/hack/deploy/deploy_velero.sh
+$ wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_velero.sh
 
 # Login to source cluster, run deploy_velero.sh against it
 $ oc login https://my-source-cluster:8443
@@ -39,7 +39,7 @@ __3. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
 
 ```
 # Download bash script to deploy latest mig-controller and mig-ui images
-$ wget https://github.com/fusor/mig-controller/blob/master/hack/deploy/deploy_mig.sh
+$ wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_mig.sh
 
 # Login to cluster of your choice where controller + UI will run
 $ oc login https://my-cluster:8443
