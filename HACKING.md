@@ -10,10 +10,11 @@ __1. Install prerequisites__
  - velero (tested @ v0.11.0) installed on both clusters involved in migration
 
 __2. Clone the project to your `$GOPATH`__
-After setting your `$GOPATH` environment variable, clone the mig-controller project to `$GOPATH/src/github.com/fusor/mig-controller` so that dependencies in `vendor` will be found at build time.
+
+Clone mig-controller to your $GOPATH so that dependencies in `vendor` will be found at build time.
 
 ```
-# Sample of setting $GOPATH, you can decide where to put this
+# Sample of setting $GOPATH
 $ mkdir -p $HOME/code/go
 $ export GOPATH="$HOME/code/go"
 
