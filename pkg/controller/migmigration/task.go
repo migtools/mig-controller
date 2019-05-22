@@ -14,19 +14,34 @@ var VeleroNamespace = "velero"
 
 // Phases
 const (
-	Started                 = ""
-	WaitOnResticRestart     = "WaitOnResticRestart"
-	ResticRestartCompleted  = "ResticRestartCompleted"
-	BackupStarted           = "BackupStarted"
-	BackupCompleted         = "BackupCompleted"
-	BackupFailed            = "BackupFailed"
-	WaitOnBackupReplication = "WaitOnBackupReplication"
-	BackupReplicated        = "BackupReplicated"
-	RestoreStarted          = "RestoreStarted"
-	RestoreCompleted        = "RestoreCompleted"
-	RestoreFailed           = "RestoreFailed"
-	Completed               = "Completed"
+	Started                 = 0
+	WaitOnResticRestart     = 10
+	ResticRestartCompleted  = 11
+	BackupStarted           = 20
+	BackupCompleted         = 21
+	BackupFailed            = 22
+	WaitOnBackupReplication = 30
+	BackupReplicated        = 31
+	RestoreStarted          = 40
+	RestoreCompleted        = 41
+	RestoreFailed           = 42
+	Completed               = 100
 )
+
+var Phases = map[int]string{
+	Started:                 "Started",
+	WaitOnResticRestart:     "WaitOnResticRestart",
+	ResticRestartCompleted:  "ResticRestartCompleted",
+	BackupStarted:           "BackupStarted",
+	BackupCompleted:         "BackupCompleted",
+	BackupFailed:            "BackupFailed",
+	WaitOnBackupReplication: "WaitOnBackupReplication",
+	BackupReplicated:        "BackupReplicated",
+	RestoreStarted:          "RestoreStarted",
+	RestoreCompleted:        "RestoreCompleted",
+	RestoreFailed:           "RestoreFailed",
+	Completed:               "Completed",
+}
 
 // A Velero task that provides the complete backup & restore workflow.
 // Log - A controller's logger.
@@ -45,7 +60,7 @@ type Task struct {
 	PlanResources         *migapi.PlanResources
 	Annotations           map[string]string
 	BackupResources       []string
-	Phase                 string
+	Phase                 int
 	Backup                *velero.Backup
 	Restore               *velero.Restore
 	SrcRegistryResources  *MigRegistryResources
@@ -182,7 +197,7 @@ func (t *Task) logEnter() {
 		"name",
 		t.Owner.Name,
 		"phase",
-		t.Phase)
+		Phases[t.Phase])
 }
 
 // Log task exit/interrupted.
@@ -203,7 +218,8 @@ func (t *Task) logExit() {
 		"Migration: waiting.",
 		"name",
 		t.Owner.Name,
-		"phase", t.Phase,
+		"phase",
+		Phases[t.Phase],
 		"backup",
 		backup,
 		"restore",
