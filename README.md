@@ -72,11 +72,11 @@ Before mig-controller can run a Migration, you'll need to provide it with:
 
 ---
 
-*__To make it easier to run your first Migration with mig-controller__*, we've published a set of annotated sample CRs that you can walk through and fill out values on. The first step will be to run `make samples`.
+*__To make it easier to run your first Migration with mig-controller__*, we've published a set of annotated sample CRs in [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) that you can walk through and fill out values on. The first step will be to run `make samples`, which will copy these to `migsamples`.
 
 ```
 make samples
-# [... sample CR content will be copied to 'migsamples' dir]
+# [... sample CR content will be copied to 'migsamples' dir, which is .gitignored so you can make changes]
 ```
 
 These sample resources describe a migration where the _source_ cluster is running the controller, so a Service Account (SA) token and cluster URL must be provided for the _destination_ cluster only.
@@ -129,8 +129,6 @@ oc apply -f mig-plan.yaml
 # Declares that a Migration operation should be run 
 oc apply -f mig-migration.yaml
 ```
-
-- See [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) CR samples. It is _highly_ recommended to run `make samples` to copy these to the .gitignore'd 'migsamples' before filling out cluster details (URLs + SA tokens).
 
 ---
 
