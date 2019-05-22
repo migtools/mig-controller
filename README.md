@@ -76,7 +76,7 @@ Before mig-controller can run a Migration, you'll need to provide it with:
 
 ```
 make samples
-# [... sample CR content will be copied to 'migsamples' dir, which is .gitignored so you can make changes]
+# [... sample CR content will be copied to 'migsamples' dir, which is .gitignored]
 ```
 
 These sample resources describe a migration where the _source_ cluster is running the controller, so a Service Account (SA) token and cluster URL must be provided for the _destination_ cluster only.
