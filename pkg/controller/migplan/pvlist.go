@@ -42,8 +42,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		}
 		plan.Spec.AddPv(
 			migapi.PersistentVolume{
-				Name:         pv.Name,
-				StorageClass: pv.Spec.StorageClassName,
+				Name:             pv.Name,
+				SupportedActions: r.getSupportedActions(pv),
+				StorageClass:     pv.Spec.StorageClassName,
 			})
 	}
 
@@ -75,6 +76,9 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 		return nil, err
 	}
 	for _, pv := range list.Items {
+		if pv.Status.Phase != core.VolumeBound {
+			continue
+		}
 		claim := pv.Spec.ClaimRef
 		if migref.RefSet(claim) {
 			key := types.NamespacedName{
@@ -114,4 +118,24 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []strin
 	}
 
 	return claims, nil
+}
+
+// Determine the supported PV actions.
+func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []string {
+	if pv.Spec.HostPath != nil {
+		return []string{}
+	}
+	if pv.Spec.NFS != nil ||
+		pv.Spec.Glusterfs != nil ||
+		pv.Spec.AzureDisk != nil ||
+		pv.Spec.AzureFile != nil ||
+		pv.Spec.AWSElasticBlockStore != nil {
+		return []string{
+			migapi.PvCopyAction,
+			migapi.PvMoveAction,
+		}
+	}
+	return []string{
+		migapi.PvCopyAction,
+	}
 }

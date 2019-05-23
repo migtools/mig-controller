@@ -35,8 +35,16 @@ func Add(mgr manager.Manager, forwardChannel chan event.GenericEvent, fowardEven
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, forwardChannel chan event.GenericEvent, forwardEvent event.GenericEvent) reconcile.Reconciler {
-	return &ReconcileRemoteWatcher{Client: mgr.GetClient(), scheme: mgr.GetScheme(), ForwardChannel: forwardChannel, ForwardEvent: forwardEvent}
+func newReconciler(
+	mgr manager.Manager,
+	forwardChannel chan event.GenericEvent,
+	forwardEvent event.GenericEvent) reconcile.Reconciler {
+	return &ReconcileRemoteWatcher{
+		Client:         mgr.GetClient(),
+		scheme:         mgr.GetScheme(),
+		ForwardChannel: forwardChannel,
+		ForwardEvent:   forwardEvent,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -97,6 +105,37 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{},
 		&SecretPredicate{})
+	if err != nil {
+		return err
+	}
+
+	// Pod
+	err = c.Watch(
+		&source.Kind{
+			Type: &kapi.Pod{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&PodPredicate{})
+	if err != nil {
+		return err
+	}
+
+	// PV
+	err = c.Watch(
+		&source.Kind{
+			Type: &kapi.PersistentVolume{},
+		},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// PVC
+	err = c.Watch(
+		&source.Kind{
+			Type: &kapi.PersistentVolumeClaim{},
+		},
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

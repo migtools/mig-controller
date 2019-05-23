@@ -4,6 +4,7 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -174,6 +175,42 @@ func (r VSLPredicate) Delete(e event.DeleteEvent) bool {
 	vsl, cast := e.Object.(*velero.VolumeSnapshotLocation)
 	if cast {
 		return hasCorrelationLabel(vsl.Labels)
+	}
+	return false
+}
+
+// Pods
+type PodPredicate struct {
+	predicate.Funcs
+}
+
+// Watched resource has been created.
+func (r PodPredicate) Create(e event.CreateEvent) bool {
+	pod, cast := e.Object.(*kapi.Pod)
+	if cast {
+		return pod.Spec.Volumes != nil
+	}
+	return false
+}
+
+// Watched resource has been updated.
+func (r PodPredicate) Update(e event.UpdateEvent) bool {
+	oldPod, cast := e.ObjectOld.(*kapi.Pod)
+	if !cast {
+		return false
+	}
+	newPod, cast := e.ObjectNew.(*kapi.Pod)
+	if !cast {
+		return false
+	}
+	return reflect.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes)
+}
+
+// Watched resource has been deleted.
+func (r PodPredicate) Delete(e event.DeleteEvent) bool {
+	pod, cast := e.Object.(*kapi.Pod)
+	if cast {
+		return pod.Spec.Volumes != nil
 	}
 	return false
 }
