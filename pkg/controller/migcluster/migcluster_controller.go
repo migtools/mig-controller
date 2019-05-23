@@ -133,6 +133,9 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Annotate with reconcile-unique UUID to trigger MigMigration reconcile
+	if migCluster.Annotations == nil {
+		migCluster.Annotations = make(map[string]string)
+	}
 	migCluster.Annotations["reconcile-id"] = uuid.New().String()
 
 	// Validations.
