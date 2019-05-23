@@ -145,6 +145,13 @@ func (t *Task) Run() error {
 		t.Phase = RestoreCompleted
 	}
 
+	if t.Phase == RestoreCompleted && t.stage() {
+		err = t.deleteStagePods()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Done
 	t.Phase = Completed
 
