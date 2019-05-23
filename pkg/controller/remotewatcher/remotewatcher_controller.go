@@ -140,6 +140,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Namespaces
+	err = c.Watch(
+		&source.Kind{
+			Type: &kapi.Namespace{},
+		},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
