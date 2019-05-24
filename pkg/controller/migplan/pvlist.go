@@ -43,8 +43,8 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		plan.Spec.AddPv(
 			migapi.PersistentVolume{
 				Name:             pv.Name,
-				SupportedActions: r.getSupportedActions(pv),
 				StorageClass:     pv.Spec.StorageClassName,
+				SupportedActions: r.getSupportedActions(pv),
 			})
 	}
 
