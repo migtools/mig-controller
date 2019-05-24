@@ -27,6 +27,7 @@ const (
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
 	PvInvalidAction                = "PvInvalidAction"
+	PvNoSupportedAction            = "PvNoSupportedAction"
 	StorageEnsured                 = "StorageEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
 )
@@ -35,6 +36,7 @@ const (
 const (
 	Critical = migapi.Critical
 	Error    = migapi.Error
+	Warn     = migapi.Warn
 )
 
 // Reasons
@@ -66,6 +68,7 @@ const (
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has an unsupported `action`."
+	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [%s] with no `SupportedActions`."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 )
@@ -398,11 +401,17 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 
 // Validate PV actions.
 func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
-	invalid := []string{}
+	invalid := make([]string, 0)
+	unsupported := make([]string, 0)
 	for _, pv := range plan.Spec.PersistentVolumes.List {
 		actions := map[string]bool{}
-		for _, a := range pv.SupportedActions {
-			actions[a] = true
+		if len(pv.SupportedActions) > 0 {
+			for _, a := range pv.SupportedActions {
+				actions[a] = true
+			}
+		} else {
+			unsupported = append(unsupported, pv.Name)
+			actions[""] = true
 		}
 		_, found := actions[pv.Action]
 		if !found {
@@ -418,6 +427,17 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
+			Message:  message,
+		})
+	}
+	if len(unsupported) > 0 {
+		message := fmt.Sprintf(
+			PvNoSupportedActionMessage,
+			strings.Join(unsupported, ", "))
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNoSupportedAction,
+			Status:   True,
+			Category: Warn,
 			Message:  message,
 		})
 		return nil
