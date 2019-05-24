@@ -1,4 +1,4 @@
-## Migrating a **stateless** OpenShift app with mig-controller
+## Migrating a *stateless* OpenShift app with mig-controller
 
 This scenario walks through Migration of a stateless OpenShift app, meaning that the app has no Persistent Volumes (PVs) attached.
 
@@ -36,7 +36,6 @@ In a few seconds, you should see nginx pods start running.
 ```bash
 # Making sure our stateless app is running
 $ oc get pods -n nginx-example
-
 NAME                                READY     STATUS    RESTARTS   AGE
 nginx-deployment-55b5c6f96c-bs5qb   1/1       Running   0          11s
 nginx-deployment-55b5c6f96c-rp4p2   1/1       Running   0          11s
@@ -47,7 +46,6 @@ We can check that our nginx pods are serving their starter webpage successfully 
 ```bash
 # Get the stateless app route host/port
 $ oc get route -n nginx-example
-
 NAME       HOST/PORT
 my-nginx   my-nginx-nginx-example.apps.my-source-cluster.example.com 
 
@@ -91,7 +89,9 @@ With the 'nginx-example' namespace listed, no further changes are needed. Let's 
 # Creates MigPlan 'migplan-sample' in namespace 'mig'
 $ oc apply -f mig-plan.yaml
 
-# Describe our MigPlan. Assuming the controller is running, validations should have run against the plan, and you should be able to see "The Migration Plan is ready" or a list of issues to resolve.
+# Describe our MigPlan. Assuming the controller is running, validations
+# should have run against the plan, and you should be able to see 
+# "The Migration Plan is ready" or a list of issues to resolve.
 $ oc describe migplan migplan-sample -n mig
 Name:         migplan-sample
 Namespace:    mig
@@ -120,12 +120,18 @@ Status:
     Type:                  Ready
 
 
-# If you see 'The migration plan is ready.' from the 'oc describe' above, proceed to creation of a MigMigration that will execute our MigPlan. If the plan is not ready, make edits to the MigPlan resource as necessary using the feedback provided by 'oc describe'.
+# If you see 'The migration plan is ready.' from the 'oc describe' above,
+# proceed to creation of a MigMigration that will execute our MigPlan. 
+# If the plan is not ready, make edits to the MigPlan resource as necessary
+# using the feedback provided by 'oc describe'.
 
 # Create MigMigration 'migmigration-sample' in namespace 'mig'
 $ oc apply -f mig-migration.yaml
 
-# Monitor progress of the migration with 'oc describe'. You should see 'The migration is ready', otherwise you'll see an error condition within 'oc describe' output indicating what action you need to take before the migration can begin.
+# Monitor progress of the migration with 'oc describe'. You should see 
+# 'The migration is ready', otherwise you'll see an error condition within
+# 'oc describe' output indicating what action you need to take before the 
+# migration can begin.
 $ oc describe migmigration -n mig migmigration-sample
 Name:         migmigration-sample
 Namespace:    mig
@@ -164,12 +170,14 @@ To double-check the work mig-controller did, login to our destination cluster an
 # Login to the migration 'destination cluster'
 $ oc login https://my-destination-cluster:8443
 
-# Making sure our stateless app is running
+# Make sure nginx pods are running
 $ oc get pods -n nginx-example
+NAME                                READY     STATUS    RESTARTS   AGE
+nginx-deployment-55b5c6f96c-bs5qb   1/1       Running   0          11s
+nginx-deployment-55b5c6f96c-rp4p2   1/1       Running   0          11s
 
 # Get the stateless app route host/port
 $ oc get route -n nginx-example
-
 NAME       HOST/PORT
 my-nginx   my-nginx-nginx-example.apps.my-destination-cluster.example.com 
 
