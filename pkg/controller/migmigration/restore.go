@@ -3,9 +3,12 @@ package migmigration
 import (
 	"context"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const podStageLabel = "migration-stage-pod"
 
 // Ensure the restore on the destination cluster has been
 // created  and has the proper settings.
@@ -100,4 +103,33 @@ func (t *Task) updateRestore(restore *velero.Restore) {
 		BackupName: t.Backup.Name,
 		RestorePVs: &restorePVs,
 	}
+}
+
+// Delete stage pods
+func (t *Task) deleteStagePods() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+	// Find all pods matching the podStageLabel
+	list := core.PodList{}
+	labels := make(map[string]string)
+	labels[podStageLabel] = "true"
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return err
+	}
+	// Delete all pods
+	for _, pod := range list.Items {
+		err = client.Delete(
+			context.TODO(),
+			&pod)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
