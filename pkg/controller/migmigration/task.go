@@ -1,6 +1,7 @@
 package migmigration
 
 import (
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -12,7 +13,7 @@ const MigQuiesceAnnotationKey = "openshift.io/migrate-quiesce-pods"
 
 // Phases
 const (
-	Started                 = ""
+	Started                 = "Started"
 	WaitOnResticRestart     = "WaitOnResticRestart"
 	ResticRestartCompleted  = "ResticRestartCompleted"
 	BackupStarted           = "BackupStarted"
@@ -34,6 +35,7 @@ const (
 // Annotations - Map of annotations to applied to the backup & restore
 // BackupResources - Resource types to be included in the backup.
 // Phase - The task phase.
+// Errors - Migration errors.
 // Backup - A Backup created on the source cluster.
 // Restore - A Restore created on the destination cluster.
 type Task struct {
@@ -44,6 +46,7 @@ type Task struct {
 	Annotations     map[string]string
 	BackupResources []string
 	Phase           string
+	Errors          []string
 	Backup          *velero.Backup
 	Restore         *velero.Restore
 }
@@ -69,6 +72,12 @@ type Task struct {
 func (t *Task) Run() error {
 	t.logEnter()
 	defer t.logExit()
+
+	// Started
+	if t.Phase == "" {
+		t.Phase = Started
+	}
+
 	// Mount propagation workaround
 	// TODO: Only bounce restic pod if cluster version is 3.7-3.9,
 	// would require passing in cluster version to the controller.
@@ -87,11 +96,24 @@ func (t *Task) Run() error {
 	if err != nil {
 		return err
 	}
-	if t.Backup.Status.Phase != velero.BackupPhaseCompleted {
+	switch t.Backup.Status.Phase {
+	case velero.BackupPhaseCompleted:
+		t.Phase = BackupCompleted
+	case velero.BackupPhaseFailed:
+		reason := fmt.Sprintf(
+			"Backup: %s/%s failed.",
+			t.Backup.Namespace,
+			t.Backup.Name)
+		t.addErrors([]string{reason})
+		t.Phase = BackupFailed
+		return nil
+	case velero.BackupPhaseFailedValidation:
+		t.addErrors(t.Backup.Status.ValidationErrors)
+		t.Phase = BackupFailed
+		return nil
+	default:
 		t.Phase = BackupStarted
 		return nil
-	} else {
-		t.Phase = BackupCompleted
 	}
 
 	// Wait on Backup replication.
@@ -111,13 +133,27 @@ func (t *Task) Run() error {
 	if err != nil {
 		return err
 	}
-	if t.Restore.Status.Phase != velero.RestorePhaseCompleted {
+	switch t.Restore.Status.Phase {
+	case velero.RestorePhaseCompleted:
+		t.Phase = RestoreCompleted
+	case velero.RestorePhaseFailedValidation:
+		t.addErrors(t.Restore.Status.ValidationErrors)
+		t.Phase = RestoreFailed
+		return nil
+	case velero.RestorePhaseFailed:
+		reason := fmt.Sprintf(
+			"Restore: %s/%s failed.",
+			t.Restore.Namespace,
+			t.Restore.Name)
+		t.addErrors([]string{reason})
+		t.Phase = RestoreFailed
+		return nil
+	default:
 		t.Phase = RestoreStarted
 		return nil
-	} else {
-		t.Phase = RestoreCompleted
 	}
 
+	// Delete stage Pods
 	if t.stage() {
 		err = t.deleteStagePods()
 		if err != nil {
@@ -193,4 +229,11 @@ func (t *Task) logExit() {
 		backup,
 		"restore",
 		restore)
+}
+
+// Add errors.
+func (t *Task) addErrors(errors []string) {
+	for _, error := range errors {
+		t.Errors = append(t.Errors, error)
+	}
 }

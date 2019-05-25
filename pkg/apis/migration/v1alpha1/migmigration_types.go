@@ -41,7 +41,8 @@ type MigMigrationStatus struct {
 	MigrationCompleted  bool         `json:"migrationCompleted,omitempty"`
 	StartTimestamp      *metav1.Time `json:"startTimestamp,omitempty"`
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
-	TaskPhase           string       `json:"taskPhase,omitempty"`
+	Phase               string       `json:"phase,omitempty"`
+	Errors              []string     `json:"errors,omitempty"`
 }
 
 // +genclient
@@ -101,4 +102,18 @@ func (r *MigMigration) MarkAsCompleted() bool {
 // Get whether the migration has completed.
 func (r *MigMigration) IsCompleted() bool {
 	return r.Status.MigrationCompleted
+}
+
+// Add (de-duplicated) errors.
+func (r *MigMigration) AddErrors(errors []string) {
+	m := map[string]bool{}
+	for _, e := range r.Status.Errors {
+		m[e] = true
+	}
+	for _, error := range errors {
+		_, found := m[error]
+		if !found {
+			r.Status.Errors = append(r.Status.Errors, error)
+		}
+	}
 }
