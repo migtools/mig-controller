@@ -29,8 +29,9 @@ var log = logf.Log.WithName("controller")
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
-	MigPlanRef *kapi.ObjectReference `json:"migPlanRef,omitempty"`
-	Stage      bool                  `json:"stage"`
+	MigPlanRef  *kapi.ObjectReference `json:"migPlanRef,omitempty"`
+	Stage       bool                  `json:"stage"`
+	QuiescePods bool                  `json:"quiescePods,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration

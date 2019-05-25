@@ -12,6 +12,9 @@ import (
 
 var VeleroNamespace = "velero"
 
+// Annotation Keys
+const MigQuiesceAnnotationKey = "openshift.io/migration-quiesce-pods"
+
 // Phases
 const (
 	Started                 = ""
@@ -171,6 +174,11 @@ func (t *Task) getDestinationClient() (k8sclient.Client, error) {
 // Get whether the migration is stage.
 func (t *Task) stage() bool {
 	return t.Owner.Spec.Stage
+}
+
+// Get whether to quiesce pods.
+func (t *Task) quiesce() bool {
+	return t.Owner.Spec.QuiescePods
 }
 
 // Log task start/resumed.

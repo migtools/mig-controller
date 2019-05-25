@@ -16,8 +16,10 @@ import (
 )
 
 // Annotations
-const MigRegistryAnnotationKey string = "openshift.io/migration-registry"
-const MigRegistryDirAnnotationKey string = "openshift.io/migration-registry-dir"
+const (
+	MigRegistryAnnotationKey    string = "openshift.io/migration-registry"
+	MigRegistryDirAnnotationKey string = "openshift.io/migration-registry-dir"
+)
 
 // Ensure the migration registry on the source cluster has been created
 // and has the proper settings.
@@ -550,6 +552,9 @@ func (t *Task) getAnnotations(registryResources *MigRegistryResources) (map[stri
 				annotations[MigRegistryDirAnnotationKey] = envVar.Value
 			}
 		}
+	}
+	if t.quiesce() {
+		annotations[MigQuiesceAnnotationKey] = "true"
 	}
 	return annotations, nil
 }
