@@ -166,9 +166,19 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}
 
+	// Migration Registry
+	err = r.ensureMigRegistries(plan)
+	if err != nil {
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Ready
 	plan.Status.SetReady(
-		plan.Status.HasCondition(StorageEnsured, PvsDiscovered) &&
+		plan.Status.HasCondition(StorageEnsured, PvsDiscovered, RegistriesEnsured) &&
 			!plan.Status.HasBlockerCondition(),
 		ReadyMessage)
 

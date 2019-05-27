@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -124,7 +125,12 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 
 // Build a Backups as desired for the source cluster.
 func (t *Task) buildBackup() (*velero.Backup, error) {
-	annotations, err := t.getAnnotations(t.SrcRegistryResources)
+	// Get client of source cluster
+	client, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+	annotations, err := t.getAnnotations(client)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +138,7 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
-			Namespace:    VeleroNamespace,
+			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
 		},
 	}
@@ -210,7 +216,7 @@ func (t *Task) bounceResticPod() error {
 	err = client.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
-			Namespace: VeleroNamespace,
+			Namespace: migapi.VeleroNamespace,
 		},
 		&list)
 	if err != nil {
