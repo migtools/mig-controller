@@ -70,11 +70,8 @@ To migrate our `nginx-example` namespace, we'll ensure that the `namespaces` fie
 ```yaml
 apiVersion: migration.openshift.io/v1alpha1
 kind: MigPlan
-metadata:
-  name: migplan-sample
-  namespace: mig
 
-[... snipped, see config/samples/mig-plan.yaml for full version ...]
+[... snipped, see config/samples/mig-plan.yaml for other required fields ...]
 
   # [!] Change namespaces to adjust which OpenShift namespaces should be migrated from source to destination cluster
   namespaces:
