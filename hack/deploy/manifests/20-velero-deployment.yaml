@@ -63,7 +63,7 @@ spec:
           emptyDir: {}
       initContainers:
         - image: quay.io/ocpmigrate/velero-plugin:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           name: velero-plugin
           resources: {}
           terminationMessagePath: /dev/termination-log
