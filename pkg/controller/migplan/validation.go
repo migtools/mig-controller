@@ -3,7 +3,6 @@ package migplan
 import (
 	"context"
 	"fmt"
-	"github.com/fusor/mig-controller/pkg/controller/migmigration"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,6 +28,7 @@ const (
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
 	StorageEnsured                 = "StorageEnsured"
+	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
 )
 
@@ -70,6 +70,7 @@ const (
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [%s] with no `SupportedActions`."
 	StorageEnsuredMessage                 = "The storage resources have been created."
+	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 )
 
@@ -311,7 +312,7 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{migmigration.VeleroNamespace}
+	namespaces := []string{migapi.VeleroNamespace}
 	for _, ns := range plan.Spec.Namespaces {
 		namespaces = append(namespaces, ns)
 	}
@@ -358,7 +359,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 // Validate required namespaces on the destination cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{migmigration.VeleroNamespace}
+	namespaces := []string{migapi.VeleroNamespace}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		return err

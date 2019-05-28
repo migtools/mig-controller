@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,7 +81,11 @@ func (t Task) getRestore() (*velero.Restore, error) {
 
 // Build a Restore as desired for the destination cluster.
 func (t *Task) buildRestore() (*velero.Restore, error) {
-	annotations, err := t.getAnnotations(t.DestRegistryResources)
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+	annotations, err := t.getAnnotations(client)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +93,7 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
-			Namespace:    VeleroNamespace,
+			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
 		},
 	}

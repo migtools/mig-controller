@@ -4,13 +4,8 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
-	appsv1 "github.com/openshift/api/apps/v1"
-	imagev1 "github.com/openshift/api/image/v1"
-	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-var VeleroNamespace = "velero"
 
 // Annotation Keys
 const MigQuiesceAnnotationKey = "openshift.io/migration-quiesce-pods"
@@ -42,30 +37,15 @@ const (
 // Backup - A Backup created on the source cluster.
 // Restore - A Restore created on the destination cluster.
 type Task struct {
-	Log                   logr.Logger
-	Client                k8sclient.Client
-	Owner                 *migapi.MigMigration
-	PlanResources         *migapi.PlanResources
-	Annotations           map[string]string
-	BackupResources       []string
-	Phase                 string
-	Backup                *velero.Backup
-	Restore               *velero.Restore
-	SrcRegistryResources  *MigRegistryResources
-	DestRegistryResources *MigRegistryResources
-}
-
-// The set of resources associated with a source or destination
-// Migration Registry.
-// CredSecret -       A secret containing the credentials for the registry storage
-// ImageStream -      The ImageStream resource pointing to the image used by the Registry DeploymentConfig
-// DeploymentConfig - The DeploymentConfig that runs the Migration Registry
-// Service          - The Service resource for the Migration Registry
-type MigRegistryResources struct {
-	CredSecret       *kapi.Secret
-	ImageStream      *imagev1.ImageStream
-	DeploymentConfig *appsv1.DeploymentConfig
-	Service          *kapi.Service
+	Log             logr.Logger
+	Client          k8sclient.Client
+	Owner           *migapi.MigMigration
+	PlanResources   *migapi.PlanResources
+	Annotations     map[string]string
+	BackupResources []string
+	Phase           string
+	Backup          *velero.Backup
+	Restore         *velero.Restore
 }
 
 // Reconcile() Example:
@@ -102,11 +82,6 @@ func (t *Task) Run() error {
 		return nil
 	}
 
-	// Source Migration Registry
-	err = t.ensureSrcMigRegistry()
-	if err != nil {
-		return err
-	}
 	// Backup
 	err = t.ensureBackup()
 	if err != nil {
@@ -131,11 +106,6 @@ func (t *Task) Run() error {
 		return nil
 	}
 
-	// Destination Migration Registry
-	err = t.ensureDestMigRegistry()
-	if err != nil {
-		return err
-	}
 	// Restore
 	err = t.ensureRestore()
 	if err != nil {
