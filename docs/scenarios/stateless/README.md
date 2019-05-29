@@ -70,12 +70,12 @@ To migrate our `nginx-example` namespace, we'll ensure that the `namespaces` fie
 ```yaml
 apiVersion: migration.openshift.io/v1alpha1
 kind: MigPlan
-
-[... snipped, see config/samples/mig-plan.yaml for other required fields ...]
-
+spec:
   # [!] Change namespaces to adjust which OpenShift namespaces should be migrated from source to destination cluster
   namespaces:
   - nginx-example
+
+[... snipped, see config/samples/mig-plan.yaml for other required fields ...]
 ```
 
 With the 'nginx-example' namespace listed, no further changes are needed. Let's create our MigPlan and also create a MigMigration referencing that MigPlan to start moving this app over to our _destination_ cluster.
