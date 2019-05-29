@@ -8,8 +8,10 @@ import (
 
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -154,11 +156,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -205,6 +207,27 @@ func (t *Task) bounceResticPod() error {
 		return err
 	}
 
+	if t.Phase == WaitOnResticRestart {
+		// Get restic daemonset to determine if pods have become ready
+		ds := appsv1.DaemonSet{}
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Namespace: VeleroNamespace,
+				Name:      "restic",
+			},
+			&ds)
+		if err != nil {
+			return err
+		}
+		if ds.Status.CurrentNumberScheduled == ds.Status.NumberReady {
+			t.Phase = ResticRestartCompleted
+			t.Log.Info("Restic pod successfully restarted")
+			return nil
+		}
+		return nil
+	}
+
 	// List all pods in velero namespace
 	list := corev1.PodList{}
 	err = client.List(
@@ -217,7 +240,7 @@ func (t *Task) bounceResticPod() error {
 		return err
 	}
 
-	// Loop through all pods in velero namespace
+	// Loop through all pods in velero namespace and delete any restic pods
 	for _, pod := range list.Items {
 		if !strings.HasPrefix(pod.Name, resticPodPrefix) {
 			continue
@@ -225,12 +248,6 @@ func (t *Task) bounceResticPod() error {
 		// Check if pod is running
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
-		}
-		// If restart already started, mark it as completed
-		if t.Phase == WaitOnResticRestart {
-			t.Phase = ResticRestartCompleted
-			t.Log.Info("Restic pod successfully restarted")
-			return nil
 		}
 		// Delete pod since restart never started
 		t.Log.Info(
@@ -244,8 +261,10 @@ func (t *Task) bounceResticPod() error {
 			return err
 		}
 		t.Phase = WaitOnResticRestart
-		return nil
 	}
+	// Sleep for one second to prevent race condition of next reconcile loop
+	// thinking pods have been deleted and are now ready
+	time.Sleep(1 * time.Second)
 
 	return nil
 }
