@@ -70,8 +70,6 @@ spec:
       labels:
         name: mysql
         app: mysql
-      annotations:
-        backup.velero.io/backup-volumes: mysql-data
     spec:
       containers:
       - env:
