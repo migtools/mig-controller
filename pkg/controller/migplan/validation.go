@@ -31,6 +31,7 @@ const (
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
+	Closed                         = "Closed"
 )
 
 // Categories
@@ -73,6 +74,7 @@ const (
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
+	ClosedMessage                         = "The migration plan is closed."
 )
 
 // Validate the plan resource.

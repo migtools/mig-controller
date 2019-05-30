@@ -105,6 +105,13 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		if err != nil {
 			return false, err
 		}
+		if !migration.Spec.Stage {
+			plan.SetClosed()
+			err = r.Update(context.TODO(), plan)
+			if err != nil {
+				return false, err
+			}
+		}
 	}
 
 	return false, nil

@@ -35,6 +35,7 @@ type MigPlanSpec struct {
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
+	Closed            bool                  `json:"closed,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
@@ -132,6 +133,11 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 	}
 
 	return resources, nil
+}
+
+// Set the MigPlan Status to closed
+func (r *MigPlan) SetClosed() {
+	r.Spec.Closed = true
 }
 
 // Build a credentials Secret as desired for the source cluster.
