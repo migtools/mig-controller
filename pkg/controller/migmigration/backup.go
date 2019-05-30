@@ -264,9 +264,10 @@ func (t *Task) annotateStorageResources() error {
 	if err != nil {
 		return err
 	}
-	//namespaces := t.PlanResources.MigPlan.Spec.Namespaces
+	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
 	for _, pv := range pvs.List {
+		// Update PVs with their action
 		resource := corev1.PersistentVolume{}
 		err := client.Get(
 			context.TODO(),
@@ -283,5 +284,48 @@ func (t *Task) annotateStorageResources() error {
 		resource.Annotations[pvAnnotationKey] = pv.Action
 		client.Update(context.TODO(), &resource)
 	}
+
+	for _, ns := range namespaces {
+		// Find all pods in our target namespaces
+		list := corev1.PodList{}
+		options := k8sclient.InNamespace(ns)
+		err = client.List(context.TODO(), options, &list)
+		if err != nil {
+			return err
+		}
+		// Loop through all pods to find all volume claims
+		for _, pod := range list.Items {
+			for _, volume := range pod.Spec.Volumes {
+				claim := volume.VolumeSource.PersistentVolumeClaim
+				if claim == nil {
+					continue
+				}
+				pvc := corev1.PersistentVolumeClaim{}
+				ref := types.NamespacedName{
+					Namespace: ns,
+					Name:      claim.ClaimName,
+				}
+				// Get PVC and update annotation
+				err = client.Get(context.TODO(), ref, &pvc)
+				if pvc.Annotations == nil {
+					pvc.Annotations = make(map[string]string)
+				}
+				pvName := pvc.Spec.VolumeName
+				action := findPVCAction(pvs, pvName)
+				pvc.Annotations[pvAnnotationKey] = action
+				err = client.Update(context.TODO(), &pvc)
+			}
+		}
+	}
+
 	return nil
+}
+
+func findPVCAction(pvList migapi.PersistentVolumes, pvName string) string {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Action
+		}
+	}
+	return ""
 }
