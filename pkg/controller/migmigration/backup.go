@@ -295,6 +295,7 @@ func (t *Task) annotateStorageResources() error {
 		}
 		// Loop through all pods to find all volume claims
 		for _, pod := range list.Items {
+			resticVolumes := []string{}
 			for _, volume := range pod.Spec.Volumes {
 				claim := volume.VolumeSource.PersistentVolumeClaim
 				if claim == nil {
@@ -314,6 +315,16 @@ func (t *Task) annotateStorageResources() error {
 				action := findPVCAction(pvs, pvName)
 				pvc.Annotations[pvAnnotationKey] = action
 				err = client.Update(context.TODO(), &pvc)
+				if action == migapi.PvCopyAction {
+					resticVolumes = append(resticVolumes, volume.Name)
+				}
+			}
+			if len(resticVolumes) > 0 {
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				// RESTIC ANNOTATION HERE
+				// backup.velero.io/backup-volumes=resticVolumes
 			}
 		}
 	}
