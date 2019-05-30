@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -253,5 +254,34 @@ func (t *Task) bounceResticPod() error {
 		return nil
 	}
 
+	return nil
+}
+
+// Annotate all resources with PV action data
+func (t *Task) annotateStorageResources() error {
+	// Get client of source cluster
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	//namespaces := t.PlanResources.MigPlan.Spec.Namespaces
+	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
+	for _, pv := range pvs.List {
+		resource := corev1.PersistentVolume{}
+		err := client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name: pv.Name,
+			},
+			&resource)
+		if err != nil {
+			return err
+		}
+		if resource.Annotations == nil {
+			resource.Annotations = make(map[string]string)
+		}
+		resource.Annotations[pvAnnotationKey] = pv.Action
+		client.Update(context.TODO(), &resource)
+	}
 	return nil
 }
