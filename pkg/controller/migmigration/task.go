@@ -8,7 +8,7 @@ import (
 )
 
 // Annotation Keys
-const MigQuiesceAnnotationKey = "openshift.io/migration-quiesce-pods"
+const MigQuiesceAnnotationKey = "openshift.io/migrate-quiesce-pods"
 
 // Phases
 const (
