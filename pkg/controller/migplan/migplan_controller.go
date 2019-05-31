@@ -136,6 +136,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{}, err
 		}
 	}
+
+	// PV discovery
+	if !r.hasPvDiscoveryBlocker(plan) {
+		err = r.updatePvs(plan)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	if plan.Status.HasCriticalCondition() {
 		plan.Status.SetReady(false, ReadyMessage)
 		err = r.Update(context.TODO(), plan)
@@ -148,12 +157,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		// done
 		return reconcile.Result{}, nil
-	}
-
-	// PV discovery
-	err = r.updatePvs(plan)
-	if err != nil {
-		return reconcile.Result{}, err
 	}
 
 	// Storage
