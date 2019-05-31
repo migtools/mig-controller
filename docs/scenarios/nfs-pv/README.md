@@ -300,9 +300,10 @@ Source:
 
 ```
 
-To verify that the MySQL database is running, we can check the Pod logs.
+To verify that the MySQL database is running, we can check the Pod logs. If you forgot to set `quiescePods: true` and selected a PV action `move`, you should expect to see error messages regarding failure to acquire the database lock until you manually scale down MySQL on the *source cluster*. This is because each MySQL instance would be connected to the same NFS mount.
 
 ```
+# Assuming we set 'quiescePods: true' using PV action 'move', we shouldn't see any errors acquiring the lock
 $ oc logs mysql-1-vs9b6 | tail 
 
 2019-05-30T17:52:39.696393Z 0 [Warning] 'user' entry 'mysql.sys@localhost' ignored in --skip-name-resolve mode.
@@ -317,7 +318,7 @@ $ oc logs mysql-1-vs9b6 | tail
 Version: '5.7.24'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  MySQL Community Server (GPL)
 ```
 
-Finally, checking the mounted NFS volume on the MySQL Pod, it's clear that we have the same data from the *source cluster* attached.
+Finally, checking the mounted NFS volume on the MySQL Pod. Running `df -h` on the destination MySQL pod, we can expect to see roughly the same amount of `Use%` on each side, since the same NFS export from the *source cluster* is mounted to the new Pod.
 
 ```
 $ oc exec -n mysql-persistent mysql-1-k985t -- /bin/bash -c df -h
