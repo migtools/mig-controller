@@ -282,6 +282,10 @@ func (t *Task) annotateStorageResources() error {
 			resource.Annotations = make(map[string]string)
 		}
 		resource.Annotations[pvAnnotationKey] = pv.Action
+		if resource.Labels == nil {
+			resource.Labels = make(map[string]string)
+		}
+		resource.Labels[pvBackupLabelKey] = pvBackupLabelValue
 		client.Update(context.TODO(), &resource)
 	}
 
@@ -314,6 +318,10 @@ func (t *Task) annotateStorageResources() error {
 				pvName := pvc.Spec.VolumeName
 				action := findPVCAction(pvs, pvName)
 				pvc.Annotations[pvAnnotationKey] = action
+				if pvc.Labels == nil {
+					pvc.Labels = make(map[string]string)
+				}
+				pvc.Labels[pvBackupLabelKey] = pvBackupLabelValue
 				err = client.Update(context.TODO(), &pvc)
 				if action == migapi.PvCopyAction {
 					resticVolumes = append(resticVolumes, volume.Name)
@@ -323,8 +331,11 @@ func (t *Task) annotateStorageResources() error {
 				if pod.Annotations == nil {
 					pod.Annotations = make(map[string]string)
 				}
-				// RESTIC ANNOTATION HERE
-				// backup.velero.io/backup-volumes=resticVolumes
+				pod.Annotations[resticPvBackupAnnotationKey] = strings.Join(resticVolumes[:], ",")
+				if pod.Labels == nil {
+					pod.Labels = make(map[string]string)
+				}
+				pod.Labels[pvBackupLabelKey] = pvBackupLabelValue
 			}
 		}
 	}
