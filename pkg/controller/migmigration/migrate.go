@@ -131,9 +131,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 // 2. We fix the plugin to operate migration specific behavior on the
 // migrateAnnnotationKey
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
-	annotations := map[string]string{
-		pvAnnotationKey: "copy",
-	}
+	annotations := make(map[string]string)
 	if migration.Spec.Stage {
 		annotations[stageAnnotationKey] = stageAnnotationValue
 	} else {
