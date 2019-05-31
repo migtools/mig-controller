@@ -133,7 +133,7 @@ spec:
 [... snipped, see config/samples/mig-plan.yaml for other required fields ...]
 ```
 
-We also need to create a MigMigration with `quiescePods: true` since only one MySQL Pod can hold the lock at once, and we this scenario covers the 'move' PV action that re-mounts the *source cluster* NFS PVs on the *destination cluster*
+We also need to create a MigMigration with `quiescePods: true` since only one MySQL Pod can hold the lock at once, and this scenario covers the 'move' PV action that re-mounts the *source cluster* NFS PVs on the *destination cluster*
 
 Modify the contents of [config/samples/mig-migration.yaml](https://github.com/fusor/mig-controller/blob/master/config/samples/mig-migration.yaml), changing `quiescePods` to 'true'.
 
@@ -272,7 +272,7 @@ Namespace:    mig
 
 ### 7. Inspect migration results on destination cluster
 
-Logging into the destination cluster, we should now see a running mysql pod in the 'mysql-persistent' namespace, matching what existed on the source cluster.
+Logging into the destination cluster, we should now see a running mysql pod in the `mysql-persistent` namespace, matching what existed on the source cluster.
 
 ```
 $ oc get pods -n mysql-persistent
