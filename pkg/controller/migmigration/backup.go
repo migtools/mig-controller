@@ -336,10 +336,66 @@ func (t *Task) annotateStorageResources() error {
 					pod.Labels = make(map[string]string)
 				}
 				pod.Labels[pvBackupLabelKey] = pvBackupLabelValue
+				err = client.Update(context.TODO(), &pod)
 			}
 		}
 	}
 
+	return nil
+}
+
+// Removes temporary annotations and labels used before backing up storage resources
+func (t *Task) removeStorageResourceAnnotations() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	labelSelector := map[string]string{
+		pvBackupLabelKey: pvBackupLabelValue,
+	}
+	pvcList := corev1.PersistentVolumeClaimList{}
+	options := k8sclient.MatchingLabels(labelSelector)
+	err = client.List(context.TODO(), options, &pvcList)
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcList.Items {
+		if pvc.Annotations != nil {
+			delete(pvc.Annotations, pvAnnotationKey)
+		}
+		if pvc.Labels != nil {
+			delete(pvc.Labels, pvBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pvc)
+	}
+	pvList := corev1.PersistentVolumeList{}
+	err = client.List(context.TODO(), options, &pvList)
+	if err != nil {
+		return err
+	}
+	for _, pv := range pvList.Items {
+		if pv.Annotations != nil {
+			delete(pv.Annotations, pvAnnotationKey)
+		}
+		if pv.Labels != nil {
+			delete(pv.Labels, pvBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pv)
+	}
+	podList := corev1.PodList{}
+	err = client.List(context.TODO(), options, &podList)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		if pod.Annotations != nil {
+			delete(pod.Annotations, resticPvBackupAnnotationKey)
+		}
+		if pod.Labels != nil {
+			delete(pod.Labels, pvBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pod)
+	}
 	return nil
 }
 

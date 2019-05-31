@@ -122,8 +122,11 @@ func (t *Task) Run() error {
 		return nil
 	}
 
+	t.Phase = BackupCompleted
+
 	// Delete storage annotations
 	// TODO
+	t.removeStorageResourceAnnotations()
 
 	// Wait on Backup replication.
 	t.Phase = WaitOnBackupReplication
@@ -161,6 +164,7 @@ func (t *Task) Run() error {
 		t.Phase = RestoreStarted
 		return nil
 	}
+	t.Phase = RestoreCompleted
 
 	// Delete stage Pods
 	if t.stage() {
