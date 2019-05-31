@@ -6,8 +6,11 @@ metadata:
   name: migmigration-sample
   namespace: mig
 spec:
+  # [!] Set 'stage: true' to run a 'Stage Migration' and skip quiescing of Pods on the source cluster.
   stage: false
+  # [!] Set 'quiescePods: true' to scale down Pods on the source cluster after the 'Backup' stage of a migration has finished
+  quiescePods: false
+
   migPlanRef:
     name: migplan-sample
     namespace: mig
-

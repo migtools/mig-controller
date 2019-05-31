@@ -34,6 +34,7 @@ spec:
       containers:
         - name: velero
           image: quay.io/ocpmigrate/velero:latest
+          imagePullPolicy: Always
           ports:
             - name: metrics
               containerPort: 8085
