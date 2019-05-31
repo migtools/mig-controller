@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
@@ -14,11 +15,13 @@ type Claims []types.NamespacedName
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
-	planResources, err := plan.GetRefResources(r)
+	// Get srcMigCluster
+	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
 		return err
 	}
-	client, err := planResources.SrcMigCluster.GetClient(r)
+
+	client, err := srcMigCluster.GetClient(r)
 	if err != nil {
 		return err
 	}

@@ -3,11 +3,12 @@ package migplan
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
-	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -445,4 +446,14 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 	}
 
 	return nil
+}
+
+// The collection contains a PV discovery blocker condition.
+func (r ReconcileMigPlan) hasPvDiscoveryBlocker(plan *migapi.MigPlan) bool {
+	return plan.Status.HasCondition(
+		InvalidSourceClusterRef,
+		SourceClusterNotReady,
+		NsListEmpty,
+		NsNotFoundOnSourceCluster,
+	)
 }
