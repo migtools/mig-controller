@@ -201,7 +201,7 @@ $ oc edit migplan migplan-sample -n mig
   persistentVolumes:
   - name: pv2
     action: move
-[... save the resource after making this change ...]
+[... save changes to the MigPlan after making this change ...]
 
 # After selecting an action for each PV, the 'unsupported action' error should
 # be replaced by 'The migration plan is ready'.
@@ -220,5 +220,109 @@ Type:                  Ready
 $ oc apply -f mig-migration.yaml
 ```
 
-After creating the MigMigration resource, you can monitor its progress with `oc describe`.
+After creating the MigMigration resource, you can monitor its progress with `oc describe`. If the migration is running, you'll see a "Task Phase" reflecting current progress.
 
+---
+
+### 6. Monitor migration progress
+
+```
+$ oc describe migmigration migmigration-sample -n mig
+Name:         migmigration-sample
+Namespace:    mig
+Status:
+  Migration Started:       true
+  Start Timestamp:         2019-05-31T14:22:08Z
+  Task Phase:              BackupStarted
+```
+
+The first phase that takes some time to complete is `BackupStarted`, as shown above. 
+
+Recall that we set `quiescePods: true` on the MigMigration resource in an earlier step. Due to this setting, the migrated Pods on the source cluster will be scaled down when the "Task Phase" progresses beyond BackupStarted.
+
+```
+# Since we are at 'WaitOnBackupReplication', the pods have already started scaling down.
+$ oc describe migmigration migmigration-sample -n mig
+Name:         migmigration-sample
+Namespace:    mig
+  Migration Started:       true
+  Start Timestamp:         2019-05-31T14:22:08Z
+  Task Phase:              WaitOnBackupReplication
+
+# Note the mysql-1-k985t Pod is scaling down on the source cluster.
+$ oc get pods -n mysql-persistent 
+NAME             READY     STATUS        RESTARTS   AGE
+mysql-1-k985t    1/1       Terminating   1          2h
+mysql-1-deploy   0/1       Completed     0          2h
+```
+
+Assuming no errors are encountered, describing the MigMigration will eventually show "Migration Completed: true".
+
+```
+$ oc describe migmigration migmigration-sample -n mig
+Name:         migmigration-sample
+Namespace:    mig
+[...]
+  Migration Completed:     true
+  Start Timestamp:         2019-05-31T14:22:08Z
+  Task Phase:              Completed
+```
+
+---
+
+### 7. Inspect migration results on destination cluster
+
+Logging into the destination cluster, we should now see a running mysql pod in the 'mysql-persistent' namespace, matching what existed on the source cluster.
+
+```
+$ oc get pods -n mysql-persistent
+NAME            READY     STATUS    RESTARTS   AGE
+mysql-1-vs9b6   1/1       Running   1          3m
+```
+
+We can inspect the PersistentVolumes on the destination cluster and notice `pv2` has been created which matches the contents of `pv2` on the source cluster.
+
+```
+$ oc get PersistentVolumes
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS    CLAIM                    STORAGECLASS   REASON    AGE
+pv2       100Gi      RWO,ROX,RWX    Retain           Bound     mysql-persistent/mysql                            3m
+
+$ oc describe pv pv2
+Name:            pv2
+[...]
+Status:          Bound
+Claim:           mysql-persistent/mysql
+Source:
+    Type:      NFS (an NFS mount that lasts the lifetime of a pod)
+    Server:    123.234.321.210
+    Path:      /var/lib/nfs/exports/pv2
+[...]
+
+```
+
+To verify that the MySQL database is running, we can check the Pod logs.
+
+```
+$ oc logs mysql-1-vs9b6 | tail 
+
+2019-05-30T17:52:39.696393Z 0 [Warning] 'user' entry 'mysql.sys@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.696423Z 0 [Warning] 'db' entry 'performance_schema mysql.session@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.696430Z 0 [Warning] 'db' entry 'sys mysql.sys@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.696443Z 0 [Warning] 'proxies_priv' entry '@ root@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.735245Z 0 [Note] InnoDB: Buffer pool(s) load completed at 190530 17:52:39
+2019-05-30T17:52:39.739264Z 0 [Warning] 'tables_priv' entry 'user mysql.session@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.739282Z 0 [Warning] 'tables_priv' entry 'sys_config mysql.sys@localhost' ignored in --skip-name-resolve mode.
+2019-05-30T17:52:39.766919Z 0 [Note] Event Scheduler: Loaded 0 events
+2019-05-30T17:52:39.767119Z 0 [Note] /opt/rh/rh-mysql57/root/usr/libexec/mysqld: ready for connections.
+Version: '5.7.24'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  MySQL Community Server (GPL)
+```
+
+Finally, checking the mounted NFS volume on the MySQL Pod, it's clear that we have the same data from the source cluster attached.
+
+```
+$ oc exec -n mysql-persistent mysql-1-k985t -- /bin/bash -c df -h
+bash-4.2$ df -h
+Filesystem                                1K-blocks  Used      Available  Use%  Mounted on
+123.234.321.210:/var/lib/nfs/exports/pv2  10473472   2881536   7591936    28%   /var/lib/mysql/data
+[...]
+```
