@@ -61,7 +61,7 @@ spec:
 
 ### 2. Deploying a _stateful_ sample app (MySQL with NFS PVs)
 
-After you've created a suitable PV on your *source cluster*, create the provided MySQL template provided with this scenario.
+After you've created a suitable PV on your *source cluster*, create the provided [MySQL template](mysql-persistent-template.yaml) provided with this scenario.
 
 ```bash
 $ oc create -f mysql-persistent-template.yaml 
