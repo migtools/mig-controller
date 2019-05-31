@@ -6,8 +6,8 @@ This scenario walks through Migration of a stateful OpenShift app with Persisten
 
 | Action | Supported | Description |
 |-----------|------------|-------------|
-| Copy | Yes | Create new PV on destination cluster. Restic will copy data from source PV to destination PV |
-| Move | Yes  | Detach PV from source cluster, then re-attach to destination cluster without copying data |
+| Copy | Yes | Create new PV on *destination cluster*. Restic will copy data from source PV to destination PV |
+| Move | Yes  | Detach PV from *source cluster*, then re-attach to *destination cluster* without copying data |
 
 ---
 
@@ -19,7 +19,7 @@ Referring to the getting started [README.md](https://github.com/fusor/mig-contro
 - `Cluster` resource for any _remote_ clusters (e.g. clusters the controller will connect to remotely, there will be at least one of these)
 - `MigStorage` providing information on how to store resource YAML in transit between clusters 
 
-Before proceeding, be sure that you have at least one available NFS PV on your source cluster that our sample MySQL app will be able to bind to. You can set up the NFS server however you like. We used Ansible Playbooks from the [mig-ci](https://github.com/fusor/mig-ci) repo to provision the NFS PVs used in this scenario, but other NFS server + PV configurations compatible with OpenShift should work equally well.
+Before proceeding, be sure that you have at least one available NFS PV on your *source cluster* that our sample MySQL app will be able to bind to. You can set up the NFS server however you like. We used Ansible Playbooks from the [mig-ci](https://github.com/fusor/mig-ci) repo to provision the NFS PVs used in this scenario, but other NFS server + PV configurations compatible with OpenShift should work equally well.
 
 - [nfs_server_deploy.yml](https://github.com/fusor/mig-ci/blob/master/nfs_server_deploy.yml)
 - [nfs_provision_pvs.yml](https://github.com/fusor/mig-ci/blob/master/nfs_provision_pvs.yml)
@@ -50,7 +50,7 @@ kind: PersistentVolume
 spec:
   # [!] NFS path and server URL in PV defined on host cluster will be 'moved' over
   #     to destination cluster as-is. The PV disk data will not be manipulated, just
-  #     re-mounted to destination cluster pods after quiescing (stopping) source cluster pods.
+  #     re-mounted to destination cluster Pods after quiescing (stopping) source cluster Pods.
   nfs:
     path: /var/lib/nfs/exports/pv2  
     server: 123.234.321.210        
@@ -238,10 +238,10 @@ Status:
 
 The first phase that takes some time to complete is `BackupStarted`, as shown above. 
 
-Recall that we set `quiescePods: true` on the MigMigration resource in an earlier step. Due to this setting, the migrated Pods on the source cluster will be scaled down when the "Task Phase" progresses beyond BackupStarted.
+Recall that we set `quiescePods: true` on the MigMigration resource in an earlier step. Due to this setting, the migrated Pods on the *source cluster* will be scaled down when the `Task Phase` progresses beyond BackupStarted.
 
 ```
-# Since we are at 'WaitOnBackupReplication', the pods have already started scaling down.
+# Since we are at 'WaitOnBackupReplication', the Pods have already started scaling down.
 $ oc describe migmigration migmigration-sample -n mig
 Name:         migmigration-sample
 Namespace:    mig
@@ -256,7 +256,7 @@ mysql-1-k985t    1/1       Terminating   1          2h
 mysql-1-deploy   0/1       Completed     0          2h
 ```
 
-Assuming no errors are encountered, describing the MigMigration will eventually show "Migration Completed: true".
+Assuming no errors are encountered, describing the MigMigration will eventually show `Migration Completed: true`.
 
 ```
 $ oc describe migmigration migmigration-sample -n mig
@@ -270,9 +270,9 @@ Namespace:    mig
 
 ---
 
-### 7. Inspect migration results on destination cluster
+### 7. Inspect migration results on *destination cluster*
 
-Logging into the destination cluster, we should now see a running mysql pod in the `mysql-persistent` namespace, matching what existed on the source cluster.
+Logging into the *destination cluster*, we should now see a running mysql pod in the `mysql-persistent` namespace, matching what existed on the *source cluster*.
 
 ```
 $ oc get pods -n mysql-persistent
@@ -280,7 +280,7 @@ NAME            READY     STATUS    RESTARTS   AGE
 mysql-1-vs9b6   1/1       Running   1          3m
 ```
 
-We can inspect the PersistentVolumes on the destination cluster and notice `pv2` has been created which matches the contents of `pv2` on the source cluster.
+We can inspect the PersistentVolumes on the *destination cluster* and notice `pv2` has been created which matches the contents of `pv2` on the *source cluster*.
 
 ```
 $ oc get PersistentVolumes
@@ -317,7 +317,7 @@ $ oc logs mysql-1-vs9b6 | tail
 Version: '5.7.24'  socket: '/var/lib/mysql/mysql.sock'  port: 3306  MySQL Community Server (GPL)
 ```
 
-Finally, checking the mounted NFS volume on the MySQL Pod, it's clear that we have the same data from the source cluster attached.
+Finally, checking the mounted NFS volume on the MySQL Pod, it's clear that we have the same data from the *source cluster* attached.
 
 ```
 $ oc exec -n mysql-persistent mysql-1-k985t -- /bin/bash -c df -h
