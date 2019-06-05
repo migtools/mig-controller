@@ -29,7 +29,10 @@ func ListPlans(client k8sclient.Client, ns string) ([]MigPlan, error) {
 // Returns and empty list when none found.
 func ListClusters(client k8sclient.Client, ns string) ([]MigCluster, error) {
 	list := MigClusterList{}
-	options := k8sclient.InNamespace(ns)
+	var options *k8sclient.ListOptions
+	if ns != "" {
+		options = k8sclient.InNamespace(ns)
+	}
 	err := client.List(context.TODO(), options, &list)
 	if err != nil {
 		return nil, err

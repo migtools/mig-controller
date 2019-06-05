@@ -127,6 +127,18 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
+	// If plan is closed, ensure resource cleanup
+	closed, err := r.handleClosed(plan)
+	if err != nil {
+		if errors.IsConflict(err) {
+			return reconcile.Result{Requeue: true}, nil
+		}
+		return reconcile.Result{}, err
+	}
+	if closed {
+		return reconcile.Result{}, nil
+	}
+
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
