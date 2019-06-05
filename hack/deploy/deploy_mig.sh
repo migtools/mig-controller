@@ -15,9 +15,3 @@ oc apply -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master
 
 # mig-controller deployment
 oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/config/releases/latest/manifest.yaml
-
-echo
-echo "==================="
-echo "Deploying mig-ui..."
-echo "==================="
-oc apply -f https://raw.githubusercontent.com/fusor/mig-ui/master/deploy/deploy.yaml

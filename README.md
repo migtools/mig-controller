@@ -38,17 +38,14 @@ Deploying Velero...
 __3. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
 
 ```
-# Download bash script to deploy latest mig-controller and mig-ui images
+# Download bash script to deploy the latest mig-controller image as a StatefulSet
 $ wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_mig.sh
 
-# Login to cluster of your choice where controller + UI will run
+# Login to cluster of your choice where mig-controller will run
 $ oc login https://my-cluster:8443
 $ bash deploy_mig.sh
 
 Deploying mig-controller...
-[...]
-
-Deploying mig-ui...
 [...]
 
 ```
