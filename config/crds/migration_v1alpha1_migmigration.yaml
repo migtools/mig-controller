@@ -30,6 +30,8 @@ spec:
           properties:
             migPlanRef:
               type: object
+            quiescePods:
+              type: boolean
             stage:
               type: boolean
           required:
@@ -40,14 +42,18 @@ spec:
             completionTimestamp:
               format: date-time
               type: string
+            errors:
+              items:
+                type: string
+              type: array
             migrationCompleted:
               type: boolean
             migrationStarted:
               type: boolean
+            phase:
+              type: string
             startTimestamp:
               format: date-time
-              type: string
-            taskPhase:
               type: string
           type: object
   version: v1alpha1

@@ -76,7 +76,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 		Client:          r,
 		Owner:           migration,
 		PlanResources:   planResources,
-		Phase:           migration.Status.TaskPhase,
+		Phase:           migration.Status.Phase,
 		Annotations:     r.getAnnotations(migration),
 		BackupResources: r.getBackupResources(migration),
 	}
@@ -84,20 +84,27 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 	if err != nil {
 		return false, err
 	}
-	migration.Status.TaskPhase = task.Phase
+	migration.Status.Phase = task.Phase
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		return false, err
 	}
 	switch task.Phase {
+	case WaitOnResticRestart:
+		return true, nil
+	case BackupFailed, RestoreFailed:
+		migration.MarkAsCompleted()
+		migration.AddErrors(task.Errors)
+		err = r.Update(context.TODO(), migration)
+		if err != nil {
+			return false, err
+		}
 	case Completed:
 		migration.MarkAsCompleted()
 		err = r.Update(context.TODO(), migration)
 		if err != nil {
 			return false, err
 		}
-	case WaitOnResticRestart:
-		return true, nil
 	}
 
 	return false, nil
