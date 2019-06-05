@@ -161,11 +161,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -264,6 +264,7 @@ func (t *Task) annotateStorageResources() error {
 	if err != nil {
 		return err
 	}
+	pvBackupLabelValue := string(t.PlanResources.MigPlan.UID)
 	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
 	for _, pv := range pvs.List {
@@ -350,6 +351,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	if err != nil {
 		return err
 	}
+	pvBackupLabelValue := string(t.PlanResources.MigPlan.UID)
 	labelSelector := map[string]string{
 		pvBackupLabelKey: pvBackupLabelValue,
 	}
