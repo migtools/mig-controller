@@ -73,7 +73,6 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	} else {
 		plan.Status.DeleteCondition(RegistriesEnsured)
 	}
-	plan.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return err
