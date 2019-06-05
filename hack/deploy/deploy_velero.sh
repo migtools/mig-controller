@@ -18,6 +18,12 @@ echo "===================================================="
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:mig
 
 echo
+echo "===================================================="
+echo "Adding privileged scc to velero service account"
+echo "===================================================="
+oc adm policy add-scc-to-user privileged system:serviceaccount:velero:velero
+
+echo
 echo "=========="
 echo "Next Steps"
 echo "=========="

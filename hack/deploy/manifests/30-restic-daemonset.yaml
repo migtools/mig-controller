@@ -41,6 +41,8 @@ spec:
       containers:
         - name: velero
           image: quay.io/ocpmigrate/velero:fusor-dev
+          securityContext:
+            privileged: true
           command:
             - /velero
           args:
