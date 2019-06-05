@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -161,11 +162,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces: namespaces,
-		ExcludedNamespaces: []string{},
-		IncludedResources:  t.BackupResources,
-		ExcludedResources:  []string{},
+		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces:      namespaces,
+		ExcludedNamespaces:      []string{},
+		IncludedResources:       t.BackupResources,
+		ExcludedResources:       []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -264,7 +265,7 @@ func (t *Task) annotateStorageResources() error {
 	if err != nil {
 		return err
 	}
-	pvBackupLabelValue := string(t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
 	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
 	for _, pv := range pvs.List {
@@ -286,7 +287,7 @@ func (t *Task) annotateStorageResources() error {
 		if resource.Labels == nil {
 			resource.Labels = make(map[string]string)
 		}
-		resource.Labels[pvBackupLabelKey] = pvBackupLabelValue
+		resource.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
 		client.Update(context.TODO(), &resource)
 	}
 
@@ -322,7 +323,7 @@ func (t *Task) annotateStorageResources() error {
 				if pvc.Labels == nil {
 					pvc.Labels = make(map[string]string)
 				}
-				pvc.Labels[pvBackupLabelKey] = pvBackupLabelValue
+				pvc.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
 				err = client.Update(context.TODO(), &pvc)
 				if action == migapi.PvCopyAction {
 					resticVolumes = append(resticVolumes, volume.Name)
@@ -336,7 +337,7 @@ func (t *Task) annotateStorageResources() error {
 				if pod.Labels == nil {
 					pod.Labels = make(map[string]string)
 				}
-				pod.Labels[pvBackupLabelKey] = pvBackupLabelValue
+				pod.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
 				err = client.Update(context.TODO(), &pod)
 			}
 		}
@@ -351,9 +352,9 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	if err != nil {
 		return err
 	}
-	pvBackupLabelValue := string(t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
 	labelSelector := map[string]string{
-		pvBackupLabelKey: pvBackupLabelValue,
+		uniqueBackupLabelKey: pvBackupLabelValue,
 	}
 	pvcList := corev1.PersistentVolumeClaimList{}
 	options := k8sclient.MatchingLabels(labelSelector)
@@ -366,7 +367,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 			delete(pvc.Annotations, pvAnnotationKey)
 		}
 		if pvc.Labels != nil {
-			delete(pvc.Labels, pvBackupLabelKey)
+			delete(pvc.Labels, uniqueBackupLabelKey)
 		}
 		err = client.Update(context.TODO(), &pvc)
 	}
@@ -380,7 +381,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 			delete(pv.Annotations, pvAnnotationKey)
 		}
 		if pv.Labels != nil {
-			delete(pv.Labels, pvBackupLabelKey)
+			delete(pv.Labels, uniqueBackupLabelKey)
 		}
 		err = client.Update(context.TODO(), &pv)
 	}
@@ -394,7 +395,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 			delete(pod.Annotations, resticPvBackupAnnotationKey)
 		}
 		if pod.Labels != nil {
-			delete(pod.Labels, pvBackupLabelKey)
+			delete(pod.Labels, uniqueBackupLabelKey)
 		}
 		err = client.Update(context.TODO(), &pod)
 	}

@@ -34,7 +34,8 @@ const (
 
 // Labels
 const (
-	pvBackupLabelKey = "openshift.io/pv-backup"
+	pvBackupLabelKey   = "openshift.io/pv-backup"
+	pvBackupLabelValue = "true"
 )
 
 // Backup resources.
