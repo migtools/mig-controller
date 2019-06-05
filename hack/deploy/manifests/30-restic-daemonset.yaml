@@ -40,7 +40,7 @@ spec:
           emptyDir: {}
       containers:
         - name: velero
-          image: quay.io/ocpmigrate/velero:latest
+          image: quay.io/ocpmigrate/velero:fusor-dev
           command:
             - /velero
           args:
