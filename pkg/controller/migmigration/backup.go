@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -160,11 +162,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -254,4 +256,157 @@ func (t *Task) bounceResticPod() error {
 	}
 
 	return nil
+}
+
+// Annotate all resources with PV action data
+func (t *Task) annotateStorageResources() error {
+	// Get client of source cluster
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
+	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
+	for _, pv := range pvs.List {
+		// Update PVs with their action
+		resource := corev1.PersistentVolume{}
+		err := client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name: pv.Name,
+			},
+			&resource)
+		if err != nil {
+			return err
+		}
+		if resource.Annotations == nil {
+			resource.Annotations = make(map[string]string)
+		}
+		resource.Annotations[pvAnnotationKey] = pv.Action
+		if resource.Labels == nil {
+			resource.Labels = make(map[string]string)
+		}
+		resource.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
+		client.Update(context.TODO(), &resource)
+	}
+
+	for _, ns := range namespaces {
+		// Find all pods in our target namespaces
+		list := corev1.PodList{}
+		options := k8sclient.InNamespace(ns)
+		err = client.List(context.TODO(), options, &list)
+		if err != nil {
+			return err
+		}
+		// Loop through all pods to find all volume claims
+		for _, pod := range list.Items {
+			resticVolumes := []string{}
+			for _, volume := range pod.Spec.Volumes {
+				claim := volume.VolumeSource.PersistentVolumeClaim
+				if claim == nil {
+					continue
+				}
+				pvc := corev1.PersistentVolumeClaim{}
+				ref := types.NamespacedName{
+					Namespace: ns,
+					Name:      claim.ClaimName,
+				}
+				// Get PVC and update annotation
+				err = client.Get(context.TODO(), ref, &pvc)
+				if pvc.Annotations == nil {
+					pvc.Annotations = make(map[string]string)
+				}
+				pvName := pvc.Spec.VolumeName
+				action := findPVAction(pvs, pvName)
+				pvc.Annotations[pvAnnotationKey] = action
+				if pvc.Labels == nil {
+					pvc.Labels = make(map[string]string)
+				}
+				pvc.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
+				err = client.Update(context.TODO(), &pvc)
+				if action == migapi.PvCopyAction {
+					resticVolumes = append(resticVolumes, volume.Name)
+				}
+			}
+			if len(resticVolumes) > 0 {
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				pod.Annotations[resticPvBackupAnnotationKey] = strings.Join(resticVolumes[:], ",")
+				if pod.Labels == nil {
+					pod.Labels = make(map[string]string)
+				}
+				pod.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
+				err = client.Update(context.TODO(), &pod)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Removes temporary annotations and labels used before backing up storage resources
+func (t *Task) removeStorageResourceAnnotations() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := map[string]string{
+		uniqueBackupLabelKey: pvBackupLabelValue,
+	}
+	pvcList := corev1.PersistentVolumeClaimList{}
+	options := k8sclient.MatchingLabels(labelSelector)
+	err = client.List(context.TODO(), options, &pvcList)
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcList.Items {
+		if pvc.Annotations != nil {
+			delete(pvc.Annotations, pvAnnotationKey)
+		}
+		if pvc.Labels != nil {
+			delete(pvc.Labels, uniqueBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pvc)
+	}
+	pvList := corev1.PersistentVolumeList{}
+	err = client.List(context.TODO(), options, &pvList)
+	if err != nil {
+		return err
+	}
+	for _, pv := range pvList.Items {
+		if pv.Annotations != nil {
+			delete(pv.Annotations, pvAnnotationKey)
+		}
+		if pv.Labels != nil {
+			delete(pv.Labels, uniqueBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pv)
+	}
+	podList := corev1.PodList{}
+	err = client.List(context.TODO(), options, &podList)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		if pod.Annotations != nil {
+			delete(pod.Annotations, resticPvBackupAnnotationKey)
+		}
+		if pod.Labels != nil {
+			delete(pod.Labels, uniqueBackupLabelKey)
+		}
+		err = client.Update(context.TODO(), &pod)
+	}
+	return nil
+}
+
+func findPVAction(pvList migapi.PersistentVolumes, pvName string) string {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Action
+		}
+	}
+	return ""
 }

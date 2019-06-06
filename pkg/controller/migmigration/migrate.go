@@ -18,16 +18,24 @@ package migmigration
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 // Annotations
 const (
-	pvAnnotationKey        = "openshift.io/migrate-type"
-	migrateAnnotationValue = "final"
-	migrateAnnotationKey   = "openshift.io/migrate-copy-phase"
-	stageAnnotationValue   = "stage"
-	stageAnnotationKey     = "openshift.io/migrate-copy-phase"
+	pvAnnotationKey             = "openshift.io/migrate-type"
+	migrateAnnotationValue      = "final"
+	migrateAnnotationKey        = "openshift.io/migrate-copy-phase"
+	stageAnnotationValue        = "stage"
+	stageAnnotationKey          = "openshift.io/migrate-copy-phase"
+	resticPvBackupAnnotationKey = "backup.velero.io/backup-volumes"
+)
+
+// Labels
+const (
+	pvBackupLabelKey   = "openshift.io/pv-backup"
+	pvBackupLabelValue = "true"
 )
 
 // Backup resources.
@@ -123,9 +131,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 // 2. We fix the plugin to operate migration specific behavior on the
 // migrateAnnnotationKey
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
-	annotations := map[string]string{
-		pvAnnotationKey: "custom",
-	}
+	annotations := make(map[string]string)
 	if migration.Spec.Stage {
 		annotations[stageAnnotationKey] = stageAnnotationValue
 	} else {

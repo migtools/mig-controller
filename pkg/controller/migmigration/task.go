@@ -86,6 +86,12 @@ func (t *Task) Run() error {
 		return err
 	}
 
+	// Annotate persistent storage resources with actions
+	err = t.annotateStorageResources()
+	if err != nil {
+		return err
+	}
+
 	// Return unless restic restart has finished
 	if t.Phase == Started || t.Phase == WaitOnResticRestart {
 		return nil
@@ -114,6 +120,14 @@ func (t *Task) Run() error {
 	default:
 		t.Phase = BackupStarted
 		return nil
+	}
+
+	t.Phase = BackupCompleted
+
+	// Delete storage annotations
+	err = t.removeStorageResourceAnnotations()
+	if err != nil {
+		return err
 	}
 
 	// Wait on Backup replication.
@@ -152,6 +166,7 @@ func (t *Task) Run() error {
 		t.Phase = RestoreStarted
 		return nil
 	}
+	t.Phase = RestoreCompleted
 
 	// Delete stage Pods
 	if t.stage() {
