@@ -76,6 +76,7 @@ To illustrate mig-controller handling migration of different OpenShift resource 
 - DeploymentConfig (this time without a build trigger)
 - Deployment
 - Job
+- DaemonSet
 - StatefulSet
 - Standalone Pod
 
