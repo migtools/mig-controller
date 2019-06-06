@@ -2,9 +2,9 @@ package migplan
 
 import (
 	"context"
-	"errors"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,25 +35,25 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 		}
 
 		// Migration Registry Secret
-		err := r.ensureRegistrySecret(client, plan, storage)
+		secret, err := r.ensureRegistrySecret(client, plan, storage)
 		if err != nil {
 			return err
 		}
 
 		// Migration Registry ImageStream
-		err = r.ensureRegistryImageStream(client, plan)
+		err = r.ensureRegistryImageStream(client, plan, secret)
 		if err != nil {
 			return err
 		}
 
 		// Migration Registry DeploymentConfig
-		err = r.ensureRegistryDC(client, plan, storage)
+		err = r.ensureRegistryDC(client, plan, storage, secret)
 		if err != nil {
 			return err
 		}
 
 		// Migration Registry Service
-		err = r.ensureRegistryService(client, plan)
+		err = r.ensureRegistryService(client, plan, secret)
 		if err != nil {
 			return err
 		}
@@ -82,44 +82,37 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 }
 
 // Ensure the credentials secret for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage) error {
+func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage) (*kapi.Secret, error) {
 	newSecret, err := plan.BuildRegistrySecret(r, storage)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	foundSecret, err := plan.GetRegistrySecret(client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if foundSecret == nil {
 		err = client.Create(context.TODO(), newSecret)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return nil
+		return newSecret, nil
 	}
 	if plan.EqualsRegistrySecret(newSecret, foundSecret) {
-		return nil
+		return foundSecret, nil
 	}
 	plan.UpdateRegistrySecret(r, storage, foundSecret)
 	err = client.Update(context.TODO(), foundSecret)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return foundSecret, nil
 }
 
 // Ensure the imagestream for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan) error {
-	registrySecret, err := plan.GetRegistrySecret(client)
-	if err != nil {
-		return err
-	}
-	if registrySecret == nil {
-		return errors.New("migration registry credentials not found")
-	}
-	newImageStream, err := plan.BuildRegistryImageStream(registrySecret.GetName())
+func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
+	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName())
 	if err != nil {
 		return err
 	}
@@ -147,15 +140,8 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 }
 
 // Ensure the deploymentconfig for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage) error {
-	registrySecret, err := plan.GetRegistrySecret(client)
-	if err != nil {
-		return err
-	}
-	if registrySecret == nil {
-		return errors.New("migration registry credentials not found")
-	}
-	name := registrySecret.GetName()
+func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage, secret *kapi.Secret) error {
+	name := secret.GetName()
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
 	newDC, err := plan.BuildRegistryDC(storage, name, dirName)
 	if err != nil {
@@ -185,15 +171,8 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 }
 
 // Ensure the service for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *migapi.MigPlan) error {
-	registrySecret, err := plan.GetRegistrySecret(client)
-	if err != nil {
-		return err
-	}
-	if registrySecret == nil {
-		return errors.New("migration registry credentials not found")
-	}
-	name := registrySecret.GetName()
+func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
+	name := secret.GetName()
 	newService, err := plan.BuildRegistryService(name)
 	if err != nil {
 		return err
