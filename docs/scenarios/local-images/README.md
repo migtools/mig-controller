@@ -84,37 +84,37 @@ First, set up an environment variable with the local registry hostname.
 $ export REGISTRY_HOST=$(oc registry info)
 ```
 
-**DeploymentConfig**
+_DeploymentConfig_
 ```bash
 # Create a DeploymentConfig using the local registry S2I image
 $ oc run test-dc --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest
 ```
 
-**Deployment**
+_Deployment_
 ```bash
 # Create a Deployment using the local registry S2I image
 $ ./create_deployment.sh
 ```
 
-**Job**
+_Job_
 ```bash
 # Create a Job using the local registry S2I image
 $ oc run test-job --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='OnFailure'
 ```
 
-**DaemonSet**
+_DaemonSet_
 ```bash
 # Create a DaemonSet using the local registry S2I image
 $ ./create_daemonset.sh
 ```
 
-**StatefulSet**
+_StatefulSet_
 ```bash
 # Create a StatefulSet using the local registry S2I image
 $ ./create_statefulset.sh
 ```
 
-**Standalone Pod**
+_Standalone Pod_
 ```bash
 # Create a Pod using the local registry S2I image
 oc run test-standalone --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='Never'
