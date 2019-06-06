@@ -66,7 +66,6 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	} else {
 		plan.Status.DeleteCondition(StorageEnsured)
 	}
-	plan.Status.EndStagingConditions()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return err
