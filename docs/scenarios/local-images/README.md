@@ -1,6 +1,14 @@
-## Migrating OpenShift apps running against local images with mig-controller
+## Migrating OpenShift apps running local images with mig-controller
 
-This scenario walks through Migration of several types of OpenShift applications, all of which are running against local images. This includes sample DeploymentConfigs, as well as a Deployment, a Job, a DaemonSet, a StatefulSet, and a standalone Pod.
+This scenario walks through Migration of apps using images stored in local OpenShift image registries. 
+
+We'll cover migration of:
+- DeploymentConfigs
+- Deployments
+- Jobs
+- DaemonSets
+- StatefulSets
+- Standalone Pods
 
 ---
 
@@ -14,133 +22,107 @@ Referring to the getting started [README.md](https://github.com/fusor/mig-contro
  
 ### 2. Deploying the sample apps
 
-On the _source_ cluster (where you will migrate your application _from_), run the following.
+On the _source_ cluster (where you'll migrate your application _from_), create a namespace to hold some sample resources.
 
 ```bash
 # Login to the migration 'source cluster'
 $ oc login https://my-source-cluster:8443
 
-# create a namespace for the test resources
-oc create namespace registry-example
-oc project registry-example
-
-# create a new s2i app with a locally-built image
-oc new-app https://github.com/openshift/nodejs-ex
+# Create a namespace for the test resources
+$ oc create namespace registry-example
+$ oc project registry-example
 ```
-At this point wait for the build to complete so that the image is available for other apps.
-When `oc get build` shows `nodejs-ex-1` with a status of `Complete`, move on to the next step.
 
+#### 2a. Building a local image with s2i (source-to-image)
+
+Use `oc new-app` to build a local nodejs s2i image.
+```bash
+# Running 'oc new-app' will result in a new image being built and pushed to our local registry
+$ oc new-app https://github.com/openshift/nodejs-ex
 ```
-oc expose service nodejs-ex
 
-# create a deploymentconfig using the same image
-export REGISTRY_HOST=$(oc registry info)
-oc run test-dc --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest
+Wait for the build to complete.
 
-# create a deployment using the same image:
-cat <<EOF | kubectl create -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  creationTimestamp: null
-  name: test-deployment
-  labels:
-    run: test-deployment
-spec:
-  selector:
-    matchLabels:
-      run: test-deployment
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        run: test-deployment
-    spec:
-      containers:
-      - image: $REGISTRY_HOST/registry-example/nodejs-ex:latest
-        name: test-deployment
-        resources: {}
-EOF
+```bash
+# When `oc get build` shows `nodejs-ex-1` with a status of `Complete`, move on to the next step.
+$ oc get build
+NAME          TYPE      FROM          STATUS     STARTED          DURATION
+nodejs-ex-1   Source    Git@e59fe75   Complete   2 minutes ago   1m14s
+```
 
-# create a job using the same image:
-oc run test-job --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='OnFailure'
+Viewing status information will reveal that a DeploymentConfig has been created based on our locally built image.
 
-# create a daemonset using the same image:
-cat <<EOF | kubectl create -f -
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  creationTimestamp: null
-  name: test-daemonset
-  labels:
-    run: test-daemonset
-spec:
-  selector:
-    matchLabels:
-      run: test-daemonset
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        run: test-daemonset
-    spec:
-      containers:
-      - image: $REGISTRY_HOST/registry-example/nodejs-ex:latest
-        name: test-daemonset
-        resources: {}
-EOF
+```bash
+$ oc status
+In project registry-example on server [...]
 
-# create a statefulset using the same image:
-cat <<EOF | kubectl create -f -
-apiVersion: v1     
-kind: Service
-metadata:
-  name: test-statefulset
-  labels:                    
-    run: test-statefulset
-spec:                         
-  ports:
-  - name: 8080-tcp
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  clusterIP: None
-  selector:
-    run: test-statefulset
-EOF
+svc/nodejs-ex - 172.30.91.99:8080
+  dc/nodejs-ex deploys istag/nodejs-ex:latest <-
+    bc/nodejs-ex source builds https://github.com/openshift/nodejs-ex on openshift/nodejs:10 
+    deployment #1 deployed 3 minutes ago - 1 pod
+```
 
-cat <<EOF | kubectl create -f -
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  creationTimestamp: null
-  name: test-statefulset
-  labels:
-    run: test-statefulset
-spec:
-  selector:
-    matchLabels:
-      run: test-statefulset
-  serviceName: "test-statefulset"
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        run: test-statefulset
-    spec:
-      containers:
-      - image: $REGISTRY_HOST/registry-example/nodejs-ex:latest
-        name: test-statefulset
-        resources: {}
-EOF
+Create a route in front of the nodejs-ex service to use for testing later in this scenario.
 
-oc expose service/test-statefulset
+```bash
+$ oc expose service nodejs-ex
+route.route.openshift.io/nodejs-ex exposed
+```
 
-# create a standalone pod using the same image
+#### 2b. Deploying the local 'nodejs-ex' image in other ways
+
+To illustrate mig-controller handling migration of different OpenShift resource types, we'll deploy our s2i image from _step 2a._ in these additional ways:
+
+- DeploymentConfig (this time without a build trigger)
+- Deployment
+- Job
+- StatefulSet
+- Standalone Pod
+
+First, set up an environment variable with the local registry hostname.
+```bash
+$ export REGISTRY_HOST=$(oc registry info)
+```
+
+**DeploymentConfig**
+```bash
+# Create a DeploymentConfig using the local registry S2I image
+$ oc run test-dc --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest
+```
+
+**Deployment**
+```bash
+# Create a Deployment using the local registry S2I image
+$ ./create_deployment.sh
+```
+
+**Job**
+```bash
+# Create a Job using the local registry S2I image
+$ oc run test-job --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='OnFailure'
+```
+
+**DaemonSet**
+```bash
+# Create a DaemonSet using the local registry S2I image
+$ ./create_daemonset.sh
+```
+
+**StatefulSet**
+```bash
+# Create a StatefulSet using the local registry S2I image
+$ ./create_statefulset.sh
+```
+
+**Standalone Pod**
+```bash
+# Create a Pod using the local registry S2I image
 oc run test-standalone --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='Never'
-
 ```
-Once this is done, verify that the pods are running. There should be a running pod for the `nodejs-ex` s2i app, as well as a pod for the other types that we created above: daemonset, deploymentconfig (dc), deployment, job, statefulset, and the standalone pod.
+
+#### 2c. Verifying creation of apps using local 'nodejs-ex' image
+
+After creating all of these resources, verify that all associated Pods are running.
 
 ```bash
 # Making sure the pods are running
@@ -192,7 +174,6 @@ After changing the 'nginx-example' namespace to 'registry-example', no further c
 ```bash
 # From project root, run `make samples` to put these yaml files in a 'migsamples' directory your can safely modify.
 
-# Before creating the migplan, modify the namespace Spec section as specified above.
 # Creates MigPlan 'migplan-sample' in namespace 'mig'
 $ oc apply -f mig-plan.yaml
 
@@ -205,31 +186,14 @@ Namespace:    mig
 API Version:  migration.openshift.io/v1alpha1
 Kind:         MigPlan
 
-[... snipped ...]
-
 Status:
   Conditions:
-    Category:              Required
-    Last Transition Time:  2019-05-24T14:50:06Z
-    Message:               The persistentVolumes list has been updated with discovered PVs.
-    Reason:                Done
-    Status:                True
-    Type:                  PvsDiscovered
-    Category:              Required
-    Last Transition Time:  2019-05-24T14:50:06Z
-    Message:               The storage resources have been created.
-    Status:                True
-    Type:                  StorageEnsured
-    Category:              Required
-    Last Transition Time:  2019-06-03T18:43:18Z
-    Message:               The migration registry resources have been created.
-    Status:                True
-    Type:                  RegistriesEnsured
     Category:              Required
     Last Transition Time:  2019-05-24T14:50:06Z
     Message:               The migration plan is ready.
     Status:                True
     Type:                  Ready
+    [... snipped ...]
 
 
 # If you see 'The migration plan is ready.' from the 'oc describe' above,
@@ -247,33 +211,23 @@ $ oc apply -f mig-migration.yaml
 $ oc describe migmigration -n mig migmigration-sample
 Name:         migmigration-sample
 Namespace:    mig
-API Version:  migration.openshift.io/v1alpha1
-Kind:         MigMigration
-Spec:
-  Mig Plan Ref:
-    Name:       migplan-sample
-    Namespace:  mig
-  Stage:        false
+[... snipped ...]
 Status:
-  Completion Timestamp:  2019-05-22T21:46:09Z
-  Conditions:
-    Category:              Required
-    Last Transition Time:  2019-05-24T14:50:06Z
-    Message:               The migration is ready.
-    Status:                True
-    Type:                  Ready
+  Completion Timestamp:    2019-05-22T21:46:09Z
   Migration Completed:     true
   Start Timestamp:         2019-05-22T21:43:27Z
   Task Phase:              Completed
-Events:                    <none>
+  [... snipped ...]
 ```
 
-Notice how the MigMigration shown above has 'Task Phase': Completed. This means that the Migration is complete, and we should be able to verify our apps existence on the destination cluster. You can continuously describe the MigMigration to see phase info, or tail the mig-controller logs with `oc logs -f <pod-name>`.
+Notice how the MigMigration shown above has 'Task Phase': Completed. This means that the Migration is complete.
+
+We should be able to verify our apps existence on the destination cluster. You can continuously describe the MigMigration to see phase info, or tail the mig-controller logs with `oc logs -f <pod-name>`.
 
 ---
 
 
-### 4. Verify that the MigMigration completed successfully
+### 4. Verify that the Migration completed successfully
 
 Before moving onto this step, make sure that `oc describe` on the MigMigration resource indicates that the migration is complete.
 
@@ -309,5 +263,4 @@ $ curl nodejs-ex-registry-example.apps.my-destination-cluster.example.com
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <title>Welcome to OpenShift</title>
 [... snipped ...]
-
 ```
