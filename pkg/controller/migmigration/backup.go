@@ -162,11 +162,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
@@ -318,7 +318,7 @@ func (t *Task) annotateStorageResources() error {
 					pvc.Annotations = make(map[string]string)
 				}
 				pvName := pvc.Spec.VolumeName
-				action := findPVCAction(pvs, pvName)
+				action := findPVAction(pvs, pvName)
 				pvc.Annotations[pvAnnotationKey] = action
 				if pvc.Labels == nil {
 					pvc.Labels = make(map[string]string)
@@ -402,7 +402,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	return nil
 }
 
-func findPVCAction(pvList migapi.PersistentVolumes, pvName string) string {
+func findPVAction(pvList migapi.PersistentVolumes, pvName string) string {
 	for _, pv := range pvList.List {
 		if pv.Name == pvName {
 			return pv.Action
