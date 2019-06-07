@@ -1,4 +1,4 @@
-## Migrating OpenShift apps running local images with mig-controller
+## Migrating OpenShift apps running *local images* with mig-controller
 
 This scenario walks through Migration of apps using images stored in local OpenShift image registries. 
 

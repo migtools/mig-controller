@@ -8,9 +8,11 @@ This scenario walks through Migration of a stateless OpenShift app, meaning that
 
 Referring to the getting started [README.md](https://github.com/fusor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
 
-- `MigCluster` resources for the _source_ and _destination_ clusters
-- `Cluster` resource for any _remote_ clusters (e.g. clusters the controller will connect to remotely, there will be at least one of these)
-- `MigStorage` providing information on how to store resource YAML in transit between clusters 
+|Resource|Purpose|
+|---|---|
+|`MigCluster`|represents the _source_ and _destination_ clusters|
+|`Cluster`|describes coordinates of any _remote_ clusters (at least one)|
+|`MigStorage`|provides config for storing resource YAML in transit between clusters |
  
 ---
 

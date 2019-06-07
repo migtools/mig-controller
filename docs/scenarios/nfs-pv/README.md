@@ -15,9 +15,11 @@ This scenario walks through Migration of a stateful OpenShift app with Persisten
 
 Referring to the getting started [README.md](https://github.com/fusor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
 
-- `MigCluster` resources for the _source_ and _destination_ clusters
-- `Cluster` resource for any _remote_ clusters (e.g. clusters the controller will connect to remotely, there will be at least one of these)
-- `MigStorage` providing information on how to store resource YAML in transit between clusters 
+|Resource|Purpose|
+|---|---|
+|`MigCluster`|represents the _source_ and _destination_ clusters|
+|`Cluster`|describes coordinates of any _remote_ clusters (at least one)|
+|`MigStorage`|provides config for storing resource YAML in transit between clusters |
 
 Before proceeding, be sure that you have at least one available NFS PV on your *source cluster* that our sample MySQL app will be able to bind to. You can set up the NFS server however you like. We used Ansible Playbooks from the [mig-ci](https://github.com/fusor/mig-ci) repo to provision the NFS PVs used in this scenario, but other NFS server + PV configurations compatible with OpenShift should work equally well.
 
