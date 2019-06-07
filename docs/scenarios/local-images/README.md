@@ -16,9 +16,11 @@ We'll cover migration of:
 
 Referring to the getting started [README.md](https://github.com/fusor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero (including ocp-velero-plugin), and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
 
-- `MigCluster` resources for the _source_ and _destination_ clusters
-- `Cluster` resource for any _remote_ clusters (e.g. clusters the controller will connect to remotely, there will be at least one of these)
-- `MigStorage` providing information on how to store resource YAML in transit between clusters 
+|Resource|Purpose|
+|---|---|
+|`MigCluster`|represents the _source_ and _destination_ clusters|
+|`Cluster`|describes coordinates of any _remote_ clusters (at least one)|
+|`MigStorage`|provides config for storing resource YAML in transit between clusters |
  
 ### 2. Deploying the sample apps
 
@@ -118,7 +120,7 @@ $ ./create_statefulset.sh
 _Standalone Pod_
 ```bash
 # Create a Pod using the local registry S2I image
-oc run test-standalone --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='Never'
+$ oc run test-standalone --image=$REGISTRY_HOST/registry-example/nodejs-ex:latest -n registry-example --restart='Never'
 ```
 
 #### 2c. Verifying creation of apps using local 'nodejs-ex' image
@@ -127,7 +129,7 @@ After creating all of these resources, verify that all associated Pods are runni
 
 ```bash
 # Making sure the pods are running
-oc get pods -n registry-example
+$ oc get pods -n registry-example
 ```
 
 We can check that the two pods with exposed routes are serving their starter webpage successfully before continuing.
@@ -248,7 +250,6 @@ test-job-4t8qk                     1/1       Running   0          13m
 test-statefulset-0                 1/1       Running   0          11m
 
 # Get the app route host/port
-$ oc get route -n nginx-example
 $ oc get route -n registry-example
 NAME               HOST/PORT								PATH      SERVICES           PORT       
 nodejs-ex          nodejs-ex-registry-example.apps.my-destination-cluster.example.com        	  nodejs-ex          8080-tcp   
