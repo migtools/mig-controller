@@ -13,41 +13,30 @@ mig-controller and mig-ui can help you move workloads from a _source_ to a _dest
 
 __2. Deploy Velero to both the _source_ and _destination_ OpenShift clusters__
 
-```
-
+```bash
 # Download bash script to deploy Velero along with required plugins
-$ wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_velero.sh
+wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_velero.sh
 
-# Login to source cluster, run deploy_velero.sh against it
-$ oc login https://my-source-cluster:8443
-$ bash deploy_velero.sh
+# Login to source cluster, run 'deploy_velero.sh' against it
+oc login https://my-source-cluster:8443
+bash deploy_velero.sh
 
-Deploying Velero...
-[...]
-
-# Login to destination cluster, run deploy_velero.sh against it
-$ oc login https://my-destination-cluster:8443
-$ bash deploy_velero.sh
-
-Deploying Velero...
-[...]
+# Login to destination cluster, run 'deploy_velero.sh' against it
+oc login https://my-destination-cluster:8443
+bash deploy_velero.sh
 ```
 
 ---
 
 __3. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
 
-```
+```bash
 # Download bash script to deploy the latest mig-controller image as a StatefulSet
-$ wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_mig.sh
+wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_mig.sh
 
-# Login to cluster of your choice where mig-controller will run
-$ oc login https://my-cluster:8443
-$ bash deploy_mig.sh
-
-Deploying mig-controller...
-[...]
-
+# Login to cluster where mig-controller will run, 'deploy_mig.sh' against it
+oc login https://my-cluster:8443
+bash deploy_mig.sh
 ```
 
 ---
@@ -97,7 +86,7 @@ As an example, you'll need to provide the following parameters to perform a Migr
 
 After modifying resource yaml, create the resources on the OpenShift cluster where the controller is running.
 
-```
+```bash
 # Option 1: Create everything in a single command
 oc apply -f migsamples
 
