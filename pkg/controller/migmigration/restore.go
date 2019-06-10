@@ -11,21 +11,22 @@ import (
 
 const podStageLabel = "migration-stage-pod"
 
-// Ensure the restore on the destination cluster has been
+// Ensure the final restore on the destination cluster has been
 // created  and has the proper settings.
-func (t *Task) ensureRestore() error {
-	newRestore, err := t.buildRestore()
+func (t *Task) ensureFinalRestore() error {
+	includeClusterResources := false
+	newRestore, err := t.buildRestore(&includeClusterResources)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	foundRestore, err := t.getRestore()
+	foundRestore, err := t.getRestore(false)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	if foundRestore == nil {
-		t.Restore = newRestore
+		t.FinalRestore = newRestore
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -38,7 +39,7 @@ func (t *Task) ensureRestore() error {
 		}
 		return nil
 	}
-	t.Restore = foundRestore
+	t.FinalRestore = foundRestore
 	if !t.equalsRestore(newRestore, foundRestore) {
 		t.updateRestore(foundRestore)
 		client, err := t.getDestinationClient()
@@ -56,6 +57,46 @@ func (t *Task) ensureRestore() error {
 	return nil
 }
 
+// Ensure the first restore on the destination cluster has been
+// created  and has the proper settings.
+func (t *Task) ensureCopyRestore() error {
+	newRestore, err := t.buildRestore(nil)
+	if err != nil {
+		return err
+	}
+	foundRestore, err := t.getRestore(true)
+	if err != nil {
+		return err
+	}
+	if foundRestore == nil {
+		newRestore.Spec.BackupName = t.CopyBackup.Name
+		t.CopyRestore = newRestore
+		client, err := t.getDestinationClient()
+		if err != nil {
+			return err
+		}
+		err = client.Create(context.TODO(), newRestore)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	t.CopyRestore = foundRestore
+	if !t.equalsRestore(newRestore, foundRestore) {
+		t.updateRestore(foundRestore)
+		client, err := t.getDestinationClient()
+		if err != nil {
+			return err
+		}
+		err = client.Update(context.TODO(), foundRestore)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Get whether the two Restores are equal.
 func (t *Task) equalsRestore(a, b *velero.Restore) bool {
 	match := a.Spec.BackupName == b.Spec.BackupName &&
@@ -64,7 +105,7 @@ func (t *Task) equalsRestore(a, b *velero.Restore) bool {
 }
 
 // Get an existing Restore on the destination cluster.
-func (t Task) getRestore() (*velero.Restore, error) {
+func (t Task) getRestore(copyRestore bool) (*velero.Restore, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return nil, err
@@ -78,15 +119,23 @@ func (t Task) getRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Find proper restore to return
 	if len(list.Items) > 0 {
-		return &list.Items[0], nil
+		for i, restore := range list.Items {
+			if restore.Annotations[copyBackupRestoreAnnotationKey] != "" && copyRestore {
+				return &list.Items[i], nil
+			}
+			if restore.Annotations[copyBackupRestoreAnnotationKey] == "" && !copyRestore {
+				return &list.Items[i], nil
+			}
+		}
 	}
 
 	return nil, nil
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore() (*velero.Restore, error) {
+func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return nil, err
@@ -95,6 +144,13 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 	if err != nil {
 		log.Trace(err)
 		return nil, err
+	}
+	// If includeClusterResources isn't set, this means it is first restore to
+	// satisfy moving the persistent storage over
+	if includeClusterResources == nil {
+		annotations[copyBackupRestoreAnnotationKey] = "true"
+	} else {
+		delete(annotations, copyBackupRestoreAnnotationKey)
 	}
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -112,7 +168,7 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 func (t *Task) updateRestore(restore *velero.Restore) {
 	restorePVs := true
 	restore.Spec = velero.RestoreSpec{
-		BackupName: t.Backup.Name,
+		BackupName: t.InitialBackup.Name,
 		RestorePVs: &restorePVs,
 	}
 }

@@ -11,28 +11,32 @@ import (
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var resticPodPrefix = "restic-"
+var rhel7ImageRef = "registry.access.redhat.com/rhel7"
 
-// Ensure the backup on the source cluster has been created
-// and has the proper settings.
-func (t *Task) ensureBackup() error {
-	newBackup, err := t.buildBackup()
+// Ensure the initial backup on the source cluster has been created and has the
+// proper settings.
+func (t *Task) ensureInitialBackup() error {
+	includeClusterResources := false
+	newBackup, err := t.buildBackup(&includeClusterResources)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	foundBackup, err := t.getBackup()
+	delete(newBackup.Annotations, MigQuiesceAnnotationKey)
+	foundBackup, err := t.getBackup(false)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	if foundBackup == nil {
-		t.Backup = newBackup
+		t.InitialBackup = newBackup
 		client, err := t.getSourceClient()
 		if err != nil {
 			log.Trace(err)
@@ -45,7 +49,7 @@ func (t *Task) ensureBackup() error {
 		}
 		return nil
 	}
-	t.Backup = foundBackup
+	t.InitialBackup = foundBackup
 	if !t.equalsBackup(newBackup, foundBackup) {
 		client, err := t.getSourceClient()
 		if err != nil {
@@ -56,6 +60,55 @@ func (t *Task) ensureBackup() error {
 		err = client.Update(context.TODO(), foundBackup)
 		if err != nil {
 			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Ensure the second backup on the source cluster has been created and has the
+// proper settings.
+func (t *Task) ensureCopyBackup() error {
+	newBackup, err := t.buildBackup(nil)
+	if err != nil {
+		return err
+	}
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			uniqueBackupLabelKey:                         "true",
+			fmt.Sprintf("%s-copy", uniqueBackupLabelKey): "true",
+		},
+	}
+
+	// Set included resources to stage resources
+	newBackup.Spec.IncludedResources = stagingResources
+	newBackup.Spec.LabelSelector = &labelSelector
+	foundBackup, err := t.getBackup(true)
+	if err != nil {
+		return err
+	}
+	if foundBackup == nil {
+		t.CopyBackup = newBackup
+		client, err := t.getSourceClient()
+		if err != nil {
+			return err
+		}
+		err = client.Create(context.TODO(), newBackup)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	t.CopyBackup = foundBackup
+	if !t.equalsBackup(newBackup, foundBackup) {
+		client, err := t.getSourceClient()
+		if err != nil {
+			return err
+		}
+		err = client.Update(context.TODO(), foundBackup)
+		if err != nil {
 			return err
 		}
 	}
@@ -74,7 +127,7 @@ func (t *Task) equalsBackup(a, b *velero.Backup) bool {
 }
 
 // Get an existing Backup on the source cluster.
-func (t Task) getBackup() (*velero.Backup, error) {
+func (t Task) getBackup(copyBackup bool) (*velero.Backup, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		return nil, err
@@ -88,8 +141,16 @@ func (t Task) getBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Find proper backup to return
 	if len(list.Items) > 0 {
-		return &list.Items[0], nil
+		for i, backup := range list.Items {
+			if backup.Annotations[copyBackupRestoreAnnotationKey] != "" && copyBackup {
+				return &list.Items[i], nil
+			}
+			if backup.Annotations[copyBackupRestoreAnnotationKey] == "" && !copyBackup {
+				return &list.Items[i], nil
+			}
+		}
 	}
 
 	return nil, nil
@@ -132,7 +193,7 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 }
 
 // Build a Backups as desired for the source cluster.
-func (t *Task) buildBackup() (*velero.Backup, error) {
+func (t *Task) buildBackup(includeClusterResources *bool) (*velero.Backup, error) {
 	// Get client of source cluster
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -143,12 +204,20 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 		log.Trace(err)
 		return nil, err
 	}
+	// If includeClusterResources isn't set, this means it is the second backup,
+	// first restore to satisfy moving the persistent storage over
+	if includeClusterResources == nil {
+		annotations[copyBackupRestoreAnnotationKey] = "true"
+	}
 	backup := &velero.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
 			GenerateName: t.Owner.GetName() + "-",
 			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
+		},
+		Spec: velero.BackupSpec{
+			IncludeClusterResources: includeClusterResources,
 		},
 	}
 	err = t.updateBackup(backup)
@@ -171,14 +240,15 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      namespaces,
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: namespaces,
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  []string{},
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},
+		IncludeClusterResources: backup.Spec.IncludeClusterResources,
 	}
 
 	return nil
@@ -199,7 +269,12 @@ func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(list.Items) > 0 {
+	// If this is stage we only need to wait for 1 backup to be replicated
+	if len(list.Items) == 1 && t.stage() {
+		return &list.Items[0], nil
+	}
+	// If this is not a stage, we need to find 2 backups before continuing
+	if len(list.Items) > 1 {
 		return &list.Items[0], nil
 	}
 
@@ -271,12 +346,14 @@ func (t *Task) bounceResticPod() error {
 }
 
 // Annotate all resources with PV action data
-func (t *Task) annotateStorageResources() error {
+// Return the number of copy pods so that we know if we need to create stage
+// pods
+func (t *Task) annotateStorageResources() (error, int) {
 	// Get client of source cluster
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
-		return err
+		return err, 0
 	}
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
 	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
@@ -292,7 +369,7 @@ func (t *Task) annotateStorageResources() error {
 			&resource)
 		if err != nil {
 			log.Trace(err)
-			return err
+			return err, 0
 		}
 		if resource.Annotations == nil {
 			resource.Annotations = make(map[string]string)
@@ -305,6 +382,7 @@ func (t *Task) annotateStorageResources() error {
 		client.Update(context.TODO(), &resource)
 	}
 
+	resticPodCount := 0
 	for _, ns := range namespaces {
 		// Find all pods in our target namespaces
 		list := corev1.PodList{}
@@ -312,10 +390,15 @@ func (t *Task) annotateStorageResources() error {
 		err = client.List(context.TODO(), options, &list)
 		if err != nil {
 			log.Trace(err)
-			return err
+			return err, 0
 		}
 		// Loop through all pods to find all volume claims
 		for _, pod := range list.Items {
+			// Don't need to do this for staging pods. Adds unnecessary work
+			if pod.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] != "" {
+				continue
+			}
+
 			resticVolumes := []string{}
 			for _, volume := range pod.Spec.Volumes {
 				claim := volume.VolumeSource.PersistentVolumeClaim
@@ -339,12 +422,14 @@ func (t *Task) annotateStorageResources() error {
 					pvc.Labels = make(map[string]string)
 				}
 				pvc.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
+				pvc.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = pvBackupLabelValue
 				err = client.Update(context.TODO(), &pvc)
 				if action == migapi.PvCopyAction {
 					resticVolumes = append(resticVolumes, volume.Name)
 				}
 			}
 			if len(resticVolumes) > 0 {
+				resticPodCount += 1
 				if pod.Annotations == nil {
 					pod.Annotations = make(map[string]string)
 				}
@@ -358,6 +443,93 @@ func (t *Task) annotateStorageResources() error {
 		}
 	}
 
+	return nil, resticPodCount
+}
+
+func (t *Task) areStagePodsCreated() (bool, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return false, err
+	}
+	// check if we have already created dummy pods
+	// if so, return true
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := map[string]string{
+		fmt.Sprintf("%s-copy", uniqueBackupLabelKey): "true",
+	}
+	options := k8sclient.MatchingLabels(labelSelector)
+	podList := corev1.PodList{}
+	err = client.List(context.TODO(), options, &podList)
+	if err != nil {
+		return false, err
+	}
+	podCount := len(podList.Items)
+	if podCount == 0 {
+		return false, nil
+	}
+	readyCount := 0
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			readyCount += 1
+		}
+	}
+	// Check if all pods are ready
+	if readyCount == podCount {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (t *Task) createStagePods() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+
+	// Dummy pods haven't been created yet, lets create them
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := map[string]string{
+		uniqueBackupLabelKey: pvBackupLabelValue,
+	}
+	options := k8sclient.MatchingLabels(labelSelector)
+	podList := corev1.PodList{}
+	err = client.List(context.TODO(), options, &podList)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		if pod.Annotations[resticPvBackupAnnotationKey] == "" {
+			continue
+		}
+		dummyPod := corev1.Pod{}
+		dummyPod.Spec.Containers = pod.Spec.Containers
+		dummyPod.Spec.Volumes = pod.Spec.Volumes
+		// Swap image ref, command, and args and create a new dummy pod to be backed up
+		for i, _ := range dummyPod.Spec.Containers {
+			dummyPod.Spec.Containers[i].Image = rhel7ImageRef
+			dummyPod.Spec.Containers[i].Command = []string{"sleep"}
+			dummyPod.Spec.Containers[i].Args = []string{"infinity"}
+		}
+		dummyPod.Name = fmt.Sprintf("%s-dummy-pod", pod.Name)
+		dummyPod.Namespace = pod.Namespace
+		if dummyPod.Labels == nil {
+			dummyPod.Labels = make(map[string]string)
+		}
+		dummyPod.Labels[uniqueBackupLabelKey] = "true"
+		dummyPod.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
+		if dummyPod.Annotations == nil {
+			dummyPod.Annotations = make(map[string]string)
+		}
+		dummyPod.Annotations[resticPvBackupAnnotationKey] = pod.Annotations[resticPvBackupAnnotationKey]
+		err = client.Create(context.TODO(), &dummyPod)
+		// This shouldn't happen with check at beginning of function, but we don't
+		// want to return an error if we somehow get here
+		if k8serrors.IsAlreadyExists(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

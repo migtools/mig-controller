@@ -1,29 +1,44 @@
 package migmigration
 
 import (
+	"context"
 	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Annotation Keys
-const MigQuiesceAnnotationKey = "openshift.io/migrate-quiesce-pods"
+const (
+	MigQuiesceAnnotationKey        = "openshift.io/migrate-quiesce-pods"
+	copyBackupRestoreAnnotationKey = "openshift.io/copy-backup-restore"
+)
 
 // Phases
 const (
 	Started                 = "Started"
 	WaitOnResticRestart     = "WaitOnResticRestart"
 	ResticRestartCompleted  = "ResticRestartCompleted"
-	BackupStarted           = "BackupStarted"
-	BackupCompleted         = "BackupCompleted"
-	BackupFailed            = "BackupFailed"
+	InitialBackupStarted    = "InitialBackupStarted"
+	InitialBackupCompleted  = "InitialBackupCompleted"
+	InitialBackupFailed     = "InitialBackupFailed"
+	CopyBackupStarted       = "CopyBackupStarted"
+	CopyBackupCompleted     = "CopyBackupCompleted"
+	CopyBackupFailed        = "CopyBackupFailed"
+	CreatingStagePods       = "CreatingStagePods"
+	StagePodsCreated        = "StagePodsCreated"
 	WaitOnBackupReplication = "WaitOnBackupReplication"
 	BackupReplicated        = "BackupReplicated"
-	RestoreStarted          = "RestoreStarted"
-	RestoreCompleted        = "RestoreCompleted"
-	RestoreFailed           = "RestoreFailed"
+	CopyRestoreStarted      = "CopyRestoreStarted"
+	CopyRestoreCompleted    = "CopyRestoreCompleted"
+	CopyRestoreFailed       = "CopyRestoreFailed"
+	DeletingStagePods       = "DeletingStagePods"
+	StagePodsDeleted        = "StagePodsDeleted"
+	FinalRestoreStarted     = "FinalRestoreStarted"
+	FinalRestoreCompleted   = "FinalRestoreCompleted"
+	FinalRestoreFailed      = "FinalRestoreFailed"
 	Completed               = "Completed"
 )
 
@@ -47,8 +62,10 @@ type Task struct {
 	BackupResources []string
 	Phase           string
 	Errors          []string
-	Backup          *velero.Backup
-	Restore         *velero.Restore
+	InitialBackup   *velero.Backup
+	CopyBackup      *velero.Backup
+	CopyRestore     *velero.Restore
+	FinalRestore    *velero.Restore
 }
 
 // Reconcile() Example:
@@ -87,53 +104,113 @@ func (t *Task) Run() error {
 		return err
 	}
 
-	// Annotate persistent storage resources with actions
-	err = t.annotateStorageResources()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
 	// Return unless restic restart has finished
 	if t.Phase == Started || t.Phase == WaitOnResticRestart {
 		return nil
 	}
 
-	// Backup
-	err = t.ensureBackup()
+	// Run initial Backup if this is not a stage
+	if !t.stage() {
+		err = t.ensureInitialBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		switch t.InitialBackup.Status.Phase {
+		case velero.BackupPhaseCompleted:
+			t.Phase = InitialBackupCompleted
+		case velero.BackupPhaseFailed:
+			reason := fmt.Sprintf(
+				"Backup: %s/%s failed.",
+				t.InitialBackup.Namespace,
+				t.InitialBackup.Name)
+			t.addErrors([]string{reason})
+			t.Phase = InitialBackupFailed
+			return nil
+		case velero.BackupPhasePartiallyFailed:
+			reason := fmt.Sprintf(
+				"Backup: %s/%s partially failed.",
+				t.InitialBackup.Namespace,
+				t.InitialBackup.Name)
+			t.addErrors([]string{reason})
+			t.Phase = InitialBackupFailed
+			return nil
+		case velero.BackupPhaseFailedValidation:
+			t.addErrors(t.InitialBackup.Status.ValidationErrors)
+			t.Phase = InitialBackupFailed
+			return nil
+		default:
+			t.Phase = InitialBackupStarted
+			return nil
+		}
+	}
+
+	t.Phase = InitialBackupCompleted
+
+	// Annotate persistent storage resources with actions
+	err, resticPodCount := t.annotateStorageResources()
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
-	switch t.Backup.Status.Phase {
+
+	created, err := t.areStagePodsCreated()
+	if err != nil {
+		return err
+	}
+
+	if created || resticPodCount == 0 {
+		t.Phase = StagePodsCreated
+	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
+		t.Phase = CreatingStagePods
+		// Swap out all copy pods with dummy pods
+		err = t.createStagePods()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Scale down all deployments/deploymentconfigs
+	if t.quiesce() {
+		err = t.scaleDownDCs()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Run second backup to copy PV data
+	err = t.ensureCopyBackup()
+	if err != nil {
+		return err
+	}
+
+	switch t.CopyBackup.Status.Phase {
 	case velero.BackupPhaseCompleted:
-		t.Phase = BackupCompleted
+		t.Phase = CopyBackupCompleted
 	case velero.BackupPhaseFailed:
 		reason := fmt.Sprintf(
 			"Backup: %s/%s failed.",
-			t.Backup.Namespace,
-			t.Backup.Name)
+			t.CopyBackup.Namespace,
+			t.CopyBackup.Name)
 		t.addErrors([]string{reason})
-		t.Phase = BackupFailed
+		t.Phase = CopyBackupFailed
 		return nil
 	case velero.BackupPhasePartiallyFailed:
 		reason := fmt.Sprintf(
 			"Backup: %s/%s partially failed.",
-			t.Backup.Namespace,
-			t.Backup.Name)
+			t.CopyBackup.Namespace,
+			t.CopyBackup.Name)
 		t.addErrors([]string{reason})
-		t.Phase = BackupFailed
+		t.Phase = CopyBackupFailed
 		return nil
 	case velero.BackupPhaseFailedValidation:
-		t.addErrors(t.Backup.Status.ValidationErrors)
-		t.Phase = BackupFailed
+		t.addErrors(t.CopyBackup.Status.ValidationErrors)
+		t.Phase = CopyBackupFailed
 		return nil
 	default:
-		t.Phase = BackupStarted
+		t.Phase = CopyBackupStarted
 		return nil
 	}
-
-	t.Phase = BackupCompleted
 
 	// Delete storage annotations
 	err = t.removeStorageResourceAnnotations()
@@ -155,41 +232,96 @@ func (t *Task) Run() error {
 		return nil
 	}
 
-	// Restore
-	err = t.ensureRestore()
+	// Copy restore
+	err = t.ensureCopyRestore()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	switch t.Restore.Status.Phase {
+
+	switch t.CopyRestore.Status.Phase {
 	case velero.RestorePhaseCompleted:
-		t.Phase = RestoreCompleted
+		t.Phase = CopyRestoreCompleted
 	case velero.RestorePhaseFailedValidation:
-		t.addErrors(t.Restore.Status.ValidationErrors)
-		t.Phase = RestoreFailed
+		t.addErrors(t.CopyRestore.Status.ValidationErrors)
+		t.Phase = CopyRestoreFailed
 		return nil
 	case velero.RestorePhaseFailed:
 		reason := fmt.Sprintf(
 			"Restore: %s/%s failed.",
-			t.Restore.Namespace,
-			t.Restore.Name)
+			t.CopyRestore.Namespace,
+			t.CopyRestore.Name)
 		t.addErrors([]string{reason})
-		t.Phase = RestoreFailed
+		t.Phase = CopyRestoreFailed
 		return nil
 	case velero.RestorePhasePartiallyFailed:
 		reason := fmt.Sprintf(
 			"Restore: %s/%s partially failed.",
-			t.Restore.Namespace,
-			t.Restore.Name)
+			t.CopyRestore.Namespace,
+			t.CopyRestore.Name)
 		t.addErrors([]string{reason})
-		t.Phase = RestoreFailed
+		t.Phase = CopyRestoreFailed
 		return nil
 	default:
-		t.Phase = RestoreStarted
+		t.Phase = CopyRestoreStarted
 		return nil
 	}
-	t.Phase = RestoreCompleted
+	t.Phase = CopyRestoreCompleted
 
+	deleted, err := t.areStagePodsDeleted()
+	if err != nil {
+		return err
+	}
+
+	if deleted {
+		t.Phase = StagePodsDeleted
+	} else {
+		t.Phase = DeletingStagePods
+		// Remove staging pods on source and destination cluster
+		err = t.removeStagePods()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Final Restore if not a stage
+	if !t.stage() {
+		err = t.ensureFinalRestore()
+		if err != nil {
+			return err
+		}
+		switch t.FinalRestore.Status.Phase {
+		case velero.RestorePhaseCompleted:
+			t.Phase = FinalRestoreCompleted
+		case velero.RestorePhaseFailedValidation:
+			t.addErrors(t.FinalRestore.Status.ValidationErrors)
+			t.Phase = FinalRestoreFailed
+			return nil
+		case velero.RestorePhasePartiallyFailed:
+			reason := fmt.Sprintf(
+				"Restore: %s/%s partially failed.",
+				t.FinalRestore.Namespace,
+				t.FinalRestore.Name)
+			t.addErrors([]string{reason})
+			t.Phase = FinalRestoreFailed
+			return nil
+		case velero.RestorePhaseFailed:
+			reason := fmt.Sprintf(
+				"Restore: %s/%s failed.",
+				t.FinalRestore.Namespace,
+				t.FinalRestore.Name)
+			t.addErrors([]string{reason})
+			t.Phase = FinalRestoreFailed
+			return nil
+		default:
+			t.Phase = FinalRestoreStarted
+			return nil
+		}
+	}
+	t.Phase = FinalRestoreCompleted
+
+	// TODO: Remove dummy pods on dest cluster
 	// Delete stage Pods
 	if t.stage() {
 		err = t.deleteStagePods()
@@ -252,11 +384,11 @@ func (t *Task) logExit() {
 	}
 	backup := ""
 	restore := ""
-	if t.Backup != nil {
-		backup = t.Backup.Name
+	if t.InitialBackup != nil {
+		backup = t.InitialBackup.Name
 	}
-	if t.Restore != nil {
-		restore = t.Restore.Name
+	if t.FinalRestore != nil {
+		restore = t.FinalRestore.Name
 	}
 	t.Log.Info(
 		"Migration: waiting.",
@@ -274,4 +406,86 @@ func (t *Task) addErrors(errors []string) {
 	for _, error := range errors {
 		t.Errors = append(t.Errors, error)
 	}
+}
+
+// Remove stage pods on source and destination cluster
+func (t *Task) removeStagePods() error {
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+	// Find all stage pods
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := map[string]string{
+		uniqueBackupLabelKey: "true",
+	}
+	options := k8sclient.MatchingLabels(labelSelector)
+	podList := corev1.PodList{}
+	err = srcClient.List(context.TODO(), options, &podList)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		err = srcClient.Delete(
+			context.TODO(),
+			&pod)
+		if err != nil {
+			return err
+		}
+	}
+	podList = corev1.PodList{}
+	err = destClient.List(context.TODO(), options, &podList)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		err = destClient.Delete(
+			context.TODO(),
+			&pod)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Task) areStagePodsDeleted() (bool, error) {
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return false, err
+	}
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return false, err
+	}
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	labelSelector := map[string]string{
+		uniqueBackupLabelKey: "true",
+	}
+	options := k8sclient.MatchingLabels(labelSelector)
+	podList := corev1.PodList{}
+	// Find all stage pods on source cluster
+	err = srcClient.List(context.TODO(), options, &podList)
+	if err != nil {
+		return false, err
+	}
+	if len(podList.Items) != 0 {
+		return false, nil
+	}
+	// Reset podlist
+	podList = corev1.PodList{}
+	err = destClient.List(context.TODO(), options, &podList)
+	if err != nil {
+		return false, err
+	}
+	if len(podList.Items) != 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
