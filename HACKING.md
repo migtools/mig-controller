@@ -15,14 +15,14 @@ Clone mig-controller to your $GOPATH so that dependencies in `vendor` will be fo
 
 ```
 # Sample of setting $GOPATH
-$ mkdir -p $HOME/code/go
-$ export GOPATH="$HOME/code/go"
+mkdir -p $HOME/code/go
+export GOPATH="$HOME/code/go"
 
 # Running 'go get -d' will clone the mig-controller repo into the proper location on your $GOPATH
-$ go get -d github.com/fusor/mig-controller
+go get -d github.com/fusor/mig-controller
 
 # Take a peek at the newly cloned files
-$ ls -al $GOPATH/src/github.com/fusor/mig-controller
+ls -al $GOPATH/src/github.com/fusor/mig-controller
 ```
 
 __3. Create required CRDs (MigMigration, MigPlan, MigCluster, Cluster...)__
@@ -31,10 +31,10 @@ Do this on the cluster where you'll be running the controller.
 
 ```
 # Create 'Mig' CRDs
-$ oc apply -f config/crds
+oc apply -f config/crds
 
 # Create 'Cluster' CRD
-$ oc apply -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
+oc apply -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
 ```
 
 ---
