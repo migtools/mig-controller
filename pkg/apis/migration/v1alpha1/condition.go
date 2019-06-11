@@ -158,8 +158,13 @@ func (r *Conditions) DeleteCondition(types ...string) {
 	kept := []Condition{}
 	for i := range r.List {
 		condition := r.List[i]
-		_, found := filter[condition.Type]
-		if !found {
+		_, matched := filter[condition.Type]
+		if !matched {
+			kept = append(kept, condition)
+			continue
+		}
+		if r.staging {
+			condition.staged = false
 			kept = append(kept, condition)
 		}
 	}
@@ -182,6 +187,25 @@ func (r *Conditions) HasCondition(types ...string) bool {
 	}
 
 	return len(types) > 0
+}
+
+// The collection has Any of the specified conditions.
+func (r *Conditions) HasAnyCondition(types ...string) bool {
+	if r.List == nil {
+		return false
+	}
+	for _, cndType := range types {
+		condition := r.FindCondition(cndType)
+		if condition == nil || condition.Status != True {
+			continue
+		}
+		if r.staging && !condition.staged {
+			continue
+		}
+		return true
+	}
+
+	return false
 }
 
 // The collection contains any conditions with category.

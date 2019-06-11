@@ -28,6 +28,7 @@ func (r ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 		return closed, nil
 	}
 
+	plan.Touch()
 	plan.Status.SetReady(false, ReadyMessage)
 	err := r.Update(context.TODO(), plan)
 	if err != nil {
@@ -54,6 +55,7 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		Message:  ClosedMessage,
 	})
 	// Apply changes.
+	plan.Touch()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return err

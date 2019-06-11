@@ -18,13 +18,11 @@ package migplan
 
 import (
 	"context"
-
-	"k8s.io/apiserver/pkg/storage/names"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -73,7 +71,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				func(a handler.MapObject) []reconcile.Request {
 					return migref.GetRequests(a, migapi.MigPlan{})
 				}),
-		})
+		},
+		&ClusterPredicate{})
 	if err != nil {
 		return err
 	}
@@ -86,7 +85,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				func(a handler.MapObject) []reconcile.Request {
 					return migref.GetRequests(a, migapi.MigPlan{})
 				}),
-		})
+		},
+		&StoragePredicate{})
 	if err != nil {
 		return err
 	}
@@ -139,27 +139,30 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, nil
 	}
 
+	// Begin staging conditions.
+	plan.Status.BeginStagingConditions()
+
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
+		return reconcile.Result{}, err
 	}
 
 	// PV discovery
-	if !r.hasPvDiscoveryBlocker(plan) {
-		err = r.updatePvs(plan)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+	err = r.updatePvs(plan)
+	if err != nil {
+		return reconcile.Result{}, err
 	}
 
-	if plan.Status.HasCriticalCondition() {
-		plan.Status.SetReady(false, ReadyMessage)
-		err = r.Update(context.TODO(), plan)
+	// Validate PV actions.
+	err = r.validatePvAction(plan)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if !plan.Status.HasCriticalCondition() {
+		// Storage
+		err = r.ensureStorage(plan)
 		if err != nil {
 			if errors.IsConflict(err) {
 				return reconcile.Result{Requeue: true}, nil
@@ -167,27 +170,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 				return reconcile.Result{}, err
 			}
 		}
-		// done
-		return reconcile.Result{}, nil
-	}
 
-	// Storage
-	err = r.ensureStorage(plan)
-	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
-	}
-
-	// Migration Registry
-	err = r.ensureMigRegistries(plan)
-	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
+		// Migration Registry
+		err = r.ensureMigRegistries(plan)
+		if err != nil {
+			if errors.IsConflict(err) {
+				return reconcile.Result{Requeue: true}, nil
+			} else {
+				return reconcile.Result{}, err
+			}
 		}
 	}
 
@@ -197,7 +188,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			!plan.Status.HasBlockerCondition(),
 		ReadyMessage)
 
-	// Update
+	// End staging conditions.
+	plan.Status.EndStagingConditions()
+
+	// Apply changes.
+	plan.Touch()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		if errors.IsConflict(err) {

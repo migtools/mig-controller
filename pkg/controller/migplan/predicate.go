@@ -124,3 +124,47 @@ func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 		})
 	}
 }
+
+type ClusterPredicate struct {
+	predicate.Funcs
+}
+
+func (r ClusterPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
+	old, cast := e.ObjectOld.(*migapi.MigCluster)
+	if !cast {
+		return false
+	}
+	new, cast := e.ObjectNew.(*migapi.MigCluster)
+	if !cast {
+		return false
+	}
+	// Updated by the controller.
+	touched := old.GetTouch() != new.GetTouch()
+	return touched
+}
+
+type StoragePredicate struct {
+	predicate.Funcs
+}
+
+func (r StoragePredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r StoragePredicate) Update(e event.UpdateEvent) bool {
+	old, cast := e.ObjectOld.(*migapi.MigStorage)
+	if !cast {
+		return false
+	}
+	new, cast := e.ObjectNew.(*migapi.MigStorage)
+	if !cast {
+		return false
+	}
+	// Updated by the controller.
+	touched := old.GetTouch() != new.GetTouch()
+	return touched
+}

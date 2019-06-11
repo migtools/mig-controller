@@ -79,8 +79,6 @@ const (
 
 // Validate the plan resource.
 func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
-	plan.Status.BeginStagingConditions()
-
 	// Source cluster
 	err := r.validateSourceCluster(plan)
 	if err != nil {
@@ -107,19 +105,6 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
-	if err != nil {
-		return err
-	}
-
-	// PV list.
-	err = r.validatePvAction(plan)
-	if err != nil {
-		return err
-	}
-
-	// Apply changes.
-	plan.Status.EndStagingConditions()
-	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		return err
 	}
@@ -448,14 +433,4 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 	}
 
 	return nil
-}
-
-// The collection contains a PV discovery blocker condition.
-func (r ReconcileMigPlan) hasPvDiscoveryBlocker(plan *migapi.MigPlan) bool {
-	return plan.Status.HasCondition(
-		InvalidSourceClusterRef,
-		SourceClusterNotReady,
-		NsListEmpty,
-		NsNotFoundOnSourceCluster,
-	)
 }

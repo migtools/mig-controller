@@ -84,3 +84,25 @@ func (r MigrationPredicate) unmapRefs(migration *migapi.MigMigration) {
 		})
 	}
 }
+
+type PlanPredicate struct {
+	predicate.Funcs
+}
+
+func (r PlanPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r PlanPredicate) Update(e event.UpdateEvent) bool {
+	old, cast := e.ObjectOld.(*migapi.MigPlan)
+	if !cast {
+		return false
+	}
+	new, cast := e.ObjectNew.(*migapi.MigPlan)
+	if !cast {
+		return false
+	}
+	// Updated by the controller.
+	touched := old.GetTouch() != new.GetTouch()
+	return touched
+}

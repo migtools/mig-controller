@@ -70,12 +70,6 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 			Category: migapi.Required,
 			Message:  RegistriesEnsuredMessage,
 		})
-	} else {
-		plan.Status.DeleteCondition(RegistriesEnsured)
-	}
-	err = r.Update(context.TODO(), plan)
-	if err != nil {
-		return err
 	}
 
 	return err

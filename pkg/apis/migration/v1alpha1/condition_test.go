@@ -193,7 +193,55 @@ func TestConditions_DeleteCondition(t *testing.T) {
 	}))
 }
 
+func TestConditions_DeleteConditionStaging(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// Setup
+	conditions := Conditions{
+		List: []Condition{
+			{Type: "A"},
+			{Type: "B"},
+			{Type: "C"},
+			{Type: "D"},
+			{Type: "E"},
+		},
+	}
+
+	// Test
+	conditions.BeginStagingConditions()
+	conditions.DeleteCondition("B", "D")
+
+	// Validation
+	g.Expect(conditions.List).To(gomega.Equal([]Condition{
+		{Type: "A"},
+		{Type: "B", staged: false},
+		{Type: "C"},
+		{Type: "D", staged: false},
+		{Type: "E"},
+	}))
+}
+
 func TestConditions_HasCondition(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// Setup
+	conditions := Conditions{
+		List: []Condition{
+			{Type: "A", Status: True},
+			{Type: "B", Status: False},
+			{Type: "C", Status: True},
+		},
+	}
+
+	// Test Found Status: True
+	g.Expect(conditions.HasCondition("A", "C")).To(gomega.BeTrue())
+	// Test NotFound
+	g.Expect(conditions.HasCondition("X")).To(gomega.BeFalse())
+	// Test Status: not-True
+	g.Expect(conditions.HasCondition("B")).To(gomega.BeFalse())
+}
+
+func TestConditions_HasAnyCondition(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	// Setup
@@ -205,11 +253,7 @@ func TestConditions_HasCondition(t *testing.T) {
 	}
 
 	// Test Found Status: True
-	g.Expect(conditions.HasCondition("A")).To(gomega.BeTrue())
-	// Test NotFound
-	g.Expect(conditions.HasCondition("X")).To(gomega.BeFalse())
-	// Test Status: not-True
-	g.Expect(conditions.HasCondition("B")).To(gomega.BeFalse())
+	g.Expect(conditions.HasAnyCondition("A", "B")).To(gomega.BeTrue())
 }
 
 func TestConditions_HasConditionStaging(t *testing.T) {

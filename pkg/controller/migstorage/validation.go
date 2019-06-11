@@ -1,7 +1,6 @@
 package migstorage
 
 import (
-	"context"
 	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -59,8 +58,6 @@ const (
 
 // Validate the storage resource.
 func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
-	storage.Status.BeginStagingConditions()
-
 	// Backup location provider.
 	err := r.validateBSL(storage)
 	if err != nil {
@@ -69,18 +66,6 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
 
 	// Volume snapshot location provider.
 	err = r.validateVSL(storage)
-	if err != nil {
-		return err
-	}
-
-	// Ready
-	storage.Status.SetReady(
-		!storage.Status.HasBlockerCondition(),
-		ReadyMessage)
-
-	// Apply changes.
-	storage.Status.EndStagingConditions()
-	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		return err
 	}
@@ -112,12 +97,6 @@ func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) error {
 	}
 
 	err = r.validateBSLCredsSecret(storage)
-	if err != nil {
-		return err
-	}
-
-	// Update
-	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		return err
 	}
