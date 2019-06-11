@@ -18,13 +18,13 @@ package migcluster
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"github.com/fusor/mig-controller/pkg/remote"
-	"github.com/google/uuid"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -123,8 +123,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("cluster|"))
 
 	// Fetch the MigCluster
-	migCluster := &migapi.MigCluster{}
-	err := r.Get(context.TODO(), request.NamespacedName, migCluster)
+	cluster := &migapi.MigCluster{}
+	err := r.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil // don't requeue
@@ -132,14 +132,34 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err // requeue
 	}
 
-	// Annotate with reconcile-unique UUID to trigger MigMigration reconcile
-	if migCluster.Annotations == nil {
-		migCluster.Annotations = make(map[string]string)
-	}
-	migCluster.Annotations["reconcile-id"] = uuid.New().String()
+	// Begin staging conditions.
+	cluster.Status.BeginStagingConditions()
 
 	// Validations.
-	err = r.validate(migCluster)
+	err = r.validate(cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Remote Watch.
+	if !cluster.Status.HasBlockerCondition() {
+		err = r.setupRemoteWatch(cluster)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
+	// Ready
+	cluster.Status.SetReady(
+		!cluster.Status.HasBlockerCondition(),
+		ReadyMessage)
+
+	// End staging conditions.
+	cluster.Status.EndStagingConditions()
+
+	// Apply changes.
+	cluster.Touch()
+	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -147,40 +167,47 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{}, err
 		}
 	}
-	if !migCluster.Status.IsReady() {
-		return reconcile.Result{}, nil
-	}
-
-	// Create a Remote Watch for this MigCluster if one doesn't exist
-	remoteWatchMap := remote.GetWatchMap()
-	remoteWatchCluster := remoteWatchMap.Get(request.NamespacedName)
-
-	if remoteWatchCluster == nil {
-		log.Info("Starting remote watch.", "cluster", request.Name)
-
-		var restCfg *rest.Config
-		if migCluster.Spec.IsHostCluster {
-			restCfg, err = config.GetConfig()
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-		} else {
-			restCfg, err = migCluster.BuildRestConfig(r.Client)
-			if err != nil {
-				return reconcile.Result{}, nil // don't requeue
-			}
-		}
-
-		StartRemoteWatch(r, remote.ManagerConfig{
-			RemoteRestConfig: restCfg,
-			ParentNsName:     request.NamespacedName,
-			ParentMeta:       migCluster.GetObjectMeta(),
-			ParentObject:     migCluster,
-		})
-
-		log.Info("Remote watch started.", "cluster", request.Name)
-	}
 
 	// Done
 	return reconcile.Result{}, nil
+}
+
+// Setup remote watch.
+func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error {
+	nsName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+	remoteWatchMap := remote.GetWatchMap()
+	remoteWatchCluster := remoteWatchMap.Get(nsName)
+	if remoteWatchCluster != nil {
+		return nil
+	}
+
+	log.Info("Starting remote watch.", "cluster", cluster.Name)
+
+	var err error
+	var restCfg *rest.Config
+	if cluster.Spec.IsHostCluster {
+		restCfg, err = config.GetConfig()
+		if err != nil {
+			return err
+		}
+	} else {
+		restCfg, err = cluster.BuildRestConfig(r.Client)
+		if err != nil {
+			return err
+		}
+	}
+
+	StartRemoteWatch(r, remote.ManagerConfig{
+		RemoteRestConfig: restCfg,
+		ParentNsName:     nsName,
+		ParentMeta:       cluster.GetObjectMeta(),
+		ParentObject:     cluster,
+	})
+
+	log.Info("Remote watch started.", "cluster", cluster.Name)
+
+	return nil
 }

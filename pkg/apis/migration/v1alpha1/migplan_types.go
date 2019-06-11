@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sort"
 )
 
 // MigPlanSpec defines the desired state of MigPlan
@@ -550,6 +551,7 @@ func (r *PersistentVolumes) BeginPvStaging() {
 }
 
 // End staging PVs and delete un-staged PVs from the list.
+// The PVs are sorted by Name.
 func (r *PersistentVolumes) EndPvStaging() {
 	r.init()
 	r.staging = false
@@ -559,6 +561,11 @@ func (r *PersistentVolumes) EndPvStaging() {
 			kept = append(kept, pv)
 		}
 	}
+	sort.Slice(
+		kept,
+		func(i, j int) bool {
+			return kept[i].Name < kept[j].Name
+		})
 	r.List = kept
 	r.buildIndex()
 }

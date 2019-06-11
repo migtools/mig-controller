@@ -112,8 +112,26 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	// Begin staging conditions.
+	storage.Status.BeginStagingConditions()
+
 	// Validations.
 	err = r.validate(storage)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Ready
+	storage.Status.SetReady(
+		!storage.Status.HasBlockerCondition(),
+		ReadyMessage)
+
+	// End staging conditions.
+	storage.Status.EndStagingConditions()
+
+	// Apply changes.
+	storage.Touch()
+	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil

@@ -73,7 +73,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				func(a handler.MapObject) []reconcile.Request {
 					return migref.GetRequests(a, migapi.MigMigration{})
 				}),
-		})
+		},
+		&PlanPredicate{})
 	if err != nil {
 		return err
 	}
@@ -105,23 +106,41 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err // requeue
 	}
 
+	// Begin staging conditions.
+	migration.Status.BeginStagingConditions()
+
 	// Validate
 	err = r.validate(migration)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
+		return reconcile.Result{}, err
+	}
+
+	// Delayed requeue to support polling.
+	requeue := false
+
+	// Migrate
+	if !migration.Status.HasBlockerCondition() {
+		requeue, err = r.migrate(migration)
+		if err != nil {
+			if errors.IsConflict(err) {
+				return reconcile.Result{Requeue: true}, nil
+			} else {
+				return reconcile.Result{}, err
+			}
 		}
 	}
 
 	// Ready
-	if !migration.Status.IsReady() {
-		return reconcile.Result{}, nil
-	}
+	migration.Status.SetReady(
+		!migration.Status.HasBlockerCondition(),
+		ReadyMessage)
 
-	// Do the migration.
-	requeue, err := r.migrate(migration)
+	// End staging conditions.
+	migration.Status.EndStagingConditions()
+
+	// Apply changes.
+	migration.Touch()
+	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		if errors.IsConflict(err) {
 			return reconcile.Result{Requeue: true}, nil
@@ -129,6 +148,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 			return reconcile.Result{}, err
 		}
 	}
+
+	// Delayed requeue to support polling.
 	if requeue {
 		delay := time.Second * 5
 		return reconcile.Result{RequeueAfter: delay}, nil

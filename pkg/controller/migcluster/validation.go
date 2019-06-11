@@ -49,8 +49,6 @@ const (
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
 func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
-	cluster.Status.BeginStagingConditions()
-
 	// registry cluster
 	err := r.validateRegistryCluster(cluster)
 	if err != nil {
@@ -65,18 +63,6 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 
 	// Test Connection
 	err = r.testConnection(cluster)
-	if err != nil {
-		return err
-	}
-
-	// Ready
-	cluster.Status.SetReady(
-		!cluster.Status.HasBlockerCondition(),
-		ReadyMessage)
-
-	// Apply changes.
-	cluster.Status.EndStagingConditions()
-	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		return err
 	}

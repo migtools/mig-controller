@@ -15,6 +15,14 @@ type Claims []types.NamespacedName
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(
+		InvalidSourceClusterRef,
+		SourceClusterNotReady,
+		NsListEmpty,
+		NsNotFoundOnSourceCluster) {
+		return nil
+	}
+
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
@@ -60,12 +68,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		Message:  PvsDiscoveredMessage,
 	})
 
-	// Update
 	plan.Spec.PersistentVolumes.EndPvStaging()
-	err = r.Update(context.TODO(), plan)
-	if err != nil {
-		return nil
-	}
 
 	return nil
 }

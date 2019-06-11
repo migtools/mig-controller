@@ -63,12 +63,6 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 			Category: migapi.Required,
 			Message:  StorageEnsuredMessage,
 		})
-	} else {
-		plan.Status.DeleteCondition(StorageEnsured)
-	}
-	err = r.Update(context.TODO(), plan)
-	if err != nil {
-		return err
 	}
 
 	return err
