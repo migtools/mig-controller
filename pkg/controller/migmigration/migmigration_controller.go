@@ -18,8 +18,10 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/storage/names"
 	"time"
 
@@ -79,6 +81,30 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Indexes
+	indexer := mgr.GetFieldIndexer()
+
+	// Plan
+	err = indexer.IndexField(
+		&migapi.MigMigration{},
+		migapi.PlanIndexField,
+		func(rawObj runtime.Object) []string {
+			m, cast := rawObj.(*migapi.MigMigration)
+			if !cast {
+				return nil
+			}
+			ref := m.Spec.MigPlanRef
+			if !migref.RefSet(ref) {
+				return nil
+			}
+			return []string{
+				fmt.Sprintf("%s/%s", ref.Namespace, ref.Name),
+			}
+		})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -101,10 +127,18 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	err := r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
+			err = r.deleted()
 		}
-		return reconcile.Result{}, err // requeue
+		return reconcile.Result{}, err
 	}
+
+	// Completed.
+	if migration.IsCompleted() {
+		return reconcile.Result{}, nil
+	}
+
+	// Re-queue (after) in seconds.
+	requeueAfter := 0 // not re-queued.
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
@@ -115,12 +149,19 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, err
 	}
 
-	// Delayed requeue to support polling.
-	requeue := false
+	// Ensure that migrations run serially ordered by when created
+	// and grouped with stage migrations followed by final migrations.
+	// Reconcile of a migration not in the desired order will be postponed.
+	if !migration.Status.HasBlockerCondition() {
+		requeueAfter, err = r.postpone(migration)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
 
 	// Migrate
 	if !migration.Status.HasBlockerCondition() {
-		requeue, err = r.migrate(migration)
+		requeueAfter, err = r.migrate(migration)
 		if err != nil {
 			if errors.IsConflict(err) {
 				return reconcile.Result{Requeue: true}, nil
@@ -149,11 +190,79 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		}
 	}
 
-	// Delayed requeue to support polling.
-	if requeue {
-		delay := time.Second * 5
+	// Requeue
+	if requeueAfter > 0 {
+		delay := time.Second * time.Duration(requeueAfter)
 		return reconcile.Result{RequeueAfter: delay}, nil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// Determine if a migration should be postponed.
+// Migrations run serially ordered by created timestamp and grouped
+// with stage migrations followed by final migrations. A migration is
+// postponed when not in the desired order.
+// When postponed:
+//   - Returns: a requeueAfter in seconds, else 0 (not postponed).
+//   - Sets the `Postponed` condition.
+func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, error) {
+	plan, err := migration.GetPlan(r)
+	if err != nil {
+		return 0, err
+	}
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return 0, err
+	}
+	// Pending migrations.
+	pending := []types.UID{}
+	for _, m := range migrations {
+		if !m.IsCompleted() {
+			pending = append(pending, m.UID)
+		}
+	}
+
+	// This migration is next.
+	if len(pending) == 0 || pending[0] == migration.UID {
+		return 0, nil
+	}
+
+	// Postpone
+	requeueAfter := 10
+	for position, uid := range pending {
+		if uid == migration.UID {
+			requeueAfter = position * 10
+			break
+		}
+	}
+	migration.Status.SetCondition(migapi.Condition{
+		Type:     Postponed,
+		Status:   True,
+		Category: Critical,
+		Message:  fmt.Sprintf(PostponedMessage, requeueAfter),
+	})
+
+	return requeueAfter, nil
+}
+
+// Migration has been deleted.
+// Delete the `HasFinalMigration` condition on all other uncompleted migrations.
+func (r *ReconcileMigMigration) deleted() error {
+	migrations, err := migapi.ListMigrations(r)
+	if err != nil {
+		return err
+	}
+	for _, m := range migrations {
+		if m.IsCompleted() || !m.Status.HasCondition(HasFinalMigration) {
+			continue
+		}
+		m.Status.DeleteCondition(HasFinalMigration)
+		err := r.Update(context.TODO(), &m)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

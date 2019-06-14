@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"errors"
+	"fmt"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
@@ -466,6 +467,52 @@ func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, er
 	}
 
 	return nil, nil
+}
+
+// Get list of migrations associated with the plan.
+// Sorted by created timestamp with final migrations grouped last.
+func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, error) {
+	stage := []*MigMigration{}
+	final := []*MigMigration{}
+	qlist := MigMigrationList{}
+
+	// Search
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingField(
+			PlanIndexField,
+			fmt.Sprintf("%s/%s", r.Namespace, r.Name)),
+		&qlist)
+	if err != nil {
+		return nil, err
+	}
+	for i := range qlist.Items {
+		migration := qlist.Items[i]
+		if migration.Spec.Stage {
+			stage = append(stage, &migration)
+		} else {
+			final = append(final, &migration)
+		}
+	}
+
+	// Sort by creation timestamp.
+	sort.Slice(
+		stage,
+		func(i, j int) bool {
+			a := stage[i].ObjectMeta.CreationTimestamp
+			b := stage[j].ObjectMeta.CreationTimestamp
+			return a.Before(&b)
+		})
+	sort.Slice(
+		final,
+		func(i, j int) bool {
+			a := final[i].ObjectMeta.CreationTimestamp
+			b := final[j].ObjectMeta.CreationTimestamp
+			return a.Before(&b)
+		})
+
+	list := append(stage, final...)
+	return list, nil
 }
 
 // Determine if two services are equal.

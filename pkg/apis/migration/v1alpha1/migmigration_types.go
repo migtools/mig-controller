@@ -22,10 +22,12 @@ import (
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
-var log = logf.Log.WithName("controller")
+// Cache Indexes.
+const (
+	PlanIndexField = "planRef"
+)
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
@@ -99,9 +101,19 @@ func (r *MigMigration) MarkAsCompleted() bool {
 	return true
 }
 
+// Get whether the migration is running.
+func (r *MigMigration) IsRunning() bool {
+	return r.Status.MigrationRunning
+}
+
 // Get whether the migration has completed.
 func (r *MigMigration) IsCompleted() bool {
 	return r.Status.MigrationCompleted
+}
+
+// Get whether the migration has failed.
+func (r *MigMigration) HasFailed() bool {
+	return r.IsCompleted() && len(r.Status.Errors) > 0
 }
 
 // Add (de-duplicated) errors.

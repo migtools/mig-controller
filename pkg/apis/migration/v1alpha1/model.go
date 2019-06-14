@@ -14,10 +14,9 @@ import (
 
 // List MigPlans
 // Returns and empty list when none found.
-func ListPlans(client k8sclient.Client, ns string) ([]MigPlan, error) {
+func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 	list := MigPlanList{}
-	options := k8sclient.InNamespace(ns)
-	err := client.List(context.TODO(), options, &list)
+	err := client.List(context.TODO(), nil, &list)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +113,18 @@ func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (*MigStorage
 	}
 
 	return &object, err
+}
+
+// List MigMigrations
+// Returns and empty list when none found.
+func ListMigrations(client k8sclient.Client) ([]MigMigration, error) {
+	list := MigMigrationList{}
+	err := client.List(context.TODO(), nil, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
 }
 
 // Get a referenced Secret.

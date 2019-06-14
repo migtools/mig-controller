@@ -29,7 +29,9 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return true
 	}
-	changed := !reflect.DeepEqual(old.Spec, new.Spec)
+	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
+		(old.Status.HasCondition(HasFinalMigration) &&
+			!new.Status.HasCondition(HasFinalMigration))
 	if changed {
 		r.unmapRefs(old)
 		r.mapRefs(new)

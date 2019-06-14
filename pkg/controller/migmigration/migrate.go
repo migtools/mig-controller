@@ -17,8 +17,6 @@ limitations under the License.
 package migmigration
 
 import (
-	"context"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
@@ -50,19 +48,25 @@ var stagingResources = []string{
 }
 
 // Perform the migration.
-func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, error) {
+func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, error) {
 	if migration.IsCompleted() {
-		return false, nil
+		return 0, nil
 	}
 
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	if !plan.Status.IsReady() {
 		log.Info("Plan not ready.", "name", migration.Name)
-		return false, err
+		return 0, err
+	}
+
+	// Resources
+	planResources, err := plan.GetRefResources(r)
+	if err != nil {
+		return 0, err
 	}
 
 	// Started
@@ -71,10 +75,6 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 	}
 
 	// Run
-	planResources, err := plan.GetRefResources(r)
-	if err != nil {
-		return false, err
-	}
 	task := Task{
 		Log:             log,
 		Client:          r,
@@ -86,27 +86,21 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (bool, e
 	}
 	err = task.Run()
 	if err != nil {
-		return false, err
+		return 0, err
 	}
+
 	migration.Status.Phase = task.Phase
 	switch task.Phase {
 	case WaitOnResticRestart:
-		return true, nil
+		return 10, nil
 	case BackupFailed, RestoreFailed:
 		migration.MarkAsCompleted()
 		migration.AddErrors(task.Errors)
 	case Completed:
 		migration.MarkAsCompleted()
-		if !migration.Spec.Stage {
-			plan.SetClosed()
-			err = r.Update(context.TODO(), plan)
-			if err != nil {
-				return false, err
-			}
-		}
 	}
 
-	return false, nil
+	return 0, nil
 }
 
 // Get annotations.
