@@ -7,8 +7,11 @@ import (
 
 // Types
 const (
-	InvalidPlanRef = "InvalidPlanRef"
-	PlanNotReady   = "PlanNotReady"
+	InvalidPlanRef    = "InvalidPlanRef"
+	PlanNotReady      = "PlanNotReady"
+	PlanClosed        = "PlanClosed"
+	HasFinalMigration = "HasFinalMigration"
+	Postponed         = "Postponed"
 )
 
 // Categories
@@ -30,16 +33,25 @@ const (
 
 // Messages
 const (
-	ReadyMessage          = "The migration is ready."
-	InvalidPlanRefMessage = "The `migPlanRef` must reference a `migplan`."
-	PlanNotReadyMessage   = "The referenced `migPlanRef` does not have a `Ready` condition."
+	ReadyMessage             = "The migration is ready."
+	InvalidPlanRefMessage    = "The `migPlanRef` must reference a `migplan`."
+	PlanNotReadyMessage      = "The referenced `migPlanRef` does not have a `Ready` condition."
+	PlanClosedMessage        = "The associated migration plan is closed."
+	HasFinalMigrationMessage = "The associated MigPlan already has a final migration."
+	PostponedMessage         = "Postponed %d seconds to ensure migrations run serially and in order."
 )
 
 // Validate the plan resource.
 // Returns error and the total error conditions set.
 func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 	// Plan
-	err := r.validatePlan(migration)
+	plan, err := r.validatePlan(migration)
+	if err != nil {
+		return err
+	}
+
+	// Final migration.
+	err = r.validateFinalMigration(plan, migration)
 	if err != nil {
 		return err
 	}
@@ -48,8 +60,7 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 }
 
 // Validate the referenced plan.
-// Returns error and the total error conditions set.
-func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) error {
+func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*migapi.MigPlan, error) {
 	ref := migration.Spec.MigPlanRef
 
 	// NotSet
@@ -61,12 +72,12 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 			Category: Critical,
 			Message:  InvalidPlanRefMessage,
 		})
-		return nil
+		return nil, nil
 	}
 
 	plan, err := migapi.GetPlan(r, ref)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// NotFound
@@ -78,7 +89,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 			Category: Critical,
 			Message:  InvalidPlanRefMessage,
 		})
-		return nil
+		return plan, nil
 	}
 
 	// NotReady
@@ -89,7 +100,65 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) erro
 			Category: Critical,
 			Message:  PlanNotReadyMessage,
 		})
+	}
+
+	// Closed
+	if plan.Spec.Closed {
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     PlanClosed,
+			Status:   True,
+			Category: Critical,
+			Message:  PlanClosedMessage,
+		})
+	}
+
+	return plan, nil
+}
+
+// Validate (other) final migrations associated with the plan.
+// An error condition is added when:
+//   When validating `stage` migrations:
+//     A final migration has started or has completed.
+//   When validating `final` migrations:
+//     A final migratoin has successfully completed.
+func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+	if plan == nil {
 		return nil
+	}
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return nil
+	}
+	hasCondition := false
+	for _, m := range migrations {
+		if m.UID == migration.UID {
+			continue
+		}
+		if !!m.Spec.Stage {
+			continue
+		}
+		// Stage
+		if migration.Spec.Stage {
+			if m.IsCompleted() || m.IsRunning() {
+				hasCondition = true
+				break
+			}
+		}
+		// Final
+		if !migration.Spec.Stage {
+			if m.IsCompleted() && !m.HasFailed() {
+				hasCondition = true
+				break
+			}
+		}
+	}
+	if hasCondition {
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     HasFinalMigration,
+			Status:   True,
+			Category: Critical,
+			Message:  HasFinalMigrationMessage,
+		})
 	}
 
 	return nil
