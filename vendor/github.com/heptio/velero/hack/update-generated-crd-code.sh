@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,6 +34,6 @@ cd ${GOPATH}/src/k8s.io/code-generator
   all \
   github.com/heptio/velero/pkg/generated \
   github.com/heptio/velero/pkg/apis \
-  "ark:v1 velero:v1" \
+  "velero:v1" \
   --go-header-file ${GOPATH}/src/github.com/heptio/velero/hack/boilerplate.go.txt \
   $@

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/volume"
@@ -52,7 +52,7 @@ type itemBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) ItemBackupper
 }
 
@@ -67,17 +67,17 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
-		backupRequest:         backupRequest,
-		backedUpItems:         backedUpItems,
-		tarWriter:             tarWriter,
-		dynamicFactory:        dynamicFactory,
-		discoveryHelper:       discoveryHelper,
-		resticBackupper:       resticBackupper,
-		resticSnapshotTracker: resticSnapshotTracker,
-		blockStoreGetter:      blockStoreGetter,
+		backupRequest:           backupRequest,
+		backedUpItems:           backedUpItems,
+		tarWriter:               tarWriter,
+		dynamicFactory:          dynamicFactory,
+		discoveryHelper:         discoveryHelper,
+		resticBackupper:         resticBackupper,
+		resticSnapshotTracker:   resticSnapshotTracker,
+		volumeSnapshotterGetter: volumeSnapshotterGetter,
 
 		itemHookHandler: &defaultItemHookHandler{
 			podCommandExecutor: podCommandExecutor,
@@ -95,18 +95,18 @@ type ItemBackupper interface {
 }
 
 type defaultItemBackupper struct {
-	backupRequest         *Request
-	backedUpItems         map[itemKey]struct{}
-	tarWriter             tarWriter
-	dynamicFactory        client.DynamicFactory
-	discoveryHelper       discovery.Helper
-	resticBackupper       restic.Backupper
-	resticSnapshotTracker *pvcSnapshotTracker
-	blockStoreGetter      BlockStoreGetter
+	backupRequest           *Request
+	backedUpItems           map[itemKey]struct{}
+	tarWriter               tarWriter
+	dynamicFactory          client.DynamicFactory
+	discoveryHelper         discovery.Helper
+	resticBackupper         restic.Backupper
+	resticSnapshotTracker   *pvcSnapshotTracker
+	volumeSnapshotterGetter VolumeSnapshotterGetter
 
-	itemHookHandler             itemHookHandler
-	additionalItemBackupper     ItemBackupper
-	snapshotLocationBlockStores map[string]cloudprovider.BlockStore
+	itemHookHandler                    itemHookHandler
+	additionalItemBackupper            ItemBackupper
+	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
 }
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
@@ -160,7 +160,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 	ib.backedUpItems[key] = struct{}{}
 
-	log.Info("Backing up resource")
+	log.Info("Backing up item")
 
 	log.Debug("Executing pre hooks")
 	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hookPhasePre); err != nil {
@@ -192,7 +192,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
 	if err != nil {
-		log.WithError(err).Error("Error executing item actions")
 		backupErrs = append(backupErrs, err)
 
 		// if there was an error running actions, execute post hooks and return
@@ -309,11 +308,6 @@ func (ib *defaultItemBackupper) executeActions(
 
 		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backupRequest.Backup)
 		if err != nil {
-			// We want this to show up in the log file at the place where the error occurs. When we return
-			// the error, it get aggregated with all the other ones at the end of the backup, making it
-			// harder to tell when it happened.
-			log.WithError(err).Error("error executing custom action")
-
 			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
 		obj = updatedItem
@@ -331,7 +325,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 			additionalItem, err := client.Get(additionalItem.Name, metav1.GetOptions{})
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 
 			if err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
@@ -343,14 +337,14 @@ func (ib *defaultItemBackupper) executeActions(
 	return obj, nil
 }
 
-// blockStore instantiates and initializes a BlockStore given a VolumeSnapshotLocation,
+// volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotLocation) (cloudprovider.BlockStore, error) {
-	if bs, ok := ib.snapshotLocationBlockStores[snapshotLocation.Name]; ok {
+func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
 
-	bs, err := ib.blockStoreGetter.GetBlockStore(snapshotLocation.Spec.Provider)
+	bs, err := ib.volumeSnapshotterGetter.GetVolumeSnapshotter(snapshotLocation.Spec.Provider)
 	if err != nil {
 		return nil, err
 	}
@@ -359,10 +353,10 @@ func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotL
 		return nil, err
 	}
 
-	if ib.snapshotLocationBlockStores == nil {
-		ib.snapshotLocationBlockStores = make(map[string]cloudprovider.BlockStore)
+	if ib.snapshotLocationVolumeSnapshotters == nil {
+		ib.snapshotLocationVolumeSnapshotters = make(map[string]velero.VolumeSnapshotter)
 	}
-	ib.snapshotLocationBlockStores[snapshotLocation.Name] = bs
+	ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name] = bs
 
 	return bs, nil
 }
@@ -393,7 +387,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	// of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
 		if ib.resticSnapshotTracker.Has(pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name) {
-			log.Info("Skipping Persistent Volume snapshot because volume has already been backed up.")
+			log.Info("Skipping persistent volume snapshot because volume has already been backed up with restic.")
 			return nil
 		}
 	}
@@ -405,15 +399,15 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	var (
 		volumeID, location string
-		blockStore         cloudprovider.BlockStore
+		volumeSnapshotter  velero.VolumeSnapshotter
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {
 		log := log.WithField("volumeSnapshotLocation", snapshotLocation.Name)
 
-		bs, err := ib.blockStore(snapshotLocation)
+		bs, err := ib.volumeSnapshotter(snapshotLocation)
 		if err != nil {
-			log.WithError(err).Error("Error getting block store for volume snapshot location")
+			log.WithError(err).Error("Error getting volume snapshotter for volume snapshot location")
 			continue
 		}
 
@@ -422,18 +416,18 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 			continue
 		}
 		if volumeID == "" {
-			log.Infof("No volume ID returned by block store for persistent volume")
+			log.Infof("No volume ID returned by volume snapshotter for persistent volume")
 			continue
 		}
 
 		log.Infof("Got volume ID for persistent volume")
-		blockStore = bs
+		volumeSnapshotter = bs
 		location = snapshotLocation.Name
 		break
 	}
 
-	if blockStore == nil {
-		log.Info("PersistentVolume is not a supported volume type for snapshots, skipping.")
+	if volumeSnapshotter == nil {
+		log.Info("Persistent volume is not a supported volume type for snapshots, skipping.")
 		return nil
 	}
 
@@ -445,19 +439,17 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	}
 
 	log.Info("Getting volume information")
-	volumeType, iops, err := blockStore.GetVolumeInfo(volumeID, pvFailureDomainZone)
+	volumeType, iops, err := volumeSnapshotter.GetVolumeInfo(volumeID, pvFailureDomainZone)
 	if err != nil {
-		log.WithError(err).Error("error getting volume info")
 		return errors.WithMessage(err, "error getting volume info")
 	}
 
-	log.Info("Snapshotting PersistentVolume")
+	log.Info("Snapshotting persistent volume")
 	snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
 	var errs []error
-	snapshotID, err := blockStore.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
+	snapshotID, err := volumeSnapshotter.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
 	if err != nil {
-		log.WithError(err).Error("error creating snapshot")
 		errs = append(errs, errors.Wrap(err, "error taking snapshot of volume"))
 		snapshot.Status.Phase = volume.SnapshotPhaseFailed
 	} else {

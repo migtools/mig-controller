@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ type podTemplateConfig struct {
 	image                    string
 	withoutCredentialsVolume bool
 	envVars                  []corev1.EnvVar
+	restoreOnly              bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -60,9 +61,16 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 	}
 }
 
+func WithRestoreOnly() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.restoreOnly = true
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deployment {
+	// TODO: Add support for server args
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/velero:latest",
+		image: DefaultImage,
 	}
 
 	for _, opt := range opts {
@@ -76,12 +84,20 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 
 	}
 
+	containerLabels := labels()
+	containerLabels["deploy"] = "velero"
+
 	deployment := &appsv1beta1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+		},
 		Spec: appsv1beta1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"deploy": "velero"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      labels(),
+					Labels:      containerLabels,
 					Annotations: podAnnotations(),
 				},
 				Spec: corev1.PodSpec{
@@ -104,14 +120,26 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 									Name:      "plugins",
 									MountPath: "/plugins",
 								},
+								{
+									Name:      "scratch",
+									MountPath: "/scratch",
+								},
 							},
 							Env: []corev1.EnvVar{
+								{
+									Name:  "VELERO_SCRATCH_DIR",
+									Value: "/scratch",
+								},
 								{
 									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
 									Value: "/credentials/cloud",
 								},
 								{
 									Name:  "AWS_SHARED_CREDENTIALS_FILE",
+									Value: "/credentials/cloud",
+								},
+								{
+									Name:  "AZURE_CREDENTIALS_FILE",
 									Value: "/credentials/cloud",
 								},
 							},
@@ -122,6 +150,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 							Name: "plugins",
 							VolumeSource: corev1.VolumeSource{
 								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "scratch",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: new(corev1.EmptyDirVolumeSource),
 							},
 						},
 					},
@@ -150,6 +184,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 				MountPath: "/credentials",
 			},
 		)
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, c.envVars...)
+
+	if c.restoreOnly {
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--restore-only")
 	}
 
 	return deployment

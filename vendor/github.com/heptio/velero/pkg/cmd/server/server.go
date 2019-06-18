@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -36,8 +35,6 @@ import (
 	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -61,13 +58,11 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/restore"
-	"github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
-	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
 const (
@@ -83,17 +78,52 @@ const (
 	defaultClientBurst int     = 30
 
 	defaultProfilerAddress = "localhost:6060"
+
+	// keys used to map out available controllers with disable-controllers flag
+	BackupControllerKey              = "backup"
+	BackupSyncControllerKey          = "backup-sync"
+	ScheduleControllerKey            = "schedule"
+	GcControllerKey                  = "gc"
+	BackupDeletionControllerKey      = "backup-deletion"
+	RestoreControllerKey             = "restore"
+	DownloadRequestControllerKey     = "download-request"
+	ResticRepoControllerKey          = "restic-repo"
+	ServerStatusRequestControllerKey = "server-status-request"
+
+	defaultControllerWorkers = 1
+	// the default TTL for a backup
+	defaultBackupTTL = 30 * 24 * time.Hour
 )
+
+// list of available controllers for input validation
+var disableControllerList = []string{
+	BackupControllerKey,
+	BackupSyncControllerKey,
+	ScheduleControllerKey,
+	GcControllerKey,
+	BackupDeletionControllerKey,
+	RestoreControllerKey,
+	DownloadRequestControllerKey,
+	ResticRepoControllerKey,
+	ServerStatusRequestControllerKey,
+}
 
 type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
+	defaultBackupTTL                                                        time.Duration
 	restoreResourcePriorities                                               []string
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
+	disabledControllers                                                     []string
 	clientQPS                                                               float32
 	clientBurst                                                             int
 	profilerAddress                                                         string
+}
+
+type controllerRunInfo struct {
+	controller controller.Interface
+	numWorkers int
 }
 
 func NewCommand() *cobra.Command {
@@ -106,6 +136,7 @@ func NewCommand() *cobra.Command {
 			defaultBackupLocation:          "default",
 			defaultVolumeSnapshotLocations: make(map[string]string),
 			backupSyncPeriod:               defaultBackupSyncPeriod,
+			defaultBackupTTL:               defaultBackupTTL,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
 			clientQPS:                      defaultClientQPS,
@@ -164,6 +195,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster")
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
+	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("list of controllers to disable on startup. Valid values are %s", strings.Join(disableControllerList, ",")))
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
@@ -171,6 +203,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
+	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "how long to wait by default before backups can be garbage collected")
 
 	return command
 }
@@ -203,8 +236,8 @@ type server struct {
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
-	pluginRegistry        plugin.Registry
-	pluginManager         plugin.Manager
+	pluginRegistry        clientmgmt.Registry
+	pluginManager         clientmgmt.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
@@ -235,11 +268,11 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		return nil, errors.WithStack(err)
 	}
 
-	pluginRegistry := plugin.NewRegistry(config.pluginDir, logger, logger.Level)
+	pluginRegistry := clientmgmt.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
+	pluginManager := clientmgmt.NewManager(logger, logger.Level, pluginRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -411,10 +444,7 @@ func (s *server) validateBackupStorageLocations() error {
 		}
 
 		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err,
-				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Velero, please refer to https://heptio.github.io/velero/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
-				location.Name,
-			).Error())
+			invalid = append(invalid, errors.Wrapf(err, "backup store for location %q is invalid", location.Name).Error())
 		}
 	}
 
@@ -489,6 +519,8 @@ func (s *server) initRestic() error {
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
 		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.kubeClient.CoreV1(),
+		s.kubeClient.CoreV1(),
 		s.logger,
 	)
 	if err != nil {
@@ -518,32 +550,32 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// Initialize manual backup metrics
 	s.metrics.InitSchedule("")
 
-	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
-		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+	newPluginManager := func(logger logrus.FieldLogger) clientmgmt.Manager {
+		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
-	backupSyncController := controller.NewBackupSyncController(
-		s.veleroClient.VeleroV1(),
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.config.backupSyncPeriod,
-		s.namespace,
-		s.config.defaultBackupLocation,
-		newPluginManager,
-		s.logger,
-	)
-	wg.Add(1)
-	go func() {
-		backupSyncController.Run(ctx, 1)
-		wg.Done()
-	}()
+	backupSyncControllerRunInfo := func() controllerRunInfo {
+		backupSyncContoller := controller.NewBackupSyncController(
+			s.veleroClient.VeleroV1(),
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.config.backupSyncPeriod,
+			s.namespace,
+			s.config.defaultBackupLocation,
+			newPluginManager,
+			s.logger,
+		)
 
-	if s.config.restoreOnly {
-		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
-	} else {
-		backupTracker := controller.NewBackupTracker()
+		return controllerRunInfo{
+			controller: backupSyncContoller,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
 
+	backupTracker := controller.NewBackupTracker()
+
+	backupControllerRunInfo := func() controllerRunInfo {
 		backupper, err := backup.NewKubernetesBackupper(
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
@@ -563,16 +595,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
+			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 		)
-		wg.Add(1)
-		go func() {
-			backupController.Run(ctx, 1)
-			wg.Done()
-		}()
 
+		return controllerRunInfo{
+			controller: backupController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	scheduleControllerRunInfo := func() controllerRunInfo {
 		scheduleController := controller.NewScheduleController(
 			s.namespace,
 			s.veleroClient.VeleroV1(),
@@ -581,25 +616,29 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.metrics,
 		)
-		wg.Add(1)
-		go func() {
-			scheduleController.Run(ctx, 1)
-			wg.Done()
-		}()
 
+		return controllerRunInfo{
+			controller: scheduleController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	gcControllerRunInfo := func() controllerRunInfo {
 		gcController := controller.NewGCController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
 			s.veleroClient.VeleroV1(),
 		)
-		wg.Add(1)
-		go func() {
-			gcController.Run(ctx, 1)
-			wg.Done()
-		}()
 
-		backupDeletionController := controller.NewBackupDeletionController(
+		return controllerRunInfo{
+			controller: gcController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	deletionControllerRunInfo := func() controllerRunInfo {
+		deletionController := controller.NewBackupDeletionController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
 			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
@@ -612,95 +651,139 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			newPluginManager,
+			s.metrics,
 		)
+
+		return controllerRunInfo{
+			controller: deletionController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	restoreControllerRunInfo := func() controllerRunInfo {
+
+		restorer, err := restore.NewKubernetesRestorer(
+			s.discoveryHelper,
+			client.NewDynamicFactory(s.dynamicClient),
+			s.config.restoreResourcePriorities,
+			s.kubeClient.CoreV1().Namespaces(),
+			s.resticManager,
+			s.config.podVolumeOperationTimeout,
+			s.config.resourceTerminatingTimeout,
+			s.logger,
+		)
+		cmd.CheckError(err)
+
+		restoreController := controller.NewRestoreController(
+			s.namespace,
+			s.sharedInformerFactory.Velero().V1().Restores(),
+			s.veleroClient.VeleroV1(),
+			s.veleroClient.VeleroV1(),
+			restorer,
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
+			s.logger,
+			s.logLevel,
+			newPluginManager,
+			s.config.defaultBackupLocation,
+			s.metrics,
+		)
+
+		return controllerRunInfo{
+			controller: restoreController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	resticRepoControllerRunInfo := func() controllerRunInfo {
+		resticRepoController := controller.NewResticRepositoryController(
+			s.logger,
+			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.resticManager,
+		)
+
+		return controllerRunInfo{
+			controller: resticRepoController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	downloadrequestControllerRunInfo := func() controllerRunInfo {
+		downloadRequestController := controller.NewDownloadRequestController(
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
+			s.sharedInformerFactory.Velero().V1().Restores(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			newPluginManager,
+			s.logger,
+		)
+
+		return controllerRunInfo{
+			controller: downloadRequestController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	serverStatusRequestControllerRunInfo := func() controllerRunInfo {
+		serverStatusRequestController := controller.NewServerStatusRequestController(
+			s.logger,
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
+		)
+
+		return controllerRunInfo{
+			controller: serverStatusRequestController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
+	enabledControllers := map[string]func() controllerRunInfo{
+		BackupSyncControllerKey:          backupSyncControllerRunInfo,
+		BackupControllerKey:              backupControllerRunInfo,
+		ScheduleControllerKey:            scheduleControllerRunInfo,
+		GcControllerKey:                  gcControllerRunInfo,
+		BackupDeletionControllerKey:      deletionControllerRunInfo,
+		RestoreControllerKey:             restoreControllerRunInfo,
+		ResticRepoControllerKey:          resticRepoControllerRunInfo,
+		DownloadRequestControllerKey:     downloadrequestControllerRunInfo,
+		ServerStatusRequestControllerKey: serverStatusRequestControllerRunInfo,
+	}
+
+	if s.config.restoreOnly {
+		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
+		s.config.disabledControllers = append(s.config.disabledControllers,
+			BackupControllerKey,
+			ScheduleControllerKey,
+			GcControllerKey,
+			BackupDeletionControllerKey,
+		)
+	}
+
+	// remove disabled controllers
+	for _, controllerName := range s.config.disabledControllers {
+		if _, ok := enabledControllers[controllerName]; ok {
+			s.logger.Infof("Disabling controller: %s", controllerName)
+			delete(enabledControllers, controllerName)
+		} else {
+			s.logger.Fatalf("Invalid value for --disable-controllers flag provided: %s. Valid values are: %s", controllerName, strings.Join(disableControllerList, ","))
+		}
+	}
+
+	for _, newController := range enabledControllers {
+		controllerRunInfo := newController()
 		wg.Add(1)
 		go func() {
-			backupDeletionController.Run(ctx, 1)
+			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
 			wg.Done()
 		}()
 	}
 
-	restorer, err := restore.NewKubernetesRestorer(
-		s.discoveryHelper,
-		client.NewDynamicFactory(s.dynamicClient),
-		s.config.restoreResourcePriorities,
-		s.kubeClient.CoreV1().Namespaces(),
-		s.resticManager,
-		s.config.podVolumeOperationTimeout,
-		s.config.resourceTerminatingTimeout,
-		s.logger,
-	)
-	cmd.CheckError(err)
-
-	restoreController := controller.NewRestoreController(
-		s.namespace,
-		s.sharedInformerFactory.Velero().V1().Restores(),
-		s.veleroClient.VeleroV1(),
-		s.veleroClient.VeleroV1(),
-		restorer,
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
-		s.logger,
-		s.logLevel,
-		newPluginManager,
-		s.config.defaultBackupLocation,
-		s.metrics,
-	)
-
-	wg.Add(1)
-	go func() {
-		restoreController.Run(ctx, 1)
-		wg.Done()
-	}()
-
-	downloadRequestController := controller.NewDownloadRequestController(
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().DownloadRequests(),
-		s.sharedInformerFactory.Velero().V1().Restores(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Velero().V1().Backups(),
-		newPluginManager,
-		s.logger,
-	)
-	wg.Add(1)
-	go func() {
-		downloadRequestController.Run(ctx, 1)
-		wg.Done()
-	}()
-
-	resticRepoController := controller.NewResticRepositoryController(
-		s.logger,
-		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-		s.resticManager,
-	)
-	wg.Add(1)
-	go func() {
-		// TODO only having a single worker may be an issue since maintenance
-		// can take a long time.
-		resticRepoController.Run(ctx, 1)
-		wg.Done()
-	}()
-
-	serverStatusRequestController := controller.NewServerStatusRequestController(
-		s.logger,
-		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
-	)
-	wg.Add(1)
-	go func() {
-		serverStatusRequestController.Run(ctx, 1)
-		wg.Done()
-	}()
-
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
-
-	// TODO(1.0): remove
-	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Velero().V1().Backups().Informer().HasSynced)
-	s.removeDeprecatedGCFinalizer()
 
 	s.logger.Info("Server started successfully")
 
@@ -722,45 +805,5 @@ func (s *server) runProfiler() {
 
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
-	}
-}
-
-// TODO(1.0): remove
-func (s *server) removeDeprecatedGCFinalizer() {
-	const gcFinalizer = "gc.ark.heptio.com"
-
-	backups, err := s.sharedInformerFactory.Velero().V1().Backups().Lister().List(labels.Everything())
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
-		return
-	}
-
-	for _, backup := range backups {
-		log := s.logger.WithField("backup", kube.NamespaceAndName(backup))
-
-		if !stringslice.Has(backup.Finalizers, gcFinalizer) {
-			log.Debug("backup doesn't have deprecated finalizer - skipping")
-			continue
-		}
-
-		log.Info("removing deprecated finalizer from backup")
-
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers":      stringslice.Except(backup.Finalizers, gcFinalizer),
-				"resourceVersion": backup.ResourceVersion,
-			},
-		}
-
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
-			continue
-		}
-
-		_, err = s.veleroClient.VeleroV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
-		}
 	}
 }

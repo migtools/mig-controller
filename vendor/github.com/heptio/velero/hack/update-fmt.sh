@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ if ! command -v goimports > /dev/null; then
   exit 1
 fi
 
-files="$(find . -type f -name '*.go' -not -path './vendor/*' -not -path './pkg/generated/*' -not -name 'zz_generated*')"
+files="$(find . -type f -name '*.go' -not -path './vendor/*' -not -path './site/*' -not -path './pkg/generated/*' -not -name 'zz_generated*')"
 echo "${ACTION} gofmt"
 for file in ${files}; do
   output=$(gofmt "${MODE}" -s "${file}")

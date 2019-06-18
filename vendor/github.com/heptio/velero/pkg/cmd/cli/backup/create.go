@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,6 +46,20 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
+		Example: `	# create a backup containing all resources
+	velero backup create backup1
+
+	# create a backup including only the nginx namespace
+	velero backup create nginx-backup --include-namespaces nginx
+
+	# create a backup excluding the velero and default namespaces
+	velero backup create backup2 --exclude-namespaces velero,default
+
+	# view the YAML for a backup that doesn't snapshot volumes, without sending it to the server
+	velero backup create backup3 --snapshot-volumes=false -o yaml
+	
+	# wait for a backup to complete before returning from the command
+	velero backup create backup4 --wait`,
 	}
 
 	o.BindFlags(c.Flags())

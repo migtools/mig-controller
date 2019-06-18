@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -27,11 +28,35 @@ import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	pkgrestore "github.com/heptio/velero/pkg/restore"
 )
 
 func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
+
+		d.Println()
+		phase := restore.Status.Phase
+		if phase == "" {
+			phase = v1.RestorePhaseNew
+		}
+
+		resultsNote := ""
+		if phase == v1.RestorePhaseFailed || phase == v1.RestorePhasePartiallyFailed {
+			resultsNote = fmt.Sprintf(" (run 'velero restore logs %s' for more information)", restore.Name)
+		}
+
+		d.Printf("Phase:\t%s%s\n", restore.Status.Phase, resultsNote)
+
+		if len(restore.Status.ValidationErrors) > 0 {
+			d.Println()
+			d.Printf("Validation errors:")
+			for _, ve := range restore.Status.ValidationErrors {
+				d.Printf("\t%s\n", ve)
+			}
+		}
+
+		describeRestoreResults(d, restore, veleroClient)
 
 		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)
@@ -82,22 +107,6 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		d.Println()
 		d.Printf("Restore PVs:\t%s\n", BoolPointerString(restore.Spec.RestorePVs, "false", "true", "auto"))
 
-		d.Println()
-		d.Printf("Phase:\t%s\n", restore.Status.Phase)
-
-		d.Println()
-		d.Printf("Validation errors:")
-		if len(restore.Status.ValidationErrors) == 0 {
-			d.Printf("\t<none>\n")
-		} else {
-			for _, ve := range restore.Status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
-			}
-		}
-
-		d.Println()
-		describeRestoreResults(d, restore, veleroClient)
-
 		if len(podVolumeRestores) > 0 {
 			d.Println()
 			describePodVolumeRestores(d, podVolumeRestores, details)
@@ -107,12 +116,11 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 
 func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
-		d.Printf("Warnings:\t<none>\nErrors:\t<none>\n")
 		return
 	}
 
 	var buf bytes.Buffer
-	var resultMap map[string]v1.RestoreResult
+	var resultMap map[string]pkgrestore.Result
 
 	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
@@ -124,15 +132,19 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 		return
 	}
 
-	describeRestoreResult(d, "Warnings", resultMap["warnings"])
-	d.Println()
-	describeRestoreResult(d, "Errors", resultMap["errors"])
+	if restore.Status.Warnings > 0 {
+		d.Println()
+		describeRestoreResult(d, "Warnings", resultMap["warnings"])
+	}
+	if restore.Status.Errors > 0 {
+		d.Println()
+		describeRestoreResult(d, "Errors", resultMap["errors"])
+	}
 }
 
-func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
+func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) {
 	d.Printf("%s:\n", name)
-	// TODO(1.0): only describe result.Velero
-	d.DescribeSlice(1, "Velero", append(result.Ark, result.Velero...))
+	d.DescribeSlice(1, "Velero", result.Velero)
 	d.DescribeSlice(1, "Cluster", result.Cluster)
 	if len(result.Namespaces) == 0 {
 		d.Printf("\tNamespaces: <none>\n")

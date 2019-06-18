@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"io"
 	"os"
 	"strings"
 	"time"
 
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -36,16 +37,109 @@ const (
 	storageAccountConfigKey = "storageAccount"
 )
 
-type objectStore struct {
-	blobClient *storage.BlobStorageClient
-	log        logrus.FieldLogger
+type containerGetter interface {
+	getContainer(bucket string) (container, error)
 }
 
-func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
-	return &objectStore{log: logger}
+type azureContainerGetter struct {
+	blobService *storage.BlobStorageClient
+}
+
+func (cg *azureContainerGetter) getContainer(bucket string) (container, error) {
+	container := cg.blobService.GetContainerReference(bucket)
+	if container == nil {
+		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
+	}
+
+	return &azureContainer{
+		container: container,
+	}, nil
+}
+
+type container interface {
+	ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error)
+}
+
+type azureContainer struct {
+	container *storage.Container
+}
+
+func (c *azureContainer) ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error) {
+	return c.container.ListBlobs(params)
+}
+
+type blobGetter interface {
+	getBlob(bucket, key string) (blob, error)
+}
+
+type azureBlobGetter struct {
+	blobService *storage.BlobStorageClient
+}
+
+func (bg *azureBlobGetter) getBlob(bucket, key string) (blob, error) {
+	container := bg.blobService.GetContainerReference(bucket)
+	if container == nil {
+		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
+	}
+
+	blob := container.GetBlobReference(key)
+	if blob == nil {
+		return nil, errors.Errorf("unable to get blob reference for key %v", key)
+	}
+
+	return &azureBlob{
+		blob: blob,
+	}, nil
+}
+
+type blob interface {
+	CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error
+	Exists() (bool, error)
+	Get(options *storage.GetBlobOptions) (io.ReadCloser, error)
+	Delete(options *storage.DeleteBlobOptions) error
+	GetSASURI(options *storage.BlobSASOptions) (string, error)
+}
+
+type azureBlob struct {
+	blob *storage.Blob
+}
+
+func (b *azureBlob) CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error {
+	return b.blob.CreateBlockBlobFromReader(blob, options)
+}
+
+func (b *azureBlob) Exists() (bool, error) {
+	return b.blob.Exists()
+}
+
+func (b *azureBlob) Get(options *storage.GetBlobOptions) (io.ReadCloser, error) {
+	return b.blob.Get(options)
+}
+
+func (b *azureBlob) Delete(options *storage.DeleteBlobOptions) error {
+	return b.blob.Delete(options)
+}
+
+func (b *azureBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
+	return b.blob.GetSASURI(*options)
+}
+
+type ObjectStore struct {
+	containerGetter containerGetter
+	blobGetter      blobGetter
+	log             logrus.FieldLogger
+}
+
+func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
+	return &ObjectStore{log: logger}
 }
 
 func getStorageAccountKey(config map[string]string) (string, error) {
+	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
+	if err := loadEnv(); err != nil {
+		return "", err
+	}
+
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
 	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
 	if err != nil {
@@ -68,7 +162,7 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
 	// 5. get storage key
-	res, err := storageAccountsClient.ListKeys(config[resourceGroupConfigKey], config[storageAccountConfigKey])
+	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -99,7 +193,11 @@ func mapLookup(data map[string]string) func(string) string {
 	}
 }
 
-func (o *objectStore) Init(config map[string]string) error {
+func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return err
+	}
+
 	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
 		return err
@@ -112,18 +210,18 @@ func (o *objectStore) Init(config map[string]string) error {
 	}
 
 	blobClient := storageClient.GetBlobService()
-	o.blobClient = &blobClient
+	o.containerGetter = &azureContainerGetter{
+		blobService: &blobClient,
+	}
+	o.blobGetter = &azureBlobGetter{
+		blobService: &blobClient,
+	}
 
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
-	container, err := getContainerReference(o.blobClient, bucket)
-	if err != nil {
-		return err
-	}
-
-	blob, err := getBlobReference(container, key)
+func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
+	blob, err := o.blobGetter.getBlob(bucket, key)
 	if err != nil {
 		return err
 	}
@@ -131,13 +229,22 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
-func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
-	container, err := getContainerReference(o.blobClient, bucket)
+func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	blob, err := o.blobGetter.getBlob(bucket, key)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
-	blob, err := getBlobReference(container, key)
+	exists, err := blob.Exists()
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	return exists, nil
+}
+
+func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
+	blob, err := o.blobGetter.getBlob(bucket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +257,8 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	return res, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
-	container, err := getContainerReference(o.blobClient, bucket)
+func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+	container, err := o.containerGetter.getContainer(bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +276,8 @@ func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 	return res.BlobPrefixes, nil
 }
 
-func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
-	container, err := getContainerReference(o.blobClient, bucket)
+func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
+	container, err := o.containerGetter.getContainer(bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -192,13 +299,8 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (o *objectStore) DeleteObject(bucket string, key string) error {
-	container, err := getContainerReference(o.blobClient, bucket)
-	if err != nil {
-		return err
-	}
-
-	blob, err := getBlobReference(container, key)
+func (o *ObjectStore) DeleteObject(bucket string, key string) error {
+	blob, err := o.blobGetter.getBlob(bucket, key)
 	if err != nil {
 		return err
 	}
@@ -206,13 +308,8 @@ func (o *objectStore) DeleteObject(bucket string, key string) error {
 	return errors.WithStack(blob.Delete(nil))
 }
 
-func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	container, err := getContainerReference(o.blobClient, bucket)
-	if err != nil {
-		return "", err
-	}
-
-	blob, err := getBlobReference(container, key)
+func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	blob, err := o.blobGetter.getBlob(bucket, key)
 	if err != nil {
 		return "", err
 	}
@@ -226,23 +323,5 @@ func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (st
 		},
 	}
 
-	return blob.GetSASURI(opts)
-}
-
-func getContainerReference(blobClient *storage.BlobStorageClient, bucket string) (*storage.Container, error) {
-	container := blobClient.GetContainerReference(bucket)
-	if container == nil {
-		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
-	}
-
-	return container, nil
-}
-
-func getBlobReference(container *storage.Container, key string) (*storage.Blob, error) {
-	blob := container.GetBlobReference(key)
-	if blob == nil {
-		return nil, errors.Errorf("unable to get blob reference for key %v", key)
-	}
-
-	return blob, nil
+	return blob.GetSASURI(&opts)
 }

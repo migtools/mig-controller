@@ -1,4 +1,4 @@
-# Copyright 2018 the Heptio Ark contributors.
+# Copyright 2018 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,6 @@
 # limitations under the License.
 
 dist: _output
-before:
-  hooks:
-    - ./hack/set-example-tags.sh
 builds:
   - main: ./cmd/velero/main.go
     env:
@@ -42,9 +39,10 @@ builds:
       - -X "github.com/heptio/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
 archive:
   name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+  wrap_in_directory: true
   files:
     - LICENSE
-    - config/**/*
+    - examples/**/*
 checksum:
   name_template: 'CHECKSUM'
 release:

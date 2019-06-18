@@ -1,6 +1,6 @@
 # Copyright 2016 The Kubernetes Authors.
 #
-# Modifications Copyright 2017 the Heptio Ark contributors.
+# Modifications Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ GOARCH = $(word 2, $(platform_temp))
 # TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
-		DOCKERFILE ?= Dockerfile-$(BIN).alpine
+		DOCKERFILE ?= Dockerfile-$(BIN)
 endif
 #ifeq ($(GOARCH),arm)
 #		DOCKERFILE ?= Dockerfile.arm #armel/busybox
@@ -132,7 +132,7 @@ DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 build-fsfreeze: BIN = fsfreeze-pause
 build-fsfreeze:
 	@cp $(DOCKERFILE)  _output/.dockerfile-$(BIN).alpine
-	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
+	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
 	@docker images -q $(IMAGE):$(VERSION) > .container-$(DOTFILE_IMAGE)
 
 push-fsfreeze: BIN = fsfreeze-pause
@@ -152,7 +152,7 @@ all-containers:
 container: verify test .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
-	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
+	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
 container-name:
@@ -200,7 +200,7 @@ build-dirs:
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build
 
 build-image:
-	cd hack/build-image && docker build -t $(BUILDER_IMAGE) .
+	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
 
 clean:
 	rm -rf .container-* _output/.dockerfile-* .push-*

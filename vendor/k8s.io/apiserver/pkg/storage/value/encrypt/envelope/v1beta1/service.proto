@@ -67,3 +67,4 @@ message EncryptResponse {
     // The encrypted data.
     bytes cipher = 1;
 }
+

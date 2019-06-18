@@ -66,3 +66,4 @@ message ReplicaSetStatus {
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
   optional int32 replicas = 1;
 }
+

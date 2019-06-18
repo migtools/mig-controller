@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ type dynamicResourceClient struct {
 var _ Dynamic = &dynamicResourceClient{}
 
 func (d *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Create(obj)
+	return d.resourceClient.Create(obj, metav1.CreateOptions{})
 }
 
 func (d *dynamicResourceClient) List(options metav1.ListOptions) (runtime.Object, error) {
@@ -114,5 +114,5 @@ func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstr
 }
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Patch(name, types.MergePatchType, data)
+	return d.resourceClient.Patch(name, types.MergePatchType, data, metav1.UpdateOptions{})
 }

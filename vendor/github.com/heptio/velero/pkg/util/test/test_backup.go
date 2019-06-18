@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -94,29 +94,6 @@ func (b *TestBackup) WithExpiration(expiration time.Time) *TestBackup {
 
 func (b *TestBackup) WithVersion(version int) *TestBackup {
 	b.Status.Version = version
-	return b
-}
-
-func (b *TestBackup) WithSnapshot(pv string, snapshot string) *TestBackup {
-	if b.Status.VolumeBackups == nil {
-		b.Status.VolumeBackups = make(map[string]*v1.VolumeBackupInfo)
-	}
-	b.Status.VolumeBackups[pv] = &v1.VolumeBackupInfo{SnapshotID: snapshot}
-	return b
-}
-
-func (b *TestBackup) WithVolumeBackupInfo(pv, snapshotID, volumeType, az string, iops *int64) *TestBackup {
-	if b.Status.VolumeBackups == nil {
-		b.Status.VolumeBackups = make(map[string]*v1.VolumeBackupInfo)
-	}
-
-	b.Status.VolumeBackups[pv] = &v1.VolumeBackupInfo{
-		SnapshotID:       snapshotID,
-		Type:             volumeType,
-		AvailabilityZone: az,
-		Iops:             iops,
-	}
-
 	return b
 }
 

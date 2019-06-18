@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -40,8 +42,8 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	pkgrestore "github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
@@ -56,13 +58,16 @@ var nonRestorableResources = []string{
 
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
 	// https://github.com/heptio/velero/issues/622
-	"backups.ark.heptio.com",
 	"backups.velero.io",
 
 	// Restores are cluster-specific, and don't have value moving across clusters.
 	// https://github.com/heptio/velero/issues/622
-	"restores.ark.heptio.com",
 	"restores.velero.io",
+
+	// Restic repositories are automatically managed by Velero and will be automatically
+	// created as needed if they don't exist.
+	// https://github.com/heptio/velero/issues/1113
+	"resticrepositories.velero.io",
 }
 
 type restoreController struct {
@@ -71,7 +76,7 @@ type restoreController struct {
 	namespace              string
 	restoreClient          velerov1client.RestoresGetter
 	backupClient           velerov1client.BackupsGetter
-	restorer               restore.Restorer
+	restorer               pkgrestore.Restorer
 	backupLister           listers.BackupLister
 	restoreLister          listers.RestoreLister
 	backupLocationLister   listers.BackupStorageLocationLister
@@ -80,12 +85,8 @@ type restoreController struct {
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
 
-	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
+	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
-}
-
-type restoreResult struct {
-	warnings, errors api.RestoreResult
 }
 
 func NewRestoreController(
@@ -93,13 +94,13 @@ func NewRestoreController(
 	restoreInformer informers.RestoreInformer,
 	restoreClient velerov1client.RestoresGetter,
 	backupClient velerov1client.BackupsGetter,
-	restorer restore.Restorer,
+	restorer pkgrestore.Restorer,
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
@@ -123,13 +124,15 @@ func NewRestoreController(
 		newBackupStore:   persistence.NewObjectBackupStore,
 	}
 
-	c.syncHandler = c.processRestore
+	c.syncHandler = c.processQueueItem
 	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
 		backupInformer.Informer().HasSynced,
 		restoreInformer.Informer().HasSynced,
 		backupLocationInformer.Informer().HasSynced,
 		snapshotLocationInformer.Informer().HasSynced,
 	)
+	c.resyncFunc = c.resync
+	c.resyncPeriod = time.Minute
 
 	restoreInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -160,13 +163,22 @@ func NewRestoreController(
 	return c
 }
 
-func (c *restoreController) processRestore(key string) error {
+func (c *restoreController) resync() {
+	restores, err := c.restoreLister.List(labels.Everything())
+	if err != nil {
+		c.logger.Error(err, "Error computing restore_total metric")
+	} else {
+		c.metrics.SetRestoreTotal(int64(len(restores)))
+	}
+}
+
+func (c *restoreController) processQueueItem(key string) error {
 	log := c.logger.WithField("key", key)
 
-	log.Debug("Running processRestore")
+	log.Debug("Running processQueueItem")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		log.WithError(err).Error("unable to process restore: error splitting queue key")
+		log.WithError(err).Error("unable to process queue item: error splitting queue key")
 		// Return nil here so we don't try to process the key any more
 		return nil
 	}
@@ -191,24 +203,30 @@ func (c *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	log.Debug("Cloning Restore")
-	// store ref to original for creating patch
-	original := restore
-	// don't modify items in the cache
-	restore = restore.DeepCopy()
+	// Deep-copy the restore so the copy from the lister is not modified.
+	// Any errors returned by processRestore will be bubbled up, meaning
+	// the key will be re-enqueued by the controller.
+	return c.processRestore(restore.DeepCopy())
+}
 
-	pluginManager := c.newPluginManager(log)
-	defer pluginManager.CleanupClients()
+func (c *restoreController) processRestore(restore *api.Restore) error {
+	// Developer note: any error returned by this method will
+	// cause the restore to be re-enqueued and re-processed by
+	// the controller.
 
-	actions, err := pluginManager.GetRestoreItemActions()
-	if err != nil {
-		return errors.Wrap(err, "error initializing restore item actions")
-	}
+	// store a copy of the original restore for creating patch
+	original := restore.DeepCopy()
 
-	// validate the restore and fetch the backup
+	// Validate the restore and fetch the backup. Note that the plugin
+	// manager used here is not the same one used by c.runValidatedRestore,
+	// since within that function we want the plugin manager to log to
+	// our per-restore log (which is instantiated within c.runValidatedRestore).
+	pluginManager := c.newPluginManager(c.logger)
 	info := c.validateAndComplete(restore, pluginManager)
-	backupScheduleName := restore.Spec.ScheduleName
+	pluginManager.CleanupClients()
+
 	// Register attempts after validation so we don't have to fetch the backup multiple times
+	backupScheduleName := restore.Spec.ScheduleName
 	c.metrics.RegisterRestoreAttempt(backupScheduleName)
 
 	if len(restore.Status.ValidationErrors) > 0 {
@@ -221,6 +239,8 @@ func (c *restoreController) processRestore(key string) error {
 	// patch to update status and persist to API
 	updatedRestore, err := patchRestore(original, restore, c.restoreClient)
 	if err != nil {
+		// return the error so the restore can be re-processed; it's currently
+		// still in phase = New.
 		return errors.Wrapf(err, "error updating Restore phase to %s", restore.Status.Phase)
 	}
 	// store ref to just-updated item for creating patch
@@ -231,43 +251,24 @@ func (c *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	log.Debug("Running restore")
-
-	// execution & upload of restore
-	restoreRes, restoreFailure := c.runRestore(
-		restore,
-		actions,
-		info,
-		pluginManager,
-	)
-
-	//TODO(1.0): Remove warnings.Ark
-	restore.Status.Warnings = len(restoreRes.warnings.Velero) + len(restoreRes.warnings.Cluster) + len(restoreRes.warnings.Ark)
-	for _, w := range restoreRes.warnings.Namespaces {
-		restore.Status.Warnings += len(w)
-	}
-
-	//TODO (1.0): Remove errors.Ark
-	restore.Status.Errors = len(restoreRes.errors.Velero) + len(restoreRes.errors.Cluster) + len(restoreRes.errors.Ark)
-	for _, e := range restoreRes.errors.Namespaces {
-		restore.Status.Errors += len(e)
-	}
-
-	if restoreFailure != nil {
-		log.Debug("restore failed")
+	if err := c.runValidatedRestore(restore, info); err != nil {
+		c.logger.WithError(err).Debug("Restore failed")
 		restore.Status.Phase = api.RestorePhaseFailed
-		restore.Status.FailureReason = restoreFailure.Error()
+		restore.Status.FailureReason = err.Error()
 		c.metrics.RegisterRestoreFailed(backupScheduleName)
+	} else if restore.Status.Errors > 0 {
+		c.logger.Debug("Restore partially failed")
+		restore.Status.Phase = api.RestorePhasePartiallyFailed
+		c.metrics.RegisterRestorePartialFailure(backupScheduleName)
 	} else {
-		log.Debug("restore completed")
-		// We got through the restore process without failing validation or restore execution
+		c.logger.Debug("Restore completed")
 		restore.Status.Phase = api.RestorePhaseCompleted
 		c.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
 
-	log.Debug("Updating Restore final status")
+	c.logger.Debug("Updating restore's final status")
 	if _, err = patchRestore(original, restore, c.restoreClient); err != nil {
-		log.WithError(errors.WithStack(err)).Info("Error updating Restore final status")
+		c.logger.WithError(errors.WithStack(err)).Info("Error updating restore's final status")
 	}
 
 	return nil
@@ -278,7 +279,7 @@ type backupInfo struct {
 	backupStore persistence.BackupStore
 }
 
-func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager plugin.Manager) backupInfo {
+func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager clientmgmt.Manager) backupInfo {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -341,26 +342,6 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		return backupInfo{}
 	}
 
-	// Ensure that we have either .status.volumeBackups (for pre-v0.10 backups) OR a
-	// volumesnapshots.json.gz file in obj storage (for v0.10+ backups), but not both.
-	// If we have .status.volumeBackups, ensure that there's only one volume snapshot
-	// location configured.
-	if info.backup.Status.VolumeBackups != nil {
-		snapshots, err := info.backupStore.GetBackupVolumeSnapshots(info.backup.Name)
-		if err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrap(err, "Error checking for volumesnapshots file").Error())
-		} else if len(snapshots) > 0 {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Backup must not have both .status.volumeBackups and a volumesnapshots.json.gz file in object storage")
-		} else {
-			locations, err := c.snapshotLocationLister.VolumeSnapshotLocations(restore.Namespace).List(labels.Everything())
-			if err != nil {
-				restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrap(err, "Error listing volume snapshot locations").Error())
-			} else if len(locations) > 1 {
-				restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Cannot restore backup with .status.volumeBackups when more than one volume snapshot location exists")
-			}
-		}
-	}
-
 	// Fill in the ScheduleName so it's easier to consume for metrics.
 	if restore.Spec.ScheduleName == "" {
 		restore.Spec.ScheduleName = info.backup.GetLabels()[velerov1api.ScheduleNameLabel]
@@ -402,7 +383,7 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
-func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+func (c *restoreController) fetchBackupInfo(backupName string, pluginManager clientmgmt.Manager) (backupInfo, error) {
 	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
 		return backupInfo{}, err
@@ -424,119 +405,96 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 	}, nil
 }
 
-func (c *restoreController) runRestore(
-	restore *api.Restore,
-	actions []restore.ItemAction,
-	info backupInfo,
-	pluginManager plugin.Manager,
-) (restoreResult, error) {
-	var restoreWarnings, restoreErrors api.RestoreResult
-	var restoreFailure error
-	logFile, err := ioutil.TempFile("", "")
+// runValidatedRestore takes a validated restore API object and executes the restore process.
+// The log and results files are uploaded to backup storage. Any error returned from this function
+// means that the restore failed. This function updates the restore API object with warning and error
+// counts, but *does not* update its phase or patch it via the API.
+func (c *restoreController) runValidatedRestore(restore *api.Restore, info backupInfo) error {
+	// instantiate the per-restore logger that will output both to a temp file
+	// (for upload to object storage) and to stdout.
+	restoreLog, err := newRestoreLogger(restore, c.logger, c.restoreLogLevel)
 	if err != nil {
-		c.logger.
-			WithFields(
-				logrus.Fields{
-					"restore": kubeutil.NamespaceAndName(restore),
-					"backup":  restore.Spec.BackupName,
-				},
-			).
-			WithError(errors.WithStack(err)).
-			Error("Error creating log temp file")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
+		return err
 	}
-	gzippedLogFile := gzip.NewWriter(logFile)
-	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
-	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
-	defer gzippedLogFile.Close()
-	defer closeAndRemoveFile(logFile, c.logger)
+	defer restoreLog.closeAndRemove(c.logger)
 
-	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
-	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.restoreLogLevel)
-	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
-	log := logger.WithFields(
-		logrus.Fields{
-			"restore": kubeutil.NamespaceAndName(restore),
-			"backup":  restore.Spec.BackupName,
-		})
+	pluginManager := c.newPluginManager(restoreLog)
+	defer pluginManager.CleanupClients()
 
-	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
+	actions, err := pluginManager.GetRestoreItemActions()
 	if err != nil {
-		log.WithError(err).Error("Error downloading backup")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
+		return errors.Wrap(err, "error getting restore item actions")
+	}
+
+	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, restoreLog)
+	if err != nil {
+		return errors.Wrap(err, "error downloading backup")
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
-	resultsFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	defer closeAndRemoveFile(resultsFile, c.logger)
-
 	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
+		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
-	// Any return statement above this line means a total restore failure
-	// Some failures after this line *may* be a total restore failure
-	log.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
-	log.Info("restore completed")
+	restoreLog.Info("starting restore")
+	restoreWarnings, restoreErrors := c.restorer.Restore(restoreLog, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
+	restoreLog.Info("restore completed")
 
-	// Try to upload the log file. This is best-effort. If we fail, we'll add to the velero errors.
-	if err := gzippedLogFile.Close(); err != nil {
-		c.logger.WithError(err).Error("error closing gzippedLogFile")
-	}
-	// Reset the offset to 0 for reading
-	if _, err = logFile.Seek(0, 0); err != nil {
-		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error resetting log file offset to 0: %v", err))
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
+	if logReader, err := restoreLog.done(c.logger); err != nil {
+		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error getting restore log reader: %v", err))
+	} else {
+		if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logReader); err != nil {
+			restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error uploading log file to backup storage: %v", err))
+		}
 	}
 
-	if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to backup storage: %v", err))
+	// At this point, no further logs should be written to restoreLog since it's been uploaded
+	// to object storage.
+
+	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster)
+	for _, w := range restoreWarnings.Namespaces {
+		restore.Status.Warnings += len(w)
 	}
 
-	m := map[string]api.RestoreResult{
+	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster)
+	for _, e := range restoreErrors.Namespaces {
+		restore.Status.Errors += len(e)
+	}
+
+	m := map[string]pkgrestore.Result{
 		"warnings": restoreWarnings,
 		"errors":   restoreErrors,
 	}
 
-	gzippedResultsFile := gzip.NewWriter(resultsFile)
-
-	if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	gzippedResultsFile.Close()
-
-	if _, err = resultsFile.Seek(0, 0); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
+	if err := putResults(restore, m, info.backupStore, c.logger); err != nil {
+		c.logger.WithError(err).Error("Error uploading restore results to backup storage")
 	}
 
-	return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
+	return nil
 }
 
-func downloadToTempFile(
-	backupName string,
-	backupStore persistence.BackupStore,
-	logger logrus.FieldLogger,
-) (*os.File, error) {
+func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(results); err != nil {
+		return errors.Wrap(err, "error encoding restore results to JSON")
+	}
+
+	if err := gzw.Close(); err != nil {
+		return errors.Wrap(err, "error closing gzip writer")
+	}
+
+	if err := backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, buf); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func downloadToTempFile(backupName string, backupStore persistence.BackupStore, logger logrus.FieldLogger) (*os.File, error) {
 	readCloser, err := backupStore.GetBackupContents(backupName)
 	if err != nil {
 		return nil, err
@@ -589,4 +547,51 @@ func patchRestore(original, updated *api.Restore, client velerov1client.Restores
 	}
 
 	return res, nil
+}
+
+type restoreLogger struct {
+	logrus.FieldLogger
+	file *os.File
+	w    *gzip.Writer
+}
+
+func newRestoreLogger(restore *api.Restore, baseLogger logrus.FieldLogger, logLevel logrus.Level) (*restoreLogger, error) {
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating temp file")
+	}
+	w := gzip.NewWriter(file)
+
+	logger := logging.DefaultLogger(logLevel)
+	logger.Out = io.MultiWriter(os.Stdout, w)
+
+	return &restoreLogger{
+		FieldLogger: logger.WithField("restore", kubeutil.NamespaceAndName(restore)),
+		file:        file,
+		w:           w,
+	}, nil
+}
+
+// done stops the restoreLogger from being able to be written to, and returns
+// an io.Reader for getting the content of the logger. Any attempts to use
+// restoreLogger to log after calling done will panic.
+func (l *restoreLogger) done(log logrus.FieldLogger) (io.Reader, error) {
+	l.FieldLogger = nil
+
+	if err := l.w.Close(); err != nil {
+		log.WithError(errors.WithStack(err)).Error("error closing gzip writer")
+	}
+
+	if _, err := l.file.Seek(0, 0); err != nil {
+		return nil, errors.Wrap(err, "error resetting log file offset to 0")
+	}
+
+	return l.file, nil
+}
+
+// closeAndRemove removes the logger's underlying temporary storage. This
+// method should be called when all logging and reading from the logger is
+// complete.
+func (l *restoreLogger) closeAndRemove(log logrus.FieldLogger) {
+	closeAndRemoveFile(l.file, log)
 }

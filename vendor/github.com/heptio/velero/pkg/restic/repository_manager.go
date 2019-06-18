@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -42,7 +43,7 @@ type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
 	InitRepo(repo *velerov1api.ResticRepository) error
 
-	// ConnectToRepo runs the 'restic stats' command against the
+	// ConnectToRepo runs the 'restic snapshots' command against the
 	// specified repo, and returns an error if it fails. This is
 	// intended to be used to ensure that the repo exists/can be
 	// authenticated to.
@@ -90,6 +91,8 @@ type repositoryManager struct {
 	repoEnsurer                  *repositoryEnsurer
 	fileSystem                   filesystem.Interface
 	ctx                          context.Context
+	pvcClient                    corev1client.PersistentVolumeClaimsGetter
+	pvClient                     corev1client.PersistentVolumesGetter
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -101,6 +104,8 @@ func NewRepositoryManager(
 	repoInformer velerov1informers.ResticRepositoryInformer,
 	repoClient velerov1client.ResticRepositoriesGetter,
 	backupLocationInformer velerov1informers.BackupStorageLocationInformer,
+	pvcClient corev1client.PersistentVolumeClaimsGetter,
+	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
@@ -111,6 +116,8 @@ func NewRepositoryManager(
 		repoInformerSynced:           repoInformer.Informer().HasSynced,
 		backupLocationLister:         backupLocationInformer.Lister(),
 		backupLocationInformerSynced: backupLocationInformer.Informer().HasSynced,
+		pvcClient:                    pvcClient,
+		pvClient:                     pvClient,
 		log:                          log,
 		ctx:                          ctx,
 
@@ -137,7 +144,7 @@ func (rm *repositoryManager) NewBackupper(ctx context.Context, backup *velerov1a
 		},
 	)
 
-	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.log)
+	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.pvcClient, rm.pvClient, rm.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {
@@ -177,11 +184,17 @@ func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error 
 }
 
 func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) error {
-	// restic stats requires a non-exclusive lock
+	// restic snapshots requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
 
-	return rm.exec(StatsCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+	snapshotsCmd := SnapshotsCommand(repo.Spec.ResticIdentifier)
+	// use the '--last' flag to minimize the amount of data fetched since
+	// we're just validating that the repo exists and can be authenticated
+	// to.
+	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--last")
+
+	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) CheckRepo(repo *velerov1api.ResticRepository) error {

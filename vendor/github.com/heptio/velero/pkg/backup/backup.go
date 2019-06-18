@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,16 +30,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 // BackupVersion is the current backup version for Velero.
@@ -49,7 +47,7 @@ const BackupVersion = 1
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -69,7 +67,7 @@ type itemKey struct {
 }
 
 type resolvedAction struct {
-	ItemAction
+	velero.BackupItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
@@ -108,7 +106,7 @@ func NewKubernetesBackupper(
 	}, nil
 }
 
-func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []velero.BackupItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {
@@ -128,7 +126,7 @@ func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAc
 		}
 
 		res := resolvedAction{
-			ItemAction:                action,
+			BackupItemAction:          action,
 			resourceIncludesExcludes:  resources,
 			namespaceIncludesExcludes: namespaces,
 			selector:                  selector,
@@ -183,18 +181,11 @@ func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper di
 }
 
 func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
-	// Use newer PreHooks if it's set
-	preHooks := hookSpec.PreHooks
-	if len(preHooks) == 0 {
-		// Fall back to Hooks otherwise (DEPRECATED)
-		preHooks = hookSpec.Hooks
-	}
-
 	h := resourceHook{
 		name:       hookSpec.Name,
 		namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
 		resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
-		pre:        preHooks,
+		pre:        hookSpec.PreHooks,
 		post:       hookSpec.PostHooks,
 	}
 
@@ -209,22 +200,23 @@ func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discov
 	return h, nil
 }
 
-type BlockStoreGetter interface {
-	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+type VolumeSnapshotterGetter interface {
+	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
-// written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error {
+// written to backupFile. The finalized api.Backup is written to metadata. Any error that represents
+// a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
+// back up individual resources that don't prevent the backup from continuing to be processed) are logged
+// to the backup log.
+func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
 	tw := tar.NewWriter(gzippedData)
 	defer tw.Close()
 
-	log := logger.WithField("backup", kubeutil.NamespaceAndName(backupRequest))
-	log.Info("Starting backup")
-
+	log.Info("Writing backup version file")
 	if err := kb.writeBackupVersion(tw); err != nil {
 		return errors.WithStack(err)
 	}
@@ -280,24 +272,16 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 		tw,
 		resticBackupper,
 		newPVCSnapshotTracker(),
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 
-	var errs []error
 	for _, group := range kb.discoveryHelper.Resources() {
 		if err := gb.backupGroup(group); err != nil {
-			errs = append(errs, err)
+			log.WithError(err).WithField("apiGroup", group.String()).Error("Error backing up API group")
 		}
 	}
 
-	err = kuberrs.Flatten(kuberrs.NewAggregate(errs))
-	if err == nil {
-		log.Infof("Backup completed successfully")
-	} else {
-		log.Infof("Backup completed with errors: %v", err)
-	}
-
-	return err
+	return nil
 }
 
 func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {

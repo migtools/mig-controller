@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
@@ -40,10 +41,6 @@ const (
 
 	podAnnotationPrefix       = "snapshot.velero.io/"
 	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
-
-	// TODO(1.0) remove both legacy annotations
-	podAnnotationLegacyPrefix       = "snapshot.ark.heptio.com/"
-	volumesToBackupLegacyAnnotation = "backup.ark.heptio.com/backup-volumes"
 )
 
 // PodHasSnapshotAnnotation returns true if the object has an annotation
@@ -52,11 +49,6 @@ const (
 func PodHasSnapshotAnnotation(obj metav1.Object) bool {
 	for key := range obj.GetAnnotations() {
 		if strings.HasPrefix(key, podAnnotationPrefix) {
-			return true
-		}
-
-		// TODO(1.0): remove if statement & contents
-		if strings.HasPrefix(key, podAnnotationLegacyPrefix) {
 			return true
 		}
 	}
@@ -79,16 +71,6 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	for k, v := range obj.GetAnnotations() {
 		if strings.HasPrefix(k, podAnnotationPrefix) {
 			insertSafe(k[len(podAnnotationPrefix):], v)
-		}
-
-		if strings.HasPrefix(k, podAnnotationLegacyPrefix) {
-			volume := k[len(podAnnotationLegacyPrefix):]
-
-			// if it has the legacy prefix, only use it if there's not
-			// already a value in res for the volume
-			if _, ok := res[volume]; !ok {
-				insertSafe(volume, v)
-			}
 		}
 	}
 
@@ -117,12 +99,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue, ok := annotations[volumesToBackupAnnotation]
-	// TODO(1.0) remove the following if statement & contents
-	if !ok {
-		backupsValue = annotations[volumesToBackupLegacyAnnotation]
-	}
-
+	backupsValue := annotations[volumesToBackupAnnotation]
 	if backupsValue == "" {
 		return nil
 	}
@@ -149,7 +126,7 @@ type SnapshotIdentifier struct {
 // a given Velero backup.
 func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister velerov1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
 	selector := labels.Set(map[string]string{
-		velerov1api.BackupNameLabel: backup.Name,
+		velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 	}).AsSelector()
 
 	podVolumeBackups, err := podVolumeBackupLister.List(selector)
@@ -213,7 +190,7 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespac
 // find PodVolumeBackups for the backup identified by name.
 func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, name),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name)),
 	}
 }
 
@@ -221,7 +198,7 @@ func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
 // find PodVolumeRestores for the restore identified by name.
 func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, name),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, label.GetValidName(name)),
 	}
 }
 

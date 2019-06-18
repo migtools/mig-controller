@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,11 +45,12 @@ func printBackupList(list *velerov1api.BackupList, w io.Writer, options printers
 	return nil
 }
 
+// sort by default alphabetically, but if backups stem from a common schedule
+// (detected by the presence of a 14-digit timestamp suffix), then within that
+// group, sort by newest to oldest (i.e. prefix ASC, suffix DESC)
+var timestampSuffix = regexp.MustCompile("-[0-9]{14}$")
+
 func sortBackupsByPrefixAndTimestamp(list *velerov1api.BackupList) {
-	// sort by default alphabetically, but if backups stem from a common schedule
-	// (detected by the presence of a 14-digit timestamp suffix), then within that
-	// group, sort by newest to oldest (i.e. prefix ASC, suffix DESC)
-	timestampSuffix := regexp.MustCompile("-[0-9]{14}$")
 
 	sort.Slice(list.Items, func(i, j int) bool {
 		iSuffixIndex := timestampSuffix.FindStringIndex(list.Items[i].Name)
@@ -84,12 +85,20 @@ func printBackup(backup *velerov1api.Backup, w io.Writer, options printers.Print
 		expiration = backup.CreationTimestamp.Add(backup.Spec.TTL.Duration)
 	}
 
-	status := backup.Status.Phase
+	status := string(backup.Status.Phase)
 	if status == "" {
-		status = velerov1api.BackupPhaseNew
+		status = string(velerov1api.BackupPhaseNew)
 	}
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero() {
 		status = "Deleting"
+	}
+	if status == string(velerov1api.BackupPhasePartiallyFailed) {
+		if backup.Status.Errors == 1 {
+			status = fmt.Sprintf("%s (1 error)", status)
+		} else {
+			status = fmt.Sprintf("%s (%d errors)", status, backup.Status.Errors)
+		}
+
 	}
 
 	location := backup.Spec.StorageLocation

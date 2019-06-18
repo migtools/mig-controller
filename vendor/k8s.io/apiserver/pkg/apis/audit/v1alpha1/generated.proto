@@ -247,3 +247,4 @@ message PolicyRule {
   // +optional
   repeated string omitStages = 8;
 }
+

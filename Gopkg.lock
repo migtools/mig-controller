@@ -168,12 +168,12 @@
   version = "v0.5.1"
 
 [[projects]]
-  digest = "1:9648a561b0205f4ccc9b5bb2ba0841af447a19f9b4156e51042a74c4086da152"
+  digest = "1:0f475ba305c18117f4408cbf73047c325e4c75a9f04fa7a74590623563c16f38"
   name = "github.com/heptio/velero"
   packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
-  revision = "ab2fc65c02ecdcb9bb1690e3afe67a3b3196aebc"
-  version = "v0.11.0"
+  revision = "72f5cadc3a865019ab9dc043d4952c9bfd5f2ecb"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:8f20c8dd713564fa97299fbcb77d729c6de9c33f3222812a76e6ecfaef80fd61"
@@ -308,7 +308,11 @@
   digest = "1:d3c834f631313a56c3df5a2574c66df4e7baed84d777d048c9aa32ff2733ec0a"
   name = "github.com/openshift/api"
   packages = [
+    "apps/v1",
     "build/v1",
+    "image/docker10",
+    "image/dockerpre012",
+    "image/v1",
     "network/v1",
     "project/v1",
     "route/v1",
@@ -962,16 +966,20 @@
   input-imports = [
     "github.com/emicklei/go-restful",
     "github.com/go-logr/logr",
+    "github.com/google/uuid",
     "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/api/apps/v1",
     "github.com/openshift/api/build/v1",
+    "github.com/openshift/api/image/docker10",
+    "github.com/openshift/api/image/dockerpre012",
+    "github.com/openshift/api/image/v1",
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/project/v1",
     "github.com/openshift/api/route/v1",
     "github.com/pkg/errors",
     "golang.org/x/net/context",
-    "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/errors",
@@ -979,6 +987,7 @@
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
     "k8s.io/apimachinery/pkg/types",
+    "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apiserver/pkg/storage/names",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",

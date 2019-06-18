@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/util/stringslice"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 )
 
 type backupSyncController struct {
@@ -47,7 +47,7 @@ type backupSyncController struct {
 	backupStorageLocationLister listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
-	newPluginManager            func(logrus.FieldLogger) plugin.Manager
+	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
@@ -59,7 +59,7 @@ func NewBackupSyncController(
 	syncPeriod time.Duration,
 	namespace string,
 	defaultBackupLocation string,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {
@@ -91,9 +91,6 @@ func NewBackupSyncController(
 
 	return c
 }
-
-// TODO(1.0): remove this
-const gcFinalizer = "gc.ark.heptio.com"
 
 func shouldSync(location *velerov1api.BackupStorageLocation, now time.Time, backupStore persistence.BackupStore, log logrus.FieldLogger) (bool, string) {
 	log = log.WithFields(map[string]interface{}{
@@ -212,9 +209,6 @@ func (c *backupSyncController) run() {
 				continue
 			}
 
-			// remove the pre-v0.8.0 gcFinalizer if it exists
-			// TODO(1.0): remove this
-			backup.Finalizers = stringslice.Except(backup.Finalizers, gcFinalizer)
 			backup.Namespace = c.namespace
 			backup.ResourceVersion = ""
 
@@ -225,7 +219,7 @@ func (c *backupSyncController) run() {
 			if backup.Labels == nil {
 				backup.Labels = make(map[string]string)
 			}
-			backup.Labels[velerov1api.StorageLocationLabel] = backup.Spec.StorageLocation
+			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 			_, err = c.backupClient.Backups(backup.Namespace).Create(backup)
 			switch {
@@ -290,7 +284,7 @@ func patchStorageLocation(backup *velerov1api.Backup, client velerov1client.Back
 // and a phase of Completed, but no corresponding backup in object storage.
 func (c *backupSyncController) deleteOrphanedBackups(locationName string, cloudBackupNames sets.String, log logrus.FieldLogger) {
 	locationSelector := labels.Set(map[string]string{
-		velerov1api.StorageLocationLabel: locationName,
+		velerov1api.StorageLocationLabel: label.GetValidName(locationName),
 	}).AsSelector()
 
 	backups, err := c.backupLister.Backups(c.namespace).List(locationSelector)
