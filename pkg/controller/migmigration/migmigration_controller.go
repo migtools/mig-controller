@@ -174,7 +174,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Ready
 	migration.Status.SetReady(
-		!migration.Status.HasBlockerCondition(),
+		!migration.IsCompleted() &&
+			!migration.Status.HasBlockerCondition(),
 		ReadyMessage)
 
 	// End staging conditions.
