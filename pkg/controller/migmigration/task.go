@@ -116,6 +116,14 @@ func (t *Task) Run() error {
 		t.addErrors([]string{reason})
 		t.Phase = BackupFailed
 		return nil
+	case velero.BackupPhasePartiallyFailed:
+		reason := fmt.Sprintf(
+			"Backup: %s/%s partially failed.",
+			t.Backup.Namespace,
+			t.Backup.Name)
+		t.addErrors([]string{reason})
+		t.Phase = BackupFailed
+		return nil
 	case velero.BackupPhaseFailedValidation:
 		t.addErrors(t.Backup.Status.ValidationErrors)
 		t.Phase = BackupFailed
@@ -163,6 +171,14 @@ func (t *Task) Run() error {
 	case velero.RestorePhaseFailed:
 		reason := fmt.Sprintf(
 			"Restore: %s/%s failed.",
+			t.Restore.Namespace,
+			t.Restore.Name)
+		t.addErrors([]string{reason})
+		t.Phase = RestoreFailed
+		return nil
+	case velero.RestorePhasePartiallyFailed:
+		reason := fmt.Sprintf(
+			"Restore: %s/%s partially failed.",
 			t.Restore.Namespace,
 			t.Restore.Name)
 		t.addErrors([]string{reason})

@@ -1,4 +1,4 @@
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2017 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero
 
 ---
 apiVersion: apps/v1beta1
@@ -73,20 +79,6 @@ spec:
       protocol: TCP
   selector:
     component: minio
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  namespace: velero
-  name: cloud-credentials
-  labels:
-    component: minio
-stringData:
-  cloud: |
-    [default]
-    aws_access_key_id = minio
-    aws_secret_access_key = minio123
 
 ---
 apiVersion: batch/v1

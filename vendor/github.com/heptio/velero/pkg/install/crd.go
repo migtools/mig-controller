@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,12 @@ func CRDs() []*apiextv1beta1.CustomResourceDefinition {
 func crd(kind, plural string) *apiextv1beta1.CustomResourceDefinition {
 	return &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
+			Name:   fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
+			Labels: labels(),
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: apiextv1beta1.SchemeGroupVersion.String(),
 		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
 			Group:   velerov1api.GroupName,

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,9 +42,10 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -60,10 +61,11 @@ type backupController struct {
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
-	newPluginManager         func(logrus.FieldLogger) plugin.Manager
+	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker            BackupTracker
 	backupLocationLister     listers.BackupStorageLocationLister
 	defaultBackupLocation    string
+	defaultBackupTTL         time.Duration
 	snapshotLocationLister   listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
@@ -76,10 +78,11 @@ func NewBackupController(
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
+	defaultBackupTTL time.Duration,
 	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -95,6 +98,7 @@ func NewBackupController(
 		backupTracker:            backupTracker,
 		backupLocationLister:     backupLocationInformer.Lister(),
 		defaultBackupLocation:    defaultBackupLocation,
+		defaultBackupTTL:         defaultBackupTTL,
 		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
@@ -108,6 +112,8 @@ func NewBackupController(
 		backupLocationInformer.Informer().HasSynced,
 		volumeSnapshotLocationInformer.Informer().HasSynced,
 	)
+	c.resyncFunc = c.resync
+	c.resyncPeriod = time.Minute
 
 	backupInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -138,17 +144,31 @@ func NewBackupController(
 	return c
 }
 
+func (c *backupController) resync() {
+	backups, err := c.lister.List(labels.Everything())
+	if err != nil {
+		c.logger.Error(err, "Error computing backup_total metric")
+	} else {
+		c.metrics.SetBackupTotal(int64(len(backups)))
+	}
+}
+
 func (c *backupController) processBackup(key string) error {
 	log := c.logger.WithField("key", key)
 
 	log.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		log.WithError(err).Errorf("error splitting key")
+		return nil
 	}
 
 	log.Debug("Getting backup")
 	original, err := c.lister.Backups(ns).Get(name)
+	if apierrors.IsNotFound(err) {
+		log.Debugf("backup %s not found", name)
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "error getting backup")
 	}
@@ -175,6 +195,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
+		request.Status.StartTimestamp.Time = c.clock.Now()
 	}
 
 	// update status
@@ -194,16 +215,29 @@ func (c *backupController) processBackup(key string) error {
 	defer c.backupTracker.Delete(request.Namespace, request.Name)
 
 	log.Debug("Running backup")
-	// execution & upload of backup
+
 	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 	c.metrics.RegisterBackupAttempt(backupScheduleName)
 
+	// execution & upload of backup
 	if err := c.runBackup(request); err != nil {
+		// even though runBackup sets the backup's phase prior
+		// to uploading artifacts to object storage, we have to
+		// check for an error again here and update the phase if
+		// one is found, because there could've been an error
+		// while uploading artifacts to object storage, which would
+		// result in the backup being Failed.
 		log.WithError(err).Error("backup failed")
 		request.Status.Phase = velerov1api.BackupPhaseFailed
-		c.metrics.RegisterBackupFailed(backupScheduleName)
-	} else {
+	}
+
+	switch request.Status.Phase {
+	case velerov1api.BackupPhaseCompleted:
 		c.metrics.RegisterBackupSuccess(backupScheduleName)
+	case velerov1api.BackupPhasePartiallyFailed:
+		c.metrics.RegisterBackupPartialFailure(backupScheduleName)
+	case velerov1api.BackupPhaseFailed:
+		c.metrics.RegisterBackupFailed(backupScheduleName)
 	}
 
 	log.Debug("Updating backup's final status")
@@ -246,10 +280,13 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// set backup version
 	request.Status.Version = pkgbackup.BackupVersion
 
-	// calculate expiration
-	if request.Spec.TTL.Duration > 0 {
-		request.Status.Expiration = metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
+	if request.Spec.TTL.Duration == 0 {
+		// set default backup TTL
+		request.Spec.TTL.Duration = c.defaultBackupTTL
 	}
+
+	// calculate expiration
+	request.Status.Expiration = metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
 
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
@@ -260,13 +297,14 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	if request.Labels == nil {
 		request.Labels = make(map[string]string)
 	}
-	request.Labels[velerov1api.StorageLocationLabel] = request.Spec.StorageLocation
+	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
 
-	// validate the included/excluded resources and namespaces
+	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
+	// validate the included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
@@ -387,10 +425,11 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 	return providerLocations, nil
 }
 
+// runBackup runs and uploads a validated backup. Any error returned from this function
+// causes the backup to be Failed; if no error is returned, the backup's status's Errors
+// field is checked to see if the backup was a partial failure.
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
-	log := c.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
-	log.Info("Starting backup")
-	backup.Status.StartTimestamp.Time = c.clock.Now()
+	c.logger.WithField("backup", kubeutil.NamespaceAndName(backup)).Info("Setting up backup log")
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -406,41 +445,48 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// backup log failed for whatever reason.
 	logger := logging.DefaultLogger(c.backupLogLevel)
 	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
-	log = logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 
-	log.Info("Starting backup")
+	logCounter := logging.NewLogCounterHook()
+	logger.Hooks.Add(logCounter)
 
+	backupLog := logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+
+	backupLog.Info("Setting up backup temp file")
 	backupFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}
-	defer closeAndRemoveFile(backupFile, log)
+	defer closeAndRemoveFile(backupFile, backupLog)
 
-	pluginManager := c.newPluginManager(log)
+	backupLog.Info("Setting up plugin manager")
+	pluginManager := c.newPluginManager(backupLog)
 	defer pluginManager.CleanupClients()
 
+	backupLog.Info("Getting backup item actions")
 	actions, err := pluginManager.GetBackupItemActions()
 	if err != nil {
 		return err
 	}
 
-	backupStore, err := c.newBackupStore(backup.StorageLocation, pluginManager, log)
+	backupLog.Info("Setting up backup store")
+	backupStore, err := c.newBackupStore(backup.StorageLocation, pluginManager, backupLog)
 	if err != nil {
 		return err
 	}
 
-	var errs []error
-
-	// Do the actual backup
-	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
-		errs = append(errs, err)
+	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
+	if exists || err != nil {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
-	} else {
-		backup.Status.Phase = velerov1api.BackupPhaseCompleted
+		backup.Status.CompletionTimestamp.Time = c.clock.Now()
+		if err != nil {
+			return errors.Wrapf(err, "error checking if backup already exists in object storage")
+		}
+		return errors.Errorf("backup already exists in object storage")
 	}
 
-	if err := gzippedLogFile.Close(); err != nil {
-		c.logger.WithError(err).Error("error closing gzippedLogFile")
+	var fatalErrs []error
+	if err := c.backupper.Backup(backupLog, backup, backupFile, actions, pluginManager); err != nil {
+		fatalErrs = append(fatalErrs, err)
 	}
 
 	// Mark completion timestamp before serializing and uploading.
@@ -454,21 +500,45 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	errs = append(errs, persistBackup(backup, backupFile, logFile, backupStore, c.logger)...)
-	errs = append(errs, recordBackupMetrics(backup.Backup, backupFile, c.metrics))
+	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
-	log.Info("Backup completed")
+	if err := gzippedLogFile.Close(); err != nil {
+		c.logger.WithError(err).Error("error closing gzippedLogFile")
+	}
 
-	return kerrors.NewAggregate(errs)
+	backup.Status.Warnings = logCounter.GetCount(logrus.WarnLevel)
+	backup.Status.Errors = logCounter.GetCount(logrus.ErrorLevel)
+
+	// Assign finalize phase as close to end as possible so that any errors
+	// logged to backupLog are captured. This is done before uploading the
+	// artifacts to object storage so that the JSON representation of the
+	// backup in object storage has the terminal phase set.
+	switch {
+	case len(fatalErrs) > 0:
+		backup.Status.Phase = velerov1api.BackupPhaseFailed
+	case logCounter.GetCount(logrus.ErrorLevel) > 0:
+		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
+	default:
+		backup.Status.Phase = velerov1api.BackupPhaseCompleted
+	}
+
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger); len(errs) > 0 {
+		fatalErrs = append(fatalErrs, errs...)
+	}
+
+	c.logger.Info("Backup completed")
+
+	// if we return a non-nil error, the calling function will update
+	// the backup's phase to Failed.
+	return kerrors.NewAggregate(fatalErrs)
 }
 
-func recordBackupMetrics(backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {
+func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) {
 	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
 	var backupSizeBytes int64
-	var err error
 	if backupFileStat, err := backupFile.Stat(); err != nil {
-		err = errors.Wrap(err, "error getting file info")
+		log.WithError(errors.WithStack(err)).Error("Error getting backup file info")
 	} else {
 		backupSizeBytes = backupFileStat.Size()
 	}
@@ -480,8 +550,6 @@ func recordBackupMetrics(backup *velerov1api.Backup, backupFile *os.File, server
 	serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
 	serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
 	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
-
-	return err
 }
 
 func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File, backupStore persistence.BackupStore, log logrus.FieldLogger) []error {

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,42 +17,44 @@ limitations under the License.
 package restore
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	batchv1api "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-type jobAction struct {
+type JobAction struct {
 	logger logrus.FieldLogger
 }
 
-func NewJobAction(logger logrus.FieldLogger) ItemAction {
-	return &jobAction{logger: logger}
+func NewJobAction(logger logrus.FieldLogger) *JobAction {
+	return &JobAction{logger: logger}
 }
 
-func (a *jobAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *JobAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"jobs"},
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	fieldDeletions := map[string]string{
-		"spec.selector.matchLabels":     "controller-uid",
-		"spec.template.metadata.labels": "controller-uid",
+func (a *JobAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	job := new(batchv1api.Job)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), job); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	for k, v := range fieldDeletions {
-		a.logger.Debugf("Getting %s", k)
-		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
-		if err != nil {
-			a.logger.WithError(err).Debugf("Unable to get %s", k)
-		} else {
-			delete(labels, v)
-		}
+	if job.Spec.Selector != nil {
+		delete(job.Spec.Selector.MatchLabels, "controller-uid")
+	}
+	delete(job.Spec.Template.ObjectMeta.Labels, "controller-uid")
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
+	if err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	return obj, nil, nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

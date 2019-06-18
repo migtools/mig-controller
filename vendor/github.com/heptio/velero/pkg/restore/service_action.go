@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,91 +22,79 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
 
-type serviceAction struct {
+type ServiceAction struct {
 	log logrus.FieldLogger
 }
 
-func NewServiceAction(logger logrus.FieldLogger) ItemAction {
-	return &serviceAction{log: logger}
+func NewServiceAction(logger logrus.FieldLogger) *ServiceAction {
+	return &ServiceAction{log: logger}
 }
 
-func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *ServiceAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"services"},
 	}, nil
 }
 
-func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, nil, err
+func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	service := new(corev1api.Service)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), service); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
-	if val, _ := collections.GetString(spec, "clusterIP"); val != "None" {
-		delete(spec, "clusterIP")
+	if service.Spec.ClusterIP != "None" {
+		service.Spec.ClusterIP = ""
 	}
 
-	if err := deleteNodePorts(obj, &spec); err != nil {
-		return nil, nil, err
+	if err := deleteNodePorts(service); err != nil {
+		return nil, err
 	}
-	return obj, nil, nil
-}
 
-func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
-	preservedPorts := map[string]bool{}
-	metadata, err := meta.Accessor(obj)
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(service)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	if lac, ok := metadata.GetAnnotations()[annotationLastAppliedConfig]; ok {
-		var svc corev1api.Service
-		if err := json.Unmarshal([]byte(lac), &svc); err != nil {
-			return nil, errors.WithStack(err)
-		}
-		for _, port := range svc.Spec.Ports {
-			if port.NodePort > 0 {
-				preservedPorts[port.Name] = true
-			}
-		}
-	}
-	return preservedPorts, nil
+
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
-func deleteNodePorts(obj runtime.Unstructured, spec *map[string]interface{}) error {
-	if serviceType, _ := collections.GetString(*spec, "type"); serviceType == "ExternalName" {
+func deleteNodePorts(service *corev1api.Service) error {
+	if service.Spec.Type == corev1api.ServiceTypeExternalName {
 		return nil
 	}
 
-	preservedPorts, err := getPreservedPorts(obj)
-	if err != nil {
-		return err
+	// find any NodePorts whose values were explicitly specified according
+	// to the last-applied-config annotation. We'll retain these values, and
+	// clear out any other (presumably auto-assigned) NodePort values.
+	explicitNodePorts := sets.NewString()
+	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
+	if ok {
+		appliedService := new(corev1api.Service)
+		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedService); err != nil {
+			return errors.WithStack(err)
+		}
+
+		for _, port := range appliedService.Spec.Ports {
+			if port.NodePort > 0 {
+				explicitNodePorts.Insert(port.Name)
+			}
+		}
 	}
 
-	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
-	if err != nil {
-		return err
+	for i, port := range service.Spec.Ports {
+		if !explicitNodePorts.Has(port.Name) {
+			service.Spec.Ports[i].NodePort = 0
+		}
 	}
 
-	for _, port := range ports {
-		p := port.(map[string]interface{})
-		var name string
-		if nameVal, ok := p["name"]; ok {
-			name = nameVal.(string)
-		}
-		if preservedPorts[name] {
-			continue
-		}
-		delete(p, "nodePort")
-	}
 	return nil
 }

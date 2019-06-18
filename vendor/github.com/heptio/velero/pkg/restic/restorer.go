@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/util/boolptr"
 )
 
@@ -156,7 +157,7 @@ func newPodVolumeRestore(restore *velerov1api.Restore, pod *corev1api.Pod, volum
 				},
 			},
 			Labels: map[string]string{
-				velerov1api.RestoreNameLabel: restore.Name,
+				velerov1api.RestoreNameLabel: label.GetValidName(restore.Name),
 				velerov1api.RestoreUIDLabel:  string(restore.UID),
 				velerov1api.PodUIDLabel:      string(pod.UID),
 			},

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 type bucketWriter interface {
 	// getWriteCloser returns an io.WriteCloser that can be used to upload data to the specified bucket for the specified key.
 	getWriteCloser(bucket, key string) io.WriteCloser
+	getAttrs(bucket, key string) (*storage.ObjectAttrs, error)
 }
 
 type writer struct {
@@ -49,7 +50,11 @@ func (w *writer) getWriteCloser(bucket, key string) io.WriteCloser {
 	return w.client.Bucket(bucket).Object(key).NewWriter(context.Background())
 }
 
-type objectStore struct {
+func (w *writer) getAttrs(bucket, key string) (*storage.ObjectAttrs, error) {
+	return w.client.Bucket(bucket).Object(key).Attrs(context.Background())
+}
+
+type ObjectStore struct {
 	log            logrus.FieldLogger
 	client         *storage.Client
 	googleAccessID string
@@ -57,11 +62,15 @@ type objectStore struct {
 	bucketWriter   bucketWriter
 }
 
-func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
-	return &objectStore{log: logger}
+func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
+	return &ObjectStore{log: logger}
 }
 
-func (o *objectStore) Init(config map[string]string) error {
+func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config); err != nil {
+		return err
+	}
+
 	credentialsFile := os.Getenv(credentialsEnvVar)
 	if credentialsFile == "" {
 		return errors.Errorf("%s is undefined", credentialsEnvVar)
@@ -97,7 +106,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
+func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	w := o.bucketWriter.getWriteCloser(bucket, key)
 
 	// The writer returned by NewWriter is asynchronous, so errors aren't guaranteed
@@ -113,7 +122,18 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	return closeErr
 }
 
-func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
+func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	if _, err := o.bucketWriter.getAttrs(bucket, key); err != nil {
+		if err == storage.ErrObjectNotExist {
+			return false, nil
+		}
+		return false, errors.WithStack(err)
+	}
+
+	return true, nil
+}
+
+func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	r, err := o.client.Bucket(bucket).Object(key).NewReader(context.Background())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -122,7 +142,7 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	return r, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	q := &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
@@ -148,7 +168,7 @@ func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 	return res, nil
 }
 
-func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	q := &storage.Query{
 		Prefix: prefix,
 	}
@@ -170,11 +190,11 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	}
 }
 
-func (o *objectStore) DeleteObject(bucket, key string) error {
+func (o *ObjectStore) DeleteObject(bucket, key string) error {
 	return errors.Wrapf(o.client.Bucket(bucket).Object(key).Delete(context.Background()), "error deleting object %s", key)
 }
 
-func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	return storage.SignedURL(bucket, key, &storage.SignedURLOptions{
 		GoogleAccessID: o.googleAccessID,
 		PrivateKey:     o.privateKey,

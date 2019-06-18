@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,15 +25,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/satori/uuid"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/volume"
 )
 
@@ -49,6 +47,10 @@ type BackupStore interface {
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
+
+	// BackupExists checks if the backup metadata file exists in object storage.
+	BackupExists(bucket, backupName string) (bool, error)
+
 	DeleteBackup(name string) error
 
 	PutRestoreLog(backup, restore string, log io.Reader) error
@@ -62,16 +64,16 @@ type BackupStore interface {
 const DownloadURLTTL = 10 * time.Minute
 
 type objectBackupStore struct {
-	objectStore cloudprovider.ObjectStore
+	objectStore velero.ObjectStore
 	bucket      string
 	layout      *ObjectStoreLayout
 	logger      logrus.FieldLogger
 }
 
-// ObjectStoreGetter is a type that can get a cloudprovider.ObjectStore
+// ObjectStoreGetter is a type that can get a velero.ObjectStore
 // from a provider name.
 type ObjectStoreGetter interface {
-	GetObjectStore(provider string) (cloudprovider.ObjectStore, error)
+	GetObjectStore(provider string) (velero.ObjectStore, error)
 }
 
 func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
@@ -152,7 +154,7 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 	output := make([]string, 0, len(prefixes))
 
 	for _, prefix := range prefixes {
-		// values returned from a call to cloudprovider.ObjectStore's
+		// values returned from a call to ObjectStore's
 		// ListCommonPrefixes method return the *full* prefix, inclusive
 		// of s.backupsPrefix, and include the delimiter ("/") as a suffix. Trim
 		// each of those off to get the backup name.
@@ -208,48 +210,7 @@ func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volu
 }
 
 func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup, error) {
-	// We need to determine whether the backup metadata file is the legacy ark.heptio.com
-	// one (named ark-backup.json) or the current velero.io one (named velero-backup.json).
-	// Listing all objects in the backup directory and searching for them is easiest, because
-	// GetObject() calls don't immediately return an error if the object is not found due to
-	// a bug related to the plugin infrastructure, and even if they did, it's difficult to
-	// distinguish between a 404 and a different error.
-	//
-	// TODO once the plugin/error-related bugs are fixed, simplify this code by just calling
-	// GetObject() to check existence of the metadata files.
-	keys, err := s.objectStore.ListObjects(s.bucket, s.layout.getBackupDir(name))
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var (
-		metadataKey       = s.layout.getBackupMetadataKey(name)
-		legacyMetadataKey = s.layout.getLegacyBackupMetadataKey(name)
-		legacyMetadata    bool
-	)
-
-	var found bool
-	for _, key := range keys {
-		switch key {
-		case metadataKey:
-			found = true
-		case legacyMetadataKey:
-			found = true
-			legacyMetadata = true
-		}
-
-		if found {
-			break
-		}
-	}
-
-	if legacyMetadata {
-		s.logger.WithField("backup", name).Debug("Legacy metadata file found, converting")
-		return s.getAndConvertLegacyBackupMetadata(legacyMetadataKey)
-	}
-
-	// TODO(1.0): remove everything in this method from here up, except the metadataKey
-	// declaration.
+	metadataKey := s.layout.getBackupMetadataKey(name)
 
 	res, err := s.objectStore.GetObject(s.bucket, metadataKey)
 	if err != nil {
@@ -276,49 +237,7 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	return backupObj, nil
 }
 
-// TODO(1.0): remove
-func (s *objectBackupStore) getAndConvertLegacyBackupMetadata(key string) (*velerov1api.Backup, error) {
-	obj, err := s.objectStore.GetObject(s.bucket, key)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(obj)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	res := new(unstructured.Unstructured)
-	if err := json.Unmarshal(data, &res); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	res.SetAPIVersion(velerov1api.SchemeGroupVersion.String())
-	res.SetLabels(convertMapKeys(res.GetLabels(), "ark.heptio.com", "velero.io"))
-	res.SetLabels(convertMapKeys(res.GetLabels(), "ark-schedule", velerov1api.ScheduleNameLabel))
-	res.SetAnnotations(convertMapKeys(res.GetAnnotations(), "ark.heptio.com", "velero.io"))
-
-	backup := new(velerov1api.Backup)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object, backup); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return backup, nil
-}
-
-// TODO(1.0): remove
-func convertMapKeys(m map[string]string, find, replace string) map[string]string {
-	for k, v := range m {
-		if updatedKey := strings.Replace(k, find, replace, -1); updatedKey != k {
-			m[updatedKey] = v
-			delete(m, k)
-		}
-	}
-
-	return m
-}
-
-func keyExists(objectStore cloudprovider.ObjectStore, bucket, prefix, key string) (bool, error) {
+func keyExists(objectStore velero.ObjectStore, bucket, prefix, key string) (bool, error) {
 	keys, err := objectStore.ListObjects(bucket, prefix)
 	if err != nil {
 		return false, err
@@ -371,6 +290,10 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
 	return s.objectStore.GetObject(s.bucket, s.layout.getBackupContentsKey(name))
+}
+
+func (s *objectBackupStore) BackupExists(bucket, backupName string) (bool, error) {
+	return s.objectStore.ObjectExists(bucket, s.layout.getBackupMetadataKey(backupName))
 }
 
 func (s *objectBackupStore) DeleteBackup(name string) error {
@@ -478,7 +401,7 @@ func seekToBeginning(r io.Reader) error {
 	return err
 }
 
-func seekAndPutObject(objectStore cloudprovider.ObjectStore, bucket, key string, file io.Reader) error {
+func seekAndPutObject(objectStore velero.ObjectStore, bucket, key string, file io.Reader) error {
 	if file == nil {
 		return nil
 	}

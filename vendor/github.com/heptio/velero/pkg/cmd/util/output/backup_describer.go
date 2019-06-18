@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,28 @@ func DescribeBackup(
 		if phase == "" {
 			phase = velerov1api.BackupPhaseNew
 		}
-		d.Printf("Phase:\t%s\n", phase)
+
+		logsNote := ""
+		if backup.Status.Phase == velerov1api.BackupPhaseFailed || backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed {
+			logsNote = fmt.Sprintf(" (run `velero backup logs %s` for more information)", backup.Name)
+		}
+
+		d.Printf("Phase:\t%s%s\n", phase, logsNote)
+
+		status := backup.Status
+		if len(status.ValidationErrors) > 0 {
+			d.Println()
+			d.Printf("Validation errors:")
+			for _, ve := range status.ValidationErrors {
+				d.Printf("\t%s\n", ve)
+			}
+		}
+
+		if status.Phase == velerov1api.BackupPhasePartiallyFailed {
+			d.Println()
+			d.Printf("Errors:\t%d\n", status.Errors)
+			d.Printf("Warnings:\t%d\n", status.Warnings)
+		}
 
 		d.Println()
 		DescribeBackupSpec(d, backup.Spec)
@@ -163,10 +184,21 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\tLabel selector:\t%s\n", s)
 
-			for _, hook := range backupResourceHookSpec.Hooks {
+			for _, hook := range backupResourceHookSpec.PreHooks {
 				if hook.Exec != nil {
 					d.Println()
-					d.Printf("\t\t\tExec Hook:\n")
+					d.Printf("\t\t\tPre Exec Hook:\n")
+					d.Printf("\t\t\t\tContainer:\t%s\n", hook.Exec.Container)
+					d.Printf("\t\t\t\tCommand:\t%s\n", strings.Join(hook.Exec.Command, " "))
+					d.Printf("\t\t\t\tOn Error:\t%s\n", hook.Exec.OnError)
+					d.Printf("\t\t\t\tTimeout:\t%s\n", hook.Exec.Timeout.Duration)
+				}
+			}
+
+			for _, hook := range backupResourceHookSpec.PostHooks {
+				if hook.Exec != nil {
+					d.Println()
+					d.Printf("\t\t\tPost Exec Hook:\n")
 					d.Printf("\t\t\t\tContainer:\t%s\n", hook.Exec.Container)
 					d.Printf("\t\t\t\tCommand:\t%s\n", strings.Join(hook.Exec.Command, " "))
 					d.Printf("\t\t\t\tOn Error:\t%s\n", hook.Exec.OnError)
@@ -201,27 +233,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
 	d.Println()
 
-	d.Printf("Validation errors:")
-	if len(status.ValidationErrors) == 0 {
-		d.Printf("\t<none>\n")
-	} else {
-		for _, ve := range status.ValidationErrors {
-			d.Printf("\t%s\n", ve)
-		}
-	}
-
-	d.Println()
-	if len(status.VolumeBackups) > 0 {
-		// pre-v0.10 backup
-		d.Printf("Persistent Volumes:\n")
-		for pvName, info := range status.VolumeBackups {
-			printSnapshot(d, pvName, info.SnapshotID, info.Type, info.AvailabilityZone, info.Iops)
-		}
-		return
-	}
-
 	if status.VolumeSnapshotsAttempted > 0 {
-		// v0.10+ backup
 		if !details {
 			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
 			return

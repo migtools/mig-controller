@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,9 +84,9 @@ func InitCommand(repoIdentifier string) *Command {
 	}
 }
 
-func StatsCommand(repoIdentifier string) *Command {
+func SnapshotsCommand(repoIdentifier string) *Command {
 	return &Command{
-		Command:        "stats",
+		Command:        "snapshots",
 		RepoIdentifier: repoIdentifier,
 	}
 }

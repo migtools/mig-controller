@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ import (
 type BackendType string
 
 const (
-	AWSBackend   BackendType = "aws"
-	AzureBackend BackendType = "azure"
-	GCPBackend   BackendType = "gcp"
+	AWSBackend   BackendType = "velero.io/aws"
+	AzureBackend BackendType = "velero.io/azure"
+	GCPBackend   BackendType = "velero.io/gcp"
 )
 
 // this func is assigned to a package-level variable so it can be
@@ -51,7 +51,12 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) string {
 	}
 	bucketAndPrefix = path.Join(bucket, prefix)
 
-	switch BackendType(location.Spec.Provider) {
+	var locationSpecProvider = location.Spec.Provider
+	if !strings.Contains(locationSpecProvider, "/") {
+		locationSpecProvider = "velero.io/" + locationSpecProvider
+	}
+
+	switch BackendType(locationSpecProvider) {
 	case AWSBackend:
 		var url string
 		switch {
@@ -68,7 +73,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) string {
 			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
-		return fmt.Sprintf("s3:%s/%s", url, bucketAndPrefix)
+		return fmt.Sprintf("s3:%s/%s", strings.TrimSuffix(url, "/"), bucketAndPrefix)
 	case AzureBackend:
 		provider = "azure"
 	case GCPBackend:

@@ -43,7 +43,7 @@ required = [
 
 [[constraint]]
   name="github.com/heptio/velero"
-  version="v0.11.0"
+  version="v1.0.0"
 
 [[constraint]]
   name = "github.com/openshift/api"
