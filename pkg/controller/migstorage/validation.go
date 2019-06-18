@@ -61,12 +61,14 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
 	// Backup location provider.
 	err := r.validateBSL(storage)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Volume snapshot location provider.
 	err = r.validateVSL(storage)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -98,6 +100,7 @@ func (r ReconcileMigStorage) validateBSL(storage *migapi.MigStorage) error {
 
 	err = r.validateBSLCredsSecret(storage)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -185,6 +188,7 @@ func (r ReconcileMigStorage) validateBSLCredsSecret(storage *migapi.MigStorage) 
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -240,6 +244,7 @@ func (r ReconcileMigStorage) validateVSL(storage *migapi.MigStorage) error {
 
 	err = r.validateVSLCredsSecret(storage)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -320,6 +325,7 @@ func (r ReconcileMigStorage) validateVSLCredsSecret(storage *migapi.MigStorage) 
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 

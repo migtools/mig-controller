@@ -19,20 +19,19 @@ package migplan
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("plan")
+var log = logging.WithName("plan")
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -50,6 +49,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -60,6 +60,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&PlanPredicate{},
 	)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -74,6 +75,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&ClusterPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -88,6 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&StoragePredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -112,28 +115,24 @@ type ReconcileMigPlan struct {
 // +kubebuilder:rbac:groups=,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=,resources=persistentvolumeclaims/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("plan|"))
+	log.Reset()
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
 	err := r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
+		log.Trace(err)
 		return reconcile.Result{}, err
 	}
 
 	// If plan is closed, ensure resource cleanup
 	closed, err := r.handleClosed(plan)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		}
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 	if closed {
 		return reconcile.Result{}, nil
@@ -145,40 +144,37 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// PV discovery
 	err = r.updatePvs(plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validate PV actions.
 	err = r.validatePvAction(plan)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	if !plan.Status.HasCriticalCondition() {
 		// Storage
 		err = r.ensureStorage(plan)
 		if err != nil {
-			if errors.IsConflict(err) {
-				return reconcile.Result{Requeue: true}, nil
-			} else {
-				return reconcile.Result{}, err
-			}
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
 		}
 
 		// Migration Registry
 		err = r.ensureMigRegistries(plan)
 		if err != nil {
-			if errors.IsConflict(err) {
-				return reconcile.Result{Requeue: true}, nil
-			} else {
-				return reconcile.Result{}, err
-			}
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -195,11 +191,8 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.Touch()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Done

@@ -44,6 +44,7 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	// Migration Registry
 	err := r.ensureMigRegistriesDelete(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -58,6 +59,7 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	plan.Touch()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 

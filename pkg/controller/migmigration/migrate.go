@@ -66,6 +66,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 	// Resources
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
+		log.Trace(err)
 		return 0, err
 	}
 

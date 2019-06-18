@@ -18,23 +18,22 @@ package migstorage
 
 import (
 	"context"
+	"github.com/fusor/mig-controller/pkg/logging"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("storage")
+var log = logging.WithName("storage")
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -57,6 +56,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migstorage-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -66,6 +66,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -79,6 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -97,19 +99,17 @@ type ReconcileMigStorage struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages/status,verbs=get;update;patch
 func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("storage|"))
+	log = logging.WithName("storage")
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
 	err := r.Get(context.TODO(), request.NamespacedName, storage)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Begin staging conditions.
@@ -118,7 +118,8 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(storage)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Ready
@@ -133,11 +134,8 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	storage.Touch()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Done

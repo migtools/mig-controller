@@ -52,18 +52,21 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 	// registry cluster
 	err := r.validateRegistryCluster(cluster)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// SA secret
 	err = r.validateSaSecret(cluster)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Test Connection
 	err = r.testConnection(cluster)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -92,6 +95,7 @@ func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster)
 
 	storage, err := r.getCluster(ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -155,6 +159,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
