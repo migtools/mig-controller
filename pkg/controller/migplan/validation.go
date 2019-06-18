@@ -82,30 +82,35 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	// Source cluster
 	err := r.validateSourceCluster(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Destination cluster
 	err = r.validateDestinationCluster(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Storage
 	err = r.validateStorage(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Migrated namespaces.
 	err = r.validateNamespaces(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -130,6 +135,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 
 	storage, err := migapi.GetStorage(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -192,6 +198,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -251,6 +258,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -285,12 +293,14 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 	// Source
 	err := r.validateSourceNamespaces(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Destination
 	err = r.validateDestinationNamespaces(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -306,6 +316,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	}
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if cluster == nil || !cluster.Status.IsReady() {
@@ -313,6 +324,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	ns := kapi.Namespace{}
@@ -326,6 +338,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
+			log.Trace(err)
 			return err
 		}
 	}
@@ -350,6 +363,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 	namespaces := []string{migapi.VeleroNamespace}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if cluster == nil || !cluster.Status.IsReady() {
@@ -357,6 +371,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	ns := kapi.Namespace{}
@@ -370,6 +385,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 		if errors.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
+			log.Trace(err)
 			return err
 		}
 	}

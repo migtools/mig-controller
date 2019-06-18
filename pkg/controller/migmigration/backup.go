@@ -23,20 +23,24 @@ var resticPodPrefix = "restic-"
 func (t *Task) ensureBackup() error {
 	newBackup, err := t.buildBackup()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundBackup, err := t.getBackup()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundBackup == nil {
 		t.Backup = newBackup
 		client, err := t.getSourceClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		err = client.Create(context.TODO(), newBackup)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -45,11 +49,13 @@ func (t *Task) ensureBackup() error {
 	if !t.equalsBackup(newBackup, foundBackup) {
 		client, err := t.getSourceClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		t.updateBackup(foundBackup)
 		err = client.Update(context.TODO(), foundBackup)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
@@ -134,6 +140,7 @@ func (t *Task) buildBackup() (*velero.Backup, error) {
 	}
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
 	backup := &velero.Backup{
@@ -153,10 +160,12 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	backupLocation, err := t.getBSL()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	snapshotLocation, err := t.getVSL()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	backup.Spec = velero.BackupSpec{
@@ -210,6 +219,7 @@ func (t *Task) bounceResticPod() error {
 	// Get client of source cluster
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -222,6 +232,7 @@ func (t *Task) bounceResticPod() error {
 		},
 		&list)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -249,6 +260,7 @@ func (t *Task) bounceResticPod() error {
 			context.TODO(),
 			&pod)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		t.Phase = WaitOnResticRestart
@@ -263,6 +275,7 @@ func (t *Task) annotateStorageResources() error {
 	// Get client of source cluster
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
@@ -278,6 +291,7 @@ func (t *Task) annotateStorageResources() error {
 			},
 			&resource)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		if resource.Annotations == nil {
@@ -297,6 +311,7 @@ func (t *Task) annotateStorageResources() error {
 		options := k8sclient.InNamespace(ns)
 		err = client.List(context.TODO(), options, &list)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		// Loop through all pods to find all volume claims
@@ -350,6 +365,7 @@ func (t *Task) annotateStorageResources() error {
 func (t *Task) removeStorageResourceAnnotations() error {
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
@@ -360,6 +376,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	options := k8sclient.MatchingLabels(labelSelector)
 	err = client.List(context.TODO(), options, &pvcList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pvc := range pvcList.Items {
@@ -374,6 +391,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	pvList := corev1.PersistentVolumeList{}
 	err = client.List(context.TODO(), options, &pvList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pv := range pvList.Items {
@@ -388,6 +406,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 	podList := corev1.PodList{}
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pod := range podList.Items {

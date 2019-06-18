@@ -47,12 +47,14 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 	// Plan
 	plan, err := r.validatePlan(migration)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Final migration.
 	err = r.validateFinalMigration(plan, migration)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 

@@ -26,11 +26,13 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	client, err := srcMigCluster.GetClient(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -39,11 +41,13 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	// Build PV map.
 	table, err := r.getPvMap(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	namespaces := plan.Spec.Namespaces
 	claims, err := r.getClaims(client, namespaces)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, claim := range claims {

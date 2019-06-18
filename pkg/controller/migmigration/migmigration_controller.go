@@ -20,24 +20,21 @@ import (
 	"context"
 	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/storage/names"
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"time"
 )
 
-var log = logf.Log.WithName("migration")
+var log = logging.WithName("migration")
 
 // Add creates a new MigMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -55,6 +52,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migmigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -64,6 +62,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -78,6 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&PlanPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -102,6 +102,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -120,7 +121,7 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("migration|"))
+	log.Reset()
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}
@@ -129,7 +130,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if errors.IsNotFound(err) {
 			err = r.deleted()
 		}
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Completed.
@@ -146,7 +148,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Validate
 	err = r.validate(migration)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Ensure that migrations run serially ordered by when created
@@ -155,6 +158,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
+			log.Trace(err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -163,11 +167,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(migration)
 		if err != nil {
-			if errors.IsConflict(err) {
-				return reconcile.Result{Requeue: true}, nil
-			} else {
-				return reconcile.Result{}, err
-			}
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -183,11 +184,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.Touch()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Requeue
@@ -209,10 +207,12 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, error) {
 	plan, err := migration.GetPlan(r)
 	if err != nil {
+		log.Trace(err)
 		return 0, err
 	}
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
+		log.Trace(err)
 		return 0, err
 	}
 	// Pending migrations.
@@ -251,6 +251,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, e
 func (r *ReconcileMigMigration) deleted() error {
 	migrations, err := migapi.ListMigrations(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, m := range migrations {
@@ -260,6 +261,7 @@ func (r *ReconcileMigMigration) deleted() error {
 		m.Status.DeleteCondition(HasFinalMigration)
 		err := r.Update(context.TODO(), &m)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

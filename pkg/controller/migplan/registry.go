@@ -15,6 +15,7 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 
 	storage, err := plan.GetStorage(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if storage == nil {
@@ -22,6 +23,7 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -31,30 +33,35 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry Secret
 		secret, err := r.ensureRegistrySecret(client, plan, storage)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry ImageStream
 		err = r.ensureRegistryImageStream(client, plan, secret)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry DeploymentConfig
 		err = r.ensureRegistryDC(client, plan, storage, secret)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry Service
 		err = r.ensureRegistryService(client, plan, secret)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
@@ -108,15 +115,18 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
 	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName())
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundImageStream, err := plan.GetRegistryImageStream(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundImageStream == nil {
 		err = client.Create(context.TODO(), newImageStream)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -127,6 +137,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 	plan.UpdateRegistryImageStream(foundImageStream)
 	err = client.Update(context.TODO(), foundImageStream)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -139,15 +150,18 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
 	newDC, err := plan.BuildRegistryDC(storage, name, dirName)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundDC, err := plan.GetRegistryDC(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundDC == nil {
 		err = client.Create(context.TODO(), newDC)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -158,6 +172,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	plan.UpdateRegistryDC(storage, foundDC, name, dirName)
 	err = client.Update(context.TODO(), foundDC)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -169,15 +184,18 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 	name := secret.GetName()
 	newService, err := plan.BuildRegistryService(name)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundService, err := plan.GetRegistryService(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundService == nil {
 		err = client.Create(context.TODO(), newService)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -188,6 +206,7 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 	plan.UpdateRegistryService(foundService, name)
 	err = client.Update(context.TODO(), foundService)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -200,6 +219,7 @@ func (r ReconcileMigPlan) ensureMigRegistriesDelete(plan *migapi.MigPlan) error 
 
 	clusters, err := migapi.ListClusters(r, "")
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -209,29 +229,34 @@ func (r ReconcileMigPlan) ensureMigRegistriesDelete(plan *migapi.MigPlan) error 
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry Service
 		err = r.ensureRegistryServiceDelete(client, plan)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry DeploymentConfig
 		err = r.ensureRegistryDCDelete(client, plan)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		// Migration Registry ImageStream
 		err = r.ensureRegistryImageStreamDelete(client, plan)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry Secret
 		err := r.ensureRegistrySecretDelete(client, plan)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
@@ -243,6 +268,7 @@ func (r ReconcileMigPlan) ensureMigRegistriesDelete(plan *migapi.MigPlan) error 
 func (r ReconcileMigPlan) ensureRegistryServiceDelete(client k8sclient.Client, plan *migapi.MigPlan) error {
 	foundService, err := plan.GetRegistryService(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundService == nil {
@@ -250,6 +276,7 @@ func (r ReconcileMigPlan) ensureRegistryServiceDelete(client k8sclient.Client, p
 	}
 	err = client.Delete(context.TODO(), foundService)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -260,6 +287,7 @@ func (r ReconcileMigPlan) ensureRegistryServiceDelete(client k8sclient.Client, p
 func (r ReconcileMigPlan) ensureRegistryDCDelete(client k8sclient.Client, plan *migapi.MigPlan) error {
 	foundDC, err := plan.GetRegistryDC(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundDC == nil {
@@ -267,6 +295,7 @@ func (r ReconcileMigPlan) ensureRegistryDCDelete(client k8sclient.Client, plan *
 	}
 	err = client.Delete(context.TODO(), foundDC)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -277,6 +306,7 @@ func (r ReconcileMigPlan) ensureRegistryDCDelete(client k8sclient.Client, plan *
 func (r ReconcileMigPlan) ensureRegistryImageStreamDelete(client k8sclient.Client, plan *migapi.MigPlan) error {
 	foundImageStream, err := plan.GetRegistryImageStream(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundImageStream == nil {
@@ -284,6 +314,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStreamDelete(client k8sclient.Clien
 	}
 	err = client.Delete(context.TODO(), foundImageStream)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -294,6 +325,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStreamDelete(client k8sclient.Clien
 func (r ReconcileMigPlan) ensureRegistrySecretDelete(client k8sclient.Client, plan *migapi.MigPlan) error {
 	foundSecret, err := plan.GetRegistrySecret(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundSecret == nil {
@@ -301,6 +333,7 @@ func (r ReconcileMigPlan) ensureRegistrySecretDelete(client k8sclient.Client, pl
 	}
 	err = client.Delete(context.TODO(), foundSecret)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 

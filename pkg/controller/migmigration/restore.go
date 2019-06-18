@@ -16,20 +16,24 @@ const podStageLabel = "migration-stage-pod"
 func (t *Task) ensureRestore() error {
 	newRestore, err := t.buildRestore()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundRestore, err := t.getRestore()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundRestore == nil {
 		t.Restore = newRestore
 		client, err := t.getDestinationClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		err = client.Create(context.TODO(), newRestore)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -39,10 +43,12 @@ func (t *Task) ensureRestore() error {
 		t.updateRestore(foundRestore)
 		client, err := t.getDestinationClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		err = client.Update(context.TODO(), foundRestore)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
@@ -87,6 +93,7 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 	}
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
 	restore := &velero.Restore{
@@ -114,6 +121,7 @@ func (t *Task) updateRestore(restore *velero.Restore) {
 func (t *Task) deleteStagePods() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	// Find all pods matching the podStageLabel
@@ -125,6 +133,7 @@ func (t *Task) deleteStagePods() error {
 		k8sclient.MatchingLabels(labels),
 		&list)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	// Delete all pods
@@ -133,6 +142,7 @@ func (t *Task) deleteStagePods() error {
 			context.TODO(),
 			&pod)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

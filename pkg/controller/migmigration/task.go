@@ -83,12 +83,14 @@ func (t *Task) Run() error {
 	// would require passing in cluster version to the controller.
 	err := t.bounceResticPod()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Annotate persistent storage resources with actions
 	err = t.annotateStorageResources()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -100,6 +102,7 @@ func (t *Task) Run() error {
 	// Backup
 	err = t.ensureBackup()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	switch t.Backup.Status.Phase {
@@ -127,6 +130,7 @@ func (t *Task) Run() error {
 	// Delete storage annotations
 	err = t.removeStorageResourceAnnotations()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -134,6 +138,7 @@ func (t *Task) Run() error {
 	t.Phase = WaitOnBackupReplication
 	backup, err := t.getReplicatedBackup()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if backup != nil {
@@ -145,6 +150,7 @@ func (t *Task) Run() error {
 	// Restore
 	err = t.ensureRestore()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	switch t.Restore.Status.Phase {
@@ -172,6 +178,7 @@ func (t *Task) Run() error {
 	if t.stage() {
 		err = t.deleteStagePods()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

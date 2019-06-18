@@ -18,9 +18,8 @@ package migcluster
 
 import (
 	"context"
+	"github.com/fusor/mig-controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/types"
-
-	"k8s.io/apiserver/pkg/storage/names"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -31,17 +30,16 @@ import (
 	"k8s.io/client-go/rest"
 
 	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("cluster")
+var log = logging.WithName("cluster")
 
 // Add creates a new MigCluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -59,6 +57,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -72,6 +71,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -85,6 +85,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 				}),
 		})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -98,6 +99,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 				}),
 		})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -108,7 +110,7 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
-	client.Client
+	k8sclient.Client
 	scheme     *runtime.Scheme
 	Controller controller.Controller
 }
@@ -120,16 +122,17 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log = logf.Log.WithName(names.SimpleNameGenerator.GenerateName("cluster|"))
+	log.Reset()
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
 	err := r.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil // don't requeue
+			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, err // requeue
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Begin staging conditions.
@@ -138,14 +141,16 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(cluster)
 	if err != nil {
-		return reconcile.Result{}, err
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Remote Watch.
 	if !cluster.Status.HasBlockerCondition() {
 		err = r.setupRemoteWatch(cluster)
 		if err != nil {
-			return reconcile.Result{}, err
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -161,11 +166,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	cluster.Touch()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
-		if errors.IsConflict(err) {
-			return reconcile.Result{Requeue: true}, nil
-		} else {
-			return reconcile.Result{}, err
-		}
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Done
@@ -191,11 +193,13 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	if cluster.Spec.IsHostCluster {
 		restCfg, err = config.GetConfig()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	} else {
 		restCfg, err = cluster.BuildRestConfig(r.Client)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

@@ -15,6 +15,7 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 
 	storage, err := plan.GetStorage(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if storage == nil {
@@ -22,6 +23,7 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -31,23 +33,27 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		// BSL
 		err := r.ensureBSL(client, storage)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// VSL
 		err = r.ensureVSL(client, storage)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
 		// Cloud Secret
 		err = r.ensureCloudSecret(client, storage)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 
@@ -73,11 +79,13 @@ func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.Mig
 	newBSL := storage.BuildBSL()
 	foundBSL, err := storage.GetBSL(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundBSL == nil {
 		err = client.Create(context.TODO(), newBSL)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -88,6 +96,7 @@ func (r ReconcileMigPlan) ensureBSL(client k8sclient.Client, storage *migapi.Mig
 	storage.UpdateBSL(foundBSL)
 	err = client.Update(context.TODO(), foundBSL)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -100,11 +109,13 @@ func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.Mig
 	newVSL := storage.BuildVSL()
 	foundVSL, err := storage.GetVSL(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundVSL == nil {
 		err = client.Create(context.TODO(), newVSL)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -115,6 +126,7 @@ func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.Mig
 	storage.UpdateVSL(foundVSL)
 	err = client.Update(context.TODO(), foundVSL)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -125,15 +137,18 @@ func (r ReconcileMigPlan) ensureVSL(client k8sclient.Client, storage *migapi.Mig
 func (r ReconcileMigPlan) ensureCloudSecret(client k8sclient.Client, storage *migapi.MigStorage) error {
 	newSecret, err := storage.BuildCloudSecret(r)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundSecret, err := storage.GetCloudSecret(client)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundSecret == nil {
 		err = client.Create(context.TODO(), newSecret)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -144,6 +159,7 @@ func (r ReconcileMigPlan) ensureCloudSecret(client k8sclient.Client, storage *mi
 	storage.UpdateCloudSecret(r, foundSecret)
 	err = client.Update(context.TODO(), foundSecret)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 

@@ -14,6 +14,7 @@ limitations under the License.
 package remotewatcher
 
 import (
+	"github.com/fusor/mig-controller/pkg/logging"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,11 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logf.Log.WithName("remote-watch")
+var log = logging.WithName("remote-watch")
 
 // Add creates a new RemoteWatcher Controller with a forwardChannel
 func Add(mgr manager.Manager, forwardChannel chan event.GenericEvent, fowardEvent event.GenericEvent) error {
@@ -51,6 +51,7 @@ func newReconciler(
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -62,6 +63,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BackupPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -73,6 +75,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&RestorePredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -84,6 +87,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BSLPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -95,6 +99,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&VSLPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -106,6 +111,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&SecretPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -117,6 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&PodPredicate{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -127,6 +134,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -137,6 +145,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -147,6 +156,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -170,6 +180,7 @@ type ReconcileRemoteWatcher struct {
 // +kubebuilder:rbac:groups=image.openshift.io,resources=*,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.openshift.io,resources=*,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Reset()
 	// Forward a known Event back to the parent controller
 	r.ForwardChannel <- r.ForwardEvent
 	return reconcile.Result{}, nil
