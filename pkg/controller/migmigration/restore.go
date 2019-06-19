@@ -127,6 +127,10 @@ func (t Task) getRestore(copyRestore bool) (*velero.Restore, error) {
 	// Find proper restore to return
 	if len(list.Items) > 0 {
 		for i, restore := range list.Items {
+			// Avoid nil dereference
+			if restore.Annotations == nil {
+				restore.Annotations = make(map[string]string)
+			}
 			if restore.Annotations[copyBackupRestoreAnnotationKey] != "" && copyRestore {
 				return &list.Items[i], nil
 			}

@@ -154,7 +154,7 @@ func (t *Task) Run() error {
 	// This will also return the number of pods we have annotated to be backed up
 	// by restic. This is useful for knowing whether or not we need to create
 	// staging pods
-	err, resticPodCount := t.annotateStorageResources()
+	err, resticAnnotationCount := t.annotateStorageResources()
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -169,7 +169,7 @@ func (t *Task) Run() error {
 
 	// If all stage pods are created and running OR there are no stage pods we
 	// need to create, continue
-	if created || resticPodCount == 0 {
+	if created || resticAnnotationCount == 0 {
 		t.Phase = StagePodsCreated
 	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
 		t.Phase = CreatingStagePods

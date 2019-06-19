@@ -144,6 +144,10 @@ func (t Task) getBackup(copyBackup bool) (*velero.Backup, error) {
 	// Find proper backup to return
 	if len(list.Items) > 0 {
 		for i, backup := range list.Items {
+			// Avoid nil annotation lookup
+			if backup.Annotations == nil {
+				backup.Annotations = make(map[string]string)
+			}
 			if backup.Annotations[copyBackupRestoreAnnotationKey] != "" && copyBackup {
 				return &list.Items[i], nil
 			}
