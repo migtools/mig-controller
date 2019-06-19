@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
@@ -104,6 +103,10 @@ func init() {
 	SchemeBuilder.Register(&MigStorage{}, &MigStorageList{})
 }
 
+//
+// BSL
+//
+
 // Determine if two BSLs are equal based on relevant fields in the Spec.
 // Returns `true` when equal.
 func (r *MigStorage) EqualsBSL(a, b *velero.BackupStorageLocation) bool {
@@ -121,7 +124,7 @@ func (r *MigStorage) EqualsVSL(a, b *velero.VolumeSnapshotLocation) bool {
 		reflect.DeepEqual(a.Spec.Config, b.Spec.Config)
 }
 
-// Build a velero backup storage location.
+// Build a BSL.
 func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 	location := &velero.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
@@ -137,7 +140,7 @@ func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 	return location
 }
 
-// Update a velero backup storage location.
+// Update a BSL.
 func (r *MigStorage) UpdateBSL(location *velero.BackupStorageLocation) {
 	location.Spec.Provider = r.Spec.BackupStorageProvider
 	switch r.Spec.BackupStorageProvider {
@@ -149,7 +152,7 @@ func (r *MigStorage) UpdateBSL(location *velero.BackupStorageLocation) {
 	}
 }
 
-// Update a velero backup storage location for the AWS provider.
+// Update a BSL for the AWS provider.
 func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 	config := r.Spec.BackupStorageConfig
 	location.Spec.StorageType = velero.StorageType{
@@ -176,24 +179,9 @@ func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
 	}
 }
 
-// Get existing backup-storage-location by Label search.
-// Returns `nil` when not found.
-func (r *MigStorage) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
-	list := velero.BackupStorageLocationList{}
-	labels := r.GetCorrelationLabels()
-	err := client.List(
-		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
-	if err != nil {
-		return nil, err
-	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-
-	return nil, nil
-}
+//
+// VSL
+//
 
 // Default the VSL settings (when not defined) using the BSL settings.
 func (r *MigStorage) DefaultVSLSettings() {
@@ -211,7 +199,7 @@ func (r *MigStorage) DefaultVSLSettings() {
 	}
 }
 
-// Build a velero volume snapshot location.
+// Build a VSL.
 func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
 	location := &velero.VolumeSnapshotLocation{
 		ObjectMeta: metav1.ObjectMeta{
@@ -227,7 +215,7 @@ func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
 	return location
 }
 
-// Update a velero volume snapshot location.
+// Update a VSL.
 func (r *MigStorage) UpdateVSL(location *velero.VolumeSnapshotLocation) {
 	location.Spec.Provider = r.Spec.VolumeSnapshotProvider
 	switch r.Spec.VolumeSnapshotProvider {
@@ -239,7 +227,7 @@ func (r *MigStorage) UpdateVSL(location *velero.VolumeSnapshotLocation) {
 	}
 }
 
-// Update a velero volume snapshot location for the AWS provider.
+// Update a VSL for the AWS provider.
 func (r *MigStorage) updateAwsVSL(location *velero.VolumeSnapshotLocation) {
 	config := r.Spec.VolumeSnapshotConfig
 	location.Spec.Config = map[string]string{
@@ -247,39 +235,14 @@ func (r *MigStorage) updateAwsVSL(location *velero.VolumeSnapshotLocation) {
 	}
 }
 
-// Get existing volume snapshot location by Label search.
-// Returns `nil` when not found.
-func (r *MigStorage) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocation, error) {
-	list := velero.VolumeSnapshotLocationList{}
-	labels := r.GetCorrelationLabels()
-	err := client.List(
-		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
-	if err != nil {
-		return nil, err
-	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-
-	return nil, nil
-}
+//
+// Cloud-Secret
+//
 
 // Determine if two secrets cloud secrets are equal.
 // Returns `true` when equal.
 func (r *MigStorage) EqualsCloudSecret(a, b *kapi.Secret) bool {
 	return reflect.DeepEqual(a.Data, b.Data)
-}
-
-// Get the cloud credentials secret by labels.
-func (r *MigStorage) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
-	return GetSecret(
-		client,
-		&kapi.ObjectReference{
-			Namespace: "velero",
-			Name:      "cloud-credentials",
-		})
 }
 
 // Build the cloud credentials secret.

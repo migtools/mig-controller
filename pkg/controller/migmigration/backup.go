@@ -101,8 +101,8 @@ func (t *Task) getBSL() (*velero.BackupStorageLocation, error) {
 	if err != nil {
 		return nil, err
 	}
-	storage := t.PlanResources.MigStorage
-	location, err := storage.GetBSL(client)
+	plan := t.PlanResources.MigPlan
+	location, err := plan.GetBSL(client)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +119,8 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 	if err != nil {
 		return nil, err
 	}
-	storage := t.PlanResources.MigStorage
-	location, err := storage.GetVSL(client)
+	plan := t.PlanResources.MigPlan
+	location, err := plan.GetVSL(client)
 	if err != nil {
 		return nil, err
 	}
