@@ -217,7 +217,7 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 func (r ReconcileMigPlan) ensureMigRegistriesDelete(plan *migapi.MigPlan) error {
 	var client k8sclient.Client
 
-	clusters, err := migapi.ListClusters(r, "")
+	clusters, err := migapi.ListClusters(r)
 	if err != nil {
 		log.Trace(err)
 		return err

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
@@ -143,6 +144,56 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 func (r *MigPlan) SetClosed() {
 	r.Spec.Closed = true
 }
+
+// Get list of migrations associated with the plan.
+// Sorted by created timestamp with final migrations grouped last.
+func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, error) {
+	stage := []*MigMigration{}
+	final := []*MigMigration{}
+	qlist := MigMigrationList{}
+
+	// Search
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingField(
+			PlanIndexField,
+			fmt.Sprintf("%s/%s", r.Namespace, r.Name)),
+		&qlist)
+	if err != nil {
+		return nil, err
+	}
+	for i := range qlist.Items {
+		migration := qlist.Items[i]
+		if migration.Spec.Stage {
+			stage = append(stage, &migration)
+		} else {
+			final = append(final, &migration)
+		}
+	}
+
+	// Sort by creation timestamp.
+	sort.Slice(
+		stage,
+		func(i, j int) bool {
+			a := stage[i].ObjectMeta.CreationTimestamp
+			b := stage[j].ObjectMeta.CreationTimestamp
+			return a.Before(&b)
+		})
+	sort.Slice(
+		final,
+		func(i, j int) bool {
+			a := final[i].ObjectMeta.CreationTimestamp
+			b := final[j].ObjectMeta.CreationTimestamp
+			return a.Before(&b)
+		})
+
+	list := append(stage, final...)
+	return list, nil
+}
+
+//
+// Registry
+//
 
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
@@ -471,58 +522,70 @@ func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, er
 	return nil, nil
 }
 
-// Get list of migrations associated with the plan.
-// Sorted by created timestamp with final migrations grouped last.
-func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, error) {
-	stage := []*MigMigration{}
-	final := []*MigMigration{}
-	qlist := MigMigrationList{}
-
-	// Search
-	err := client.List(
-		context.TODO(),
-		k8sclient.MatchingField(
-			PlanIndexField,
-			fmt.Sprintf("%s/%s", r.Namespace, r.Name)),
-		&qlist)
-	if err != nil {
-		return nil, err
-	}
-	for i := range qlist.Items {
-		migration := qlist.Items[i]
-		if migration.Spec.Stage {
-			stage = append(stage, &migration)
-		} else {
-			final = append(final, &migration)
-		}
-	}
-
-	// Sort by creation timestamp.
-	sort.Slice(
-		stage,
-		func(i, j int) bool {
-			a := stage[i].ObjectMeta.CreationTimestamp
-			b := stage[j].ObjectMeta.CreationTimestamp
-			return a.Before(&b)
-		})
-	sort.Slice(
-		final,
-		func(i, j int) bool {
-			a := final[i].ObjectMeta.CreationTimestamp
-			b := final[j].ObjectMeta.CreationTimestamp
-			return a.Before(&b)
-		})
-
-	list := append(stage, final...)
-	return list, nil
-}
-
 // Determine if two services are equal.
 // Returns `true` when equal.
 func (r *MigPlan) EqualsRegistryService(a, b *kapi.Service) bool {
 	return reflect.DeepEqual(a.Spec.Ports, b.Spec.Ports) &&
 		reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector)
 }
+
+//
+// Storage
+//
+
+// Get an associated BSL by Label search.
+// Returns `nil` when not found.
+func (r *MigPlan) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation, error) {
+	list := velero.BackupStorageLocationList{}
+	labels := r.GetCorrelationLabels()
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
+}
+
+// Get an associated VSL by Label search.
+// Returns `nil` when not found.
+func (r *MigPlan) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocation, error) {
+	list := velero.VolumeSnapshotLocationList{}
+	labels := r.GetCorrelationLabels()
+	err := client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	return nil, nil
+}
+
+// Get the cloud credentials secret by labels.
+func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	return GetSecret(
+		client,
+		&kapi.ObjectReference{
+			Namespace: VeleroNamespace,
+			Name:      "cloud-credentials",
+		})
+}
+
+//
+//
+// PV list
+//
+//
 
 // PV Actions.
 const (

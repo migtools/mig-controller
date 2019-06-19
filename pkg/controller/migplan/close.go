@@ -18,7 +18,6 @@ package migplan
 
 import (
 	"context"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
@@ -45,6 +44,11 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	err := r.ensureMigRegistriesDelete(plan)
 	if err != nil {
 		log.Trace(err)
+		return err
+	}
+	// Storage
+	err = r.ensureStorageDeleted(plan)
+	if err != nil {
 		return err
 	}
 
