@@ -156,12 +156,14 @@ func (t *Task) Run() error {
 	// staging pods
 	err, resticPodCount := t.annotateStorageResources()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	// Check if stage pods are created and running
 	created, err := t.areStagePodsCreated()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -174,6 +176,7 @@ func (t *Task) Run() error {
 		// Swap out all copy pods with dummy pods
 		err = t.createStagePods()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -183,6 +186,7 @@ func (t *Task) Run() error {
 	if t.quiesce() {
 		err = t.quiesceApplications()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
@@ -190,6 +194,7 @@ func (t *Task) Run() error {
 	// Run second backup to copy PV data
 	err = t.ensureCopyBackup()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -279,6 +284,7 @@ func (t *Task) Run() error {
 
 	deleted, err := t.areStagePodsDeleted()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -289,6 +295,7 @@ func (t *Task) Run() error {
 		// Remove staging pods on source and destination cluster
 		err = t.removeStagePods()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -298,6 +305,7 @@ func (t *Task) Run() error {
 	if !t.stage() {
 		err = t.ensureFinalRestore()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		switch t.FinalRestore.Status.Phase {
@@ -411,10 +419,12 @@ func (t *Task) addErrors(errors []string) {
 func (t *Task) removeStagePods() error {
 	srcClient, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	destClient, err := t.getDestinationClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	// Find all stage pods
@@ -426,6 +436,7 @@ func (t *Task) removeStagePods() error {
 	podList := corev1.PodList{}
 	err = srcClient.List(context.TODO(), options, &podList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pod := range podList.Items {
@@ -433,12 +444,14 @@ func (t *Task) removeStagePods() error {
 			context.TODO(),
 			&pod)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
 	podList = corev1.PodList{}
 	err = destClient.List(context.TODO(), options, &podList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pod := range podList.Items {
@@ -446,6 +459,7 @@ func (t *Task) removeStagePods() error {
 			context.TODO(),
 			&pod)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

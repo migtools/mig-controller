@@ -483,6 +483,7 @@ func (t *Task) areStagePodsCreated() (bool, error) {
 func (t *Task) createStagePods() error {
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -495,6 +496,7 @@ func (t *Task) createStagePods() error {
 	podList := corev1.PodList{}
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, pod := range podList.Items {
@@ -527,6 +529,7 @@ func (t *Task) createStagePods() error {
 		if k8serrors.IsAlreadyExists(err) {
 			return nil
 		} else if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}

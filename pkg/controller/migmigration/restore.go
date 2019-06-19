@@ -61,10 +61,12 @@ func (t *Task) ensureFinalRestore() error {
 func (t *Task) ensureCopyRestore() error {
 	newRestore, err := t.buildRestore(nil)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	foundRestore, err := t.getRestore(true)
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	if foundRestore == nil {
@@ -72,10 +74,12 @@ func (t *Task) ensureCopyRestore() error {
 		t.CopyRestore = newRestore
 		client, err := t.getDestinationClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		err = client.Create(context.TODO(), newRestore)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		return nil
@@ -85,10 +89,12 @@ func (t *Task) ensureCopyRestore() error {
 		t.updateRestore(foundRestore, t.CopyBackup.Name)
 		client, err := t.getDestinationClient()
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		err = client.Update(context.TODO(), foundRestore)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 	}
