@@ -62,12 +62,12 @@ func TestPersistentVolume_Update(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	// Setup
-	pvA := PersistentVolume{
+	pvA := PV{
 		Name:         "Elvis",
 		StorageClass: "local",
 		Action:       "Copy",
 	}
-	pvB := PersistentVolume{
+	pvB := PV{
 		Name:         "Elvis",
 		StorageClass: "changed",
 		Action:       "Copy",
@@ -85,7 +85,7 @@ func TestPersistentVolumes_AddPv(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	pvs := PersistentVolumes{}
 	// Add First
-	pvA := PersistentVolume{
+	pvA := PV{
 		Name:         "Elvis",
 		StorageClass: "local",
 	}
@@ -94,14 +94,14 @@ func TestPersistentVolumes_AddPv(t *testing.T) {
 	// Validate pvA
 	_, found := pvs.index[pvA.Name]
 	g.Expect(found).To(gomega.BeTrue())
-	g.Expect(pvs.List[0]).To(gomega.Equal(PersistentVolume{
+	g.Expect(pvs.List[0]).To(gomega.Equal(PV{
 		Name:         "Elvis",
 		StorageClass: "local",
 		staged:       true,
 	}))
 
 	// Add Second.
-	pvB := PersistentVolume{
+	pvB := PV{
 		Name:         "Another",
 		StorageClass: "mounted",
 	}
@@ -112,12 +112,12 @@ func TestPersistentVolumes_AddPv(t *testing.T) {
 	g.Expect(found).To(gomega.BeTrue())
 	_, found = pvs.index[pvB.Name]
 	g.Expect(found).To(gomega.BeTrue())
-	g.Expect(pvs.List[0]).To(gomega.Equal(PersistentVolume{
+	g.Expect(pvs.List[0]).To(gomega.Equal(PV{
 		Name:         "Elvis",
 		StorageClass: "local",
 		staged:       true,
 	}))
-	g.Expect(pvs.List[1]).To(gomega.Equal(PersistentVolume{
+	g.Expect(pvs.List[1]).To(gomega.Equal(PV{
 		Name:         "Another",
 		StorageClass: "mounted",
 		staged:       true,
@@ -131,7 +131,7 @@ func TestPersistentVolumes_DeletePv(t *testing.T) {
 	n := 5
 	pvs := PersistentVolumes{}
 	for i := 0; i < n; i++ {
-		pv := PersistentVolume{
+		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
 			Action:       "Copy",
@@ -145,7 +145,7 @@ func TestPersistentVolumes_DeletePv(t *testing.T) {
 
 	// Validation
 	g.Expect(pvs.List).To(gomega.Equal(
-		[]PersistentVolume{
+		[]PV{
 			{
 				Name:         "0",
 				StorageClass: "local",
@@ -172,7 +172,7 @@ func TestPersistentVolumes_FindPv(t *testing.T) {
 
 	// Setup
 	pvs := PersistentVolumes{}
-	pv := PersistentVolume{
+	pv := PV{
 		Name:         "Elvis",
 		StorageClass: "local",
 		staged:       true,
@@ -194,7 +194,7 @@ func TestPersistentVolumes_BeginPvStaging(t *testing.T) {
 	n := 5
 	pvs := PersistentVolumes{}
 	for i := 0; i < n; i++ {
-		pv := PersistentVolume{
+		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
 			Action:       "Copy",
@@ -223,7 +223,7 @@ func TestPersistentVolumes_EndPvStaging(t *testing.T) {
 	// Setup
 	pvs := PersistentVolumes{}
 	for i := 0; i < 10; i++ {
-		pv := PersistentVolume{
+		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
 			Action:       "Copy",
@@ -239,7 +239,7 @@ func TestPersistentVolumes_EndPvStaging(t *testing.T) {
 
 	// Validation
 	g.Expect(pvs.List).To(gomega.Equal(
-		[]PersistentVolume{
+		[]PV{
 			{
 				Name:         "2",
 				StorageClass: "local",

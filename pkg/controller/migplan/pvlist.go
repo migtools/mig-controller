@@ -2,7 +2,6 @@ package migplan
 
 import (
 	"context"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
@@ -11,7 +10,7 @@ import (
 )
 
 type PvMap map[types.NamespacedName]core.PersistentVolume
-type Claims []types.NamespacedName
+type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
@@ -39,7 +38,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	plan.Spec.BeginPvStaging()
 
 	// Build PV map.
-	table, err := r.getPvMap(client)
+	pvMap, err := r.getPvMap(client)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -51,15 +50,21 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return err
 	}
 	for _, claim := range claims {
-		pv, found := table[claim]
+		key := types.NamespacedName{
+			Namespace: claim.Namespace,
+			Name:      claim.Name,
+		}
+		pv, found := pvMap[key]
 		if !found {
 			continue
 		}
 		plan.Spec.AddPv(
-			migapi.PersistentVolume{
+			migapi.PV{
 				Name:             pv.Name,
+				Capacity:         pv.Spec.Capacity[core.ResourceStorage],
 				StorageClass:     pv.Spec.StorageClassName,
 				SupportedActions: r.getSupportedActions(pv),
+				PVC:              claim,
 			})
 	}
 
@@ -77,9 +82,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	return nil
 }
 
-// Get a table (map) of PVs keyed by namespaced name.
+// Get a table (map) of PVs keyed by PVC namespaced name.
 func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
-	table := PvMap{}
+	pvMap := PvMap{}
 	list := core.PersistentVolumeList{}
 	err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
 	if err != nil {
@@ -95,11 +100,11 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 				Namespace: claim.Namespace,
 				Name:      claim.Name,
 			}
-			table[key] = pv
+			pvMap[key] = pv
 		}
 	}
 
-	return table, nil
+	return pvMap, nil
 }
 
 // Get a list of PVCs found on pods with the specified namespaces.
@@ -114,15 +119,15 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []strin
 		}
 		for _, pod := range list.Items {
 			for _, volume := range pod.Spec.Volumes {
-				claim := volume.VolumeSource.PersistentVolumeClaim
-				if claim == nil {
+				claimRef := volume.VolumeSource.PersistentVolumeClaim
+				if claimRef == nil {
 					continue
 				}
-				ref := types.NamespacedName{
-					Namespace: pod.Namespace,
-					Name:      claim.ClaimName,
-				}
-				claims = append(claims, ref)
+				claims = append(
+					claims, migapi.PVC{
+						Namespace: pod.Namespace,
+						Name:      claimRef.ClaimName,
+					})
 			}
 		}
 	}

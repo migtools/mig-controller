@@ -23,7 +23,9 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -530,22 +532,30 @@ const (
 )
 
 // Name - The PV name.
+// Capacity - The PV storage capacity.
 // StorageClass - The PV storage class name.
 // Action - The PV migration action (move|copy)
 // SupportedActions - The list of supported actions.
 // staged - A PV has been explicitly added/updated.
-type PersistentVolume struct {
-	Name             string   `json:"name,omitempty"`
-	StorageClass     string   `json:"storageClass,omitempty"`
-	SupportedActions []string `json:"supportedActions"`
-	Action           string   `json:"action,omitempty"`
+type PV struct {
+	Name             string            `json:"name,omitempty"`
+	Capacity         resource.Quantity `json:"capacity,omitempty"`
+	StorageClass     string            `json:"storageClass,omitempty"`
+	SupportedActions []string          `json:"supportedActions"`
+	Action           string            `json:"action,omitempty"`
+	PVC              PVC               `json:"pvc,omitempty"`
 	staged           bool
 }
 
+// PVC
+type PVC types.NamespacedName
+
 // Update the PV with another.
-func (r *PersistentVolume) Update(pv PersistentVolume) {
+func (r *PV) Update(pv PV) {
 	r.StorageClass = pv.StorageClass
 	r.SupportedActions = pv.SupportedActions
+	r.Capacity = pv.Capacity
+	r.PVC = pv.PVC
 	if len(r.SupportedActions) == 1 {
 		r.Action = r.SupportedActions[0]
 	}
@@ -564,7 +574,7 @@ func (r *PersistentVolume) Update(pv PersistentVolume) {
 // plan.Spec.EndPvStaging()
 //
 type PersistentVolumes struct {
-	List    []PersistentVolume `json:"persistentVolumes,omitempty"`
+	List    []PV `json:"persistentVolumes,omitempty"`
 	index   map[string]int
 	staging bool
 }
@@ -572,7 +582,7 @@ type PersistentVolumes struct {
 // Allocate collections.
 func (r *PersistentVolumes) init() {
 	if r.List == nil {
-		r.List = []PersistentVolume{}
+		r.List = []PV{}
 	}
 	if r.index == nil {
 		r.buildIndex()
@@ -602,7 +612,7 @@ func (r *PersistentVolumes) BeginPvStaging() {
 func (r *PersistentVolumes) EndPvStaging() {
 	r.init()
 	r.staging = false
-	kept := []PersistentVolume{}
+	kept := []PV{}
 	for _, pv := range r.List {
 		if pv.staged {
 			kept = append(kept, pv)
@@ -618,7 +628,7 @@ func (r *PersistentVolumes) EndPvStaging() {
 }
 
 // Find a PV
-func (r *PersistentVolumes) FindPv(pv PersistentVolume) *PersistentVolume {
+func (r *PersistentVolumes) FindPv(pv PV) *PV {
 	r.init()
 	i, found := r.index[pv.Name]
 	if found {
@@ -629,7 +639,7 @@ func (r *PersistentVolumes) FindPv(pv PersistentVolume) *PersistentVolume {
 }
 
 // Add (or update) Pv to the collection.
-func (r *PersistentVolumes) AddPv(pv PersistentVolume) {
+func (r *PersistentVolumes) AddPv(pv PV) {
 	r.init()
 	pv.staged = true
 	foundPv := r.FindPv(pv)
