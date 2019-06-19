@@ -110,6 +110,9 @@ func (t *Task) Run() error {
 	}
 
 	// Run initial Backup if this is not a stage
+	// The initial backup captures the state of the applications on the source
+	// cluster while explicity setting `includePersistentVolumes` value to
+	// `false`. This will capture everything except PVs
 	if !t.stage() {
 		err = t.ensureInitialBackup()
 		if err != nil {
@@ -147,17 +150,23 @@ func (t *Task) Run() error {
 
 	t.Phase = InitialBackupCompleted
 
-	// Annotate persistent storage resources with actions
+	// Annotate persistent storage resources with PV actions
+	// This will also return the number of pods we have annotated to be backed up
+	// by restic. This is useful for knowing whether or not we need to create
+	// staging pods
 	err, resticPodCount := t.annotateStorageResources()
 	if err != nil {
 		return err
 	}
 
+	// Check if stage pods are created and running
 	created, err := t.areStagePodsCreated()
 	if err != nil {
 		return err
 	}
 
+	// If all stage pods are created and running OR there are no stage pods we
+	// need to create, continue
 	if created || resticPodCount == 0 {
 		t.Phase = StagePodsCreated
 	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
@@ -170,9 +179,9 @@ func (t *Task) Run() error {
 		return nil
 	}
 
-	// Scale down all deployments/deploymentconfigs
+	// Scale down all owning resources
 	if t.quiesce() {
-		err = t.scaleDownDCs()
+		err = t.quiesceApplications()
 		if err != nil {
 			return err
 		}
@@ -320,16 +329,6 @@ func (t *Task) Run() error {
 		}
 	}
 	t.Phase = FinalRestoreCompleted
-
-	// TODO: Remove dummy pods on dest cluster
-	// Delete stage Pods
-	if t.stage() {
-		err = t.deleteStagePods()
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-	}
 
 	// Done
 	t.Phase = Completed

@@ -4,7 +4,6 @@ import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
-	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,7 +40,7 @@ func (t *Task) ensureFinalRestore() error {
 	}
 	t.FinalRestore = foundRestore
 	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore)
+		t.updateRestore(foundRestore, t.InitialBackup.Name)
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -83,7 +82,7 @@ func (t *Task) ensureCopyRestore() error {
 	}
 	t.CopyRestore = foundRestore
 	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore)
+		t.updateRestore(foundRestore, t.CopyBackup.Name)
 		client, err := t.getDestinationClient()
 		if err != nil {
 			return err
@@ -145,11 +144,15 @@ func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, err
 		log.Trace(err)
 		return nil, err
 	}
+	// Set it to copy backup name since initial backup isn't set on stage
+	backupName := t.CopyBackup.Name
 	// If includeClusterResources isn't set, this means it is first restore to
 	// satisfy moving the persistent storage over
 	if includeClusterResources == nil {
+		backupName = t.CopyBackup.Name
 		annotations[copyBackupRestoreAnnotationKey] = "true"
 	} else {
+		backupName = t.InitialBackup.Name
 		delete(annotations, copyBackupRestoreAnnotationKey)
 	}
 	restore := &velero.Restore{
@@ -160,47 +163,15 @@ func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, err
 			Annotations:  annotations,
 		},
 	}
-	t.updateRestore(restore)
+	t.updateRestore(restore, backupName)
 	return restore, nil
 }
 
 // Update a Restore as desired for the destination cluster.
-func (t *Task) updateRestore(restore *velero.Restore) {
+func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	restorePVs := true
 	restore.Spec = velero.RestoreSpec{
-		BackupName: t.InitialBackup.Name,
+		BackupName: backupName,
 		RestorePVs: &restorePVs,
 	}
-}
-
-// Delete stage pods
-func (t *Task) deleteStagePods() error {
-	client, err := t.getDestinationClient()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	// Find all pods matching the podStageLabel
-	list := core.PodList{}
-	labels := make(map[string]string)
-	labels[podStageLabel] = "true"
-	err = client.List(
-		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	// Delete all pods
-	for _, pod := range list.Items {
-		err = client.Delete(
-			context.TODO(),
-			&pod)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-	}
-	return nil
 }
