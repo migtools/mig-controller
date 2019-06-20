@@ -161,7 +161,7 @@ func (t *Task) Run() error {
 	}
 
 	// Check if stage pods are created and running
-	created, err := t.areStagePodsCreated()
+	created, err := t.areStagePodsCreated(resticAnnotationCount)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -169,11 +169,11 @@ func (t *Task) Run() error {
 
 	// If all stage pods are created and running OR there are no stage pods we
 	// need to create, continue
-	if created || resticAnnotationCount == 0 {
+	if created {
 		t.Phase = StagePodsCreated
 	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
 		t.Phase = CreatingStagePods
-		// Swap out all copy pods with dummy pods
+		// Swap out all copy pods with stage pods
 		err = t.createStagePods()
 		if err != nil {
 			log.Trace(err)
@@ -235,16 +235,15 @@ func (t *Task) Run() error {
 
 	// Wait on Backup replication.
 	t.Phase = WaitOnBackupReplication
-	backup, err := t.getReplicatedBackup()
+	backupReplicated, err := t.areBackupsReplicated()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	if backup != nil {
-		t.Phase = BackupReplicated
-	} else {
+	if !backupReplicated {
 		return nil
 	}
+	t.Phase = BackupReplicated
 
 	// Copy restore
 	err = t.ensureCopyRestore()

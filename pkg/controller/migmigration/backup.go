@@ -258,11 +258,12 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	return nil
 }
 
-// Get a Backup that has been replicated by velero on the destination cluster.
-func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
+// Determine whether backups are replicated by velero on the destination
+// cluster.
+func (t *Task) areBackupsReplicated() (bool, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	list := velero.BackupList{}
 	labels := t.Owner.GetCorrelationLabels()
@@ -271,18 +272,18 @@ func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
 		k8sclient.MatchingLabels(labels),
 		&list)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	// If this is stage we only need to wait for 1 backup to be replicated
 	if len(list.Items) == 1 && t.stage() {
-		return &list.Items[0], nil
+		return true, nil
 	}
 	// If this is not a stage, we need to find 2 backups before continuing
 	if len(list.Items) > 1 {
-		return &list.Items[0], nil
+		return true, nil
 	}
 
-	return nil, nil
+	return false, nil
 }
 
 // Delete the running restic pod in velero namespace
@@ -386,7 +387,7 @@ func (t *Task) annotateStorageResources() (error, int) {
 		client.Update(context.TODO(), &resource)
 	}
 
-	resticPodCount := 0
+	resticAnnotationCount := 0
 	for _, ns := range namespaces {
 		// Find all pods in our target namespaces
 		list := corev1.PodList{}
@@ -398,6 +399,9 @@ func (t *Task) annotateStorageResources() (error, int) {
 		}
 		// Loop through all pods to find all volume claims
 		for _, pod := range list.Items {
+			if pod.Labels == nil {
+				pod.Labels = make(map[string]string)
+			}
 			// Don't need to do this for staging pods. Adds unnecessary work
 			if pod.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] != "" {
 				continue
@@ -433,7 +437,7 @@ func (t *Task) annotateStorageResources() (error, int) {
 				}
 			}
 			if len(resticVolumes) > 0 {
-				resticPodCount += 1
+				resticAnnotationCount += 1
 				if pod.Annotations == nil {
 					pod.Annotations = make(map[string]string)
 				}
@@ -447,15 +451,15 @@ func (t *Task) annotateStorageResources() (error, int) {
 		}
 	}
 
-	return nil, resticPodCount
+	return nil, resticAnnotationCount
 }
 
-func (t *Task) areStagePodsCreated() (bool, error) {
+func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		return false, err
 	}
-	// check if we have already created dummy pods
+	// check if we have already created stage pods
 	// if so, return true
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
 	labelSelector := map[string]string{
@@ -468,9 +472,6 @@ func (t *Task) areStagePodsCreated() (bool, error) {
 		return false, err
 	}
 	podCount := len(podList.Items)
-	if podCount == 0 {
-		return false, nil
-	}
 	readyCount := 0
 	for _, pod := range podList.Items {
 		if pod.Status.Phase == corev1.PodRunning {
@@ -478,7 +479,7 @@ func (t *Task) areStagePodsCreated() (bool, error) {
 		}
 	}
 	// Check if all pods are ready
-	if readyCount == podCount {
+	if readyCount == podCount && podCount == resticAnnotationCount {
 		return true, nil
 	}
 	return false, nil
@@ -491,7 +492,7 @@ func (t *Task) createStagePods() error {
 		return err
 	}
 
-	// Dummy pods haven't been created yet, lets create them
+	// Stage pods haven't been created yet, lets create them
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
 	labelSelector := map[string]string{
 		uniqueBackupLabelKey: pvBackupLabelValue,
@@ -507,29 +508,29 @@ func (t *Task) createStagePods() error {
 		if pod.Annotations[resticPvBackupAnnotationKey] == "" {
 			continue
 		}
-		dummyPod := corev1.Pod{}
-		dummyPod.Spec.Containers = pod.Spec.Containers
-		dummyPod.Spec.Volumes = pod.Spec.Volumes
-		// Swap image ref, command, and args and create a new dummy pod to be backed up
-		for i, _ := range dummyPod.Spec.Containers {
-			dummyPod.Spec.Containers[i].Image = rhel7ImageRef
-			dummyPod.Spec.Containers[i].Command = []string{"sleep"}
-			dummyPod.Spec.Containers[i].Args = []string{"infinity"}
+		stagePod := corev1.Pod{}
+		stagePod.Spec.Containers = pod.Spec.Containers
+		stagePod.Spec.Volumes = pod.Spec.Volumes
+		// Swap image ref, command, and args and create a new stage pod to be backed up
+		for i, _ := range stagePod.Spec.Containers {
+			stagePod.Spec.Containers[i].Image = rhel7ImageRef
+			stagePod.Spec.Containers[i].Command = []string{"sleep"}
+			stagePod.Spec.Containers[i].Args = []string{"infinity"}
 		}
-		dummyPod.Name = fmt.Sprintf("%s-dummy-pod", pod.Name)
-		dummyPod.Namespace = pod.Namespace
-		if dummyPod.Labels == nil {
-			dummyPod.Labels = make(map[string]string)
+		stagePod.Name = fmt.Sprintf("%s-stage-pod", pod.Name)
+		stagePod.Namespace = pod.Namespace
+		if stagePod.Labels == nil {
+			stagePod.Labels = make(map[string]string)
 		}
-		dummyPod.Labels[uniqueBackupLabelKey] = "true"
-		dummyPod.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
-		if dummyPod.Annotations == nil {
-			dummyPod.Annotations = make(map[string]string)
+		stagePod.Labels[uniqueBackupLabelKey] = "true"
+		stagePod.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
+		if stagePod.Annotations == nil {
+			stagePod.Annotations = make(map[string]string)
 		}
-		dummyPod.Annotations[resticPvBackupAnnotationKey] = pod.Annotations[resticPvBackupAnnotationKey]
-		err = client.Create(context.TODO(), &dummyPod)
-		// This shouldn't happen with check at beginning of function, but we don't
-		// want to return an error if we somehow get here
+		stagePod.Annotations[resticPvBackupAnnotationKey] = pod.Annotations[resticPvBackupAnnotationKey]
+		err = client.Create(context.TODO(), &stagePod)
+		// If we have already created the pod and it just isn't ready yet, we don't
+		// want to return an error
 		if k8serrors.IsAlreadyExists(err) {
 			return nil
 		} else if err != nil {

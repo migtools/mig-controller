@@ -39,6 +39,9 @@ func (t *Task) scaleDownDCs() error {
 			return err
 		}
 		for _, dc := range list.Items {
+			if dc.Spec.Replicas == 0 {
+				continue
+			}
 			dc.Spec.Replicas = 0
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
@@ -53,6 +56,7 @@ func (t *Task) scaleDownDCs() error {
 func (t *Task) scaleDownDeployments() error {
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	zeroReplica := int32(0)
@@ -64,12 +68,17 @@ func (t *Task) scaleDownDeployments() error {
 			options,
 			&list)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		for _, dep := range list.Items {
+			if dep.Spec.Replicas == &zeroReplica {
+				continue
+			}
 			dep.Spec.Replicas = &zeroReplica
 			err = client.Update(context.TODO(), &dep)
 			if err != nil {
+				log.Trace(err)
 				return err
 			}
 		}
