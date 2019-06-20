@@ -19,6 +19,7 @@ import (
 
 var resticPodPrefix = "restic-"
 var rhel7ImageRef = "registry.access.redhat.com/rhel7"
+var stagePodSuffix = "stage-pod"
 
 // Ensure the initial backup on the source cluster has been created and has the
 // proper settings.
@@ -472,6 +473,12 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 		return false, err
 	}
 	podCount := len(podList.Items)
+	// If there are no stage pods and resticAnnotationCount is zero, this means
+	// we have already quiesced the app so the stage pods were created
+	// previously. Do not recreate them so return true
+	if podCount == 0 && resticAnnotationCount == 0 {
+		return true, nil
+	}
 	readyCount := 0
 	for _, pod := range podList.Items {
 		if pod.Status.Phase == corev1.PodRunning {
@@ -479,7 +486,7 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 		}
 	}
 	// Check if all pods are ready
-	if readyCount == podCount && podCount == resticAnnotationCount {
+	if readyCount == podCount {
 		return true, nil
 	}
 	return false, nil
@@ -508,6 +515,9 @@ func (t *Task) createStagePods() error {
 		if pod.Annotations[resticPvBackupAnnotationKey] == "" {
 			continue
 		}
+		if strings.HasSuffix(pod.Name, stagePodSuffix) {
+			continue
+		}
 		stagePod := corev1.Pod{}
 		stagePod.Spec.Containers = pod.Spec.Containers
 		stagePod.Spec.Volumes = pod.Spec.Volumes
@@ -517,7 +527,7 @@ func (t *Task) createStagePods() error {
 			stagePod.Spec.Containers[i].Command = []string{"sleep"}
 			stagePod.Spec.Containers[i].Args = []string{"infinity"}
 		}
-		stagePod.Name = fmt.Sprintf("%s-stage-pod", pod.Name)
+		stagePod.Name = fmt.Sprintf("%s-%s", pod.Name, stagePodSuffix)
 		stagePod.Namespace = pod.Namespace
 		if stagePod.Labels == nil {
 			stagePod.Labels = make(map[string]string)
