@@ -24,16 +24,16 @@ const (
 	InitialBackupStarted     = "InitialBackupStarted"
 	InitialBackupCompleted   = "InitialBackupCompleted"
 	InitialBackupFailed      = "InitialBackupFailed"
-	CopyBackupStarted        = "CopyBackupStarted"
-	CopyBackupCompleted      = "CopyBackupCompleted"
-	CopyBackupFailed         = "CopyBackupFailed"
+	StageBackupStarted       = "StageBackupStarted"
+	StageBackupCompleted     = "StageBackupCompleted"
+	StageBackupFailed        = "StageBackupFailed"
 	CreateStagePodsStarted   = "CreateStagePodsStarted"
 	CreateStagePodsCompleted = "CreateStagePodsCompleted"
 	WaitOnBackupReplication  = "WaitOnBackupReplication"
 	BackupReplicated         = "BackupReplicated"
-	CopyRestoreStarted       = "CopyRestoreStarted"
-	CopyRestoreCompleted     = "CopyRestoreCompleted"
-	CopyRestoreFailed        = "CopyRestoreFailed"
+	StageRestoreStarted      = "StageRestoreStarted"
+	StageRestoreCompleted    = "StageRestoreCompleted"
+	StageRestoreFailed       = "StageRestoreFailed"
 	DeleteStagePodsStarted   = "DeleteStagePodsStarted"
 	DeleteStagePodsCompleted = "DeleteStagePodsCompleted"
 	FinalRestoreStarted      = "FinalRestoreStarted"
@@ -63,8 +63,8 @@ type Task struct {
 	Phase           string
 	Errors          []string
 	InitialBackup   *velero.Backup
-	CopyBackup      *velero.Backup
-	CopyRestore     *velero.Restore
+	StageBackup     *velero.Backup
+	StageRestore    *velero.Restore
 	FinalRestore    *velero.Restore
 }
 
@@ -192,37 +192,37 @@ func (t *Task) Run() error {
 	}
 
 	// Run second backup to copy PV data
-	err = t.ensureCopyBackup()
+	err = t.ensureStageBackup()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	switch t.CopyBackup.Status.Phase {
+	switch t.StageBackup.Status.Phase {
 	case velero.BackupPhaseCompleted:
-		t.Phase = CopyBackupCompleted
+		t.Phase = StageBackupCompleted
 	case velero.BackupPhaseFailed:
 		reason := fmt.Sprintf(
 			"Backup: %s/%s failed.",
-			t.CopyBackup.Namespace,
-			t.CopyBackup.Name)
+			t.StageBackup.Namespace,
+			t.StageBackup.Name)
 		t.addErrors([]string{reason})
-		t.Phase = CopyBackupFailed
+		t.Phase = StageBackupFailed
 		return nil
 	case velero.BackupPhasePartiallyFailed:
 		reason := fmt.Sprintf(
 			"Backup: %s/%s partially failed.",
-			t.CopyBackup.Namespace,
-			t.CopyBackup.Name)
+			t.StageBackup.Namespace,
+			t.StageBackup.Name)
 		t.addErrors([]string{reason})
-		t.Phase = CopyBackupFailed
+		t.Phase = StageBackupFailed
 		return nil
 	case velero.BackupPhaseFailedValidation:
-		t.addErrors(t.CopyBackup.Status.ValidationErrors)
-		t.Phase = CopyBackupFailed
+		t.addErrors(t.StageBackup.Status.ValidationErrors)
+		t.Phase = StageBackupFailed
 		return nil
 	default:
-		t.Phase = CopyBackupStarted
+		t.Phase = StageBackupStarted
 		return nil
 	}
 
@@ -245,41 +245,41 @@ func (t *Task) Run() error {
 	}
 	t.Phase = BackupReplicated
 
-	// Copy restore
-	err = t.ensureCopyRestore()
+	// Stage restore
+	err = t.ensureStageRestore()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	switch t.CopyRestore.Status.Phase {
+	switch t.StageRestore.Status.Phase {
 	case velero.RestorePhaseCompleted:
-		t.Phase = CopyRestoreCompleted
+		t.Phase = StageRestoreCompleted
 	case velero.RestorePhaseFailedValidation:
-		t.addErrors(t.CopyRestore.Status.ValidationErrors)
-		t.Phase = CopyRestoreFailed
+		t.addErrors(t.StageRestore.Status.ValidationErrors)
+		t.Phase = StageRestoreFailed
 		return nil
 	case velero.RestorePhaseFailed:
 		reason := fmt.Sprintf(
 			"Restore: %s/%s failed.",
-			t.CopyRestore.Namespace,
-			t.CopyRestore.Name)
+			t.StageRestore.Namespace,
+			t.StageRestore.Name)
 		t.addErrors([]string{reason})
-		t.Phase = CopyRestoreFailed
+		t.Phase = StageRestoreFailed
 		return nil
 	case velero.RestorePhasePartiallyFailed:
 		reason := fmt.Sprintf(
 			"Restore: %s/%s partially failed.",
-			t.CopyRestore.Namespace,
-			t.CopyRestore.Name)
+			t.StageRestore.Namespace,
+			t.StageRestore.Name)
 		t.addErrors([]string{reason})
-		t.Phase = CopyRestoreFailed
+		t.Phase = StageRestoreFailed
 		return nil
 	default:
-		t.Phase = CopyRestoreStarted
+		t.Phase = StageRestoreStarted
 		return nil
 	}
-	t.Phase = CopyRestoreCompleted
+	t.Phase = StageRestoreCompleted
 
 	deleted, err := t.areStagePodsDeleted()
 	if err != nil {

@@ -70,7 +70,7 @@ func (t *Task) ensureInitialBackup() error {
 
 // Ensure the second backup on the source cluster has been created and has the
 // proper settings.
-func (t *Task) ensureCopyBackup() error {
+func (t *Task) ensureStageBackup() error {
 	newBackup, err := t.buildBackup(nil)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (t *Task) ensureCopyBackup() error {
 		return err
 	}
 	if foundBackup == nil {
-		t.CopyBackup = newBackup
+		t.StageBackup = newBackup
 		client, err := t.getSourceClient()
 		if err != nil {
 			return err
@@ -102,7 +102,7 @@ func (t *Task) ensureCopyBackup() error {
 		}
 		return nil
 	}
-	t.CopyBackup = foundBackup
+	t.StageBackup = foundBackup
 	if !t.equalsBackup(newBackup, foundBackup) {
 		client, err := t.getSourceClient()
 		if err != nil {
@@ -483,7 +483,7 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 		}
 	}
 	// Check if all pods are ready
-	if readyCount == podCount {
+	if readyCount == podCount && podCount != 0 {
 		return true, nil
 	}
 	return false, nil

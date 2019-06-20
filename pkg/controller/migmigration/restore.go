@@ -58,7 +58,7 @@ func (t *Task) ensureFinalRestore() error {
 
 // Ensure the first restore on the destination cluster has been
 // created  and has the proper settings.
-func (t *Task) ensureCopyRestore() error {
+func (t *Task) ensureStageRestore() error {
 	newRestore, err := t.buildRestore(nil)
 	if err != nil {
 		log.Trace(err)
@@ -70,8 +70,8 @@ func (t *Task) ensureCopyRestore() error {
 		return err
 	}
 	if foundRestore == nil {
-		newRestore.Spec.BackupName = t.CopyBackup.Name
-		t.CopyRestore = newRestore
+		newRestore.Spec.BackupName = t.StageBackup.Name
+		t.StageRestore = newRestore
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -84,9 +84,9 @@ func (t *Task) ensureCopyRestore() error {
 		}
 		return nil
 	}
-	t.CopyRestore = foundRestore
+	t.StageRestore = foundRestore
 	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore, t.CopyBackup.Name)
+		t.updateRestore(foundRestore, t.StageBackup.Name)
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -152,12 +152,12 @@ func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, err
 		log.Trace(err)
 		return nil, err
 	}
-	// Set it to copy backup name since initial backup isn't set on stage
-	backupName := t.CopyBackup.Name
+	// Set it to stage backup name since initial backup isn't set on stage
+	backupName := t.StageBackup.Name
 	// If includeClusterResources isn't set, this means it is first restore to
 	// satisfy moving the persistent storage over
 	if includeClusterResources == nil {
-		backupName = t.CopyBackup.Name
+		backupName = t.StageBackup.Name
 		annotations[copyBackupRestoreAnnotationKey] = "true"
 	} else {
 		backupName = t.InitialBackup.Name

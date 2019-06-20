@@ -103,7 +103,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 	switch task.Phase {
 	case WaitOnResticRestart:
 		return 10, nil
-	case InitialBackupFailed, CopyBackupFailed, CopyRestoreFailed, FinalRestoreFailed:
+	case InitialBackupFailed, StageBackupFailed, StageRestoreFailed, FinalRestoreFailed:
 		migration.MarkAsCompleted()
 		migration.AddErrors(task.Errors)
 	case Completed:
