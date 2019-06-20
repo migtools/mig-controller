@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -515,14 +516,35 @@ func (t *Task) createStagePods() error {
 		if strings.HasSuffix(pod.Name, stagePodSuffix) {
 			continue
 		}
+		resticVolumeNames := strings.Split(pod.Annotations[resticPvBackupAnnotationKey], ",")
 		stagePod := corev1.Pod{}
-		stagePod.Spec.Containers = pod.Spec.Containers
+		stagePod.Spec.Containers = []corev1.Container{}
+		stagePod.Spec.Volumes = []corev1.Volume{}
+		for _, volume := range resticVolumeNames {
+			for _, podVolume := range pod.Spec.Volumes {
+				if volume == podVolume.Name {
+					stagePod.Spec.Volumes = append(stagePod.Spec.Volumes, podVolume)
+				}
+			}
+		}
 		stagePod.Spec.Volumes = pod.Spec.Volumes
 		// Swap image ref, command, and args and create a new stage pod to be backed up
-		for i, _ := range stagePod.Spec.Containers {
-			stagePod.Spec.Containers[i].Image = rhel7ImageRef
-			stagePod.Spec.Containers[i].Command = []string{"sleep"}
-			stagePod.Spec.Containers[i].Args = []string{"infinity"}
+		for i, c := range pod.Spec.Containers {
+			newContainer := corev1.Container{
+				Name:    fmt.Sprintf("sleep-%s", strconv.Itoa(i)),
+				Image:   rhel7ImageRef,
+				Command: []string{"sleep"},
+				Args:    []string{"infinity"},
+			}
+			newContainer.VolumeMounts = []corev1.VolumeMount{}
+			for _, vm := range c.VolumeMounts {
+				for _, resticVolume := range resticVolumeNames {
+					if resticVolume == vm.Name {
+						newContainer.VolumeMounts = append(newContainer.VolumeMounts, vm)
+					}
+				}
+			}
+			stagePod.Spec.Containers = append(stagePod.Spec.Containers, newContainer)
 		}
 		stagePod.Name = fmt.Sprintf("%s-%s", pod.Name, stagePodSuffix)
 		stagePod.Namespace = pod.Namespace
