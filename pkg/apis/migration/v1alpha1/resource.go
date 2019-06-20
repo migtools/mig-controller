@@ -14,9 +14,10 @@ const (
 // provide remote watch predicates the ability to determine
 // when an updated referenced resource has been fully reconciled.
 type MigResource interface {
-	// Get the correlation labels.
-	// Labels are used as a back-reference to this resource.
+	// Get a map containing the correlation label.
 	GetCorrelationLabels() map[string]string
+	// Get the correlation label (key, value).
+	GetCorrelationLabel() (string, string)
 	// Get the resource namespace.
 	GetNamespace() string
 	// Get the resource name.
@@ -29,7 +30,14 @@ type MigResource interface {
 
 // Plan
 func (r *MigPlan) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		key: value,
+	}
+}
+
+func (r *MigPlan) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
 }
 
 func (r *MigPlan) GetNamespace() string {
@@ -61,7 +69,14 @@ func (r *MigPlan) Touch() {
 
 // Storage
 func (r *MigStorage) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		key: value,
+	}
+}
+
+func (r *MigStorage) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
 }
 
 func (r *MigStorage) GetNamespace() string {
@@ -93,7 +108,14 @@ func (r *MigStorage) Touch() {
 
 // Cluster
 func (r *MigCluster) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		key: value,
+	}
+}
+
+func (r *MigCluster) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
 }
 
 func (r *MigCluster) GetNamespace() string {
@@ -125,7 +147,14 @@ func (r *MigCluster) Touch() {
 
 // Migration
 func (r *MigMigration) GetCorrelationLabels() map[string]string {
-	return buildCorrelationLabels(r, r.UID)
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		key: value,
+	}
+}
+
+func (r *MigMigration) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
 }
 
 func (r *MigMigration) GetNamespace() string {
