@@ -4,10 +4,10 @@
 
 __1. Identify a pair of running OpenShift clusters to migrate workloads between__
 
-mig-controller and mig-ui can help you move workloads from a _source_ to a _destination_ cluster. You'll need cluster-admin permissions on both clusters. 
+mig-controller can help you move OpenShift application workloads from a _source_ to a _destination_ cluster. You'll need cluster-admin permissions on both OpenShift clusters. 
 
 - **velero** will need to be installed on both clusters, and will be driven by mig-controller
-- **mig-controller** and **mig-ui** should only be installed on _one of the two_ clusters. You can decide which cluster will host these components. 
+- **mig-controller** should only be installed on _one of the two_ clusters. You can decide which cluster will host this component. 
 
 ---
 
@@ -28,7 +28,7 @@ bash deploy_velero.sh
 
 ---
 
-__3. Deploy _mig-controller_ and _mig-ui_ to one of the two involved clusters__
+__3. Deploy _mig-controller_ to one of the two involved clusters__
 
 ```bash
 # Download bash script to deploy the latest mig-controller image as a StatefulSet
