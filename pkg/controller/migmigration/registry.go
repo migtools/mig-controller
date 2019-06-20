@@ -44,7 +44,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		}
 	}
 	if t.quiesce() {
-		annotations[MigQuiesceAnnotationKey] = "true"
+		annotations[migQuiesceAnnotationKey] = "true"
 	}
 	return annotations, nil
 }

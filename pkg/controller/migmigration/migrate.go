@@ -93,7 +93,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 	// TODO: SYNC WITH JEFF TO GET OPINION ON THIS HACK
 	// Setting this annotation to not create stage pods after copy restore has
 	// run to completion
-	if task.Phase == DeletingStagePods {
+	if task.Phase == DeleteStagePodsStarted {
 		if migration.Annotations == nil {
 			migration.Annotations = make(map[string]string)
 		}

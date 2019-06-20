@@ -12,34 +12,34 @@ import (
 
 // Annotation Keys
 const (
-	MigQuiesceAnnotationKey        = "openshift.io/migrate-quiesce-pods"
+	migQuiesceAnnotationKey        = "openshift.io/migrate-quiesce-pods"
 	copyBackupRestoreAnnotationKey = "openshift.io/copy-backup-restore"
 )
 
 // Phases
 const (
-	Started                 = "Started"
-	WaitOnResticRestart     = "WaitOnResticRestart"
-	ResticRestartCompleted  = "ResticRestartCompleted"
-	InitialBackupStarted    = "InitialBackupStarted"
-	InitialBackupCompleted  = "InitialBackupCompleted"
-	InitialBackupFailed     = "InitialBackupFailed"
-	CopyBackupStarted       = "CopyBackupStarted"
-	CopyBackupCompleted     = "CopyBackupCompleted"
-	CopyBackupFailed        = "CopyBackupFailed"
-	CreatingStagePods       = "CreatingStagePods"
-	StagePodsCreated        = "StagePodsCreated"
-	WaitOnBackupReplication = "WaitOnBackupReplication"
-	BackupReplicated        = "BackupReplicated"
-	CopyRestoreStarted      = "CopyRestoreStarted"
-	CopyRestoreCompleted    = "CopyRestoreCompleted"
-	CopyRestoreFailed       = "CopyRestoreFailed"
-	DeletingStagePods       = "DeletingStagePods"
-	StagePodsDeleted        = "StagePodsDeleted"
-	FinalRestoreStarted     = "FinalRestoreStarted"
-	FinalRestoreCompleted   = "FinalRestoreCompleted"
-	FinalRestoreFailed      = "FinalRestoreFailed"
-	Completed               = "Completed"
+	Started                  = "Started"
+	WaitOnResticRestart      = "WaitOnResticRestart"
+	ResticRestartCompleted   = "ResticRestartCompleted"
+	InitialBackupStarted     = "InitialBackupStarted"
+	InitialBackupCompleted   = "InitialBackupCompleted"
+	InitialBackupFailed      = "InitialBackupFailed"
+	CopyBackupStarted        = "CopyBackupStarted"
+	CopyBackupCompleted      = "CopyBackupCompleted"
+	CopyBackupFailed         = "CopyBackupFailed"
+	CreateStagePodsStarted   = "CreateStagePodsStarted"
+	CreateStagePodsCompleted = "CreateStagePodsCompleted"
+	WaitOnBackupReplication  = "WaitOnBackupReplication"
+	BackupReplicated         = "BackupReplicated"
+	CopyRestoreStarted       = "CopyRestoreStarted"
+	CopyRestoreCompleted     = "CopyRestoreCompleted"
+	CopyRestoreFailed        = "CopyRestoreFailed"
+	DeleteStagePodsStarted   = "DeleteStagePodsStarted"
+	DeleteStagePodsCompleted = "DeleteStagePodsCompleted"
+	FinalRestoreStarted      = "FinalRestoreStarted"
+	FinalRestoreCompleted    = "FinalRestoreCompleted"
+	FinalRestoreFailed       = "FinalRestoreFailed"
+	Completed                = "Completed"
 )
 
 // A Velero task that provides the complete backup & restore workflow.
@@ -170,9 +170,9 @@ func (t *Task) Run() error {
 	// If all stage pods are created and running OR there are no stage pods we
 	// need to create, continue
 	if created {
-		t.Phase = StagePodsCreated
+		t.Phase = CreateStagePodsCompleted
 	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
-		t.Phase = CreatingStagePods
+		t.Phase = CreateStagePodsStarted
 		// Swap out all copy pods with stage pods
 		err = t.createStagePods()
 		if err != nil {
@@ -288,9 +288,9 @@ func (t *Task) Run() error {
 	}
 
 	if deleted {
-		t.Phase = StagePodsDeleted
+		t.Phase = DeleteStagePodsCompleted
 	} else {
-		t.Phase = DeletingStagePods
+		t.Phase = DeleteStagePodsStarted
 		// Remove staging pods on source and destination cluster
 		err = t.removeStagePods()
 		if err != nil {
@@ -427,7 +427,7 @@ func (t *Task) removeStagePods() error {
 		return err
 	}
 	// Find all stage pods
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := map[string]string{
 		uniqueBackupLabelKey: "true",
 	}
@@ -475,7 +475,7 @@ func (t *Task) areStagePodsDeleted() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s-copy", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := map[string]string{
 		uniqueBackupLabelKey: "true",
 	}

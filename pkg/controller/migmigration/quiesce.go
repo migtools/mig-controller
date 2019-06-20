@@ -16,9 +16,13 @@ func (t *Task) quiesceApplications() error {
 	}
 	err := t.scaleDownDCs()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	err = t.scaleDownDeployments()
+	if err != nil {
+		log.Trace(err)
+	}
 	return err
 }
 
@@ -26,6 +30,7 @@ func (t *Task) quiesceApplications() error {
 func (t *Task) scaleDownDCs() error {
 	client, err := t.getSourceClient()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
@@ -36,6 +41,7 @@ func (t *Task) scaleDownDCs() error {
 			options,
 			&list)
 		if err != nil {
+			log.Trace(err)
 			return err
 		}
 		for _, dc := range list.Items {
@@ -45,6 +51,7 @@ func (t *Task) scaleDownDCs() error {
 			dc.Spec.Replicas = 0
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
+				log.Trace(err)
 				return err
 			}
 		}

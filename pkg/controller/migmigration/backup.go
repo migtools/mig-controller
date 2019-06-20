@@ -30,7 +30,7 @@ func (t *Task) ensureInitialBackup() error {
 		log.Trace(err)
 		return err
 	}
-	delete(newBackup.Annotations, MigQuiesceAnnotationKey)
+	delete(newBackup.Annotations, migQuiesceAnnotationKey)
 	foundBackup, err := t.getBackup(false)
 	if err != nil {
 		log.Trace(err)
@@ -75,7 +75,7 @@ func (t *Task) ensureCopyBackup() error {
 	if err != nil {
 		return err
 	}
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			uniqueBackupLabelKey:                         "true",
@@ -142,19 +142,16 @@ func (t Task) getBackup(copyBackup bool) (*velero.Backup, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Find proper backup to return
-	if len(list.Items) > 0 {
-		for i, backup := range list.Items {
-			// Avoid nil annotation lookup
-			if backup.Annotations == nil {
-				backup.Annotations = make(map[string]string)
-			}
-			if backup.Annotations[copyBackupRestoreAnnotationKey] != "" && copyBackup {
-				return &list.Items[i], nil
-			}
-			if backup.Annotations[copyBackupRestoreAnnotationKey] == "" && !copyBackup {
-				return &list.Items[i], nil
-			}
+	for i, backup := range list.Items {
+		// Avoid nil annotation lookup
+		if backup.Annotations == nil {
+			backup.Annotations = make(map[string]string)
+		}
+		if backup.Annotations[copyBackupRestoreAnnotationKey] != "" && copyBackup {
+			return &list.Items[i], nil
+		}
+		if backup.Annotations[copyBackupRestoreAnnotationKey] == "" && !copyBackup {
+			return &list.Items[i], nil
 		}
 	}
 
@@ -361,7 +358,7 @@ func (t *Task) annotateStorageResources() (error, int) {
 		log.Trace(err)
 		return err, 0
 	}
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
 	namespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	pvs := t.PlanResources.MigPlan.Spec.PersistentVolumes
 	for _, pv := range pvs.List {
@@ -462,7 +459,7 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 	}
 	// check if we have already created stage pods
 	// if so, return true
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := map[string]string{
 		fmt.Sprintf("%s-copy", uniqueBackupLabelKey): "true",
 	}
@@ -500,7 +497,7 @@ func (t *Task) createStagePods() error {
 	}
 
 	// Stage pods haven't been created yet, lets create them
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := map[string]string{
 		uniqueBackupLabelKey: pvBackupLabelValue,
 	}
@@ -558,7 +555,7 @@ func (t *Task) removeStorageResourceAnnotations() error {
 		log.Trace(err)
 		return err
 	}
-	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.PlanResources.MigPlan.UID)
+	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
 	labelSelector := map[string]string{
 		uniqueBackupLabelKey: pvBackupLabelValue,
 	}
