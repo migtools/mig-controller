@@ -6,13 +6,18 @@ metadata:
   name: migstorage-creds
 type: Opaque
 data:
-  # [!] If using S3 / AWS, change aws-access-key-id and aws-secret-access-key to contain the base64 encoded keys
-  #     needed to authenticate with the storage specified in migstorage.
+  # [!] If using S3 / AWS, change aws-access-key-id and aws-secret-access-key to contain the base64
+  #      encoded keys needed to authenticate with the storage specified in migstorage.
+  
+  # [!] CAUTION: It's easy to miss the step of base64 encoding your AWS credentials when inputting
+  #     them to this secret. since AWS credentials are base64 compatible already. Be _sure_ to run
+  #     `echo -n "<key>" | base64 -w 0` on your access and secret key before providing them below.
+  
   # [Note] these credentials will be injected into cloud-credentials in the 'velero' namespace.
   aws-access-key-id: aGVsbG8K
   aws-secret-access-key: aGVsbG8K
 
-  # [!] If using Azure (not yet supported), change parameters below with base64 encoded access credentials.
+  # [!] If using Azure (not yet supported), change parameters below with base64 encoded credentials
   azure-client-secret: aGVsbG8K
   azure-subscription-id: aGVsbG8K
   azure-tenant-id: aGVsbG8K
