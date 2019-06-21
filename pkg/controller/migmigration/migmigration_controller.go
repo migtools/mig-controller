@@ -135,7 +135,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Completed.
-	if migration.IsCompleted() {
+	if migration.Status.HasAnyCondition(Succeeded, Failed) {
 		return reconcile.Result{}, nil
 	}
 
@@ -174,7 +174,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Ready
 	migration.Status.SetReady(
-		!migration.IsCompleted() &&
+		!migration.Status.HasAnyCondition(Succeeded, Failed) &&
 			!migration.Status.HasBlockerCondition(),
 		ReadyMessage)
 
@@ -219,7 +219,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, e
 	// Pending migrations.
 	pending := []types.UID{}
 	for _, m := range migrations {
-		if !m.IsCompleted() {
+		if !m.Status.HasAnyCondition(Succeeded, Failed) {
 			pending = append(pending, m.UID)
 		}
 	}
@@ -256,7 +256,7 @@ func (r *ReconcileMigMigration) deleted() error {
 		return err
 	}
 	for _, m := range migrations {
-		if m.IsCompleted() || !m.Status.HasCondition(HasFinalMigration) {
+		if m.Status.HasAnyCondition(Succeeded, Failed) || !m.Status.HasCondition(HasFinalMigration) {
 			continue
 		}
 		m.Status.DeleteCondition(HasFinalMigration)

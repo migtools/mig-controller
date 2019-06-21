@@ -18,6 +18,8 @@ package migmigration
 
 import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 // Annotations
@@ -49,7 +51,7 @@ var stagingResources = []string{
 
 // Perform the migration.
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, error) {
-	if migration.IsCompleted() {
+	if migration.Status.HasAnyCondition(Succeeded, Failed) {
 		return 0, nil
 	}
 
@@ -71,8 +73,8 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 	}
 
 	// Started
-	if !migration.Status.MigrationRunning {
-		migration.MarkAsRunning()
+	if migration.Status.StartTimestamp == nil {
+		migration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Run
@@ -89,16 +91,38 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 	if err != nil {
 		return 0, err
 	}
+	migration.Status.SetCondition(migapi.Condition{
+		Type:     Running,
+		Status:   True,
+		Reason:   task.Phase,
+		Category: Advisory,
+		Message:  RunningMessage,
+	})
 
+	// Result
 	migration.Status.Phase = task.Phase
 	switch task.Phase {
 	case WaitOnResticRestart:
 		return 10, nil
 	case BackupFailed, RestoreFailed:
-		migration.MarkAsCompleted()
 		migration.AddErrors(task.Errors)
+		migration.Status.DeleteCondition(Running)
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     Failed,
+			Status:   True,
+			Reason:   task.Phase,
+			Category: Critical,
+			Message:  FailedMessage,
+		})
 	case Completed:
-		migration.MarkAsCompleted()
+		migration.Status.DeleteCondition(Running)
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     Succeeded,
+			Status:   True,
+			Reason:   task.Phase,
+			Category: Advisory,
+			Message:  SucceededMessage,
+		})
 	}
 
 	return 0, nil
