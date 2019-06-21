@@ -12,11 +12,15 @@ const (
 	PlanClosed        = "PlanClosed"
 	HasFinalMigration = "HasFinalMigration"
 	Postponed         = "Postponed"
+	Running           = "Running"
+	Succeeded         = "Succeeded"
+	Failed            = "Failed"
 )
 
 // Categories
 const (
 	Critical = migapi.Critical
+	Advisory = migapi.Advisory
 )
 
 // Reasons
@@ -39,6 +43,9 @@ const (
 	PlanClosedMessage        = "The associated migration plan is closed."
 	HasFinalMigrationMessage = "The associated MigPlan already has a final migration."
 	PostponedMessage         = "Postponed %d seconds to ensure migrations run serially and in order."
+	RunningMessage           = "The migration is running."
+	FailedMessage            = "The migration has failed.  See: Errors."
+	SucceededMessage         = "The migration has completed successfully."
 )
 
 // Validate the plan resource.
@@ -141,14 +148,14 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 		}
 		// Stage
 		if migration.Spec.Stage {
-			if m.IsCompleted() || m.IsRunning() {
+			if m.Status.HasAnyCondition(Running, Succeeded, Failed) {
 				hasCondition = true
 				break
 			}
 		}
 		// Final
 		if !migration.Spec.Stage {
-			if m.IsCompleted() && !m.HasFailed() {
+			if m.Status.HasCondition(Succeeded) {
 				hasCondition = true
 				break
 			}

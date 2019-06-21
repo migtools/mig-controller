@@ -279,10 +279,6 @@ func (in *MigMigrationStatus) DeepCopyInto(out *MigMigrationStatus) {
 		in, out := &in.StartTimestamp, &out.StartTimestamp
 		*out = (*in).DeepCopy()
 	}
-	if in.CompletionTimestamp != nil {
-		in, out := &in.CompletionTimestamp, &out.CompletionTimestamp
-		*out = (*in).DeepCopy()
-	}
 	if in.Errors != nil {
 		in, out := &in.Errors, &out.Errors
 		*out = make([]string, len(*in))

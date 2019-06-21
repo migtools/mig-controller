@@ -39,17 +39,10 @@ spec:
           type: object
         status:
           properties:
-            completionTimestamp:
-              format: date-time
-              type: string
             errors:
               items:
                 type: string
               type: array
-            migrationCompleted:
-              type: boolean
-            migrationStarted:
-              type: boolean
             phase:
               type: string
             startTimestamp:

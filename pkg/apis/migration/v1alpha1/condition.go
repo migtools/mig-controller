@@ -22,11 +22,13 @@ const (
 // Error - Errors that block the `Ready` condition.
 // Warn - Warnings that do not block the `Ready` condition.
 // Required - Required for the `Ready` condition.
+// Advisory - An advisory condition.
 const (
 	Critical = "Critical"
 	Error    = "Error"
 	Warn     = "Warn"
 	Required = "Required"
+	Advisory = "Advisory"
 )
 
 // Condition
