@@ -101,6 +101,16 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 		Message:  RunningMessage,
 	})
 
+	// TODO: SYNC WITH JEFF TO GET OPINION ON THIS HACK
+	// Setting this annotation to not create stage pods after copy restore has
+	// run to completion
+	if task.Phase.Equals(DeleteStagePodsStarted) {
+		if migration.Annotations == nil {
+			migration.Annotations = make(map[string]string)
+		}
+		migration.Annotations["openshift.io/stage-completed"] = "true"
+	}
+
 	// Result
 	migration.Status.Phase = task.Phase.Name
 	if task.Phase.Equals(WaitOnResticRestart) {
