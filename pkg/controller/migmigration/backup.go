@@ -210,9 +210,9 @@ func (t *Task) getReplicatedBackup() (*velero.Backup, error) {
 // This function is used to get around mount propagation requirements
 func (t *Task) bounceResticPod() error {
 	// If restart already completed, return
-	if t.Phase != WaitOnResticRestart && t.Phase != Started {
+	if !t.Phase.Equals(WaitOnResticRestart) && !t.Phase.Equals(Started) {
 		return nil
-	} else if t.Phase == WaitOnResticRestart {
+	} else if t.Phase.Equals(WaitOnResticRestart) {
 		t.Log.Info("Waiting for restic pod to be ready")
 	}
 
@@ -246,8 +246,8 @@ func (t *Task) bounceResticPod() error {
 			continue
 		}
 		// If restart already started, mark it as completed
-		if t.Phase == WaitOnResticRestart {
-			t.Phase = ResticRestartCompleted
+		if t.Phase.Equals(WaitOnResticRestart) {
+			t.Phase.Set(ResticRestartCompleted)
 			t.Log.Info("Restic pod successfully restarted")
 			return nil
 		}
@@ -263,7 +263,7 @@ func (t *Task) bounceResticPod() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = WaitOnResticRestart
+		t.Phase.Set(WaitOnResticRestart)
 		return nil
 	}
 
