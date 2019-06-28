@@ -4,28 +4,28 @@ import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
-	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const podStageLabel = "migration-stage-pod"
 
-// Ensure the restore on the destination cluster has been
+// Ensure the final restore on the destination cluster has been
 // created  and has the proper settings.
-func (t *Task) ensureRestore() error {
-	newRestore, err := t.buildRestore()
+func (t *Task) ensureFinalRestore() error {
+	includeClusterResources := false
+	newRestore, err := t.buildRestore(&includeClusterResources)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	foundRestore, err := t.getRestore()
+	foundRestore, err := t.getRestore(false)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	if foundRestore == nil {
-		t.Restore = newRestore
+		t.FinalRestore = newRestore
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -38,9 +38,55 @@ func (t *Task) ensureRestore() error {
 		}
 		return nil
 	}
-	t.Restore = foundRestore
+	t.FinalRestore = foundRestore
 	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore)
+		t.updateRestore(foundRestore, t.InitialBackup.Name)
+		client, err := t.getDestinationClient()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		err = client.Update(context.TODO(), foundRestore)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Ensure the first restore on the destination cluster has been
+// created  and has the proper settings.
+func (t *Task) ensureStageRestore() error {
+	newRestore, err := t.buildRestore(nil)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	foundRestore, err := t.getRestore(true)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if foundRestore == nil {
+		newRestore.Spec.BackupName = t.StageBackup.Name
+		t.StageRestore = newRestore
+		client, err := t.getDestinationClient()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		err = client.Create(context.TODO(), newRestore)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		return nil
+	}
+	t.StageRestore = foundRestore
+	if !t.equalsRestore(newRestore, foundRestore) {
+		t.updateRestore(foundRestore, t.StageBackup.Name)
 		client, err := t.getDestinationClient()
 		if err != nil {
 			log.Trace(err)
@@ -64,7 +110,7 @@ func (t *Task) equalsRestore(a, b *velero.Restore) bool {
 }
 
 // Get an existing Restore on the destination cluster.
-func (t Task) getRestore() (*velero.Restore, error) {
+func (t Task) getRestore(copyRestore bool) (*velero.Restore, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return nil, err
@@ -78,15 +124,25 @@ func (t Task) getRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
+	// Find proper restore to return
+	for i, restore := range list.Items {
+		// Avoid nil dereference
+		if restore.Annotations == nil {
+			restore.Annotations = make(map[string]string)
+		}
+		if restore.Annotations[copyBackupRestoreAnnotationKey] != "" && copyRestore {
+			return &list.Items[i], nil
+		}
+		if restore.Annotations[copyBackupRestoreAnnotationKey] == "" && !copyRestore {
+			return &list.Items[i], nil
+		}
 	}
 
 	return nil, nil
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore() (*velero.Restore, error) {
+func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return nil, err
@@ -96,6 +152,17 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 		log.Trace(err)
 		return nil, err
 	}
+	// Set it to stage backup name since initial backup isn't set on stage
+	backupName := t.StageBackup.Name
+	// If includeClusterResources isn't set, this means it is first restore to
+	// satisfy moving the persistent storage over
+	if includeClusterResources == nil {
+		backupName = t.StageBackup.Name
+		annotations[copyBackupRestoreAnnotationKey] = "true"
+	} else {
+		backupName = t.InitialBackup.Name
+		delete(annotations, copyBackupRestoreAnnotationKey)
+	}
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
@@ -104,47 +171,15 @@ func (t *Task) buildRestore() (*velero.Restore, error) {
 			Annotations:  annotations,
 		},
 	}
-	t.updateRestore(restore)
+	t.updateRestore(restore, backupName)
 	return restore, nil
 }
 
 // Update a Restore as desired for the destination cluster.
-func (t *Task) updateRestore(restore *velero.Restore) {
+func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	restorePVs := true
 	restore.Spec = velero.RestoreSpec{
-		BackupName: t.Backup.Name,
+		BackupName: backupName,
 		RestorePVs: &restorePVs,
 	}
-}
-
-// Delete stage pods
-func (t *Task) deleteStagePods() error {
-	client, err := t.getDestinationClient()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	// Find all pods matching the podStageLabel
-	list := core.PodList{}
-	labels := make(map[string]string)
-	labels[podStageLabel] = "true"
-	err = client.List(
-		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	// Delete all pods
-	for _, pod := range list.Items {
-		err = client.Delete(
-			context.TODO(),
-			&pod)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-	}
-	return nil
 }
