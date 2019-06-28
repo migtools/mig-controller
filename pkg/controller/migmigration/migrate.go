@@ -83,45 +83,48 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 		Client:          r,
 		Owner:           migration,
 		PlanResources:   planResources,
-		Phase:           migration.Status.Phase,
+		Phase:           Phase{Name: migration.Status.Phase},
 		Annotations:     r.getAnnotations(migration),
 		BackupResources: r.getBackupResources(migration),
 	}
 	err = task.Run()
 	if err != nil {
+		log.Trace(err)
 		return 0, err
 	}
+
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,
-		Reason:   task.Phase,
+		Reason:   task.Phase.Name,
 		Category: Advisory,
 		Message:  RunningMessage,
 	})
 
 	// Result
-	migration.Status.Phase = task.Phase
-	switch task.Phase {
-	case WaitOnResticRestart:
+	migration.Status.Phase = task.Phase.Name
+	if task.Phase.Equals(WaitOnResticRestart) {
 		return 10, nil
-	case BackupFailed, RestoreFailed:
+	}
+	if task.Phase.Final() {
+		migration.Status.DeleteCondition(Running)
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     Succeeded,
+			Status:   True,
+			Reason:   task.Phase.Name,
+			Category: Advisory,
+			Message:  SucceededMessage,
+		})
+	}
+	if task.Phase.Failed() {
 		migration.AddErrors(task.Errors)
 		migration.Status.DeleteCondition(Running)
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     Failed,
 			Status:   True,
-			Reason:   task.Phase,
+			Reason:   task.Phase.Name,
 			Category: Critical,
 			Message:  FailedMessage,
-		})
-	case Completed:
-		migration.Status.DeleteCondition(Running)
-		migration.Status.SetCondition(migapi.Condition{
-			Type:     Succeeded,
-			Status:   True,
-			Reason:   task.Phase,
-			Category: Advisory,
-			Message:  SucceededMessage,
 		})
 	}
 
