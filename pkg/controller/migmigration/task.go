@@ -284,6 +284,18 @@ func (t *Task) Run() error {
 
 	t.Phase.Set(InitialBackupCompleted)
 
+	// Wait on Backup replication.
+	t.Phase.Set(WaitOnBackupReplication)
+	backupReplicated, err := t.areBackupsReplicated(true)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !backupReplicated {
+		return nil
+	}
+	t.Phase.Set(BackupReplicated)
+
 	// Annotate persistent storage resources with PV actions
 	// This will also return the number of pods we have annotated to be backed up
 	// by restic. This is useful for knowing whether or not we need to create
@@ -373,7 +385,7 @@ func (t *Task) Run() error {
 
 		// Wait on Backup replication.
 		t.Phase.Set(WaitOnBackupReplication)
-		backupReplicated, err := t.areBackupsReplicated()
+		backupReplicated, err := t.areBackupsReplicated(false)
 		if err != nil {
 			log.Trace(err)
 			return err
