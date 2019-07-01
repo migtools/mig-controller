@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,8 +153,7 @@ func (t *Task) buildRestore(includeClusterResources *bool) (*velero.Restore, err
 		log.Trace(err)
 		return nil, err
 	}
-	// Set it to stage backup name since initial backup isn't set on stage
-	backupName := t.StageBackup.Name
+	backupName := ""
 	// If includeClusterResources isn't set, this means it is first restore to
 	// satisfy moving the persistent storage over
 	if includeClusterResources == nil {
