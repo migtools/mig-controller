@@ -259,7 +259,7 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 
 // Determine whether backups are replicated by velero on the destination
 // cluster.
-func (t *Task) areBackupsReplicated() (bool, error) {
+func (t *Task) areBackupsReplicated(isInitial bool) (bool, error) {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return false, err
@@ -274,7 +274,7 @@ func (t *Task) areBackupsReplicated() (bool, error) {
 		return false, err
 	}
 	// If this is stage we only need to wait for 1 backup to be replicated
-	if len(list.Items) == 1 && t.stage() {
+	if len(list.Items) == 1 && (t.stage() || isInitial) {
 		return true, nil
 	}
 	// If this is not a stage, we need to find 2 backups before continuing
