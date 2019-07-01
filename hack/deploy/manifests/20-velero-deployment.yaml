@@ -63,7 +63,7 @@ spec:
         - name: scratch
           emptyDir: {}
       initContainers:
-        - image: quay.io/ocpmigrate/velero-plugin:latest
+        - image: quay.io/ocpmigrate/migration-plugin:latest
           imagePullPolicy: Always
           name: velero-plugin
           resources: {}
