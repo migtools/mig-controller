@@ -453,10 +453,10 @@ func (t *Task) annotateStorageResources() (error, int) {
 	return nil, resticAnnotationCount
 }
 
-func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
+func (t *Task) areStagePodsCreated(resticAnnotationCount int) (int, bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	// check if we have already created stage pods
 	// if so, return true
@@ -468,14 +468,14 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 	podList := corev1.PodList{}
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
-		return false, err
+		return 0, false, err
 	}
 	podCount := len(podList.Items)
 	// If there are no stage pods and resticAnnotationCount is zero, this means
 	// we have already quiesced the app so the stage pods were created
 	// previously. Do not recreate them so return true
 	if podCount == 0 && resticAnnotationCount == 0 {
-		return true, nil
+		return 0, true, nil
 	}
 	readyCount := 0
 	for _, pod := range podList.Items {
@@ -485,16 +485,16 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 	}
 	// Check if all pods are ready
 	if readyCount == podCount && podCount != 0 {
-		return true, nil
+		return len(podList.Items), true, nil
 	}
-	return false, nil
+	return 0, false, nil
 }
 
-func (t *Task) createStagePods() error {
+func (t *Task) createStagePods() (int, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
-		return err
+		return 0, err
 	}
 
 	// Stage pods haven't been created yet, lets create them
@@ -507,7 +507,7 @@ func (t *Task) createStagePods() error {
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
 		log.Trace(err)
-		return err
+		return 0, err
 	}
 	for _, pod := range podList.Items {
 		if pod.Annotations[resticPvBackupAnnotationKey] == "" {
@@ -561,13 +561,13 @@ func (t *Task) createStagePods() error {
 		// If we have already created the pod and it just isn't ready yet, we don't
 		// want to return an error
 		if k8serrors.IsAlreadyExists(err) {
-			return nil
+			return len(podList.Items), nil
 		} else if err != nil {
 			log.Trace(err)
-			return err
+			return 0, err
 		}
 	}
-	return nil
+	return len(podList.Items), nil
 }
 
 // Removes temporary annotations and labels used before backing up storage resources

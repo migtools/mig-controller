@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -293,8 +294,9 @@ func (t *Task) Run() error {
 		return err
 	}
 
+	noPods := 0
 	// Check if stage pods are created and running
-	created, err := t.areStagePodsCreated(resticAnnotationCount)
+	noPods, created, err := t.areStagePodsCreated(resticAnnotationCount)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -307,7 +309,7 @@ func (t *Task) Run() error {
 	} else if t.Owner.Annotations["openshift.io/stage-completed"] == "" {
 		t.Phase.Set(CreateStagePodsStarted)
 		// Swap out all copy pods with stage pods
-		err = t.createStagePods()
+		noPods, err = t.createStagePods()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -324,113 +326,117 @@ func (t *Task) Run() error {
 		}
 	}
 
-	// Run second backup to copy PV data
-	err = t.ensureStageBackup()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	switch t.StageBackup.Status.Phase {
-	case velero.BackupPhaseCompleted:
-		t.Phase.Set(StageBackupCompleted)
-	case velero.BackupPhaseFailed:
-		reason := fmt.Sprintf(
-			"Backup: %s/%s failed.",
-			t.StageBackup.Namespace,
-			t.StageBackup.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(StageBackupFailed)
-		return nil
-	case velero.BackupPhasePartiallyFailed:
-		reason := fmt.Sprintf(
-			"Backup: %s/%s partially failed.",
-			t.StageBackup.Namespace,
-			t.StageBackup.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(StageBackupFailed)
-		return nil
-	case velero.BackupPhaseFailedValidation:
-		t.addErrors(t.StageBackup.Status.ValidationErrors)
-		t.Phase.Set(StageBackupFailed)
-		return nil
-	default:
-		t.Phase.Set(StageBackupStarted)
-		return nil
-	}
-
-	// Delete storage annotations
-	err = t.removeStorageResourceAnnotations()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// Wait on Backup replication.
-	t.Phase.Set(WaitOnBackupReplication)
-	backupReplicated, err := t.areBackupsReplicated()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	if !backupReplicated {
-		return nil
-	}
-	t.Phase.Set(BackupReplicated)
-
-	// Stage restore
-	err = t.ensureStageRestore()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	switch t.StageRestore.Status.Phase {
-	case velero.RestorePhaseCompleted:
-		t.Phase.Set(StageRestoreCompleted)
-	case velero.RestorePhaseFailedValidation:
-		t.addErrors(t.StageRestore.Status.ValidationErrors)
-		t.Phase.Set(StageRestoreFailed)
-		return nil
-	case velero.RestorePhaseFailed:
-		reason := fmt.Sprintf(
-			"Restore: %s/%s failed.",
-			t.StageRestore.Namespace,
-			t.StageRestore.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(StageRestoreFailed)
-		return nil
-	case velero.RestorePhasePartiallyFailed:
-		reason := fmt.Sprintf(
-			"Restore: %s/%s partially failed.",
-			t.StageRestore.Namespace,
-			t.StageRestore.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(StageRestoreFailed)
-		return nil
-	default:
-		t.Phase.Set(StageRestoreStarted)
-		return nil
-	}
-	t.Phase.Set(StageRestoreCompleted)
-
-	deleted, err := t.areStagePodsDeleted()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	if deleted {
-		t.Phase.Set(DeleteStagePodsCompleted)
-	} else {
-		t.Phase.Set(DeleteStagePodsStarted)
-		// Remove staging pods on source and destination cluster
-		err = t.removeStagePods()
+	// run stage backup only when stage pods exist
+	// skip stage backup and restore when there's
+	// no need. for instance, stateless apps
+	if noPods > 0 {
+		// Run second backup to copy PV data
+		err = t.ensureStageBackup()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		return nil
+		switch t.StageBackup.Status.Phase {
+		case velero.BackupPhaseCompleted:
+			t.Phase.Set(StageBackupCompleted)
+		case velero.BackupPhaseFailed:
+			reason := fmt.Sprintf(
+				"Backup: %s/%s failed.",
+				t.StageBackup.Namespace,
+				t.StageBackup.Name)
+			t.addErrors([]string{reason})
+			t.Phase.Set(StageBackupFailed)
+			return nil
+		case velero.BackupPhasePartiallyFailed:
+			reason := fmt.Sprintf(
+				"Backup: %s/%s partially failed.",
+				t.StageBackup.Namespace,
+				t.StageBackup.Name)
+			t.addErrors([]string{reason})
+			t.Phase.Set(StageBackupFailed)
+			return nil
+		case velero.BackupPhaseFailedValidation:
+			t.addErrors(t.StageBackup.Status.ValidationErrors)
+			t.Phase.Set(StageBackupFailed)
+			return nil
+		default:
+			t.Phase.Set(StageBackupStarted)
+			return nil
+		}
+
+		// Delete storage annotations
+		err = t.removeStorageResourceAnnotations()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		// Wait on Backup replication.
+		t.Phase.Set(WaitOnBackupReplication)
+		backupReplicated, err := t.areBackupsReplicated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if !backupReplicated {
+			return nil
+		}
+		t.Phase.Set(BackupReplicated)
+
+		// Stage restore
+		err = t.ensureStageRestore()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		switch t.StageRestore.Status.Phase {
+		case velero.RestorePhaseCompleted:
+			t.Phase.Set(StageRestoreCompleted)
+		case velero.RestorePhaseFailedValidation:
+			t.addErrors(t.StageRestore.Status.ValidationErrors)
+			t.Phase.Set(StageRestoreFailed)
+			return nil
+		case velero.RestorePhaseFailed:
+			reason := fmt.Sprintf(
+				"Restore: %s/%s failed.",
+				t.StageRestore.Namespace,
+				t.StageRestore.Name)
+			t.addErrors([]string{reason})
+			t.Phase.Set(StageRestoreFailed)
+			return nil
+		case velero.RestorePhasePartiallyFailed:
+			reason := fmt.Sprintf(
+				"Restore: %s/%s partially failed.",
+				t.StageRestore.Namespace,
+				t.StageRestore.Name)
+			t.addErrors([]string{reason})
+			t.Phase.Set(StageRestoreFailed)
+			return nil
+		default:
+			t.Phase.Set(StageRestoreStarted)
+			return nil
+		}
+		t.Phase.Set(StageRestoreCompleted)
+
+		deleted, err := t.areStagePodsDeleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		if deleted {
+			t.Phase.Set(DeleteStagePodsCompleted)
+		} else {
+			t.Phase.Set(DeleteStagePodsStarted)
+			// Remove staging pods on source and destination cluster
+			err = t.removeStagePods()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			return nil
+		}
 	}
 
 	// Final Restore if not a stage
