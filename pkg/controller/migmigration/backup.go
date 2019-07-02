@@ -514,8 +514,7 @@ func (t *Task) addLabelsToNamespace() error {
 	return nil
 }
 
-// removeLabelsFromNamespace forces velero to include namespaces
-// in the second backup to avoid creating an empty backup
+// removeLabelsFromNamespace removes temporary labels from namespace
 func (t *Task) removeLabelsFromNamespace() error {
 	client, err := t.getSourceClient()
 	if err != nil {
