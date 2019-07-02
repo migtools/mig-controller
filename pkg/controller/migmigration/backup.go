@@ -490,8 +490,9 @@ func (t *Task) areStagePodsCreated(resticAnnotationCount int) (bool, error) {
 	return false, nil
 }
 
-// addLabelsToNamespace forces velero to include namespaces
-// in the second backup to avoid creating an empty backup
+// addLabelsToNamespace adds labels to namespaces to force
+// Velero to include them in the second backup to avoid
+// creating an empty backup
 func (t *Task) addLabelsToNamespace() error {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -499,19 +500,21 @@ func (t *Task) addLabelsToNamespace() error {
 		return err
 	}
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
-	namespace := t.PlanResources.MigPlan.Spec.Namespaces[0]
-	ref := types.NamespacedName{
-		Name: namespace,
+	if len(t.PlanResources.MigPlan.Spec.Namespaces) > 0 {
+		namespace := t.PlanResources.MigPlan.Spec.Namespaces[0]
+		ref := types.NamespacedName{
+			Name: namespace,
+		}
+		foundNamespace := corev1.Namespace{}
+		err = client.Get(context.TODO(), ref, &foundNamespace)
+		if foundNamespace.Labels == nil {
+			foundNamespace.Labels = make(map[string]string)
+		}
+		foundNamespace.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
+		foundNamespace.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
+		err = client.Update(context.TODO(), &foundNamespace)
+		return nil
 	}
-	foundNamespace := corev1.Namespace{}
-	err = client.Get(context.TODO(), ref, &foundNamespace)
-	if foundNamespace.Labels == nil {
-		foundNamespace.Labels = make(map[string]string)
-	}
-	foundNamespace.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
-	foundNamespace.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
-	err = client.Update(context.TODO(), &foundNamespace)
-	return nil
 }
 
 // removeLabelsFromNamespace removes temporary labels from namespace
@@ -522,18 +525,20 @@ func (t *Task) removeLabelsFromNamespace() error {
 		return err
 	}
 	uniqueBackupLabelKey := fmt.Sprintf("%s-%s", pvBackupLabelKey, t.Owner.UID)
-	namespace := t.PlanResources.MigPlan.Spec.Namespaces[0]
-	ref := types.NamespacedName{
-		Name: namespace,
+	if len(t.PlanResources.MigPlan.Spec.Namespaces) > 0 {
+		namespace := t.PlanResources.MigPlan.Spec.Namespaces[0]
+		ref := types.NamespacedName{
+			Name: namespace,
+		}
+		foundNamespace := corev1.Namespace{}
+		err = client.Get(context.TODO(), ref, &foundNamespace)
+		if foundNamespace.Labels != nil {
+			delete(foundNamespace.Labels, uniqueBackupLabelKey)
+			delete(foundNamespace.Labels, fmt.Sprintf("%s-copy", uniqueBackupLabelKey))
+			err = client.Update(context.TODO(), &foundNamespace)
+		}
+		return nil
 	}
-	foundNamespace := corev1.Namespace{}
-	err = client.Get(context.TODO(), ref, &foundNamespace)
-	if foundNamespace.Labels != nil {
-		delete(foundNamespace.Labels, uniqueBackupLabelKey)
-		delete(foundNamespace.Labels, fmt.Sprintf("%s-copy", uniqueBackupLabelKey))
-		err = client.Update(context.TODO(), &foundNamespace)
-	}
-	return nil
 }
 
 func (t *Task) createStagePods() error {
