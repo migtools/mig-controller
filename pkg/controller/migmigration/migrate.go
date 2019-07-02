@@ -17,9 +17,10 @@ limitations under the License.
 package migmigration
 
 import (
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 // Annotations
@@ -47,6 +48,7 @@ var stagingResources = []string{
 	"secrets",
 	"configmaps",
 	"pods",
+	"namespaces",
 }
 
 // Perform the migration.
