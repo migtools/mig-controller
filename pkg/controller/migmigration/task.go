@@ -436,6 +436,10 @@ func (t *Task) Run() error {
 		}
 		return nil
 	}
+	t.Phase.Set(FinalRestoreCompleted)
+
+	// remove the labels added to source namespace
+	t.removeLabelsFromNamespace()
 
 	// Final Restore if not a stage
 	if !t.stage() {
@@ -473,9 +477,6 @@ func (t *Task) Run() error {
 		}
 	}
 	t.Phase.Set(FinalRestoreCompleted)
-
-	// remove the labels added to source namespace
-	t.removeLabelsFromNamespace()
 
 	// Done
 	t.Phase.Set(Completed)
