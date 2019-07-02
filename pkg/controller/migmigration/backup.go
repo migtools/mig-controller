@@ -513,8 +513,8 @@ func (t *Task) addLabelsToNamespace() error {
 		foundNamespace.Labels[uniqueBackupLabelKey] = pvBackupLabelValue
 		foundNamespace.Labels[fmt.Sprintf("%s-copy", uniqueBackupLabelKey)] = "true"
 		err = client.Update(context.TODO(), &foundNamespace)
-		return nil
 	}
+	return nil
 }
 
 // removeLabelsFromNamespace removes temporary labels from namespace
@@ -537,8 +537,8 @@ func (t *Task) removeLabelsFromNamespace() error {
 			delete(foundNamespace.Labels, fmt.Sprintf("%s-copy", uniqueBackupLabelKey))
 			err = client.Update(context.TODO(), &foundNamespace)
 		}
-		return nil
 	}
+	return nil
 }
 
 func (t *Task) createStagePods() error {
