@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -242,6 +243,9 @@ func (t *Task) Run() error {
 		return nil
 	}
 
+	// forces velero to select namespaces as part of the backup
+	t.addLabelsToNamespace()
+
 	// Run initial Backup if this is not a stage
 	// The initial backup captures the state of the applications on the source
 	// cluster while explicity setting `includePersistentVolumes` value to
@@ -432,6 +436,9 @@ func (t *Task) Run() error {
 		}
 		return nil
 	}
+
+	// remove the labels added to source namespace
+	t.removeLabelsFromNamespace()
 
 	// Final Restore if not a stage
 	if !t.stage() {
