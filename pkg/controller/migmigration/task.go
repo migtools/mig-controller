@@ -436,7 +436,6 @@ func (t *Task) Run() error {
 		}
 		return nil
 	}
-	t.Phase.Set(FinalRestoreCompleted)
 
 	// remove the labels added to source namespace
 	t.removeLabelsFromNamespace()
