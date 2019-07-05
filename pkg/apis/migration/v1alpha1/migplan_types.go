@@ -591,7 +591,7 @@ func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) 
 const (
 	PvMoveAction    = "move"
 	PvCopyAction    = "copy"
-	VeleroNamespace = "velero"
+	VeleroNamespace = "mig"
 )
 
 // Name - The PV name.
