@@ -199,7 +199,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validate PV actions.
-	err = r.validatePvAction(plan)
+	err = r.validatePvSelections(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

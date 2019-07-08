@@ -11,9 +11,10 @@ import (
 
 // Velero Plugin Annotations
 const (
-	StageOrFinalAnnotation = "openshift.io/migrate-copy-phase"   // (stage|final)
-	PvActionAnnotation     = "openshift.io/migrate-type"         // (move|copy)
-	QuiesceAnnotation      = "openshift.io/migrate-quiesce-pods" // (true|false)
+	StageOrFinalAnnotation   = "openshift.io/migrate-copy-phase"   // (stage|final)
+	PvActionAnnotation       = "openshift.io/migrate-type"         // (move|copy)
+	PvStorageClassAnnotation = "openshift.io/target-storage-class" // storageClassName
+	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods" // (true|false)
 )
 
 // Restic Annotations
@@ -42,6 +43,7 @@ const (
 
 // Add annotations and labels.
 // The PvActionAnnotation annotation is added to PV & PVC as needed by the velero plugin.
+// The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
 // The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
 // by the velero.Backup label selector.
@@ -71,6 +73,7 @@ func (t *Task) annotateStageResources() error {
 
 // Add annotations and labels to PVCs.
 // The PvActionAnnotation annotation is added to PVCs as needed by the velero plugin.
+// The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
 // The IncludedInStageBackupLabel label is added to PVCs and is referenced
 // by the velero.Backup label selector.
 func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, error) {
@@ -103,6 +106,9 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 		// Add to Restic volume list.
 		if pvAction == migapi.PvCopyAction {
 			volumes = append(volumes, pv.Name)
+			// PV storageClass annotation needed by the velero plugin.
+			storageClass := findPVStorageClass(pvs, pvc.Spec.VolumeName)
+			pvc.Annotations[PvStorageClassAnnotation] = storageClass
 		}
 		// Update
 		err = client.Update(context.TODO(), &pvc)
@@ -206,7 +212,7 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 			resource.Annotations = make(map[string]string)
 		}
 		// PV action (move|copy) needed by the velero plugin.
-		resource.Annotations[PvActionAnnotation] = pv.Action
+		resource.Annotations[PvActionAnnotation] = pv.Selection.Action
 		// Add label used by stage backup label selector.
 		if resource.Labels == nil {
 			resource.Labels = make(map[string]string)
@@ -315,6 +321,10 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client) error {
 			if pvc.Annotations != nil {
 				if _, found := pvc.Annotations[PvActionAnnotation]; found {
 					delete(pvc.Annotations, PvActionAnnotation)
+					needsUpdate = true
+				}
+				if _, found := pvc.Annotations[PvStorageClassAnnotation]; found {
+					delete(pvc.Annotations, PvStorageClassAnnotation)
 					needsUpdate = true
 				}
 			}

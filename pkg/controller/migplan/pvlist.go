@@ -35,6 +35,16 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return err
 	}
 
+	// Get destMigCluster
+	destMigCluster, err := plan.GetDestinationCluster(r.Client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	srcStorageClasses := srcMigCluster.Spec.StorageClasses
+	destStorageClasses := destMigCluster.Spec.StorageClasses
+
 	plan.Spec.BeginPvStaging()
 
 	// Build PV map.
@@ -58,13 +68,19 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		if !found {
 			continue
 		}
+		selectedStorageClass, err := r.getDestStorageClass(pv, client, plan, srcStorageClasses, destStorageClasses)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
 		plan.Spec.AddPv(
 			migapi.PV{
-				Name:             pv.Name,
-				Capacity:         pv.Spec.Capacity[core.ResourceStorage],
-				StorageClass:     pv.Spec.StorageClassName,
-				SupportedActions: r.getSupportedActions(pv),
-				PVC:              claim,
+				Name:         pv.Name,
+				Capacity:     pv.Spec.Capacity[core.ResourceStorage],
+				StorageClass: pv.Spec.StorageClassName,
+				Supported:    migapi.Supported{Actions: r.getSupportedActions(pv)},
+				Selection:    migapi.Selection{StorageClass: selectedStorageClass},
+				PVC:          claim,
 			})
 	}
 
@@ -153,4 +169,126 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []strin
 	return []string{
 		migapi.PvCopyAction,
 	}
+}
+
+// Determine the initial value for the destination storage class.
+func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
+	srcClient k8sclient.Client,
+	plan *migapi.MigPlan,
+	srcStorageClasses []migapi.StorageClass,
+	destStorageClasses []migapi.StorageClass) (string, error) {
+	srcStorageClassName := pv.Spec.StorageClassName
+
+	srcProvisioner := findProvisionerForName(srcStorageClassName, srcStorageClasses)
+	targetProvisioner := ""
+	targetStorageClassName := ""
+	warnIfTargetUnavailable := false
+
+	// For gluster src volumes, migrate to cephfs or cephrbd (warn if unavailable)
+	// For nfs src volumes, migrate to cephfs or cephrbd (no warning if unavailable)
+	// FIXME: Is there a corresponding pv.Spec.<volumeSource> for glusterblock?
+	// FIXME: Do we want to check for a provisioner for NFS or just pv.Spec.NFS?
+	if srcProvisioner == "kubernetes.io/glusterfs" ||
+		srcProvisioner == "gluster.org/glusterblock" ||
+		pv.Spec.Glusterfs != nil ||
+		pv.Spec.NFS != nil {
+		pvc := core.PersistentVolumeClaim{}
+		// Get PVC
+		ref := types.NamespacedName{
+			Namespace: pv.Spec.ClaimRef.Namespace,
+			Name:      pv.Spec.ClaimRef.Name,
+		}
+		err := srcClient.Get(context.TODO(), ref, &pvc)
+		if err != nil {
+			log.Trace(err)
+			return "", err
+		}
+		if isRWX(pvc.Spec.AccessModes) {
+			targetProvisioner = "cephfs.csi.ceph.com"
+		} else if isRWO(pvc.Spec.AccessModes) {
+			targetProvisioner = "rbd.csi.ceph.com"
+		} else {
+			targetProvisioner = "cephfs.csi.ceph.com"
+		}
+		// warn for gluster but not NFS
+		if pv.Spec.NFS == nil {
+			warnIfTargetUnavailable = true
+		}
+		// For all other pvs, migrate to storage class with the same provisioner, if available
+		// FIXME: Are there any other types where we want to target a matching dynamic provisioner even if the src
+		// pv doesn't have a storage class (i.e. matching targetProvisioner based on pv.Spec.PersistentVolumeSource)?
+	} else {
+		targetProvisioner = srcProvisioner
+	}
+	matchingStorageClasses := findStorageClassesForProvisioner(targetProvisioner, destStorageClasses)
+	if len(matchingStorageClasses) > 0 {
+		if findProvisionerForName(srcStorageClassName, matchingStorageClasses) != "" {
+			targetStorageClassName = srcStorageClassName
+		} else {
+			targetStorageClassName = matchingStorageClasses[0].Name
+		}
+	} else {
+		targetStorageClassName = findDefaultStorageClassName(destStorageClasses)
+		// if we're using a default storage class and we need to warn
+		if targetStorageClassName != "" && warnIfTargetUnavailable {
+			existingWarnCondition := plan.Status.FindCondition(PvWarnNoCephAvailable)
+			if existingWarnCondition == nil {
+				plan.Status.SetCondition(migapi.Condition{
+					Type:     PvWarnNoCephAvailable,
+					Status:   True,
+					Category: Warn,
+					Message:  PvWarnNoCephAvailableMessage,
+					Items:    []string{pv.Name},
+				})
+			} else {
+				existingWarnCondition.Items = append(existingWarnCondition.Items, pv.Name)
+			}
+		}
+	}
+	return targetStorageClassName, nil
+}
+
+func findDefaultStorageClassName(storageClasses []migapi.StorageClass) string {
+	for _, storageClass := range storageClasses {
+		if storageClass.Default {
+			return storageClass.Name
+		}
+	}
+	return ""
+}
+
+func findProvisionerForName(name string, storageClasses []migapi.StorageClass) string {
+	for _, storageClass := range storageClasses {
+		if name == storageClass.Name {
+			return storageClass.Provisioner
+		}
+	}
+	return ""
+}
+
+func findStorageClassesForProvisioner(provisioner string, storageClasses []migapi.StorageClass) []migapi.StorageClass {
+	var matchingClasses []migapi.StorageClass
+	for _, storageClass := range storageClasses {
+		if provisioner == storageClass.Provisioner {
+			matchingClasses = append(matchingClasses, storageClass)
+		}
+	}
+	return matchingClasses
+}
+
+func isRWX(accessModes []core.PersistentVolumeAccessMode) bool {
+	for _, accessMode := range accessModes {
+		if accessMode == core.ReadWriteMany {
+			return true
+		}
+	}
+	return false
+}
+func isRWO(accessModes []core.PersistentVolumeAccessMode) bool {
+	for _, accessMode := range accessModes {
+		if accessMode == core.ReadWriteOnce {
+			return true
+		}
+	}
+	return false
 }

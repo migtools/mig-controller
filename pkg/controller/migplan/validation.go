@@ -25,6 +25,9 @@ const (
 	PlanConflict                   = "PlanConflict"
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
+	PvInvalidStorageClass          = "PvInvalidStorageClass"
+	PvNoStorageClassSelection      = "PvNoStorageClassSelection"
+	PvWarnNoCephAvailable          = "PvWarnNoCephAvailable"
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
@@ -70,6 +73,9 @@ const (
 	PlanConflictMessage                   = "The plan is in conflict with []."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
+	PvInvalidStorageClassMessage          = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
+	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`."
+	PvWarnNoCephAvailableMessage          = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
@@ -441,32 +447,54 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 }
 
 // Validate PV actions.
-func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
-	invalid := make([]string, 0)
+func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
+	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
+
+	storageClasses := map[string]bool{}
+	missingStorageClass := make([]string, 0)
+	invalidStorageClass := make([]string, 0)
+
+	destMigCluster, err := plan.GetDestinationCluster(r.Client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, storageClass := range destMigCluster.Spec.StorageClasses {
+		storageClasses[storageClass.Name] = true
+	}
+
 	for _, pv := range plan.Spec.PersistentVolumes.List {
 		actions := map[string]bool{}
-		if len(pv.SupportedActions) > 0 {
-			for _, a := range pv.SupportedActions {
+		if len(pv.Supported.Actions) > 0 {
+			for _, a := range pv.Supported.Actions {
 				actions[a] = true
 			}
 		} else {
 			unsupported = append(unsupported, pv.Name)
 			actions[""] = true
 		}
-		_, found := actions[pv.Action]
+		_, found := actions[pv.Selection.Action]
 		if !found {
-			invalid = append(invalid, pv.Name)
+			invalidAction = append(invalidAction, pv.Name)
+		}
+		if pv.Selection.StorageClass == "" {
+			missingStorageClass = append(missingStorageClass, pv.Name)
+		} else {
+			_, found := storageClasses[pv.Selection.StorageClass]
+			if !found {
+				invalidStorageClass = append(invalidStorageClass, pv.Name)
+			}
 		}
 	}
-	if len(invalid) > 0 {
+	if len(invalidAction) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAction,
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
 			Message:  PvInvalidActionMessage,
-			Items:    invalid,
+			Items:    invalidAction,
 		})
 	}
 	if len(unsupported) > 0 {
@@ -476,6 +504,26 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 			Category: Warn,
 			Message:  PvNoSupportedActionMessage,
 			Items:    unsupported,
+		})
+		return nil
+	}
+	if len(invalidStorageClass) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvInvalidStorageClass,
+			Status:   True,
+			Reason:   NotDone,
+			Category: Error,
+			Message:  PvInvalidStorageClassMessage,
+			Items:    invalidStorageClass,
+		})
+	}
+	if len(missingStorageClass) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNoStorageClassSelection,
+			Status:   True,
+			Category: Error,
+			Message:  PvNoStorageClassSelectionMessage,
+			Items:    missingStorageClass,
 		})
 		return nil
 	}

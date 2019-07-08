@@ -305,7 +305,16 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 func findPVAction(pvList migapi.PersistentVolumes, pvName string) string {
 	for _, pv := range pvList.List {
 		if pv.Name == pvName {
-			return pv.Action
+			return pv.Selection.Action
+		}
+	}
+	return ""
+}
+
+func findPVStorageClass(pvList migapi.PersistentVolumes, pvName string) string {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Selection.StorageClass
 		}
 	}
 	return ""
