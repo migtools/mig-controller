@@ -175,9 +175,9 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 			log.Info(
 				"Stage pod created.",
 				"ns",
-				pod.Namespace,
+				newPod.Namespace,
 				"name",
-				pod.Name)
+				newPod.Name)
 			delete(pod.Labels, IncludedInStageBackupLabel)
 			delete(pod.Annotations, ResticPvBackupAnnotation)
 			err = client.Update(context.TODO(), &pod)
