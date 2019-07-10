@@ -36,6 +36,7 @@ const (
 // Status - The condition status.
 // Reason - The reason for the condition.
 // Message - The human readable description of the condition.
+// Durable - The condition not subject to staging.
 // staging - A condition has been explicitly set/updated.
 type Condition struct {
 	Type               string      `json:"type"`
@@ -44,6 +45,7 @@ type Condition struct {
 	Category           string      `json:"category"`
 	Message            string      `json:"message,omitempty"`
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	Durable            bool        `json:"durable,omitempty"`
 	staged             bool
 }
 
@@ -99,7 +101,7 @@ func (r *Conditions) BeginStagingConditions() {
 	}
 	for index := range r.List {
 		condition := &r.List[index]
-		condition.staged = false
+		condition.staged = condition.Durable
 	}
 }
 
