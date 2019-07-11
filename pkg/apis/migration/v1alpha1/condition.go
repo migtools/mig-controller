@@ -1,6 +1,10 @@
 package v1alpha1
 
 import (
+	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +40,8 @@ const (
 // Status - The condition status.
 // Reason - The reason for the condition.
 // Message - The human readable description of the condition.
+// Durable - The condition is not un-staged.
+// Items - A list of `items` associated with the condition used to replace [] in `Message`.
 // staging - A condition has been explicitly set/updated.
 type Condition struct {
 	Type               string      `json:"type"`
@@ -44,6 +50,8 @@ type Condition struct {
 	Category           string      `json:"category"`
 	Message            string      `json:"message,omitempty"`
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	Durable            bool        `json:"durable,omitempty"`
+	Items              []string    `json:"-"`
 	staged             bool
 }
 
@@ -58,15 +66,27 @@ func (r *Condition) Update(other Condition) {
 	r.Reason = other.Reason
 	r.Category = other.Category
 	r.Message = other.Message
+	r.Durable = other.Durable
+	r.Items = other.Items
 	r.LastTransitionTime = metav1.NewTime(time.Now())
 }
 
-func (r Condition) Equal(other Condition) bool {
+// Get whether the conditions are equal.
+func (r *Condition) Equal(other Condition) bool {
 	return r.Type == other.Type &&
 		r.Status == other.Status &&
 		r.Category == other.Category &&
 		r.Reason == other.Reason &&
-		r.Message == other.Message
+		r.Message == other.Message &&
+		r.Durable == other.Durable &&
+		reflect.DeepEqual(r.Items, other.Items)
+}
+
+// Replace [] in `Message` with the content of `Items`.
+func (r *Condition) ExpandItems() {
+	re := regexp.MustCompile(`\[[^]]*\]`)
+	list := fmt.Sprintf("[%s]", strings.Join(r.Items, ","))
+	r.Message = re.ReplaceAllString(r.Message, list)
 }
 
 // Managed collection of conditions.
@@ -99,7 +119,7 @@ func (r *Conditions) BeginStagingConditions() {
 	}
 	for index := range r.List {
 		condition := &r.List[index]
-		condition.staged = false
+		condition.staged = condition.Durable
 	}
 }
 
@@ -113,6 +133,7 @@ func (r *Conditions) EndStagingConditions() {
 	for index := range r.List {
 		condition := r.List[index]
 		if condition.staged {
+			condition.ExpandItems()
 			kept = append(kept, condition)
 		}
 	}
@@ -120,7 +141,8 @@ func (r *Conditions) EndStagingConditions() {
 }
 
 // Find a condition by type.
-func (r *Conditions) FindCondition(cndType string) *Condition {
+// Staging is ignored.
+func (r *Conditions) find(cndType string) *Condition {
 	if r.List == nil {
 		return nil
 	}
@@ -133,13 +155,29 @@ func (r *Conditions) FindCondition(cndType string) *Condition {
 	return nil
 }
 
+// Find a condition by type.
+func (r *Conditions) FindCondition(cndType string) *Condition {
+	if r.List == nil {
+		return nil
+	}
+	condition := r.find(cndType)
+	if condition == nil {
+		return nil
+	}
+	if r.staging && !condition.staged {
+		return nil
+	}
+
+	return condition
+}
+
 // Set (add/update) the specified condition to the collection.
 func (r *Conditions) SetCondition(condition Condition) {
 	if r.List == nil {
 		r.List = []Condition{}
 	}
 	condition.staged = true
-	found := r.FindCondition(condition.Type)
+	found := r.find(condition.Type)
 	if found == nil {
 		condition.LastTransitionTime = metav1.NewTime(time.Now())
 		r.List = append(r.List, condition)
@@ -183,9 +221,6 @@ func (r *Conditions) HasCondition(types ...string) bool {
 		if condition == nil || condition.Status != True {
 			return false
 		}
-		if r.staging && !condition.staged {
-			return false
-		}
 	}
 
 	return len(types) > 0
@@ -199,9 +234,6 @@ func (r *Conditions) HasAnyCondition(types ...string) bool {
 	for _, cndType := range types {
 		condition := r.FindCondition(cndType)
 		if condition == nil || condition.Status != True {
-			continue
-		}
-		if r.staging && !condition.staged {
 			continue
 		}
 		return true
@@ -272,9 +304,6 @@ func (r *Conditions) SetReady(ready bool, message string) {
 func (r *Conditions) IsReady() bool {
 	condition := r.FindCondition(Ready)
 	if condition == nil || condition.Status != True {
-		return false
-	}
-	if r.staging && !condition.staged {
 		return false
 	}
 	return true

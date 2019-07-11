@@ -2,13 +2,10 @@ package migplan
 
 import (
 	"context"
-	"fmt"
-	"reflect"
-	"strings"
-
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -67,10 +64,10 @@ const (
 	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
 	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	NsNotFoundOnSourceClusterMessage      = "Namespaces [%s] not found on the source cluster."
-	NsNotFoundOnDestinationClusterMessage = "Namespaces [%s] not found on the destination cluster."
-	PvInvalidActionMessage                = "PV in `persistentVolumes` [%s] has an unsupported `action`."
-	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [%s] with no `SupportedActions`."
+	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
+	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
+	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
+	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
@@ -343,13 +340,13 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 		}
 	}
 	if len(notFound) > 0 {
-		message := fmt.Sprintf(NsNotFoundOnSourceClusterMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsNotFoundOnSourceCluster,
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  message,
+			Message:  NsNotFoundOnSourceClusterMessage,
+			Items:    notFound,
 		})
 		return nil
 	}
@@ -390,13 +387,13 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 		}
 	}
 	if len(notFound) > 0 {
-		message := fmt.Sprintf(NsNotFoundOnDestinationClusterMessage, strings.Join(notFound, ", "))
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsNotFoundOnDestinationCluster,
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  message,
+			Message:  NsNotFoundOnDestinationClusterMessage,
+			Items:    notFound,
 		})
 		return nil
 	}
@@ -424,26 +421,22 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 		}
 	}
 	if len(invalid) > 0 {
-		message := fmt.Sprintf(
-			PvInvalidActionMessage,
-			strings.Join(invalid, ", "))
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAction,
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
-			Message:  message,
+			Message:  PvInvalidActionMessage,
+			Items:    invalid,
 		})
 	}
 	if len(unsupported) > 0 {
-		message := fmt.Sprintf(
-			PvNoSupportedActionMessage,
-			strings.Join(unsupported, ", "))
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoSupportedAction,
 			Status:   True,
 			Category: Warn,
-			Message:  message,
+			Message:  PvNoSupportedActionMessage,
+			Items:    unsupported,
 		})
 		return nil
 	}
