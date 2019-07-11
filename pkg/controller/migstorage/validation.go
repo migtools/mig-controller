@@ -1,11 +1,9 @@
 package migstorage
 
 import (
-	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
-	"strings"
 )
 
 // Notes:
@@ -47,11 +45,11 @@ const (
 const (
 	ReadyMessage                    = "The storage is ready."
 	InvalidBSLProviderMessage       = "The `backupStorageProvider` must be: (aws|gcp|azure)."
-	InvalidBSLSettingsMessage       = "The `backupStorageConfig` settings [%s] not valid."
+	InvalidBSLSettingsMessage       = "The `backupStorageConfig` settings [] not valid."
 	InvalidBSLCredsSecretRefMessage = "The `backupStorageConfig.credsSecretRef` must reference a `secret`."
 	InvalidBSLCredsSecretMessage    = "The `backupStorageConfig.credsSecretRef` secret has invalid content."
 	InvalidVSLProviderMessage       = "The `volumeSnapshotProvider` must be: (aws|gcp|azure)."
-	InvalidVSLSettingsMessage       = "The `volumeSnapshotConfig` settings [%s] not valid."
+	InvalidVSLSettingsMessage       = "The `volumeSnapshotConfig` settings [] not valid."
 	InvalidVSLCredsSecretRefMessage = "The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`."
 	InvalidVSLCredsSecretMessage    = "The `volumeSnapshotConfig.credsSecretRef` secret has invalid content."
 )
@@ -125,13 +123,13 @@ func (r ReconcileMigStorage) validateAwsBSLSettings(storage *migapi.MigStorage) 
 
 	// Set condition.
 	if len(fields) > 0 {
-		message := fmt.Sprintf(InvalidBSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidBSLProvider,
 			Status:   True,
 			Category: Critical,
 			Reason:   InvalidSetting,
-			Message:  message,
+			Message:  InvalidBSLSettingsMessage,
+			Items:    fields,
 		})
 		return nil
 	}
@@ -153,13 +151,13 @@ func (r ReconcileMigStorage) validateAzureBSLSettings(storage *migapi.MigStorage
 
 	// Set condition.
 	if len(fields) > 0 {
-		message := fmt.Sprintf(InvalidBSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidBSLProvider,
 			Status:   True,
 			Category: Critical,
 			Reason:   InvalidSetting,
-			Message:  message,
+			Message:  InvalidBSLSettingsMessage,
+			Items:    fields,
 		})
 		return nil
 	}
@@ -262,13 +260,13 @@ func (r ReconcileMigStorage) validateAwsVSLSettings(storage *migapi.MigStorage) 
 
 	// Set condition.
 	if len(fields) > 0 {
-		message := fmt.Sprintf(InvalidVSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidVSLProvider,
 			Status:   True,
 			Reason:   InvalidSetting,
 			Category: Critical,
-			Message:  message,
+			Message:  InvalidVSLSettingsMessage,
+			Items:    fields,
 		})
 		return nil
 	}
@@ -290,13 +288,13 @@ func (r ReconcileMigStorage) validateAzureVSLSettings(storage *migapi.MigStorage
 
 	// Set condition.
 	if len(fields) > 0 {
-		message := fmt.Sprintf(InvalidVSLSettingsMessage, strings.Join(fields, ", "))
 		storage.Status.SetCondition(migapi.Condition{
 			Type:     InvalidVSLProvider,
 			Status:   True,
 			Reason:   InvalidSetting,
 			Category: Critical,
-			Message:  message,
+			Message:  InvalidVSLSettingsMessage,
+			Items:    fields,
 		})
 		return nil
 	}
