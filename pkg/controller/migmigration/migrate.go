@@ -23,24 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Annotations
-const (
-	pvAnnotationKey             = "openshift.io/migrate-type"
-	migrateAnnotationValue      = "final"
-	migrateAnnotationKey        = "openshift.io/migrate-copy-phase"
-	stageAnnotationValue        = "stage"
-	stageAnnotationKey          = "openshift.io/migrate-copy-phase"
-	resticPvBackupAnnotationKey = "backup.velero.io/backup-volumes"
-)
-
-// Labels
-const (
-	pvBackupLabelKey   = "openshift.io/pv-backup"
-	pvBackupLabelValue = "true"
-)
-
 // Backup resources.
 var stagingResources = []string{
+	"namespaces",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"imagestreams",
@@ -52,7 +37,7 @@ var stagingResources = []string{
 }
 
 // Perform the migration.
-func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, error) {
+func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Duration, error) {
 	if migration.Status.HasAnyCondition(Succeeded, Failed) {
 		return 0, nil
 	}
@@ -85,7 +70,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 		Client:          r,
 		Owner:           migration,
 		PlanResources:   planResources,
-		Phase:           Phase{Name: migration.Status.Phase},
+		Phase:           migration.Status.Phase,
 		Annotations:     r.getAnnotations(migration),
 		BackupResources: r.getBackupResources(migration),
 	}
@@ -95,52 +80,52 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 		return 0, err
 	}
 
-	migration.Status.SetCondition(migapi.Condition{
-		Type:     Running,
-		Status:   True,
-		Reason:   task.Phase.Name,
-		Category: Advisory,
-		Message:  RunningMessage,
-	})
-
-	// TODO: SYNC WITH JEFF TO GET OPINION ON THIS HACK
-	// Setting this annotation to not create stage pods after copy restore has
-	// run to completion
-	if task.Phase.Equals(DeleteStagePodsStarted) {
-		if migration.Annotations == nil {
-			migration.Annotations = make(map[string]string)
-		}
-		migration.Annotations["openshift.io/stage-completed"] = "true"
-	}
-
 	// Result
-	migration.Status.Phase = task.Phase.Name
-	if task.Phase.Equals(WaitOnResticRestart) {
-		return 10, nil
-	}
-	if task.Phase.Final() {
+	migration.Status.Phase = task.Phase
+
+	// Succeeded
+	if task.Phase == Completed {
 		migration.Status.DeleteCondition(Running)
-		migration.Status.SetCondition(migapi.Condition{
-			Type:     Succeeded,
-			Status:   True,
-			Reason:   task.Phase.Name,
-			Category: Advisory,
-			Message:  SucceededMessage,
-		})
+		failed := task.Owner.Status.FindCondition(Failed)
+		if failed == nil {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     Succeeded,
+				Status:   True,
+				Reason:   task.Phase,
+				Category: Advisory,
+				Message:  SucceededMessage,
+				Durable:  true,
+			})
+		} else {
+			failed.Status = "True"
+		}
+		return task.Requeue, nil
 	}
-	if task.Phase.Failed() {
+	// Failed
+	if _, found := ErrorPhase[task.Phase]; found {
 		migration.AddErrors(task.Errors)
 		migration.Status.DeleteCondition(Running)
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     Failed,
-			Status:   True,
-			Reason:   task.Phase.Name,
+			Status:   False,
+			Reason:   task.Phase,
 			Category: Critical,
 			Message:  FailedMessage,
+			Durable:  true,
 		})
+		return task.Requeue, nil
 	}
 
-	return 0, nil
+	// Running
+	migration.Status.SetCondition(migapi.Condition{
+		Type:     Running,
+		Status:   True,
+		Reason:   task.Phase,
+		Category: Advisory,
+		Message:  RunningMessage,
+	})
+
+	return task.Requeue, nil
 }
 
 // Get annotations.
@@ -151,9 +136,9 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (int, er
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
 	annotations := make(map[string]string)
 	if migration.Spec.Stage {
-		annotations[stageAnnotationKey] = stageAnnotationValue
+		annotations[StageOrFinalAnnotation] = "stage"
 	} else {
-		annotations[migrateAnnotationKey] = migrateAnnotationValue
+		annotations[StageOrFinalAnnotation] = "final"
 	}
 	return annotations
 }
