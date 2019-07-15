@@ -135,12 +135,12 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Completed.
-	if migration.Status.HasAnyCondition(Succeeded, Failed) {
+	if migration.Status.Phase == Completed {
 		return reconcile.Result{}, nil
 	}
 
 	// Re-queue (after) in seconds.
-	requeueAfter := 0 // not re-queued.
+	requeueAfter := time.Duration(0) // not re-queued.
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
@@ -191,8 +191,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Requeue
 	if requeueAfter > 0 {
-		delay := time.Second * time.Duration(requeueAfter)
-		return reconcile.Result{RequeueAfter: delay}, nil
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -203,9 +202,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 // with stage migrations followed by final migrations. A migration is
 // postponed when not in the desired order.
 // When postponed:
-//   - Returns: a requeueAfter in seconds, else 0 (not postponed).
+//   - Returns: a requeueAfter as time.Duration, else 0 (not postponed).
 //   - Sets the `Postponed` condition.
-func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, error) {
+func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.Duration, error) {
 	plan, err := migration.GetPlan(r)
 	if err != nil {
 		log.Trace(err)
@@ -230,10 +229,10 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (int, e
 	}
 
 	// Postpone
-	requeueAfter := 10
+	requeueAfter := time.Second * 10
 	for position, uid := range pending {
 		if uid == migration.UID {
-			requeueAfter = position * 10
+			requeueAfter = time.Second * time.Duration(position*10)
 			break
 		}
 	}

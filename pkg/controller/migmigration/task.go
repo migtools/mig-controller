@@ -1,148 +1,58 @@
 package migmigration
 
 import (
-	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 )
-
-// Annotation Keys
-const MigQuiesceAnnotationKey = "openshift.io/migrate-quiesce-pods"
 
 // Phases
 const (
-	Created                 = ""
-	Started                 = "Started"
-	WaitOnResticRestart     = "WaitOnResticRestart"
-	ResticRestartCompleted  = "ResticRestartCompleted"
-	BackupStarted           = "BackupStarted"
-	BackupCompleted         = "BackupCompleted"
-	BackupFailed            = "BackupFailed"
-	WaitOnBackupReplication = "WaitOnBackupReplication"
-	BackupReplicated        = "BackupReplicated"
-	RestoreStarted          = "RestoreStarted"
-	RestoreCompleted        = "RestoreCompleted"
-	RestoreFailed           = "RestoreFailed"
-	Completed               = "Completed"
+	Created                       = ""
+	Started                       = "Started"
+	Prepare                       = "Prepare"
+	EnsureInitialBackup           = "EnsureInitialBackup"
+	InitialBackupCreated          = "InitialBackupCreated"
+	InitialBackupFailed           = "InitialBackupFailed"
+	AnnotateResources             = "AnnotateResources"
+	EnsureStagePods               = "EnsureStagePods"
+	StagePodsCreated              = "StagePodsCreated"
+	RestartRestic                 = "RestartRestic"
+	ResticRestarted               = "ResticRestarted"
+	QuiesceApplications           = "QuiesceApplications"
+	EnsureStageBackup             = "EnsureStageBackup"
+	StageBackupCreated            = "StageBackupCreated"
+	StageBackupFailed             = "StageBackupFailed"
+	EnsureInitialBackupReplicated = "EnsureInitialBackupReplicated"
+	EnsureStageBackupReplicated   = "EnsureStageBackupReplicated"
+	EnsureStageRestore            = "EnsureStageRestore"
+	StageRestoreCreated           = "StageRestoreCreated"
+	StageRestoreFailed            = "StageRestoreFailed"
+	EnsureFinalRestore            = "EnsureFinalRestore"
+	FinalRestoreCreated           = "FinalRestoreCreated"
+	FinalRestoreFailed            = "FinalRestoreFailed"
+	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
+	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
+	Completed                     = "Completed"
 )
 
-var PhaseOrder = map[string]int{
-	Created:                 00, // 0-499 normal
-	Started:                 1,
-	WaitOnResticRestart:     10,
-	ResticRestartCompleted:  11,
-	BackupStarted:           20,
-	BackupCompleted:         21,
-	WaitOnBackupReplication: 30,
-	BackupReplicated:        31,
-	RestoreStarted:          40,
-	RestoreCompleted:        41,
-	BackupFailed:            501, // 500-999 errors
-	RestoreFailed:           510,
-	Completed:               1000, // Succeeded
+// End phases.
+var EndPhase = map[string]bool{
+	InitialBackupFailed: true,
+	StageBackupFailed:   true,
+	FinalRestoreFailed:  true,
+	StageRestoreFailed:  true,
+	Completed:           true,
 }
 
-// Phase Error
-type PhaseNotValid struct {
-	Name string
-}
-
-func (p PhaseNotValid) Error() string {
-	return fmt.Sprintf("Phase %s not valid.", p.Name)
-}
-
-// Phase
-type Phase struct {
-	Name string
-}
-
-// Validate the phase.
-func (p *Phase) Validate() error {
-	_, found := PhaseOrder[p.Name]
-	if !found {
-		return &PhaseNotValid{Name: p.Name}
-	}
-
-	return nil
-}
-
-// Set the phase.
-// Prevents rewind or set to invalid value.
-func (p *Phase) Set(name string) {
-	if !p.Before(name) {
-		return
-	}
-	_, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: name})
-		return
-	}
-	p.Name = name
-}
-
-// Phase is equal.
-func (p Phase) Equals(other string) bool {
-	return p.Name == other
-}
-
-// Phase is after `other`.
-func (p Phase) After(other string) bool {
-	nA, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: p.Name})
-	}
-	nB, found := PhaseOrder[other]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: other})
-	}
-	return nA > nB
-}
-
-// The `other` phase is done.
-// Same as p.Phase.Equals(other) || p.Phase.After(other)
-func (p Phase) EqAfter(other string) bool {
-	nA, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: p.Name})
-	}
-	nB, found := PhaseOrder[other]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: other})
-	}
-	return nA >= nB
-}
-
-// Phase is before `other`.
-func (p Phase) Before(other string) bool {
-	nA, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: p.Name})
-	}
-	nB, found := PhaseOrder[other]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: other})
-	}
-	return nA < nB
-}
-
-// Phase is final.
-func (p Phase) Final() bool {
-	n, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: p.Name})
-	}
-	return n >= 500
-}
-
-// Phase is final.
-func (p Phase) Failed() bool {
-	n, found := PhaseOrder[p.Name]
-	if !found {
-		log.Trace(&PhaseNotValid{Name: p.Name})
-	}
-	return n >= 500 && n < 1000
+// Error phases.
+var ErrorPhase = map[string]bool{
+	InitialBackupFailed: true,
+	StageBackupFailed:   true,
+	FinalRestoreFailed:  true,
+	StageRestoreFailed:  true,
 }
 
 // A Velero task that provides the complete backup & restore workflow.
@@ -153,9 +63,8 @@ func (p Phase) Failed() bool {
 // Annotations - Map of annotations to applied to the backup & restore
 // BackupResources - Resource types to be included in the backup.
 // Phase - The task phase.
+// Requeue - The requeueAfter duration. 0 indicates no requeue.
 // Errors - Migration errors.
-// Backup - A Backup created on the source cluster.
-// Restore - A Restore created on the destination cluster.
 type Task struct {
 	Log             logr.Logger
 	Client          k8sclient.Client
@@ -163,169 +72,371 @@ type Task struct {
 	PlanResources   *migapi.PlanResources
 	Annotations     map[string]string
 	BackupResources []string
-	Phase           Phase
+	Phase           string
+	Requeue         time.Duration
 	Errors          []string
-	Backup          *velero.Backup
-	Restore         *velero.Restore
 }
 
-// Reconcile() Example:
-//
-// task := Task{
-//     Log: log,
-//     Client: r,
-//     Owner: migration,
-//     PlanResources: plan.GetPlanResources(),
-// }
-//
-// err := task.Run()
-// switch task.Phase {
-//     case Complete:
-//         ...
-// }
-//
-
 // Run the task.
-// Return `true` when run to completion.
+// Each call will:
+//   1. Run the current phase.
+//   2. Update the phase to the next phase.
+//   3. Set the Requeue (as appropriate).
+//   4. Return.
 func (t *Task) Run() error {
-	t.logEnter()
-	defer t.logExit()
+	t.Log.Info(
+		"Migration [RUN]",
+		"name",
+		t.Owner.Name,
+		"stage",
+		t.stage(),
+		"phase",
+		t.Phase)
 
-	// Validate phase.
-	err := t.Phase.Validate()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
+	t.Requeue = time.Millisecond * 100
 
-	// Started
-	t.Phase.Set(Started)
-
-	// Mount propagation workaround
-	// TODO: Only bounce restic pod if cluster version is 3.7-3.9,
-	// would require passing in cluster version to the controller.
-	err = t.bounceResticPod()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// Annotate persistent storage resources with actions
-	err = t.annotateStorageResources()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// Return unless restic restart has finished
-	if t.Phase.Equals(Started) || t.Phase.Equals(WaitOnResticRestart) {
-		return nil
-	}
-
-	// Backup
-	err = t.ensureBackup()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	switch t.Backup.Status.Phase {
-	case velero.BackupPhaseCompleted:
-		t.Phase.Set(BackupCompleted)
-	case velero.BackupPhaseFailed:
-		reason := fmt.Sprintf(
-			"Backup: %s/%s failed.",
-			t.Backup.Namespace,
-			t.Backup.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(BackupFailed)
-		return nil
-	case velero.BackupPhasePartiallyFailed:
-		reason := fmt.Sprintf(
-			"Backup: %s/%s partially failed.",
-			t.Backup.Namespace,
-			t.Backup.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(BackupFailed)
-		return nil
-	case velero.BackupPhaseFailedValidation:
-		t.addErrors(t.Backup.Status.ValidationErrors)
-		t.Phase.Set(BackupFailed)
-		return nil
-	default:
-		t.Phase.Set(BackupStarted)
-		return nil
-	}
-
-	t.Phase.Set(BackupCompleted)
-
-	// Delete storage annotations
-	err = t.removeStorageResourceAnnotations()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// Wait on Backup replication.
-	t.Phase.Set(WaitOnBackupReplication)
-	backup, err := t.getReplicatedBackup()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	if backup != nil {
-		t.Phase.Set(BackupReplicated)
-	} else {
-		return nil
-	}
-
-	// Restore
-	err = t.ensureRestore()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	switch t.Restore.Status.Phase {
-	case velero.RestorePhaseCompleted:
-		t.Phase.Set(RestoreCompleted)
-	case velero.RestorePhaseFailedValidation:
-		t.addErrors(t.Restore.Status.ValidationErrors)
-		t.Phase.Set(RestoreFailed)
-		return nil
-	case velero.RestorePhaseFailed:
-		reason := fmt.Sprintf(
-			"Restore: %s/%s failed.",
-			t.Restore.Namespace,
-			t.Restore.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(RestoreFailed)
-		return nil
-	case velero.RestorePhasePartiallyFailed:
-		reason := fmt.Sprintf(
-			"Restore: %s/%s partially failed.",
-			t.Restore.Namespace,
-			t.Restore.Name)
-		t.addErrors([]string{reason})
-		t.Phase.Set(RestoreFailed)
-		return nil
-	default:
-		t.Phase.Set(RestoreStarted)
-		return nil
-	}
-	t.Phase.Set(RestoreCompleted)
-
-	// Delete stage Pods
-	if t.stage() {
-		err = t.deleteStagePods()
+	switch t.Phase {
+	case Created:
+		t.Phase = Started
+	case Started:
+		t.Phase = Prepare
+	case Prepare:
+		err := t.deleteAnnotations()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
+		err = t.ensureStagePodsDeleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if t.stage() {
+			if t.hasPVs() {
+				t.Phase = AnnotateResources
+			} else {
+				t.Phase = Completed
+			}
+		} else {
+			t.Phase = EnsureInitialBackup
+		}
+	case EnsureInitialBackup:
+		_, err := t.ensureInitialBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = InitialBackupCreated
+		t.Requeue = 0
+	case InitialBackupCreated:
+		backup, err := t.ensureInitialBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		completed, reasons := t.hasBackupCompleted(backup)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			if len(reasons) > 0 {
+				t.addErrors(reasons)
+				t.Phase = InitialBackupFailed
+			} else {
+				if t.hasPVs() {
+					t.Phase = AnnotateResources
+				} else {
+					t.Phase = EnsureInitialBackupReplicated
+				}
+			}
+		} else {
+			t.Requeue = 0
+		}
+	case AnnotateResources:
+		err := t.annotateStageResources()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = EnsureStagePods
+	case EnsureStagePods:
+		count, err := t.ensureStagePodsCreated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if count > 0 {
+			t.Phase = StagePodsCreated
+			t.Requeue = 0
+		} else {
+			if t.quiesce() {
+				t.Phase = QuiesceApplications
+			} else {
+				t.Phase = EnsureStageBackup
+			}
+		}
+	case StagePodsCreated:
+		started, err := t.ensureStagePodsStarted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if started {
+			t.Phase = RestartRestic
+		} else {
+			t.Requeue = 0
+		}
+	case RestartRestic:
+		err := t.restartResticPod()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = ResticRestarted
+	case ResticRestarted:
+		started, err := t.hasResticPodStarted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if started {
+			if t.quiesce() {
+				t.Phase = QuiesceApplications
+			} else {
+				t.Phase = EnsureStageBackup
+			}
+		} else {
+			t.Requeue = time.Second * 3
+		}
+	case QuiesceApplications:
+		err := t.quiesceApplications()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = EnsureStageBackup
+	case EnsureStageBackup:
+		_, err := t.ensureStageBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = StageBackupCreated
+		t.Requeue = 0
+	case StageBackupCreated:
+		backup, err := t.ensureStageBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		completed, reasons := t.hasBackupCompleted(backup)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			if len(reasons) > 0 {
+				t.addErrors(reasons)
+				t.Phase = StageBackupFailed
+			} else {
+				t.Phase = EnsureStageBackupReplicated
+			}
+		} else {
+			t.Requeue = 0
+		}
+	case EnsureStageBackupReplicated:
+		backup, err := t.getStageBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		replicated, err := t.isBackupReplicated(backup)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if replicated {
+			if t.stage() {
+				t.Phase = EnsureStageRestore
+			} else {
+				t.Phase = EnsureStageRestore
+			}
+		} else {
+			t.Requeue = 0
+		}
+	case EnsureStageRestore:
+		backup, err := t.getStageBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		_, err = t.ensureStageRestore()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = StageRestoreCreated
+		t.Requeue = 0
+	case StageRestoreCreated:
+		restore, err := t.ensureStageRestore()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if restore == nil {
+			return errors.New("Restore not found")
+		}
+		completed, reasons := t.hasRestoreCompleted(restore)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			if len(reasons) > 0 {
+				t.addErrors(reasons)
+				t.Phase = StageRestoreFailed
+			} else {
+				t.Phase = EnsureStagePodsDeleted
+			}
+		} else {
+			t.Requeue = 0
+		}
+	case EnsureStagePodsDeleted:
+		err := t.ensureStagePodsDeleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = EnsureAnnotationsDeleted
+	case EnsureAnnotationsDeleted:
+		err := t.deleteAnnotations()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if t.stage() {
+			t.Phase = Completed
+		} else {
+			t.Phase = EnsureInitialBackupReplicated
+		}
+	case EnsureInitialBackupReplicated:
+		backup, err := t.getInitialBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		replicated, err := t.isBackupReplicated(backup)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if replicated {
+			t.Phase = EnsureFinalRestore
+		} else {
+			t.Requeue = 0
+		}
+	case EnsureFinalRestore:
+		backup, err := t.getInitialBackup()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if backup == nil {
+			return errors.New("Backup not found")
+		}
+		_, err = t.ensureFinalRestore()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = FinalRestoreCreated
+		t.Requeue = 0
+	case FinalRestoreCreated:
+		restore, err := t.ensureFinalRestore()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if restore == nil {
+			return errors.New("Restore not found")
+		}
+		completed, reasons := t.hasRestoreCompleted(restore)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			if len(reasons) > 0 {
+				t.addErrors(reasons)
+				t.Phase = FinalRestoreFailed
+			} else {
+				t.Phase = Completed
+			}
+		} else {
+			t.Requeue = 0
+		}
+	case StageBackupFailed, StageRestoreFailed:
+		err := t.deleteAnnotations()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		err = t.ensureStagePodsDeleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Phase = Completed
+	case InitialBackupFailed, FinalRestoreFailed:
+		t.Phase = Completed
+	case Completed:
+		t.Requeue = 0
 	}
 
-	// Done
-	t.Phase.Set(Completed)
+	if t.Phase == Completed {
+		t.Log.Info(
+			"Migration [COMPLETED]",
+			"name",
+			t.Owner.Name)
+	}
 
 	return nil
+}
+
+// Migration UID.
+func (t *Task) UID() string {
+	return string(t.Owner.UID)
+}
+
+// Get whether the migration is stage.
+func (t *Task) stage() bool {
+	return t.Owner.Spec.Stage
+}
+
+// Get the migration namespaces.
+func (t *Task) namespaces() []string {
+	return t.PlanResources.MigPlan.Spec.Namespaces
+}
+
+// Get whether to quiesce pods.
+func (t *Task) quiesce() bool {
+	return t.Owner.Spec.QuiescePods
 }
 
 // Get a client for the source cluster.
@@ -338,58 +449,35 @@ func (t *Task) getDestinationClient() (k8sclient.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
-// Get whether the migration is stage.
-func (t *Task) stage() bool {
-	return t.Owner.Spec.Stage
+// Get the persistent volumes included in the plan.
+func (t *Task) getPVs() migapi.PersistentVolumes {
+	return t.PlanResources.MigPlan.Spec.PersistentVolumes
 }
 
-// Get whether to quiesce pods.
-func (t *Task) quiesce() bool {
-	return t.Owner.Spec.QuiescePods
+// Get whether the associated plan lists any PVs.
+func (t *Task) hasPVs() bool {
+	return len(t.getPVs().List) > 0
 }
 
-// Log task start/resumed.
-func (t *Task) logEnter() {
-	if t.Phase.Equals(Started) {
-		t.Log.Info(
-			"Migration: started.",
-			"name",
-			t.Owner.Name,
-			"stage",
-			t.stage())
-		return
+// Get both source and destination clients.
+func (t *Task) getBothClients() ([]k8sclient.Client, error) {
+	list := []k8sclient.Client{}
+	// Source
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
 	}
-	t.Log.Info(
-		"Migration: resumed.",
-		"name",
-		t.Owner.Name,
-		"phase",
-		t.Phase)
-}
+	list = append(list, client)
+	// Destination
+	client, err = t.getDestinationClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	list = append(list, client)
 
-// Log task exit/interrupted.
-func (t *Task) logExit() {
-	if t.Phase.Equals(Completed) {
-		t.Log.Info("Migration completed.")
-		return
-	}
-	backup := ""
-	restore := ""
-	if t.Backup != nil {
-		backup = t.Backup.Name
-	}
-	if t.Restore != nil {
-		restore = t.Restore.Name
-	}
-	t.Log.Info(
-		"Migration: waiting.",
-		"name",
-		t.Owner.Name,
-		"phase", t.Phase,
-		"backup",
-		backup,
-		"restore",
-		restore)
+	return list, nil
 }
 
 // Add errors.
