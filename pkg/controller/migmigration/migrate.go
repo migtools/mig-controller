@@ -25,7 +25,6 @@ import (
 
 // Backup resources.
 var stagingResources = []string{
-	"namespaces",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"imagestreams",
@@ -33,7 +32,6 @@ var stagingResources = []string{
 	"secrets",
 	"configmaps",
 	"pods",
-	"namespaces",
 }
 
 // Perform the migration.
