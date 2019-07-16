@@ -107,7 +107,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 			Type:     Failed,
 			Status:   False,
 			Reason:   task.Phase,
-			Category: Critical,
+			Category: Advisory,
 			Message:  FailedMessage,
 			Durable:  true,
 		})
