@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strconv"
 )
 
 var log = logging.WithName("plan")
@@ -89,6 +90,27 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		},
 		&StoragePredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Indexes
+	indexer := mgr.GetFieldIndexer()
+
+	// Plan
+	err = indexer.IndexField(
+		&migapi.MigPlan{},
+		migapi.ClosedIndexField,
+		func(rawObj runtime.Object) []string {
+			p, cast := rawObj.(*migapi.MigPlan)
+			if !cast {
+				return nil
+			}
+			return []string{
+				strconv.FormatBool(p.Spec.Closed),
+			}
+		})
 	if err != nil {
 		log.Trace(err)
 		return err

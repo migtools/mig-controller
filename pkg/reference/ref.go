@@ -12,6 +12,13 @@ func RefSet(ref *kapi.ObjectReference) bool {
 		ref.Name != ""
 }
 
+func RefEquals(refA, refB *kapi.ObjectReference) bool {
+	if refA == nil || refB == nil {
+		return false
+	}
+	return reflect.DeepEqual(refA, refB)
+}
+
 func ToKind(resource interface{}) string {
 	t := reflect.TypeOf(resource).String()
 	p := strings.SplitN(t, ".", 2)
