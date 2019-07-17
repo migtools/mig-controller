@@ -174,6 +174,12 @@ func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 				backup.Name))
 	case velero.BackupPhaseFailedValidation:
 		reasons = backup.Status.ValidationErrors
+		reasons = append(
+			reasons,
+			fmt.Sprintf(
+				"Backup: %s/%s validation failed.",
+				backup.Namespace,
+				backup.Name))
 		completed = true
 	}
 

@@ -184,6 +184,12 @@ func (t Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 				restore.Name))
 	case velero.RestorePhaseFailedValidation:
 		reasons = restore.Status.ValidationErrors
+		reasons = append(
+			reasons,
+			fmt.Sprintf(
+				"Restore: %s/%s validation failed.",
+				restore.Namespace,
+				restore.Name))
 		completed = true
 	}
 
