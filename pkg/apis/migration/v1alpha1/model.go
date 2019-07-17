@@ -6,17 +6,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 )
 
 //
 // Convenience functions for managing the object model.
 ///
 
-// List MigPlans
+// List `open` MigPlans
 // Returns and empty list when none found.
 func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 	list := MigPlanList{}
-	err := client.List(context.TODO(), nil, &list)
+	options := k8sclient.MatchingField(ClosedIndexField, strconv.FormatBool(false))
+	err := client.List(context.TODO(), options, &list)
 	if err != nil {
 		return nil, err
 	}

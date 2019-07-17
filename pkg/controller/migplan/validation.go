@@ -2,13 +2,12 @@ package migplan
 
 import (
 	"context"
+	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"reflect"
-
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
 )
 
 // Types
@@ -23,6 +22,7 @@ const (
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
+	PlanConflict                   = "PlanConflict"
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
 	StorageEnsured                 = "StorageEnsured"
@@ -45,6 +45,7 @@ const (
 	NotDistinct = "NotDistinct"
 	NotDone     = "NotDone"
 	Done        = "Done"
+	Conflict    = "Conflict"
 )
 
 // Statuses
@@ -66,6 +67,7 @@ const (
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
+	PlanConflictMessage                   = "The plan is in conflict with []."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
 	StorageEnsuredMessage                 = "The storage resources have been created."
@@ -106,6 +108,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Conflict
+	err = r.validateConflict(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -396,6 +405,36 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 			Items:    notFound,
 		})
 		return nil
+	}
+
+	return nil
+}
+
+// Validate the plan does not conflict with another plan.
+func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
+	plans, err := migapi.ListPlans(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	list := []string{}
+	for _, p := range plans {
+		if plan.UID == p.UID {
+			continue
+		}
+		if plan.HasConflict(&p) {
+			list = append(list, p.Name)
+		}
+	}
+	if len(list) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PlanConflict,
+			Status:   True,
+			Reason:   Conflict,
+			Category: Error,
+			Message:  PlanConflictMessage,
+			Items:    list,
+		})
 	}
 
 	return nil

@@ -383,7 +383,6 @@ func TestConditions_HasConditionCategoryStaging(t *testing.T) {
 	g.Expect(conditions.HasConditionCategory(Critical)).To(gomega.BeFalse())
 }
 
-
 func TestConditions_AppendingItems(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 

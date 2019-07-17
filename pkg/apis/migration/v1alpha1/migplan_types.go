@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
@@ -31,6 +32,11 @@ import (
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sort"
+)
+
+// Cache Indexes.
+const (
+	ClosedIndexField = "closed"
 )
 
 // MigPlanSpec defines the desired state of MigPlan
@@ -579,6 +585,30 @@ func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) 
 			Namespace: VeleroNamespace,
 			Name:      "cloud-credentials",
 		})
+}
+
+// Get whether the plan conflicts with another.
+// Plans conflict when:
+//   - Have any of the clusters in common.
+//   - Hand any of the namespaces in common.
+func (r *MigPlan) HasConflict(plan *MigPlan) bool {
+	if !migref.RefEquals(r.Spec.SrcMigClusterRef, plan.Spec.SrcMigClusterRef) &&
+		!migref.RefEquals(r.Spec.DestMigClusterRef, plan.Spec.DestMigClusterRef) &&
+		!migref.RefEquals(r.Spec.SrcMigClusterRef, plan.Spec.DestMigClusterRef) &&
+		!migref.RefEquals(r.Spec.DestMigClusterRef, plan.Spec.SrcMigClusterRef) {
+		return false
+	}
+	nsMap := map[string]bool{}
+	for _, name := range plan.Spec.Namespaces {
+		nsMap[name] = true
+	}
+	for _, name := range r.Spec.Namespaces {
+		if _, found := nsMap[name]; found {
+			return true
+		}
+	}
+
+	return false
 }
 
 //
