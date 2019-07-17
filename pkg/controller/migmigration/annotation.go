@@ -60,7 +60,7 @@ func (t *Task) annotateStageResources() error {
 		return err
 	}
 	// PV & PVCs
-	err = t.annotatePvs(client)
+	err = t.annotatePVs(client)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -70,8 +70,8 @@ func (t *Task) annotateStageResources() error {
 }
 
 // Add annotations and labels to PVCs.
-// The PvActionAnnotation annotation is added to PVC as needed by the velero plugin.
-// The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
+// The PvActionAnnotation annotation is added to PVCs as needed by the velero plugin.
+// The IncludedInStageBackupLabel label is added to PVCs and is referenced
 // by the velero.Backup label selector.
 func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, error) {
 	volumes := []string{}
@@ -123,7 +123,7 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 
 // Add annotations and labels to Pods.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
-// The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
+// The IncludedInStageBackupLabel label is added to Pods and is referenced
 // by the velero.Backup label selector.
 func (t *Task) annotatePods(client k8sclient.Client) error {
 	for _, ns := range t.namespaces() {
@@ -185,10 +185,10 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 }
 
 // Add annotations and labels to PVs.
-// The PvActionAnnotation annotation is added to PVC as needed by the velero plugin.
-// The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
+// The PvActionAnnotation annotation is added to PVs as needed by the velero plugin.
+// The IncludedInStageBackupLabel label is added to PVs and is referenced
 // by the velero.Backup label selector.
-func (t *Task) annotatePvs(client k8sclient.Client) error {
+func (t *Task) annotatePVs(client k8sclient.Client) error {
 	pvs := t.getPVs()
 	for _, pv := range pvs.List {
 		resource := corev1.PersistentVolume{}
@@ -350,26 +350,24 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 		IncludedInStageBackupLabel: t.UID(),
 	}
 	options := k8sclient.MatchingLabels(labels)
-	pvcList := corev1.PersistentVolumeClaimList{}
-	err := client.List(context.TODO(), options, &pvcList)
+	pvList := corev1.PersistentVolumeList{}
+	err := client.List(context.TODO(), options, &pvList)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	for _, pvc := range pvcList.Items {
-		delete(pvc.Labels, IncludedInStageBackupLabel)
-		delete(pvc.Annotations, PvActionAnnotation)
-		err = client.Update(context.TODO(), &pvc)
+	for _, pv := range pvList.Items {
+		delete(pv.Labels, IncludedInStageBackupLabel)
+		delete(pv.Annotations, PvActionAnnotation)
+		err = client.Update(context.TODO(), &pv)
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
 		log.Info(
-			"PVC annotations/labels removed.",
-			"ns",
-			pvc.Namespace,
+			"PV annotations/labels removed.",
 			"name",
-			pvc.Name)
+			pv.Name)
 	}
 
 	return nil
