@@ -38,6 +38,36 @@ const (
 	Completed                     = "Completed"
 )
 
+// Steps
+var Step = []string{
+	Created,
+	Started,
+	Prepare,
+	EnsureInitialBackup,
+	InitialBackupCreated,
+	InitialBackupFailed,
+	AnnotateResources,
+	EnsureStagePods,
+	StagePodsCreated,
+	RestartRestic,
+	ResticRestarted,
+	QuiesceApplications,
+	EnsureStageBackup,
+	StageBackupCreated,
+	StageBackupFailed,
+	EnsureInitialBackupReplicated,
+	EnsureStageBackupReplicated,
+	EnsureStageRestore,
+	StageRestoreCreated,
+	StageRestoreFailed,
+	EnsureFinalRestore,
+	FinalRestoreCreated,
+	FinalRestoreFailed,
+	EnsureStagePodsDeleted,
+	EnsureAnnotationsDeleted,
+	Completed,
+}
+
 // End phases.
 var EndPhase = map[string]bool{
 	InitialBackupFailed: true,
@@ -485,4 +515,18 @@ func (t *Task) addErrors(errors []string) {
 	for _, error := range errors {
 		t.Errors = append(t.Errors, error)
 	}
+}
+
+// Get the current step.
+// Returns: name, n, total.
+func (t *Task) getStep() (string, int, int) {
+	n := -1
+	total := len(Step)
+	for i, step := range Step {
+		if step == t.Phase {
+			n = i + 1
+		}
+	}
+
+	return t.Phase, n, total
 }

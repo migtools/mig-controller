@@ -17,6 +17,7 @@ limitations under the License.
 package migmigration
 
 import (
+	"fmt"
 	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -115,12 +116,14 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	}
 
 	// Running
+	step, n, total := task.getStep()
+	message := fmt.Sprintf(RunningMessage, n, total)
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,
-		Reason:   task.Phase,
+		Reason:   step,
 		Category: Advisory,
-		Message:  RunningMessage,
+		Message:  message,
 	})
 
 	return task.Requeue, nil
