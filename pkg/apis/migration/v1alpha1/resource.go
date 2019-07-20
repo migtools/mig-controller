@@ -6,6 +6,7 @@ import (
 
 const (
 	TouchAnnotation = "touch"
+	Finalizer       = "openshift.io/migration"
 )
 
 // Migration application CR.
@@ -32,7 +33,8 @@ type MigResource interface {
 func (r *MigPlan) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
-		key: value,
+		PartOfLabel: Application,
+		key:         value,
 	}
 }
 
@@ -71,7 +73,8 @@ func (r *MigPlan) Touch() {
 func (r *MigStorage) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
-		key: value,
+		PartOfLabel: Application,
+		key:         value,
 	}
 }
 
@@ -110,7 +113,8 @@ func (r *MigStorage) Touch() {
 func (r *MigCluster) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
-		key: value,
+		PartOfLabel: Application,
+		key:         value,
 	}
 }
 
@@ -149,7 +153,8 @@ func (r *MigCluster) Touch() {
 func (r *MigMigration) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
-		key: value,
+		PartOfLabel: Application,
+		key:         value,
 	}
 }
 

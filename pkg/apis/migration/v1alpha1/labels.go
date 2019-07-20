@@ -6,13 +6,11 @@ import (
 	"strings"
 )
 
-// All known correlation labels.
-var KnownLabels = map[string]bool{
-	labelKey(MigPlan{}):      true,
-	labelKey(MigCluster{}):   true,
-	labelKey(MigStorage{}):   true,
-	labelKey(MigMigration{}): true,
-}
+// Labels
+const (
+	PartOfLabel = "app.kubernetes.io/part-of" // = Application
+	Application = "migration"
+)
 
 // Build label (key, value) used to correlate CRs.
 // Format: <kind>: <uid>.  The <uid> should be the ObjectMeta.UID

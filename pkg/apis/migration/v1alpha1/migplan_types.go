@@ -80,6 +80,38 @@ func init() {
 	SchemeBuilder.Register(&MigPlan{}, &MigPlanList{})
 }
 
+// Ensure finalizer.
+func (r *MigPlan) EnsureFinalizer() bool {
+	if r.Finalizers == nil {
+		r.Finalizers = []string{}
+	}
+	for _, f := range r.Finalizers {
+		if f == Finalizer {
+			return false
+		}
+	}
+	r.Finalizers = append(r.Finalizers, Finalizer)
+	return true
+}
+
+// Delete finalizer.
+func (r *MigPlan) DeleteFinalizer() bool {
+	if r.Finalizers == nil {
+		r.Finalizers = []string{}
+	}
+	deleted := false
+	kept := []string{}
+	for _, f := range r.Finalizers {
+		if f == Finalizer {
+			deleted = true
+			continue
+		}
+		kept = append(kept, f)
+	}
+	r.Finalizers = kept
+	return deleted
+}
+
 // GetSourceCluster - Get the referenced source cluster.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {

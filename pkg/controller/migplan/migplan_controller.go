@@ -150,7 +150,28 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// If plan is closed, ensure resource cleanup
+	// Finalizer
+	added := plan.EnsureFinalizer()
+	if added {
+		err = r.Update(context.TODO(), plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+	}
+
+	// Plan deleted.
+	if plan.DeletionTimestamp != nil {
+		retry := false
+		err := r.planDeleted(plan)
+		if err != nil {
+			log.Trace(err)
+			retry = r.retryFinalizer(plan)
+		}
+		return reconcile.Result{Requeue: retry}, nil
+	}
+
+	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
 		log.Trace(err)
@@ -219,4 +240,108 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Done
 	return reconcile.Result{}, nil
+}
+
+// The plan has been deleted.
+// Delete all `remote` resources created by the plan
+// on all clusters.
+func (r *ReconcileMigPlan) planDeleted(plan *migapi.MigPlan) error {
+	var err error
+	clusters, err := migapi.ListClusters(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, cluster := range clusters {
+		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
+		if err != nil {
+			log.Trace(err)
+		}
+	}
+	plan.Touch()
+	plan.DeleteFinalizer()
+	err = r.Update(context.TODO(), plan)
+	if err != nil {
+		log.Trace(err)
+	}
+
+	return err
+}
+
+// Get whether the finalizer may retry.
+func (r *ReconcileMigPlan) retryFinalizer(plan *migapi.MigPlan) bool {
+	retries := 3
+	key := "retry-finalizer"
+	if plan.Annotations == nil {
+		plan.Annotations = map[string]string{}
+	}
+	n := 0
+	if v, found := plan.Annotations[key]; found {
+		n, _ = strconv.Atoi(v)
+	} else {
+		n = retries
+	}
+	if n > 0 {
+		n--
+		plan.Annotations[key] = strconv.Itoa(n)
+	} else {
+		plan.DeleteFinalizer()
+	}
+	err := r.Update(context.TODO(), plan)
+	if err != nil {
+		log.Trace(err)
+	}
+
+	return n > 0
+}
+
+// Detect that a plan is been closed and ensure all its referenced
+// resources have been cleaned up.
+func (r ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
+	closed := plan.Spec.Closed
+	if !closed || plan.Status.HasCondition(Closed) {
+		return closed, nil
+	}
+
+	plan.Touch()
+	plan.Status.SetReady(false, ReadyMessage)
+	err := r.Update(context.TODO(), plan)
+	if err != nil {
+		return closed, err
+	}
+
+	err = r.ensureClosed(plan)
+	return closed, err
+}
+
+// Ensure that resources managed by the plan have been cleaned up.
+func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
+	clusters, err := migapi.ListClusters(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, cluster := range clusters {
+		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+	plan.Status.DeleteCondition(RegistriesEnsured)
+	plan.Status.SetCondition(migapi.Condition{
+		Type:     Closed,
+		Status:   True,
+		Category: Critical,
+		Message:  ClosedMessage,
+	})
+	// Apply changes.
+	plan.Touch()
+	err = r.Update(context.TODO(), plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	return nil
 }
