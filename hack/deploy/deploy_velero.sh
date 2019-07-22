@@ -21,7 +21,7 @@ echo
 echo "===================================================="
 echo "Adding privileged scc to velero service account"
 echo "===================================================="
-oc adm policy add-scc-to-user privileged system:serviceaccount:velero:velero
+oc adm policy add-scc-to-user privileged system:serviceaccount:mig:velero
 
 echo
 echo "=========="

@@ -621,7 +621,7 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 const (
 	PvMoveAction    = "move"
 	PvCopyAction    = "copy"
-	VeleroNamespace = "velero"
+	VeleroNamespace = "mig"
 )
 
 // Name - The PV name.

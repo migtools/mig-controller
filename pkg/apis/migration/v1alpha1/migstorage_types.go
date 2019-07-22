@@ -129,7 +129,7 @@ func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 	location := &velero.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       r.GetCorrelationLabels(),
-			Namespace:    "velero",
+			Namespace:    VeleroNamespace,
 			GenerateName: r.Name + "-",
 		},
 		Spec: velero.BackupStorageLocationSpec{
@@ -204,7 +204,7 @@ func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
 	location := &velero.VolumeSnapshotLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       r.GetCorrelationLabels(),
-			Namespace:    "velero",
+			Namespace:    VeleroNamespace,
 			GenerateName: r.Name + "-",
 		},
 		Spec: velero.VolumeSnapshotLocationSpec{
@@ -250,7 +250,7 @@ func (r *MigStorage) BuildCloudSecret(client k8sclient.Client) (*kapi.Secret, er
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
-			Namespace: "velero",
+			Namespace: VeleroNamespace,
 			Name:      "cloud-credentials",
 		},
 	}
