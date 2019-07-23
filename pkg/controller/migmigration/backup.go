@@ -6,6 +6,7 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -315,6 +316,15 @@ func findPVStorageClass(pvList migapi.PersistentVolumes, pvName string) string {
 	for _, pv := range pvList.List {
 		if pv.Name == pvName {
 			return pv.Selection.StorageClass
+		}
+	}
+	return ""
+}
+
+func findPVAccessMode(pvList migapi.PersistentVolumes, pvName string) corev1.PersistentVolumeAccessMode {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Selection.AccessMode
 		}
 	}
 	return ""

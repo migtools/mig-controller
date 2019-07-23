@@ -68,7 +68,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		if !found {
 			continue
 		}
-		selectedStorageClass, err := r.getDestStorageClass(pv, client, plan, srcStorageClasses, destStorageClasses)
+		selectedStorageClass, err := r.getDestStorageClass(pv, claim, plan, srcStorageClasses, destStorageClasses)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -131,6 +131,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []strin
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, list)
 		if err != nil {
+			log.Trace(err)
 			return nil, err
 		}
 		for _, pod := range list.Items {
@@ -139,10 +140,23 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []strin
 				if claimRef == nil {
 					continue
 				}
+				pvc := core.PersistentVolumeClaim{}
+				// Get PVC
+				ref := types.NamespacedName{
+					Namespace: pod.Namespace,
+					Name:      claimRef.ClaimName,
+				}
+				err := client.Get(context.TODO(), ref, &pvc)
+				if err != nil {
+					log.Trace(err)
+					return nil, err
+				}
+
 				claims = append(
 					claims, migapi.PVC{
-						Namespace: pod.Namespace,
-						Name:      claimRef.ClaimName,
+						Namespace:   pod.Namespace,
+						Name:        claimRef.ClaimName,
+						AccessModes: pvc.Spec.AccessModes,
 					})
 			}
 		}
@@ -173,7 +187,7 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []strin
 
 // Determine the initial value for the destination storage class.
 func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
-	srcClient k8sclient.Client,
+	claim migapi.PVC,
 	plan *migapi.MigPlan,
 	srcStorageClasses []migapi.StorageClass,
 	destStorageClasses []migapi.StorageClass) (string, error) {
@@ -192,20 +206,9 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 		srcProvisioner == "gluster.org/glusterblock" ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.NFS != nil {
-		pvc := core.PersistentVolumeClaim{}
-		// Get PVC
-		ref := types.NamespacedName{
-			Namespace: pv.Spec.ClaimRef.Namespace,
-			Name:      pv.Spec.ClaimRef.Name,
-		}
-		err := srcClient.Get(context.TODO(), ref, &pvc)
-		if err != nil {
-			log.Trace(err)
-			return "", err
-		}
-		if isRWX(pvc.Spec.AccessModes) {
+		if isRWX(claim.AccessModes) {
 			targetProvisioner = "cephfs.csi.ceph.com"
-		} else if isRWO(pvc.Spec.AccessModes) {
+		} else if isRWO(claim.AccessModes) {
 			targetProvisioner = "rbd.csi.ceph.com"
 		} else {
 			targetProvisioner = "cephfs.csi.ceph.com"

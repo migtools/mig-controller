@@ -74,10 +74,12 @@ type MigClusterList struct {
 // Name - the storage class name
 // Provisioner - the dynamic provisioner for the storage class
 // Default - whether or not this storage class is the default
+// AccessModes - access modes supported by the dynamic provisioner
 type StorageClass struct {
-	Name        string `json:"name,omitempty"`
-	Provisioner string `json:"provisioner,omitempty"`
-	Default     bool   `json:"default,omitempty"`
+	Name        string                            `json:"name,omitempty"`
+	Provisioner string                            `json:"provisioner,omitempty"`
+	Default     bool                              `json:"default,omitempty"`
+	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 }
 
 func init() {

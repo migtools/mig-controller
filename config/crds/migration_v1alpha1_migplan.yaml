@@ -46,9 +46,20 @@ spec:
                   name:
                     type: string
                   pvc:
+                    properties:
+                      accessModes:
+                        items:
+                          type: string
+                        type: array
+                      name:
+                        type: string
+                      namespace:
+                        type: string
                     type: object
                   selection:
                     properties:
+                      accessMode:
+                        type: string
                       action:
                         type: string
                       storageClass:

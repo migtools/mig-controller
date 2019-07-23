@@ -37,6 +37,10 @@ spec:
             storageClasses:
               items:
                 properties:
+                  accessModes:
+                    items:
+                      type: string
+                    type: array
                   default:
                     type: boolean
                   name:
