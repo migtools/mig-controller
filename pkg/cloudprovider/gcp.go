@@ -10,7 +10,7 @@ type GCPProvider struct {
 }
 
 func (p *GCPProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
-	bsl.Spec.Provider = Azure
+	bsl.Spec.Provider = GCP
 }
 
 func (p *GCPProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
