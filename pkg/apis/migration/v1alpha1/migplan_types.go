@@ -201,11 +201,18 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 // Registry
 //
 
+// Registry label for controller-created migration registry resoruces
+const (
+	MigrationRegistryLabel = "migration-registry"
+)
+
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
+	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       r.GetCorrelationLabels(),
+			Labels:       labels,
 			GenerateName: r.GetName() + "-registry-",
 			Namespace:    VeleroNamespace,
 		},
@@ -234,6 +241,7 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 func (r *MigPlan) GetRegistrySecret(client k8sclient.Client) (*kapi.Secret, error) {
 	list := kapi.SecretList{}
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -257,6 +265,7 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 // Build a Registry ImageStream as desired for the source cluster.
 func (r *MigPlan) BuildRegistryImageStream(name string) (*imagev1.ImageStream, error) {
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
 	imagestream := &imagev1.ImageStream{
 		ObjectMeta: metav1.ObjectMeta{
@@ -296,6 +305,7 @@ func (r *MigPlan) UpdateRegistryImageStream(imagestream *imagev1.ImageStream) er
 func (r *MigPlan) GetRegistryImageStream(client k8sclient.Client) (*imagev1.ImageStream, error) {
 	list := imagev1.ImageStreamList{}
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -328,6 +338,7 @@ func (r *MigPlan) EqualsRegistryImageStream(a, b *imagev1.ImageStream) bool {
 // Build a Registry DeploymentConfig as desired for the source cluster.
 func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*appsv1.DeploymentConfig, error) {
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
 	deploymentconfig := &appsv1.DeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -435,6 +446,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 func (r *MigPlan) GetRegistryDC(client k8sclient.Client) (*appsv1.DeploymentConfig, error) {
 	list := appsv1.DeploymentConfigList{}
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -479,6 +491,7 @@ func (r *MigPlan) EqualsRegistryDC(a, b *appsv1.DeploymentConfig) bool {
 // Build a Registry Service as desired for the specified cluster.
 func (r *MigPlan) BuildRegistryService(name string) (*kapi.Service, error) {
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
 	service := &kapi.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -514,6 +527,7 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) erro
 func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, error) {
 	list := kapi.ServiceList{}
 	labels := r.GetCorrelationLabels()
+	labels[MigrationRegistryLabel] = string(r.UID)
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
