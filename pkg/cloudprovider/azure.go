@@ -17,7 +17,7 @@ func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 }
 
 func (p *AzureProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
-	vsl.Spec.Provider = AWS
+	vsl.Spec.Provider = Azure
 }
 
 func (p *AzureProvider) UpdateCloudSecret(ecret, cloudSecret *kapi.Secret) {
