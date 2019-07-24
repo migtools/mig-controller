@@ -3,7 +3,6 @@ package migplan
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -80,44 +79,6 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	}
 
 	return err
-}
-
-// Delete associated storage.
-func (r ReconcileMigPlan) ensureStorageDeleted(plan *migapi.MigPlan) error {
-	clusters, err := migapi.ListClusters(r)
-	if err != nil {
-		return err
-	}
-	for _, cluster := range clusters {
-		client, err := cluster.GetClient(r)
-		if err != nil {
-			return err
-		}
-		// BSL
-		bsl, err := plan.GetBSL(client)
-		if err != nil {
-			return err
-		}
-		if bsl != nil {
-			err := client.Delete(context.TODO(), bsl)
-			if err != nil && !errors.IsNotFound(err) {
-				return err
-			}
-		}
-		// VSL
-		vsl, err := plan.GetVSL(client)
-		if err != nil {
-			return err
-		}
-		if vsl != nil {
-			err := client.Delete(context.TODO(), vsl)
-			if err != nil && !errors.IsNotFound(err) {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 //

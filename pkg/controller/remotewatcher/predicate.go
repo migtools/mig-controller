@@ -10,13 +10,8 @@ import (
 )
 
 func hasCorrelationLabel(labels map[string]string) bool {
-	for label := range labels {
-		_, found := migapi.KnownLabels[label]
-		if found {
-			return true
-		}
-	}
-	return false
+	_, found := labels[migapi.PartOfLabel]
+	return found
 }
 
 // Secret

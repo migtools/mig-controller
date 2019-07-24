@@ -20,7 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	ocapi "github.com/openshift/api/apps/v1"
+	imgapi "github.com/openshift/api/image/v1"
+	"k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -67,6 +72,38 @@ func init() {
 	SchemeBuilder.Register(&MigCluster{}, &MigClusterList{})
 }
 
+// Ensure finalizer.
+func (r *MigCluster) EnsureFinalizer() bool {
+	if r.Finalizers == nil {
+		r.Finalizers = []string{}
+	}
+	for _, f := range r.Finalizers {
+		if f == Finalizer {
+			return false
+		}
+	}
+	r.Finalizers = append(r.Finalizers, Finalizer)
+	return true
+}
+
+// Delete finalizer.
+func (r *MigCluster) DeleteFinalizer() bool {
+	if r.Finalizers == nil {
+		r.Finalizers = []string{}
+	}
+	deleted := false
+	kept := []string{}
+	for _, f := range r.Finalizers {
+		if f == Finalizer {
+			deleted = true
+			continue
+		}
+		kept = append(kept, f)
+	}
+	r.Finalizers = kept
+	return deleted
+}
+
 // Get the service account secret.
 // Returns `nil` when the reference cannot be resolved.
 func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Secret, error) {
@@ -96,7 +133,7 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
 		return nil, err
 	}
 
-	client, err := buildClient(restConfig)
+	client, err := m.buildClient(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -159,14 +196,14 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 
 	// Build insecure rest.Config from gathered data
 	// TODO: get caBundle from MigCluster and use that to construct rest.Config
-	restConfig := buildRestConfig(clusterURL, saToken)
+	restConfig := m.buildRestConfig(clusterURL, saToken)
 
 	return restConfig, nil
 }
 
 // buildRestConfig creates an insecure REST config from a clusterURL and bearerToken
 // TODO: add support for creating a secure rest.Config
-func buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
+func (m *MigCluster) buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
 	clusterConfig := &rest.Config{
 		Host:        clusterURL,
 		BearerToken: bearerToken,
@@ -177,10 +214,155 @@ func buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
 
 // buildClient builds a controller-runtime client for interacting with
 // a K8s cluster.
-func buildClient(config *rest.Config) (k8sclient.Client, error) {
+func (m *MigCluster) buildClient(config *rest.Config) (k8sclient.Client, error) {
 	c, err := k8sclient.New(config, k8sclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// Delete resources on the cluster by label.
+func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string) error {
+	client, err := m.GetClient(client)
+	if err != nil {
+		return err
+	}
+	if labels == nil {
+		labels = map[string]string{PartOfLabel: Application}
+	}
+
+	options := k8sclient.MatchingLabels(labels)
+
+	// Deployment
+	dList := v1.DeploymentList{}
+	err = client.List(context.TODO(), options, &dList)
+	if err != nil {
+		return err
+	}
+	for _, r := range dList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// DeploymentConfig
+	dcList := ocapi.DeploymentConfigList{}
+	err = client.List(context.TODO(), options, &dcList)
+	if err != nil {
+		return err
+	}
+	for _, r := range dcList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// Service
+	svList := kapi.ServiceList{}
+	err = client.List(context.TODO(), options, &svList)
+	if err != nil {
+		return err
+	}
+	for _, r := range svList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// Pod
+	pList := kapi.PodList{}
+	err = client.List(context.TODO(), options, &pList)
+	if err != nil {
+		return err
+	}
+	for _, r := range pList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// Secret
+	sList := kapi.SecretList{}
+	err = client.List(context.TODO(), options, &sList)
+	if err != nil {
+		return err
+	}
+	for _, r := range sList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// ImageStream
+	iList := imgapi.ImageStreamList{}
+	err = client.List(context.TODO(), options, &iList)
+	if err != nil {
+		return err
+	}
+	for _, r := range iList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// Backup
+	bList := velero.BackupList{}
+	err = client.List(context.TODO(), options, &bList)
+	if err != nil {
+		return err
+	}
+	for _, r := range bList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// Restore
+	rList := velero.RestoreList{}
+	err = client.List(context.TODO(), options, &rList)
+	if err != nil {
+		return err
+	}
+	for _, r := range rList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// BSL
+	bslList := velero.BackupStorageLocationList{}
+	err = client.List(context.TODO(), options, &bslList)
+	if err != nil {
+		return err
+	}
+	for _, r := range bslList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// VSL
+	vslList := velero.VolumeSnapshotLocationList{}
+	err = client.List(context.TODO(), options, &vslList)
+	if err != nil {
+		return err
+	}
+	for _, r := range vslList.Items {
+		err = client.Delete(context.TODO(), &r)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
 }

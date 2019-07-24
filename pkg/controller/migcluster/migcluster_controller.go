@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/fusor/mig-controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/types"
+	"strconv"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -135,6 +136,27 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Finalizer
+	added := cluster.EnsureFinalizer()
+	if added {
+		err = r.Update(context.TODO(), cluster)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+	}
+
+	// Cluster deleted.
+	if cluster.DeletionTimestamp != nil {
+		retry := false
+		err := r.clusterDeleted(cluster)
+		if err != nil {
+			log.Trace(err)
+			retry = r.retryFinalizer(cluster)
+		}
+		return reconcile.Result{Requeue: retry}, nil
+	}
+
 	// Begin staging conditions.
 	cluster.Status.BeginStagingConditions()
 
@@ -214,4 +236,50 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	log.Info("Remote watch started.", "cluster", cluster.Name)
 
 	return nil
+}
+
+// The cluster has been deleted.
+// Delete all `remote` resources created by the application
+// on the deleted cluster.
+func (r *ReconcileMigCluster) clusterDeleted(cluster *migapi.MigCluster) error {
+	var err error
+	err = cluster.DeleteResources(r, nil)
+	if err != nil {
+		log.Trace(err)
+	}
+	cluster.Touch()
+	cluster.DeleteFinalizer()
+	err = r.Update(context.TODO(), cluster)
+	if err != nil {
+		log.Trace(err)
+	}
+
+	return err
+}
+
+// Get whether the finalizer may retry.
+func (r *ReconcileMigCluster) retryFinalizer(cluster *migapi.MigCluster) bool {
+	retries := 3
+	key := "retry-finalizer"
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	n := 0
+	if v, found := cluster.Annotations[key]; found {
+		n, _ = strconv.Atoi(v)
+	} else {
+		n = retries
+	}
+	if n > 0 {
+		n--
+		cluster.Annotations[key] = strconv.Itoa(n)
+	} else {
+		cluster.DeleteFinalizer()
+	}
+	err := r.Update(context.TODO(), cluster)
+	if err != nil {
+		log.Trace(err)
+	}
+
+	return n > 0
 }

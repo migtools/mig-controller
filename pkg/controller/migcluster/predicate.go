@@ -31,7 +31,8 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return true
 	}
-	changed := !reflect.DeepEqual(old.Spec, new.Spec)
+	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
+		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
 	if changed {
 		r.unmapRefs(old)
 		r.mapRefs(new)
