@@ -127,7 +127,6 @@ func (r PlanStorage) ensureBSL() error {
 
 // Create the velero VolumeSnapshotLocation has been created.
 func (r PlanStorage) ensureVSL() error {
-	r.storage.DefaultVSLSettings()
 	newVSL := r.storage.BuildVSL()
 	newVSL.Labels = r.plan.GetCorrelationLabels()
 	foundVSL, err := r.plan.GetVSL(r.targetClient)
@@ -158,12 +157,12 @@ func (r PlanStorage) ensureVSL() error {
 
 // Create the velero BSL cloud secret has been created.
 func (r PlanStorage) ensureCloudSecret() error {
-	newSecret, err := r.storage.BuildCloudSecret(r)
-	newSecret.Labels = r.plan.GetCorrelationLabels()
+	newSecret, err := r.storage.BuildBSLCloudSecret(r.Client)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
+	newSecret.Labels = r.plan.GetCorrelationLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient)
 	if err != nil {
 		log.Trace(err)
@@ -180,7 +179,7 @@ func (r PlanStorage) ensureCloudSecret() error {
 	if r.storage.EqualsCloudSecret(foundSecret, newSecret) {
 		return nil
 	}
-	r.storage.UpdateCloudSecret(r, foundSecret)
+	r.storage.UpdateBSLCloudSecret(r.Client, foundSecret)
 	err = r.targetClient.Update(context.TODO(), foundSecret)
 	if err != nil {
 		log.Trace(err)
