@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
 	kapi "k8s.io/api/core/v1"
@@ -26,21 +26,15 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Cloud Secret Format
-const AwsCloudSecretContent = `
-[default]
-aws_access_key_id=%s
-aws_secret_access_key=%s
-`
-
-// Cred Secret Fields
+// Cloud Providers.
 const (
-	AwsAccessKeyId     = "aws-access-key-id"
-	AwsSecretAccessKey = "aws-secret-access-key"
+	AWS   = pvdr.AWS
+	Azure = pvdr.Azure
+	GCP   = pvdr.GCP
 )
 
 // Error
-var CredSecretNotFound = errors.New("Cred secret not found.")
+var CredSecretNotFound = errors.New("Credentials secret not found.")
 
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
@@ -103,9 +97,97 @@ func init() {
 	SchemeBuilder.Register(&MigStorage{}, &MigStorageList{})
 }
 
-//
-// BSL
-//
+// Build BSL.
+func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
+	bsl := &velero.BackupStorageLocation{
+		Spec: velero.BackupStorageLocationSpec{},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       r.GetCorrelationLabels(),
+			Namespace:    VeleroNamespace,
+			GenerateName: r.Name + "-",
+		},
+	}
+
+	r.UpdateBSL(bsl)
+	return bsl
+}
+
+// Update BSL.
+func (r *MigStorage) UpdateBSL(bsl *velero.BackupStorageLocation) {
+	provider := r.GetBackupStorageProvider()
+	provider.UpdateBSL(bsl)
+}
+
+// Build VSL.
+func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
+	vsl := &velero.VolumeSnapshotLocation{
+		Spec: velero.VolumeSnapshotLocationSpec{},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:       r.GetCorrelationLabels(),
+			Namespace:    VeleroNamespace,
+			GenerateName: r.Name + "-",
+		},
+	}
+
+	r.UpdateVSL(vsl)
+	return vsl
+}
+
+// Update VSL.
+func (r *MigStorage) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
+	provider := r.GetVolumeSnapshotProvider()
+	provider.UpdateVSL(vsl)
+}
+
+// Build backup cloud-secret.
+func (r *MigStorage) BuildBSLCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	secret := &kapi.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    r.GetCorrelationLabels(),
+			Namespace: VeleroNamespace,
+			Name:      "cloud-credentials",
+		},
+	}
+
+	err := r.UpdateBSLCloudSecret(client, secret)
+	return secret, err
+}
+
+// Update backup cloud-secret.
+func (r *MigStorage) UpdateBSLCloudSecret(client k8sclient.Client, cloudSecret *kapi.Secret) error {
+	secret, err := r.GetBackupStorageCredSecret(client)
+	if err != nil {
+		return err
+	}
+	provider := r.GetBackupStorageProvider()
+	provider.UpdateCloudSecret(secret, cloudSecret)
+	return nil
+}
+
+// Build snapshot cloud-secret.
+func (r *MigStorage) BuildVSLCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	secret := &kapi.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    r.GetCorrelationLabels(),
+			Namespace: VeleroNamespace,
+			Name:      "cloud-credentials",
+		},
+	}
+
+	err := r.UpdateVSLCloudSecret(client, secret)
+	return secret, err
+}
+
+// Update snapshot cloud-secret.
+func (r *MigStorage) UpdateVSLCloudSecret(client k8sclient.Client, cloudSecret *kapi.Secret) error {
+	secret, err := r.GetVolumeSnapshotCredSecret(client)
+	if err != nil {
+		return err
+	}
+	provider := r.GetBackupStorageProvider()
+	provider.UpdateCloudSecret(secret, cloudSecret)
+	return nil
+}
 
 // Determine if two BSLs are equal based on relevant fields in the Spec.
 // Returns `true` when equal.
@@ -124,166 +206,120 @@ func (r *MigStorage) EqualsVSL(a, b *velero.VolumeSnapshotLocation) bool {
 		reflect.DeepEqual(a.Spec.Config, b.Spec.Config)
 }
 
-// Build a BSL.
-func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
-	location := &velero.BackupStorageLocation{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:       r.GetCorrelationLabels(),
-			Namespace:    VeleroNamespace,
-			GenerateName: r.Name + "-",
-		},
-		Spec: velero.BackupStorageLocationSpec{
-			Provider: r.Spec.BackupStorageProvider,
-		},
-	}
-	r.UpdateBSL(location)
-	return location
-}
-
-// Update a BSL.
-func (r *MigStorage) UpdateBSL(location *velero.BackupStorageLocation) {
-	location.Spec.Provider = r.Spec.BackupStorageProvider
-	switch r.Spec.BackupStorageProvider {
-	case "aws":
-		r.updateAwsBSL(location)
-	case "azure":
-	case "gcp":
-	case "":
-	}
-}
-
-// Update a BSL for the AWS provider.
-func (r *MigStorage) updateAwsBSL(location *velero.BackupStorageLocation) {
-	config := r.Spec.BackupStorageConfig
-	location.Spec.StorageType = velero.StorageType{
-		ObjectStorage: &velero.ObjectStorageLocation{
-			Bucket: config.AwsBucketName,
-			Prefix: "velero",
-		},
-	}
-	location.Spec.Config = map[string]string{
-		"s3ForcePathStyle": fmt.Sprintf("%t", config.AwsS3ForcePathStyle),
-		"region":           config.AwsRegion,
-	}
-	if config.AwsS3URL != "" {
-		location.Spec.Config["s3Url"] = config.AwsS3URL
-	}
-	if config.AwsPublicURL != "" {
-		location.Spec.Config["publicUrl"] = config.AwsPublicURL
-	}
-	if config.AwsKmsKeyID != "" {
-		location.Spec.Config["kmsKeyId"] = config.AwsKmsKeyID
-	}
-	if config.AwsSignatureVersion != "" {
-		location.Spec.Config["signatureVersion"] = config.AwsSignatureVersion
-	}
-}
-
-//
-// VSL
-//
-
-// Default the VSL settings (when not defined) using the BSL settings.
-func (r *MigStorage) DefaultVSLSettings() {
-	if r.Spec.VolumeSnapshotProvider != "" {
-		return
-	}
-	r.Spec.VolumeSnapshotProvider = r.Spec.BackupStorageProvider
-	r.Spec.VolumeSnapshotConfig.CredsSecretRef = r.Spec.BackupStorageConfig.CredsSecretRef
-	switch r.Spec.BackupStorageProvider {
-	case "aws":
-		r.Spec.VolumeSnapshotConfig.AwsRegion = r.Spec.BackupStorageConfig.AwsRegion
-	case "azure":
-	case "gcp":
-	case "":
-	}
-}
-
-// Build a VSL.
-func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
-	location := &velero.VolumeSnapshotLocation{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:       r.GetCorrelationLabels(),
-			Namespace:    VeleroNamespace,
-			GenerateName: r.Name + "-",
-		},
-		Spec: velero.VolumeSnapshotLocationSpec{
-			Provider: r.Spec.VolumeSnapshotProvider,
-		},
-	}
-	r.UpdateVSL(location)
-	return location
-}
-
-// Update a VSL.
-func (r *MigStorage) UpdateVSL(location *velero.VolumeSnapshotLocation) {
-	location.Spec.Provider = r.Spec.VolumeSnapshotProvider
-	switch r.Spec.VolumeSnapshotProvider {
-	case "aws":
-		r.updateAwsVSL(location)
-	case "azure":
-	case "gcp":
-	case "":
-	}
-}
-
-// Update a VSL for the AWS provider.
-func (r *MigStorage) updateAwsVSL(location *velero.VolumeSnapshotLocation) {
-	config := r.Spec.VolumeSnapshotConfig
-	location.Spec.Config = map[string]string{
-		"region": config.AwsRegion,
-	}
-}
-
-//
-// Cloud-Secret
-//
-
 // Determine if two secrets cloud secrets are equal.
 // Returns `true` when equal.
 func (r *MigStorage) EqualsCloudSecret(a, b *kapi.Secret) bool {
 	return reflect.DeepEqual(a.Data, b.Data)
 }
 
-// Build the cloud credentials secret.
-func (r *MigStorage) BuildCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
-	secret := &kapi.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    r.GetCorrelationLabels(),
-			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
-		},
-	}
-	err := r.UpdateCloudSecret(client, secret)
-	return secret, err
+// Get the backup storage cloud provider.
+func (r *MigStorage) GetBackupStorageProvider() pvdr.Provider {
+	var provider pvdr.Provider
+	provider = r.Spec.BackupStorageConfig.GetProvider(r.Spec.BackupStorageProvider)
+	return provider
 }
 
-// Update the cloud credentials secret.
-func (r *MigStorage) UpdateCloudSecret(client k8sclient.Client, secret *kapi.Secret) error {
-	credSecret, err := r.Spec.BackupStorageConfig.GetCredsSecret(client)
-	if err != nil {
-		return err
+// Get the volume snapshot cloud provider.
+func (r *MigStorage) GetVolumeSnapshotProvider() pvdr.Provider {
+	var provider pvdr.Provider
+	if r.Spec.VolumeSnapshotProvider != "" {
+		provider = r.Spec.VolumeSnapshotConfig.GetProvider(r.Spec.VolumeSnapshotProvider)
+	} else {
+		provider = r.Spec.BackupStorageConfig.GetProvider(r.Spec.BackupStorageProvider)
 	}
-	if credSecret == nil {
-		return CredSecretNotFound
+	if provider != nil {
+		provider.SetRole(pvdr.VolumeSnapshot)
 	}
-	secret.Data = map[string][]byte{
-		"cloud": []byte(
-			fmt.Sprintf(
-				AwsCloudSecretContent,
-				credSecret.Data[AwsAccessKeyId],
-				credSecret.Data[AwsSecretAccessKey]),
-		),
-	}
-	return nil
+
+	return provider
 }
 
-// Get the referenced Cred secret.
-func (r *BackupStorageConfig) GetCredsSecret(client k8sclient.Client) (*kapi.Secret, error) {
+// Get the backup credentials secret.
+func (r *MigStorage) GetBackupStorageCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	return r.Spec.BackupStorageConfig.GetCredSecret(client)
+}
+
+// Get the backup credentials secret.
+func (r *MigStorage) GetVolumeSnapshotCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
+	if r.Spec.VolumeSnapshotProvider != "" {
+		return r.Spec.VolumeSnapshotConfig.GetCredSecret(client)
+	} else {
+		return r.Spec.BackupStorageConfig.GetCredSecret(client)
+	}
+}
+
+// Get the cloud provider.
+func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
+	var provider pvdr.Provider
+	switch name {
+	case AWS:
+		provider = &pvdr.AWSProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.BackupStorage,
+			},
+			Region:           r.AwsRegion,
+			Bucket:           r.AwsBucketName,
+			S3URL:            r.AwsS3URL,
+			PublicURL:        r.AwsPublicURL,
+			KMSKeyId:         r.AwsKmsKeyID,
+			SignatureVersion: r.AwsSignatureVersion,
+			S3ForcePathStyle: r.AwsS3ForcePathStyle,
+		}
+	case Azure:
+		provider = &pvdr.AzureProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.BackupStorage,
+			},
+			ResourceGroup:  r.AzureResourceGroup,
+			StorageAccount: r.AzureStorageAccount,
+		}
+	case GCP:
+		provider = &pvdr.GCPProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.BackupStorage,
+			},
+		}
+	}
+
+	return provider
+}
+
+// Get credentials secret.
+func (r *BackupStorageConfig) GetCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	return GetSecret(client, r.CredsSecretRef)
 }
 
-// Get the referenced Cred secret.
+// Get the cloud provider.
+func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
+	var provider pvdr.Provider
+	switch name {
+	case AWS:
+		provider = &pvdr.AWSProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.VolumeSnapshot,
+			},
+			Region: r.AwsRegion,
+		}
+	case Azure:
+		provider = &pvdr.AzureProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.VolumeSnapshot,
+			},
+			ResourceGroup: r.AzureResourceGroup,
+			APITimeout:    r.AzureAPITimeout,
+		}
+	case GCP:
+		provider = &pvdr.GCPProvider{
+			BaseProvider: pvdr.BaseProvider{
+				Role: pvdr.VolumeSnapshot,
+			},
+		}
+	}
+
+	return provider
+}
+
+// Get credentials secret.
 func (r *VolumeSnapshotConfig) GetCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	return GetSecret(client, r.CredsSecretRef)
 }

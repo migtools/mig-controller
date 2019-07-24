@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -255,7 +256,7 @@ func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStora
 
 // Update a Registry credentials secret as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, secret *kapi.Secret) error {
-	credSecret, err := storage.Spec.BackupStorageConfig.GetCredsSecret(client)
+	credSecret, err := storage.GetBackupStorageCredSecret(client)
 	if err != nil {
 		return err
 	}
@@ -263,8 +264,8 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 		return CredSecretNotFound
 	}
 	secret.Data = map[string][]byte{
-		"access_key": []byte(credSecret.Data[AwsAccessKeyId]),
-		"secret_key": []byte(credSecret.Data[AwsSecretAccessKey]),
+		"access_key": []byte(credSecret.Data[pvdr.AwsAccessKeyId]),
+		"secret_key": []byte(credSecret.Data[pvdr.AwsSecretAccessKey]),
 	}
 	return nil
 }
