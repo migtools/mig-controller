@@ -22,6 +22,7 @@ const (
 	RestartRestic                 = "RestartRestic"
 	ResticRestarted               = "ResticRestarted"
 	QuiesceApplications           = "QuiesceApplications"
+	EnsureQuiesced                = "EnsureQuiesced"
 	EnsureStageBackup             = "EnsureStageBackup"
 	StageBackupCreated            = "StageBackupCreated"
 	StageBackupFailed             = "StageBackupFailed"
@@ -248,7 +249,18 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = EnsureStageBackup
+		t.Phase = EnsureQuiesced
+	case EnsureQuiesced:
+		quiesced, err := t.ensureQuiescedPodsTerminated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if quiesced {
+			t.Phase = EnsureStageBackup
+		} else {
+			t.Requeue = time.Second * 3
+		}
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {

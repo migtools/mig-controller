@@ -4,6 +4,7 @@ import (
 	"context"
 	appsv1 "github.com/openshift/api/apps/v1"
 	coreappsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -14,7 +15,7 @@ func (t *Task) quiesceApplications() error {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDCs(client)
+	err = t.scaleDownDeploymentConfigs(client)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -23,12 +24,20 @@ func (t *Task) quiesceApplications() error {
 	if err != nil {
 		log.Trace(err)
 	}
+	err = t.scaleDownStatefulSets(client)
+	if err != nil {
+		log.Trace(err)
+	}
+	err = t.scaleDownReplicaSets(client)
+	if err != nil {
+		log.Trace(err)
+	}
 
 	return err
 }
 
-// Scales down Deployment Configs on source cluster
-func (t *Task) scaleDownDCs(client k8sclient.Client) error {
+// Scales down DeploymentConfig on source cluster
+func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
 		list := appsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
@@ -70,12 +79,12 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 			log.Trace(err)
 			return err
 		}
-		for _, dep := range list.Items {
-			if dep.Spec.Replicas == &zero {
+		for _, deployment := range list.Items {
+			if deployment.Spec.Replicas == &zero {
 				continue
 			}
-			dep.Spec.Replicas = &zero
-			err = client.Update(context.TODO(), &dep)
+			deployment.Spec.Replicas = &zero
+			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
 				log.Trace(err)
 				return err
@@ -84,4 +93,98 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 	}
 
 	return nil
+}
+
+// Scales down all StatefulSets.
+func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
+	zero := int32(0)
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := coreappsv1.StatefulSetList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, set := range list.Items {
+			if set.Spec.Replicas == &zero {
+				continue
+			}
+			set.Spec.Replicas = &zero
+			err = client.Update(context.TODO(), &set)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Scales down all ReplicaSets.
+func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
+	zero := int32(0)
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := coreappsv1.ReplicaSetList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, set := range list.Items {
+			if set.Spec.Replicas == &zero {
+				continue
+			}
+			set.Spec.Replicas = &zero
+			err = client.Update(context.TODO(), &set)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Ensure scaled down pods have terminated.
+// Returns: `true` when all pods terminated.
+func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
+	kinds := map[string]bool{
+		"ReplicationController": true,
+		"StatefulSet":           true,
+		"ReplicaSet":            true,
+	}
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := v1.PodList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+		for _, pod := range list.Items {
+			for _, ref := range pod.OwnerReferences {
+				if _, found := kinds[ref.Kind]; found {
+					return false, nil
+				}
+			}
+		}
+	}
+
+	return true, nil
 }
