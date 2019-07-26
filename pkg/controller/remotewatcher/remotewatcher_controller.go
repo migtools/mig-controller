@@ -17,6 +17,7 @@ import (
 	"github.com/fusor/mig-controller/pkg/logging"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+	storageapi "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -153,6 +154,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{
 			Type: &kapi.Namespace{},
+		},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// StorageClass
+	err = c.Watch(
+		&source.Kind{
+			Type: &storageapi.StorageClass{},
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {

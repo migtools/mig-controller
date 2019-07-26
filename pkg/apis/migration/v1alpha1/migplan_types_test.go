@@ -65,12 +65,12 @@ func TestPersistentVolume_Update(t *testing.T) {
 	pvA := PV{
 		Name:         "Elvis",
 		StorageClass: "local",
-		Action:       "Copy",
+		Selection:    Selection{Action: "Copy"},
 	}
 	pvB := PV{
 		Name:         "Elvis",
 		StorageClass: "changed",
-		Action:       "Copy",
+		Selection:    Selection{Action: "Copy"},
 	}
 
 	// Test
@@ -134,7 +134,7 @@ func TestPersistentVolumes_DeletePv(t *testing.T) {
 		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
-			Action:       "Copy",
+			Selection:    Selection{Action: "Copy"},
 		}
 		pvs.AddPv(pv)
 	}
@@ -149,19 +149,19 @@ func TestPersistentVolumes_DeletePv(t *testing.T) {
 			{
 				Name:         "0",
 				StorageClass: "local",
-				Action:       "Copy",
+				Selection:    Selection{Action: "Copy"},
 				staged:       true,
 			},
 			{
 				Name:         "2",
 				StorageClass: "local",
-				Action:       "Copy",
+				Selection:    Selection{Action: "Copy"},
 				staged:       true,
 			},
 			{
 				Name:         "4",
 				StorageClass: "local",
-				Action:       "Copy",
+				Selection:    Selection{Action: "Copy"},
 				staged:       true,
 			},
 		}))
@@ -197,7 +197,7 @@ func TestPersistentVolumes_BeginPvStaging(t *testing.T) {
 		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
-			Action:       "Copy",
+			Selection:    Selection{Action: "Copy"},
 		}
 		pvs.AddPv(pv)
 	}
@@ -226,7 +226,7 @@ func TestPersistentVolumes_EndPvStaging(t *testing.T) {
 		pv := PV{
 			Name:         fmt.Sprintf("%d", i),
 			StorageClass: "local",
-			Action:       "Copy",
+			Selection:    Selection{Action: "Copy"},
 		}
 		pvs.AddPv(pv)
 	}
@@ -243,13 +243,13 @@ func TestPersistentVolumes_EndPvStaging(t *testing.T) {
 			{
 				Name:         "2",
 				StorageClass: "local",
-				Action:       "Copy",
+				Selection:    Selection{Action: "Copy"},
 				staged:       true,
 			},
 			{
 				Name:         "4",
 				StorageClass: "local",
-				Action:       "Copy",
+				Selection:    Selection{Action: "Copy"},
 				staged:       true,
 			},
 		}))

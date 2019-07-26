@@ -28,7 +28,6 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +41,7 @@ const (
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
-	PersistentVolumes
+	PersistentVolumes `json:",inline"`
 	Namespaces        []string              `json:"namespaces,omitempty"`
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
@@ -674,30 +673,50 @@ const (
 // Name - The PV name.
 // Capacity - The PV storage capacity.
 // StorageClass - The PV storage class name.
-// Action - The PV migration action (move|copy)
-// SupportedActions - The list of supported actions.
+// Supported - Lists of what is supported
+// Selection - Choices made from supported
 // staged - A PV has been explicitly added/updated.
 type PV struct {
-	Name             string            `json:"name,omitempty"`
-	Capacity         resource.Quantity `json:"capacity,omitempty"`
-	StorageClass     string            `json:"storageClass,omitempty"`
-	SupportedActions []string          `json:"supportedActions"`
-	Action           string            `json:"action,omitempty"`
-	PVC              PVC               `json:"pvc,omitempty"`
-	staged           bool
+	Name         string            `json:"name,omitempty"`
+	Capacity     resource.Quantity `json:"capacity,omitempty"`
+	StorageClass string            `json:"storageClass,omitempty"`
+	Supported    Supported         `json:"supported"`
+	Selection    Selection         `json:"selection"`
+	PVC          PVC               `json:"pvc,omitempty"`
+	staged       bool
 }
 
 // PVC
-type PVC types.NamespacedName
+type PVC struct {
+	Namespace   string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	Name        string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+}
+
+// Supported
+// Actions - The list of supported actions
+type Supported struct {
+	Actions []string `json:"actions"`
+}
+
+// Selection
+// Action - The PV migration action (move|copy)
+// StorageClass - The PV storage class name to use in the destination cluster.
+// AccessMode   - The PV access mode to use in the destination cluster, if different from src PVC AccessMode
+type Selection struct {
+	Action       string                          `json:"action,omitempty"`
+	StorageClass string                          `json:"storageClass,omitempty"`
+	AccessMode   kapi.PersistentVolumeAccessMode `json:"accessMode,omitempty" protobuf:"bytes,1,rep,name=accessMode,casttype=PersistentVolumeAccessMode"`
+}
 
 // Update the PV with another.
 func (r *PV) Update(pv PV) {
 	r.StorageClass = pv.StorageClass
-	r.SupportedActions = pv.SupportedActions
+	r.Supported.Actions = pv.Supported.Actions
 	r.Capacity = pv.Capacity
 	r.PVC = pv.PVC
-	if len(r.SupportedActions) == 1 {
-		r.Action = r.SupportedActions[0]
+	if len(r.Supported.Actions) == 1 {
+		r.Selection.Action = r.Supported.Actions[0]
 	}
 	r.staged = true
 }

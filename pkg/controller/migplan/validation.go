@@ -25,6 +25,11 @@ const (
 	PlanConflict                   = "PlanConflict"
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
+	PvInvalidStorageClass          = "PvInvalidStorageClass"
+	PvInvalidAccessMode            = "PvInvalidAccessMode"
+	PvNoStorageClassSelection      = "PvNoStorageClassSelection"
+	PvWarnNoCephAvailable          = "PvWarnNoCephAvailable"
+	PvWarnAccessModeUnavailable    = "PvWarnAccessModeUnavailable"
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
@@ -70,11 +75,19 @@ const (
 	PlanConflictMessage                   = "The plan is in conflict with []."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
+	PvInvalidStorageClassMessage          = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
+	PvInvalidAccessModeMessage            = "PV in `persistentVolumes` [] has an invalid `accessMode`."
+	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`."
+	PvWarnNoCephAvailableMessage          = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
+	PvWarnAccessModeUnavailableMessage    = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                         = "The migration plan is closed."
 )
+
+// Valid AccessMode values
+var validAccessModes = []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany}
 
 // Validate the plan resource.
 func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
@@ -441,32 +454,74 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 }
 
 // Validate PV actions.
-func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
-	invalid := make([]string, 0)
+func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
+	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
+
+	storageClasses := map[string][]kapi.PersistentVolumeAccessMode{}
+	missingStorageClass := make([]string, 0)
+	invalidStorageClass := make([]string, 0)
+	invalidAccessMode := make([]string, 0)
+	unavailableAccessMode := make([]string, 0)
+
+	destMigCluster, err := plan.GetDestinationCluster(r.Client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, storageClass := range destMigCluster.Spec.StorageClasses {
+		storageClasses[storageClass.Name] = storageClass.AccessModes
+	}
+
 	for _, pv := range plan.Spec.PersistentVolumes.List {
 		actions := map[string]bool{}
-		if len(pv.SupportedActions) > 0 {
-			for _, a := range pv.SupportedActions {
+		if len(pv.Supported.Actions) > 0 {
+			for _, a := range pv.Supported.Actions {
 				actions[a] = true
 			}
 		} else {
 			unsupported = append(unsupported, pv.Name)
 			actions[""] = true
 		}
-		_, found := actions[pv.Action]
+		_, found := actions[pv.Selection.Action]
 		if !found {
-			invalid = append(invalid, pv.Name)
+			invalidAction = append(invalidAction, pv.Name)
+		}
+		if pv.Selection.StorageClass == "" {
+			missingStorageClass = append(missingStorageClass, pv.Name)
+		} else {
+			storageClassAccessModes, found := storageClasses[pv.Selection.StorageClass]
+			if found {
+				if pv.Selection.AccessMode != "" {
+					if !containsAccessMode(validAccessModes, pv.Selection.AccessMode) {
+						invalidAccessMode = append(invalidAccessMode, pv.Name)
+					} else if !containsAccessMode(storageClassAccessModes, pv.Selection.AccessMode) {
+						unavailableAccessMode = append(unavailableAccessMode, pv.Name)
+					}
+				} else {
+					foundMode := false
+					for _, accessMode := range pv.PVC.AccessModes {
+						if containsAccessMode(storageClassAccessModes, accessMode) {
+							foundMode = true
+						}
+					}
+					if !foundMode {
+						unavailableAccessMode = append(unavailableAccessMode, pv.Name)
+					}
+				}
+			} else {
+				invalidStorageClass = append(invalidStorageClass, pv.Name)
+			}
 		}
 	}
-	if len(invalid) > 0 {
+	if len(invalidAction) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAction,
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
 			Message:  PvInvalidActionMessage,
-			Items:    invalid,
+			Items:    invalidAction,
 		})
 	}
 	if len(unsupported) > 0 {
@@ -479,6 +534,54 @@ func (r ReconcileMigPlan) validatePvAction(plan *migapi.MigPlan) error {
 		})
 		return nil
 	}
+	if len(invalidStorageClass) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvInvalidStorageClass,
+			Status:   True,
+			Reason:   NotDone,
+			Category: Error,
+			Message:  PvInvalidStorageClassMessage,
+			Items:    invalidStorageClass,
+		})
+	}
+	if len(invalidAccessMode) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvInvalidAccessMode,
+			Status:   True,
+			Category: Error,
+			Message:  PvInvalidAccessModeMessage,
+			Items:    invalidAccessMode,
+		})
+	}
+	if len(missingStorageClass) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNoStorageClassSelection,
+			Status:   True,
+			Category: Error,
+			Message:  PvNoStorageClassSelectionMessage,
+			Items:    missingStorageClass,
+		})
+		return nil
+	}
+	if len(unavailableAccessMode) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvWarnAccessModeUnavailable,
+			Status:   True,
+			Category: Warn,
+			Message:  PvWarnAccessModeUnavailableMessage,
+			Items:    unavailableAccessMode,
+		})
+		return nil
+	}
 
 	return nil
+}
+
+func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode kapi.PersistentVolumeAccessMode) bool {
+	for _, mode := range modeList {
+		if mode == accessMode {
+			return true
+		}
+	}
+	return false
 }

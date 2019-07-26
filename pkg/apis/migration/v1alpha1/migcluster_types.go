@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	storageapi "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -39,6 +40,7 @@ type MigClusterSpec struct {
 	IsHostCluster           bool                  `json:"isHostCluster"`
 	ClusterRef              *kapi.ObjectReference `json:"clusterRef,omitempty"`
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
+	StorageClasses          []StorageClass        `json:"storageClasses,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
@@ -66,6 +68,18 @@ type MigClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []MigCluster `json:"items"`
+}
+
+// StorageClass is an available storage class in the cluster
+// Name - the storage class name
+// Provisioner - the dynamic provisioner for the storage class
+// Default - whether or not this storage class is the default
+// AccessModes - access modes supported by the dynamic provisioner
+type StorageClass struct {
+	Name        string                            `json:"name,omitempty"`
+	Provisioner string                            `json:"provisioner,omitempty"`
+	Default     bool                              `json:"default,omitempty"`
+	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 }
 
 func init() {
@@ -365,4 +379,16 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 	}
 
 	return nil
+
+// Get the list of storage classes from the cluster.
+func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]storageapi.StorageClass, error) {
+	list := storageapi.StorageClassList{}
+	err := client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{},
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
