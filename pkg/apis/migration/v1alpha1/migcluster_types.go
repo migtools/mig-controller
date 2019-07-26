@@ -25,8 +25,8 @@ import (
 	imgapi "github.com/openshift/api/image/v1"
 	"k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	storageapi "k8s.io/api/storage/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -382,6 +382,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 	}
 
 	return nil
+}
 
 // Get the list of storage classes from the cluster.
 func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]storageapi.StorageClass, error) {
