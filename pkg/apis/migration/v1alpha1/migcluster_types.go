@@ -74,6 +74,9 @@ func init() {
 
 // Ensure finalizer.
 func (r *MigCluster) EnsureFinalizer() bool {
+	if !FinalizerEnabled {
+		return false
+	}
 	if r.Finalizers == nil {
 		r.Finalizers = []string{}
 	}

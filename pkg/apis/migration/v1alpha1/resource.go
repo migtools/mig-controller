@@ -5,8 +5,10 @@ import (
 )
 
 const (
-	TouchAnnotation = "touch"
-	Finalizer       = "openshift.io/migration"
+	TouchAnnotation  = "touch"
+	FinalizerEnabled = false
+	Finalizer        = "openshift.io/migration"
+	VeleroNamespace  = "mig"
 )
 
 // Migration application CR.
