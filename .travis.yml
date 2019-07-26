@@ -1,0 +1,22 @@
+language: go
+sudo: false
+install: true
+
+matrix:
+  include:
+    - os: linux
+      go: "1.12.x"
+      sudo: true
+      cache:
+        directories:
+          - $HOME/.cache/go-build
+          - $HOME/gopath/pkg/mod
+
+    - os: osx
+      go: "1.12.x"
+      cache:
+        directories:
+          - $HOME/Library/Caches/go-build
+          - $HOME/gopath/pkg/mod
+script:
+  - env GO111MODULE=on make ci
