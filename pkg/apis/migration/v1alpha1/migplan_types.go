@@ -82,6 +82,9 @@ func init() {
 
 // Ensure finalizer.
 func (r *MigPlan) EnsureFinalizer() bool {
+	if !FinalizerEnabled {
+		return false
+	}
 	if r.Finalizers == nil {
 		r.Finalizers = []string{}
 	}
@@ -665,9 +668,8 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 
 // PV Actions.
 const (
-	PvMoveAction    = "move"
-	PvCopyAction    = "copy"
-	VeleroNamespace = "mig"
+	PvMoveAction = "move"
+	PvCopyAction = "copy"
 )
 
 // Name - The PV name.

@@ -150,16 +150,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Finalizer
-	added := plan.EnsureFinalizer()
-	if added {
-		err = r.Update(context.TODO(), plan)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
-	}
-
 	// Plan deleted.
 	if plan.DeletionTimestamp != nil {
 		retry := false
@@ -169,6 +159,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			retry = r.retryFinalizer(plan)
 		}
 		return reconcile.Result{Requeue: retry}, nil
+	} else {
+		added := plan.EnsureFinalizer()
+		if added {
+			err = r.Update(context.TODO(), plan)
+			if err != nil {
+				log.Trace(err)
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
 	}
 
 	// Plan closed.

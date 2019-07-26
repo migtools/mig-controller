@@ -136,16 +136,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Finalizer
-	added := cluster.EnsureFinalizer()
-	if added {
-		err = r.Update(context.TODO(), cluster)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
-	}
-
 	// Cluster deleted.
 	if cluster.DeletionTimestamp != nil {
 		retry := false
@@ -155,6 +145,15 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			retry = r.retryFinalizer(cluster)
 		}
 		return reconcile.Result{Requeue: retry}, nil
+	} else {
+		added := cluster.EnsureFinalizer()
+		if added {
+			err = r.Update(context.TODO(), cluster)
+			if err != nil {
+				log.Trace(err)
+				return reconcile.Result{Requeue: true}, nil
+			}
+		}
 	}
 
 	// Begin staging conditions.
