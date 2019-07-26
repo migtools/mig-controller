@@ -5,7 +5,7 @@ install: true
 matrix:
   include:
     - os: linux
-      go: "1.12.x"
+      go: "1.10.3"
       sudo: true
       cache:
         directories:
@@ -13,7 +13,7 @@ matrix:
           - $HOME/gopath/pkg/mod
 
     - os: osx
-      go: "1.12.x"
+      go: "1.10.3"
       cache:
         directories:
           - $HOME/Library/Caches/go-build
