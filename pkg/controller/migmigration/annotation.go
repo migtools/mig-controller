@@ -57,6 +57,12 @@ func (t *Task) annotateStageResources() error {
 		log.Trace(err)
 		return err
 	}
+	// Namespaces
+	err = t.labelNamespaces(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 	// Pods
 	err = t.annotatePods(client)
 	if err != nil {
@@ -133,6 +139,33 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 	}
 
 	return volumes, nil
+}
+
+// Add label to namespaces
+func (t *Task) labelNamespaces(client k8sclient.Client) error {
+	for _, ns := range t.namespaces() {
+		namespace := corev1.Namespace{}
+		err := client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name: ns,
+			},
+			&namespace)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if namespace.Labels == nil {
+			namespace.Labels = make(map[string]string)
+		}
+		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
+		err = client.Update(context.TODO(), &namespace)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+	return nil
 }
 
 // Add annotations and labels to Pods.
@@ -265,6 +298,11 @@ func (t *Task) deleteAnnotations() error {
 			log.Trace(err)
 			return err
 		}
+		err = t.deleteNamespaceLabels(client)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
 	}
 
 	return nil
@@ -311,6 +349,30 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 		}
 	}
 
+	return nil
+}
+
+// Delete stage label from namespaces
+func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
+	for _, ns := range t.namespaces() {
+		namespace := corev1.Namespace{}
+		err := client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name: ns,
+			},
+			&namespace)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		delete(namespace.Labels, IncludedInStageBackupLabel)
+		err = client.Update(context.TODO(), &namespace)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
 	return nil
 }
 

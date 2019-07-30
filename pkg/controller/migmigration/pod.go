@@ -109,8 +109,9 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			Labels: labels,
 		},
 		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{},
-			Volumes:    []corev1.Volume{},
+			Containers:      []corev1.Container{},
+			Volumes:         []corev1.Volume{},
+			SecurityContext: pod.Spec.SecurityContext,
 		},
 	}
 	// Add volumes.
