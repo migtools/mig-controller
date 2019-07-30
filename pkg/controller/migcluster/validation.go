@@ -3,6 +3,8 @@ package migcluster
 import (
 	"context"
 	"fmt"
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
@@ -209,7 +211,11 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	if cluster.Status.HasCriticalCondition() {
 		return nil
 	}
-	_, err := cluster.GetClient(r)
+
+	// Timeout of 5s instead of the default 30s to lessen lockup
+	timeout := time.Duration(time.Second * 5)
+	_, err := cluster.CheckConnection(r.Client, timeout)
+
 	if err != nil {
 		message := fmt.Sprintf(TestConnectFailedMessage, err)
 		cluster.Status.SetCondition(migapi.Condition{
@@ -221,6 +227,5 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		})
 		return nil
 	}
-
 	return nil
 }

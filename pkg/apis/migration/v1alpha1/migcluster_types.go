@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
@@ -156,6 +158,30 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
 	}
 
 	return client, nil
+}
+
+// CheckConnection checks if MigCluster client config is valid by creating a client
+func (m *MigCluster) CheckConnection(c k8sclient.Client, timeout time.Duration) (bool, error) {
+	// If MigCluster isHostCluster, no need to connection check
+	if m.Spec.IsHostCluster {
+		return true, nil
+	}
+
+	// If MigCluster is remote, build a client to check connection
+	restConfig, err := m.BuildRestConfig(c)
+	if err != nil {
+		return false, err
+	}
+
+	// Allow setting of custom timeout for connection checking
+	restConfig.Timeout = timeout
+
+	_, err = m.buildClient(restConfig)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // BuildRestConfig creates a remote cluster RestConfig from a MigCluster and a local client
