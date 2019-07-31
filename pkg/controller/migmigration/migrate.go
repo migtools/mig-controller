@@ -28,6 +28,7 @@ import (
 var stagingResources = []string{
 	"persistentvolumes",
 	"persistentvolumeclaims",
+	"namespaces",
 	"imagestreams",
 	"imagestreamtags",
 	"secrets",
