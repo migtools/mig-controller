@@ -4,6 +4,7 @@ import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
@@ -362,6 +363,11 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
 				Name: ns,
 			},
 			&namespace)
+		// Check if namespace doesn't exist. This will happpen during prepare phase
+		// since destination cluster doesn't have the migrated namespaces yet
+		if errors.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
 			log.Trace(err)
 			return err
