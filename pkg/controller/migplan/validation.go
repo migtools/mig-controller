@@ -486,6 +486,11 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		_, found := actions[pv.Selection.Action]
 		if !found {
 			invalidAction = append(invalidAction, pv.Name)
+			continue
+		}
+		// Don't report StorageClass, AccessMode errors if Action != 'copy'
+		if pv.Selection.Action != migapi.PvCopyAction {
+			continue
 		}
 		if pv.Selection.StorageClass == "" {
 			missingStorageClass = append(missingStorageClass, pv.Name)
