@@ -126,8 +126,8 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 // Get a list of PVCs found on pods with the specified namespaces.
 func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []string) (Claims, error) {
 	claims := Claims{}
-	list := &core.PodList{}
 	for _, ns := range namespaces {
+		list := &core.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, list)
 		if err != nil {
