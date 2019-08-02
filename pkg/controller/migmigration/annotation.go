@@ -29,6 +29,9 @@ const (
 	// Resources included in the stage backup.
 	// Referenced by the Backup.LabelSelector. The value is the Task.UID().
 	IncludedInStageBackupLabel = "migration-included-stage-backup"
+	// For pods included in the stage backup, this label contains a pod-unique
+	// value (namespace "/"+name)
+	StagePodAffinityLabel = "migration-stage-pod-affinity"
 	// Designated as an `initial` Backup.
 	// The value is the Task.UID().
 	InitialBackupLabel = "migration-initial-backup"
@@ -214,6 +217,7 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 				pod.Labels = make(map[string]string)
 			}
 			pod.Labels[IncludedInStageBackupLabel] = t.UID()
+			pod.Labels[StagePodAffinityLabel] = pod.Name
 			// Update
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
@@ -330,6 +334,10 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 			if pod.Labels != nil {
 				if _, found := pod.Labels[IncludedInStageBackupLabel]; found {
 					delete(pod.Labels, IncludedInStageBackupLabel)
+					needsUpdate = true
+				}
+				if _, found := pod.Labels[StagePodAffinityLabel]; found {
+					delete(pod.Labels, StagePodAffinityLabel)
 					needsUpdate = true
 				}
 			}
