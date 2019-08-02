@@ -99,6 +99,9 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 		resticVolumes[name] = true
 	}
 	// Base pod.
+	stageNodeSelector := map[string]string{
+		"kubernetes.io/hostname": pod.Spec.NodeName,
+	}
 	newPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
@@ -112,6 +115,7 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			Containers:      []corev1.Container{},
 			Volumes:         []corev1.Volume{},
 			SecurityContext: pod.Spec.SecurityContext,
+			NodeSelector:    stageNodeSelector,
 		},
 	}
 	// Add volumes.
