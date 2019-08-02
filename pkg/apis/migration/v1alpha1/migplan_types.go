@@ -248,7 +248,7 @@ func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStora
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       labels,
-			GenerateName: r.GetName() + "-registry-",
+			GenerateName: "registry-" + r.GetName() + "-",
 			Namespace:    VeleroNamespace,
 		},
 	}
