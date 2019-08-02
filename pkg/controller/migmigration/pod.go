@@ -112,6 +112,24 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			Containers:      []corev1.Container{},
 			Volumes:         []corev1.Volume{},
 			SecurityContext: pod.Spec.SecurityContext,
+			Affinity: &corev1.Affinity{
+				PodAffinity: &corev1.PodAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+						corev1.WeightedPodAffinityTerm{
+							Weight: 100,
+							PodAffinityTerm: corev1.PodAffinityTerm{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										StagePodAffinityLabel: pod.Name,
+									},
+								},
+								Namespaces:  []string{pod.Namespace},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	// Add volumes.
