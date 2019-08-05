@@ -2,12 +2,13 @@ package migmigration
 
 import (
 	"context"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 // Velero Plugin Annotations
@@ -324,6 +325,9 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 			return err
 		}
 		for _, pod := range podList.Items {
+			if !pod.ObjectMeta.DeletionTimestamp.IsZero() {
+				continue
+			}
 			needsUpdate := false
 			if pod.Annotations != nil {
 				if _, found := pod.Annotations[ResticPvBackupAnnotation]; found {
