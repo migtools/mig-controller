@@ -218,7 +218,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.D
 	// Pending migrations.
 	pending := []types.UID{}
 	for _, m := range migrations {
-		if !m.Status.HasAnyCondition(Succeeded, Failed) {
+		if m.Status.Phase != Completed {
 			pending = append(pending, m.UID)
 		}
 	}
@@ -240,7 +240,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.D
 		Type:     Postponed,
 		Status:   True,
 		Category: Critical,
-		Message:  fmt.Sprintf(PostponedMessage, requeueAfter),
+		Message:  fmt.Sprintf(PostponedMessage, requeueAfter/time.Second),
 	})
 
 	return requeueAfter, nil
