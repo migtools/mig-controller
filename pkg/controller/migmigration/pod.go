@@ -168,7 +168,7 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 	}
 
 	labelSelector := map[string]string{
-		IncludedInStageBackupLabel: t.UID(),
+		IncludedInStageBackupLabel: t.StagePodSearchLabel(),
 	}
 	podList := corev1.PodList{}
 	options := k8sclient.MatchingLabels(labelSelector)

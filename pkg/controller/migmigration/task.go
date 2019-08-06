@@ -1,6 +1,7 @@
 package migmigration
 
 import (
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -465,6 +466,11 @@ func (t *Task) Run() error {
 // Migration UID.
 func (t *Task) UID() string {
 	return string(t.Owner.UID)
+}
+
+// Migration Stage Pod Search Label
+func (t *Task) StagePodSearchLabel() string {
+	return fmt.Sprintf("%s-search", t.UID())
 }
 
 // Get whether the migration is stage.

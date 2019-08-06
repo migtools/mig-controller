@@ -217,7 +217,7 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 			if pod.Labels == nil {
 				pod.Labels = make(map[string]string)
 			}
-			pod.Labels[IncludedInStageBackupLabel] = t.UID()
+			pod.Labels[IncludedInStageBackupLabel] = t.StagePodSearchLabel()
 			pod.Labels[StagePodAffinityLabel] = pod.Name
 			// Update
 			err = client.Update(context.TODO(), &pod)
