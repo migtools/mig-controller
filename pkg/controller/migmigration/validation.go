@@ -43,7 +43,7 @@ const (
 	PlanClosedMessage        = "The associated migration plan is closed."
 	HasFinalMigrationMessage = "The associated MigPlan already has a final migration."
 	PostponedMessage         = "Postponed %d seconds to ensure migrations run serially and in order."
-	RunningMessage           = "Step: %d/%d."
+	RunningMessage           = "Step: %d/%d"
 	FailedMessage            = "The migration has failed.  See: Errors."
 	SucceededMessage         = "The migration has completed successfully."
 )
