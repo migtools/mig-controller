@@ -133,12 +133,12 @@ func (t *Task) Run() error {
 	case Started:
 		t.Phase = Prepare
 	case Prepare:
-		err := t.deleteAnnotations()
+		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		err = t.ensureStagePodsDeleted()
+		err = t.deleteAnnotations()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -435,12 +435,12 @@ func (t *Task) Run() error {
 			t.Requeue = 0
 		}
 	case StageBackupFailed, StageRestoreFailed:
-		err := t.deleteAnnotations()
+		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		err = t.ensureStagePodsDeleted()
+		err = t.deleteAnnotations()
 		if err != nil {
 			log.Trace(err)
 			return err
