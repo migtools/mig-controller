@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -94,19 +95,22 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 	labels[IncludedInStageBackupLabel] = t.UID()
 
 	// Map of Restic volumes.
+	annotations := map[string]string{
+		ResticPvBackupAnnotation: pod.Annotations[ResticPvBackupAnnotation],
+	}
 	resticVolumes := map[string]bool{}
 	for _, name := range strings.Split(pod.Annotations[ResticPvBackupAnnotation], ",") {
 		resticVolumes[name] = true
+		// Set snapshot annotation so restic restore picks up the volume
+		annotations[fmt.Sprintf("snapshot.velero.io/%s", name)] = "true"
 	}
 	// Base pod.
 	newPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: pod.Namespace,
-			Name:      pod.Name + "-" + "stage",
-			Annotations: map[string]string{
-				ResticPvBackupAnnotation: pod.Annotations[ResticPvBackupAnnotation],
-			},
-			Labels: labels,
+			Namespace:   pod.Namespace,
+			Name:        pod.Name + "-" + "stage",
+			Annotations: annotations,
+			Labels:      labels,
 		},
 		Spec: corev1.PodSpec{
 			Containers:      []corev1.Container{},
