@@ -168,7 +168,7 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 	}
 
 	labelSelector := map[string]string{
-		IncludedInStageBackupLabel: t.UID(),
+		ApplicationPodLabel: t.UID(),
 	}
 	podList := corev1.PodList{}
 	options := k8sclient.MatchingLabels(labelSelector)
@@ -197,7 +197,6 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 				newPod.Namespace,
 				"name",
 				newPod.Name)
-			delete(pod.Labels, IncludedInStageBackupLabel)
 			delete(pod.Annotations, ResticPvBackupAnnotation)
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
