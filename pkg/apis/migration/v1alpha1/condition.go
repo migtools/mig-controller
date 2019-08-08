@@ -186,6 +186,23 @@ func (r *Conditions) SetCondition(condition Condition) {
 	}
 }
 
+// Stage an existing condition by type.
+func (r *Conditions) StageCondition(types ...string) {
+	if r.List == nil {
+		return
+	}
+	filter := make(map[string]bool)
+	for _, t := range types {
+		filter[t] = true
+	}
+	for i := range r.List {
+		condition := &r.List[i]
+		if _, found := filter[condition.Type]; found {
+			condition.staged = true
+		}
+	}
+}
+
 // Delete conditions by type.
 func (r *Conditions) DeleteCondition(types ...string) {
 	if r.List == nil {

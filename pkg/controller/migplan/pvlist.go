@@ -14,6 +14,10 @@ type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
+	if plan.Status.HasCondition(Suspended) {
+		plan.Status.StageCondition(PvsDiscovered)
+		return nil
+	}
 	if plan.Status.HasAnyCondition(
 		InvalidSourceClusterRef,
 		SourceClusterNotReady,

@@ -197,6 +197,32 @@ func TestConditions_SetCondition(t *testing.T) {
 		}))
 }
 
+func TestConditions_StageCondition(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+
+	// Setup
+	conditions := Conditions{
+		List: []Condition{
+			{Type: "A"},
+			{Type: "B"},
+			{Type: "C"},
+			{Type: "D"},
+		},
+	}
+
+	// Test
+	conditions.StageCondition("A", "C", "X")
+
+	// Validation
+	g.Expect(conditions.staging).To(gomega.BeFalse())
+	g.Expect(conditions.List).To(gomega.Equal([]Condition{
+		{Type: "A", staged: true},
+		{Type: "B", staged: false},
+		{Type: "C", staged: true},
+		{Type: "D", staged: false},
+	}))
+}
+
 func TestConditions_DeleteCondition(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
