@@ -12,6 +12,7 @@ import (
 
 // Types
 const (
+	Suspended                      = "Suspended"
 	InvalidSourceClusterRef        = "InvalidSourceClusterRef"
 	InvalidDestinationClusterRef   = "InvalidDestinationClusterRef"
 	InvalidStorageRef              = "InvalidStorageRef"
@@ -38,6 +39,7 @@ const (
 
 // Categories
 const (
+	Advisory = migapi.Advisory
 	Critical = migapi.Critical
 	Error    = migapi.Error
 	Warn     = migapi.Warn
@@ -62,6 +64,7 @@ const (
 // Messages
 const (
 	ReadyMessage                          = "The migration plan is ready."
+	SuspendedMessage                      = "Limited validation; PV discovery and resource reconciliation suspended."
 	InvalidSourceClusterRefMessage        = "The `srcMigClusterRef` must reference a `migcluster`."
 	InvalidDestinationClusterRefMessage   = "The `dstMigClusterRef` must reference a `migcluster`."
 	InvalidStorageRefMessage              = "The `migStorageRef` must reference a `migstorage`."
@@ -309,14 +312,14 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 
 // Validate required namespaces.
 func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error {
-	// Source
+	if plan.Status.HasAnyCondition(Suspended) {
+		return nil
+	}
 	err := r.validateSourceNamespaces(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-
-	// Destination
 	err = r.validateDestinationNamespaces(plan)
 	if err != nil {
 		log.Trace(err)
@@ -330,6 +333,9 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{migapi.VeleroNamespace}
+	if plan.Status.HasAnyCondition(Suspended) {
+		return nil
+	}
 	for _, ns := range plan.Spec.Namespaces {
 		namespaces = append(namespaces, ns)
 	}
@@ -380,6 +386,9 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{migapi.VeleroNamespace}
+	if plan.Status.HasAnyCondition(Suspended) {
+		return nil
+	}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		log.Trace(err)
@@ -464,6 +473,9 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 	invalidAccessMode := make([]string, 0)
 	unavailableAccessMode := make([]string, 0)
 
+	if plan.Status.HasAnyCondition(Suspended) {
+		return nil
+	}
 	destMigCluster, err := plan.GetDestinationCluster(r.Client)
 	if err != nil {
 		log.Trace(err)

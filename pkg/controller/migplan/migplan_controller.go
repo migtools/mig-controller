@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migctl "github.com/fusor/mig-controller/pkg/controller/migmigration"
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -90,6 +91,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		},
 		&StoragePredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Watch for changes to MigMigrations.
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigMigration{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: handler.ToRequestsFunc(MigrationRequests),
+		},
+		&MigrationPredicate{})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -183,6 +196,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
 
+	// Plan Suspended
+	err = r.planSuspended(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
@@ -204,20 +224,18 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if !plan.Status.HasCriticalCondition() {
-		// Storage
-		err = r.ensureStorage(plan)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
+	// Storage
+	err = r.ensureStorage(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
 
-		// Migration Registry
-		err = r.ensureMigRegistries(plan)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
+	// Migration Registry
+	err = r.ensureMigRegistries(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Ready
@@ -296,7 +314,7 @@ func (r *ReconcileMigPlan) retryFinalizer(plan *migapi.MigPlan) bool {
 
 // Detect that a plan is been closed and ensure all its referenced
 // resources have been cleaned up.
-func (r ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
+func (r *ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 	closed := plan.Spec.Closed
 	if !closed || plan.Status.HasCondition(Closed) {
 		return closed, nil
@@ -314,7 +332,7 @@ func (r ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 }
 
 // Ensure that resources managed by the plan have been cleaned up.
-func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	clusters, err := migapi.ListClusters(r)
 	if err != nil {
 		log.Trace(err)
@@ -331,7 +349,7 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	plan.Status.SetCondition(migapi.Condition{
 		Type:     Closed,
 		Status:   True,
-		Category: Critical,
+		Category: Advisory,
 		Message:  ClosedMessage,
 	})
 	// Apply changes.
@@ -340,6 +358,40 @@ func (r ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+
+	return nil
+}
+
+// Determine whether the plan is `suspended`.
+// A plan is considered`suspended` when a migration is running or the final migration has
+// completed successfully. While suspended, reconcile is limited to basic validation
+// and PV discovery and ensuring resources is not performed.
+func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
+	suspended := false
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, m := range migrations {
+		if m.Status.HasCondition(migctl.Running) {
+			suspended = true
+			break
+		}
+		if m.Status.HasCondition(migctl.Succeeded) && !m.Spec.Stage {
+			suspended = true
+			break
+		}
+	}
+
+	if suspended {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     Suspended,
+			Status:   True,
+			Category: Advisory,
+			Message:  SuspendedMessage,
+		})
 	}
 
 	return nil

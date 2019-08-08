@@ -2,6 +2,7 @@ package migplan
 
 import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migctl "github.com/fusor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -168,4 +169,32 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 	// Updated by the controller.
 	touched := old.GetTouch() != new.GetTouch()
 	return touched
+}
+
+type MigrationPredicate struct {
+	predicate.Funcs
+}
+
+func (r MigrationPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
+	old, cast := e.ObjectOld.(*migapi.MigMigration)
+	if !cast {
+		return false
+	}
+	new, cast := e.ObjectNew.(*migapi.MigMigration)
+	if !cast {
+		return false
+	}
+	started := !old.Status.HasCondition(migctl.Running) &&
+		new.Status.HasCondition(migctl.Running)
+	stopped := old.Status.HasCondition(migctl.Running) &&
+		!new.Status.HasCondition(migctl.Running)
+	if started || stopped {
+		return true
+	}
+
+	return false
 }
