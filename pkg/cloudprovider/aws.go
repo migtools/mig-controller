@@ -21,6 +21,7 @@ import (
 const (
 	AwsAccessKeyId     = "aws-access-key-id"
 	AwsSecretAccessKey = "aws-secret-access-key"
+	AwsS3DefaultRegion = "us-east-1"
 )
 
 // Velero cloud-secret.
@@ -131,7 +132,7 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 
 func (p *AWSProvider) GetRegion() string {
 	if p.Region == "" {
-		return "us-east-1"
+		return AwsS3DefaultRegion
 	}
 	return p.Region
 }

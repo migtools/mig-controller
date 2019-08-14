@@ -390,7 +390,7 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
 	region := storage.Spec.BackupStorageConfig.AwsRegion
 	if region == "" {
-		region = "us-east-1"
+		region = pvdr.AwsS3DefaultRegion
 	}
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
