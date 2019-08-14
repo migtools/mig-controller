@@ -7,6 +7,7 @@ import (
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 type PvMap map[types.NamespacedName]core.PersistentVolume
@@ -211,11 +212,11 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.NFS != nil {
 		if isRWX(claim.AccessModes) {
-			targetProvisioner = "cephfs.csi.ceph.com"
+			targetProvisioner = findProvisionerForSuffix("cephfs.csi.ceph.com", destStorageClasses)
 		} else if isRWO(claim.AccessModes) {
-			targetProvisioner = "rbd.csi.ceph.com"
+			targetProvisioner = findProvisionerForSuffix("rbd.csi.ceph.com", destStorageClasses)
 		} else {
-			targetProvisioner = "cephfs.csi.ceph.com"
+			targetProvisioner = findProvisionerForSuffix("cephfs.csi.ceph.com", destStorageClasses)
 		}
 		// warn for gluster but not NFS
 		if pv.Spec.NFS == nil {
@@ -271,6 +272,16 @@ func findProvisionerForName(name string, storageClasses []migapi.StorageClass) s
 		}
 	}
 	return ""
+}
+
+// If not found, just return the suffix. It will fail matching later, but it avoids having an empty target string
+func findProvisionerForSuffix(suffix string, storageClasses []migapi.StorageClass) string {
+	for _, storageClass := range storageClasses {
+		if strings.HasSuffix(storageClass.Provisioner, suffix) {
+			return storageClass.Provisioner
+		}
+	}
+	return suffix
 }
 
 func findStorageClassesForProvisioner(provisioner string, storageClasses []migapi.StorageClass) []migapi.StorageClass {
