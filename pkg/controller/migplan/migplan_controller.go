@@ -345,7 +345,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 			return err
 		}
 	}
-	plan.Status.DeleteCondition(RegistriesEnsured)
+	plan.Status.DeleteCondition(StorageEnsured, RegistriesEnsured, Suspended)
 	plan.Status.SetCondition(migapi.Condition{
 		Type:     Closed,
 		Status:   True,
