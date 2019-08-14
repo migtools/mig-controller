@@ -388,6 +388,10 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
+	region := storage.Spec.BackupStorageConfig.AwsRegion
+	if region == "" {
+		region = pvdr.AwsS3DefaultRegion
+	}
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
@@ -426,7 +430,11 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 							},
 							kapi.EnvVar{
 								Name:  "REGISTRY_STORAGE_S3_REGION",
-								Value: storage.Spec.BackupStorageConfig.AwsRegion,
+								Value: region,
+							},
+							kapi.EnvVar{
+								Name:  "REGISTRY_STORAGE_S3_REGIONENDPOINT",
+								Value: storage.Spec.BackupStorageConfig.AwsS3URL,
 							},
 							kapi.EnvVar{
 								Name:  "REGISTRY_STORAGE_S3_ROOTDIRECTORY",
