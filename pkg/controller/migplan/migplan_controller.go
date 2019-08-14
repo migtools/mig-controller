@@ -150,11 +150,12 @@ type ReconcileMigPlan struct {
 // +kubebuilder:rbac:groups=,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=,resources=persistentvolumeclaims/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	var err error
 	log.Reset()
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
-	err := r.Get(context.TODO(), request.NamespacedName, plan)
+	err = r.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
@@ -182,6 +183,19 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 		}
 	}
+
+	// Report reconcile error.
+	defer func() {
+		if err == nil || errors.IsConflict(err) {
+			return
+		}
+		plan.Status.SetReconcileFailed(err)
+		err := r.Update(context.TODO(), plan)
+		if err != nil {
+			log.Trace(err)
+			return
+		}
+	}()
 
 	// Plan closed.
 	closed, err := r.handleClosed(plan)

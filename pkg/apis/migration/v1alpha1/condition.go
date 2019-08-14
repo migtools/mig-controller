@@ -12,7 +12,8 @@ import (
 
 // Types
 const (
-	Ready = "Ready"
+	ReconcileFailed = "ReconcileFailed"
+	Ready           = "Ready"
 )
 
 // Status
@@ -324,4 +325,19 @@ func (r *Conditions) IsReady() bool {
 		return false
 	}
 	return true
+}
+
+// Set the `ReconcileFailed` condition.
+// Clear the `Ready` condition.
+// Ends staging.
+func (r *Conditions) SetReconcileFailed(err error) {
+	r.DeleteCondition(Ready)
+	r.SetCondition(Condition{
+		Type:     ReconcileFailed,
+		Status:   True,
+		Category: Critical,
+		Message:  "Reconcile failed: []. See controller logs for details.",
+		Items:    []string{err.Error()},
+	})
+	r.EndStagingConditions()
 }
