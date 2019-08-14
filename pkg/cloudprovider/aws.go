@@ -21,6 +21,10 @@ import (
 const (
 	AwsAccessKeyId     = "aws-access-key-id"
 	AwsSecretAccessKey = "aws-secret-access-key"
+)
+
+// S3 constants
+const (
 	AwsS3DefaultRegion = "us-east-1"
 )
 
