@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/uuid"
+	"net/url"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -61,7 +62,7 @@ func (p *AWSProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 	}
 	bsl.Spec.Config = map[string]string{
 		"s3ForcePathStyle": strconv.FormatBool(p.S3ForcePathStyle),
-		"region":           p.Region,
+		"region":           p.GetRegion(),
 	}
 	if p.S3URL != "" {
 		bsl.Spec.Config["s3Url"] = p.S3URL
@@ -80,7 +81,7 @@ func (p *AWSProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 func (p *AWSProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	vsl.Spec.Provider = AWS
 	vsl.Spec.Config = map[string]string{
-		"region": p.Region,
+		"region": p.GetRegion(),
 	}
 }
 
@@ -98,9 +99,6 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
 func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 	fields := []string{}
 
-	if p.Region == "" {
-		fields = append(fields, "Region")
-	}
 	if secret != nil {
 		keySet := []string{
 			AwsAccessKeyId,
@@ -131,6 +129,31 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 	return fields
 }
 
+func (p *AWSProvider) GetRegion() string {
+	if p.Region == "" {
+		return "us-east-1"
+	}
+	return p.Region
+}
+
+func (p *AWSProvider) GetDisableSSL() bool {
+	s3Url, err := url.Parse(p.GetURL())
+	if err != nil {
+		return false
+	}
+	if s3Url.Scheme == "" || s3Url.Scheme == "http" {
+		return true
+	}
+	return false
+}
+
+func (p *AWSProvider) GetForcePathStyle() bool {
+	if p.GetURL() == "" {
+		return false
+	}
+	return true
+}
+
 func (p *AWSProvider) Test(secret *kapi.Secret) error {
 	var err error
 
@@ -142,31 +165,37 @@ func (p *AWSProvider) Test(secret *kapi.Secret) error {
 	case BackupStorage:
 		key, _ := uuid.NewUUID()
 		test := S3Test{
-			key:    key.String(),
-			url:    p.GetURL(),
-			region: p.Region,
-			bucket: p.Bucket,
-			secret: secret,
+			key:            key.String(),
+			url:            p.GetURL(),
+			region:         p.GetRegion(),
+			disableSSL:     p.GetDisableSSL(),
+			forcePathStyle: p.GetForcePathStyle(),
+			bucket:         p.Bucket,
+			secret:         secret,
 		}
 		err = test.Run()
 	case VolumeSnapshot:
-		test := Ec2Test{
+		// Disable volume snapshot test until
+		// https://github.com/fusor/mig-controller/issues/256 is resolved
+		/*test := Ec2Test{
 			url:    p.GetURL(),
-			region: p.Region,
+			region: p.GetRegion(),
 			secret: secret,
 		}
-		err = test.Run()
+		err = test.Run()*/
 	}
 
 	return err
 }
 
 type S3Test struct {
-	key    string
-	url    string
-	region string
-	bucket string
-	secret *kapi.Secret
+	key            string
+	url            string
+	region         string
+	bucket         string
+	disableSSL     bool
+	forcePathStyle bool
+	secret         *kapi.Secret
 }
 
 func (r *S3Test) Run() error {
@@ -189,7 +218,10 @@ func (r *S3Test) Run() error {
 
 func (r *S3Test) newSession() (*session.Session, error) {
 	return session.NewSession(&aws.Config{
-		Region: &r.region,
+		Region:           &r.region,
+		Endpoint:         &r.url,
+		DisableSSL:       aws.Bool(r.disableSSL),
+		S3ForcePathStyle: aws.Bool(r.forcePathStyle),
 		Credentials: credentials.NewStaticCredentials(
 			bytes.NewBuffer(r.secret.Data[AwsAccessKeyId]).String(),
 			bytes.NewBuffer(r.secret.Data[AwsSecretAccessKey]).String(),
