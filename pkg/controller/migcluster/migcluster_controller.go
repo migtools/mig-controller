@@ -123,11 +123,12 @@ type ReconcileMigCluster struct {
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	var err error
 	log.Reset()
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
-	err := r.Get(context.TODO(), request.NamespacedName, cluster)
+	err = r.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
@@ -155,6 +156,19 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			}
 		}
 	}
+
+	// Report reconcile error.
+	defer func() {
+		if err == nil || errors.IsConflict(err) {
+			return
+		}
+		cluster.Status.SetReconcileFailed(err)
+		err := r.Update(context.TODO(), cluster)
+		if err != nil {
+			log.Trace(err)
+			return
+		}
+	}()
 
 	// Begin staging conditions.
 	cluster.Status.BeginStagingConditions()

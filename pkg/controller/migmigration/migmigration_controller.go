@@ -121,11 +121,12 @@ type ReconcileMigMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migmigrations/status,verbs=get;update;patch
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	var err error
 	log.Reset()
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, migration)
+	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = r.deleted()
@@ -133,6 +134,19 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Report reconcile error.
+	defer func() {
+		if err == nil || errors.IsConflict(err) {
+			return
+		}
+		migration.Status.SetReconcileFailed(err)
+		err := r.Update(context.TODO(), migration)
+		if err != nil {
+			log.Trace(err)
+			return
+		}
+	}()
 
 	// Completed.
 	if migration.Status.Phase == Completed {
