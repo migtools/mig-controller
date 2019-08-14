@@ -62,7 +62,7 @@ func (p *AWSProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 		},
 	}
 	bsl.Spec.Config = map[string]string{
-		"s3ForcePathStyle": strconv.FormatBool(p.S3ForcePathStyle),
+		"s3ForcePathStyle": strconv.FormatBool(p.GetForcePathStyle()),
 		"region":           p.GetRegion(),
 	}
 	if p.S3URL != "" {
@@ -130,6 +130,7 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 	return fields
 }
 
+// Returns `us-east-1` if no region is specified
 func (p *AWSProvider) GetRegion() string {
 	if p.Region == "" {
 		return AwsS3DefaultRegion
@@ -137,6 +138,8 @@ func (p *AWSProvider) GetRegion() string {
 	return p.Region
 }
 
+// Check the scheme on the configured URL. If a URL is not specified, return
+// false
 func (p *AWSProvider) GetDisableSSL() bool {
 	s3Url, err := url.Parse(p.GetURL())
 	if err != nil {
@@ -148,7 +151,13 @@ func (p *AWSProvider) GetDisableSSL() bool {
 	return false
 }
 
+// This function returns a boolean determining whether we are talking to an S3
+// endpoint that requires path style formatting. Since all S3 APIs support path
+// style, the safe approach is to default to path style if the user has
+// specified an S3 API URL. This should be updated to perform some smarter
+// interpretation of the URL.
 func (p *AWSProvider) GetForcePathStyle() bool {
+	// If the user has specified a URL, lets assume Path Style for now.
 	if p.GetURL() == "" {
 		return false
 	}
