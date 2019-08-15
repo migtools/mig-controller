@@ -18,6 +18,8 @@ package migplan
 
 import (
 	"context"
+	"strconv"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/fusor/mig-controller/pkg/controller/migmigration"
 	"github.com/fusor/mig-controller/pkg/logging"
@@ -30,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"strconv"
 )
 
 var log = logging.WithName("plan")
@@ -143,6 +144,11 @@ type ReconcileMigPlan struct {
 // Automatically generate RBAC rules
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.openshift.io,resources=*,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=*,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=extensions,resources=*,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=,resources=namespaces/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
