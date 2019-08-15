@@ -278,6 +278,18 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 // on all clusters.
 func (r *ReconcileMigPlan) planDeleted(plan *migapi.MigPlan) error {
 	var err error
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, migration := range migrations {
+		err = r.Delete(context.TODO(), migration)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
 	clusters, err := migapi.ListClusters(r)
 	if err != nil {
 		log.Trace(err)
@@ -287,6 +299,7 @@ func (r *ReconcileMigPlan) planDeleted(plan *migapi.MigPlan) error {
 		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
 		if err != nil {
 			log.Trace(err)
+			return err
 		}
 	}
 	plan.Touch()
@@ -294,9 +307,10 @@ func (r *ReconcileMigPlan) planDeleted(plan *migapi.MigPlan) error {
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Get whether the finalizer may retry.
