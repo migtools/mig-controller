@@ -266,15 +266,17 @@ func (r *ReconcileMigCluster) clusterDeleted(cluster *migapi.MigCluster) error {
 	err = cluster.DeleteResources(r, nil)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	cluster.Touch()
 	cluster.DeleteFinalizer()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Get whether the finalizer may retry.
