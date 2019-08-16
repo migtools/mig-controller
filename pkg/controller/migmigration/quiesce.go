@@ -4,6 +4,7 @@ import (
 	"context"
 	appsv1 "github.com/openshift/api/apps/v1"
 	coreappsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,6 +30,14 @@ func (t *Task) quiesceApplications() error {
 		log.Trace(err)
 	}
 	err = t.scaleDownReplicaSets(client)
+	if err != nil {
+		log.Trace(err)
+	}
+	err = t.scaleDownDaemonSets(client)
+	if err != nil {
+		log.Trace(err)
+	}
+	err = t.scaleDownJobs(client)
 	if err != nil {
 		log.Trace(err)
 	}
@@ -153,6 +162,72 @@ func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
 	return nil
 }
 
+// values to support nodeSelector-based DaemonSet quiesce
+const (
+	quiesceNodeSelector    = "openshift.io/quiesceDaemonSet"
+	quiesceNodeSelectorVal = "quiesce"
+)
+
+// Scales down all DaemonSets.
+func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := coreappsv1.DaemonSetList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, set := range list.Items {
+			if set.Spec.Template.Spec.NodeSelector == nil {
+				set.Spec.Template.Spec.NodeSelector = make(map[string]string)
+			} else if set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] == quiesceNodeSelectorVal {
+				continue
+			}
+			set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] = quiesceNodeSelectorVal
+			err = client.Update(context.TODO(), &set)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Scales down all Jobs
+func (t *Task) scaleDownJobs(client k8sclient.Client) error {
+	zero := int32(0)
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := batchv1.JobList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, job := range list.Items {
+			if job.Spec.Parallelism == &zero {
+				continue
+			}
+			job.Spec.Parallelism = &zero
+			err = client.Update(context.TODO(), &job)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // Ensure scaled down pods have terminated.
 // Returns: `true` when all pods terminated.
 func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
@@ -160,6 +235,8 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 		"ReplicationController": true,
 		"StatefulSet":           true,
 		"ReplicaSet":            true,
+		"DaemonSet":             true,
+		"Job":                   true,
 	}
 	client, err := t.getSourceClient()
 	if err != nil {
