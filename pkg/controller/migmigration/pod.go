@@ -50,8 +50,8 @@ func (t *Task) restartResticPods() error {
 			log.Trace(err)
 			return err
 		}
-		return nil
 	}
+	time.Sleep(time.Second * 3)
 
 	return nil
 }
