@@ -227,14 +227,14 @@ func (t *Task) Run() error {
 			t.Requeue = 0
 		}
 	case RestartRestic:
-		err := t.restartResticPod()
+		err := t.restartResticPods()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
 		t.Phase = ResticRestarted
 	case ResticRestarted:
-		started, err := t.hasResticPodStarted()
+		started, err := t.haveResticPodsStarted()
 		if err != nil {
 			log.Trace(err)
 			return err

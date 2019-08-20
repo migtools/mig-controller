@@ -16,9 +16,9 @@ const (
 	resticPodPrefix = "restic-"
 )
 
-// Delete the running restic pod.
+// Delete the running restic pods.
 // Restarted to get around mount propagation requirements.
-func (t *Task) restartResticPod() error {
+func (t *Task) restartResticPods() error {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
@@ -57,7 +57,7 @@ func (t *Task) restartResticPod() error {
 }
 
 // Determine if restic pod is running.
-func (t *Task) hasResticPodStarted() (bool, error) {
+func (t *Task) haveResticPodsStarted() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
@@ -79,13 +79,13 @@ func (t *Task) hasResticPodStarted() (bool, error) {
 		if !strings.HasPrefix(pod.Name, resticPodPrefix) {
 			continue
 		}
-		if pod.Status.Phase == corev1.PodRunning {
+		if pod.Status.Phase != corev1.PodRunning {
 			time.Sleep(time.Second * 3)
-			return true, nil
+			return false, nil
 		}
 	}
 
-	return false, nil
+	return true, nil
 }
 
 // Build a stage pod based on `pod`.
