@@ -147,7 +147,11 @@ func (t *Task) Run() error {
 			if t.hasPVs() {
 				t.Phase = AnnotateResources
 			} else {
-				t.Phase = Completed
+				if t.quiesce() {
+					t.Phase = QuiesceApplications
+				} else {
+					t.Phase = Completed
+				}
 			}
 		} else {
 			t.Phase = EnsureInitialBackup
@@ -258,7 +262,11 @@ func (t *Task) Run() error {
 			return err
 		}
 		if quiesced {
-			t.Phase = EnsureStageBackup
+			if t.hasPVs() {
+				t.Phase = EnsureStageBackup
+			} else {
+				t.Phase = Completed
+			}
 		} else {
 			t.Requeue = time.Second * 3
 		}
