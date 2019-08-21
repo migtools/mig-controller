@@ -4,16 +4,15 @@ import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
 	"time"
-)
-
-const (
-	resticPodPrefix = "restic-"
 )
 
 // Delete the running restic pods.
@@ -25,10 +24,14 @@ func (t *Task) restartResticPods() error {
 		return err
 	}
 	list := corev1.PodList{}
+	selector := labels.SelectorFromSet(map[string]string{
+		"name": "restic",
+	})
 	err = client.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
-			Namespace: migapi.VeleroNamespace,
+			Namespace:     migapi.VeleroNamespace,
+			LabelSelector: selector,
 		},
 		&list)
 	if err != nil {
@@ -37,9 +40,6 @@ func (t *Task) restartResticPods() error {
 	}
 
 	for _, pod := range list.Items {
-		if !strings.HasPrefix(pod.Name, resticPodPrefix) {
-			continue
-		}
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
@@ -64,10 +64,15 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 	list := corev1.PodList{}
+	ds := v1beta1.DaemonSet{}
+	selector := labels.SelectorFromSet(map[string]string{
+		"name": "restic",
+	})
 	err = client.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
-			Namespace: migapi.VeleroNamespace,
+			Namespace:     migapi.VeleroNamespace,
+			LabelSelector: selector,
 		},
 		&list)
 	if err != nil {
@@ -75,14 +80,30 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 
+	err = client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Name:      "restic",
+			Namespace: migapi.VeleroNamespace,
+		},
+		&ds)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
 	for _, pod := range list.Items {
-		if !strings.HasPrefix(pod.Name, resticPodPrefix) {
-			continue
+		if pod.DeletionTimestamp != nil {
+			return false, nil
 		}
 		if pod.Status.Phase != corev1.PodRunning {
 			time.Sleep(time.Second * 3)
 			return false, nil
 		}
+	}
+	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
+		time.Sleep(time.Second * 3)
+		return false, nil
 	}
 
 	return true, nil
