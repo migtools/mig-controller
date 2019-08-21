@@ -233,6 +233,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Phase = ResticRestarted
+		t.Requeue = time.Second * 3
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
