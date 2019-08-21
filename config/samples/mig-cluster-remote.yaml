@@ -12,7 +12,7 @@ spec:
 
   clusterRef:
     name: remote-cluster
-    namespace: openshift-migration-operator
+    namespace: openshift-migration
 
   serviceAccountSecretRef:
     name: sa-token-remote
