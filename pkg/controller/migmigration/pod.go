@@ -12,7 +12,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Delete the running restic pods.
@@ -51,7 +50,6 @@ func (t *Task) restartResticPods() error {
 			return err
 		}
 	}
-	time.Sleep(time.Second * 3)
 
 	return nil
 }
@@ -97,12 +95,10 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 			return false, nil
 		}
 		if pod.Status.Phase != corev1.PodRunning {
-			time.Sleep(time.Second * 3)
 			return false, nil
 		}
 	}
 	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
-		time.Sleep(time.Second * 3)
 		return false, nil
 	}
 
