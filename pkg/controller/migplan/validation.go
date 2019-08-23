@@ -481,6 +481,9 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
+	if destMigCluster == nil {
+		return nil
+	}
 	for _, storageClass := range destMigCluster.Spec.StorageClasses {
 		storageClasses[storageClass.Name] = storageClass.AccessModes
 	}
