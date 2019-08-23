@@ -16,7 +16,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata: 
   name: restic
-  namespace: openshift-migration
+  namespace: openshift-migration-operator
 spec:
   selector:
     matchLabels:
