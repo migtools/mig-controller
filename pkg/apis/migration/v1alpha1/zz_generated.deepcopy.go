@@ -672,6 +672,11 @@ func (in *Supported) DeepCopyInto(out *Supported) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.CopyMethods != nil {
+		in, out := &in.CopyMethods, &out.CopyMethods
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -680,6 +680,12 @@ const (
 	PvCopyAction = "copy"
 )
 
+// PV Copy Methods.
+const (
+	PvFilesystemCopyMethod = "filesystem"
+	PvSnapshotCopyMethod   = "snapshot"
+)
+
 // Name - The PV name.
 // Capacity - The PV storage capacity.
 // StorageClass - The PV storage class name.
@@ -704,25 +710,30 @@ type PVC struct {
 }
 
 // Supported
-// Actions - The list of supported actions
+// Actions     - The list of supported actions
+// CopyMethods - The list of supported copy methods
 type Supported struct {
-	Actions []string `json:"actions"`
+	Actions     []string `json:"actions"`
+	CopyMethods []string `json:"copyMethods"`
 }
 
 // Selection
 // Action - The PV migration action (move|copy)
 // StorageClass - The PV storage class name to use in the destination cluster.
 // AccessMode   - The PV access mode to use in the destination cluster, if different from src PVC AccessMode
+// CopyMethod   - The PV copy method to use ('filesystem' for restic copy, or 'snapshot' for velero snapshot plugin)
 type Selection struct {
 	Action       string                          `json:"action,omitempty"`
 	StorageClass string                          `json:"storageClass,omitempty"`
 	AccessMode   kapi.PersistentVolumeAccessMode `json:"accessMode,omitempty" protobuf:"bytes,1,rep,name=accessMode,casttype=PersistentVolumeAccessMode"`
+	CopyMethod   string                          `json:"copyMethod,omitempty"`
 }
 
 // Update the PV with another.
 func (r *PV) Update(pv PV) {
 	r.StorageClass = pv.StorageClass
 	r.Supported.Actions = pv.Supported.Actions
+	r.Supported.CopyMethods = pv.Supported.CopyMethods
 	r.Capacity = pv.Capacity
 	r.PVC = pv.PVC
 	if len(r.Supported.Actions) == 1 {

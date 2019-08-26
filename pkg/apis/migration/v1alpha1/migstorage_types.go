@@ -119,13 +119,15 @@ func (r *MigStorage) UpdateBSL(bsl *velero.BackupStorageLocation) {
 }
 
 // Build VSL.
-func (r *MigStorage) BuildVSL() *velero.VolumeSnapshotLocation {
+// planUID param is a workaround for velero, needed until velero
+// restore accepts a VSL attibute when the name differs from the backup
+func (r *MigStorage) BuildVSL(planUID string) *velero.VolumeSnapshotLocation {
 	vsl := &velero.VolumeSnapshotLocation{
 		Spec: velero.VolumeSnapshotLocationSpec{},
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       r.GetCorrelationLabels(),
-			Namespace:    VeleroNamespace,
-			GenerateName: r.Name + "-",
+			Labels:    r.GetCorrelationLabels(),
+			Namespace: VeleroNamespace,
+			Name:      r.Name + "-" + planUID,
 		},
 	}
 
