@@ -170,26 +170,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Plan deleted.
-	if plan.DeletionTimestamp != nil {
-		retry := false
-		err := r.planDeleted(plan)
-		if err != nil {
-			log.Trace(err)
-			retry = r.retryFinalizer(plan)
-		}
-		return reconcile.Result{Requeue: retry}, nil
-	} else {
-		added := plan.EnsureFinalizer()
-		if added {
-			err = r.Update(context.TODO(), plan)
-			if err != nil {
-				log.Trace(err)
-				return reconcile.Result{Requeue: true}, nil
-			}
-		}
-	}
-
 	// Report reconcile error.
 	defer func() {
 		if err == nil || errors.IsConflict(err) {
@@ -277,73 +257,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Done
 	return reconcile.Result{}, nil
-}
-
-// The plan has been deleted.
-// Delete all `remote` resources created by the plan
-// on all clusters.
-func (r *ReconcileMigPlan) planDeleted(plan *migapi.MigPlan) error {
-	var err error
-	migrations, err := plan.ListMigrations(r)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	for _, migration := range migrations {
-		err = r.Delete(context.TODO(), migration)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-	}
-	clusters, err := migapi.ListClusters(r)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	for _, cluster := range clusters {
-		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-	}
-	plan.Touch()
-	plan.DeleteFinalizer()
-	err = r.Update(context.TODO(), plan)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	return nil
-}
-
-// Get whether the finalizer may retry.
-func (r *ReconcileMigPlan) retryFinalizer(plan *migapi.MigPlan) bool {
-	retries := 3
-	key := "retry-finalizer"
-	if plan.Annotations == nil {
-		plan.Annotations = map[string]string{}
-	}
-	n := 0
-	if v, found := plan.Annotations[key]; found {
-		n, _ = strconv.Atoi(v)
-	} else {
-		n = retries
-	}
-	if n > 0 {
-		n--
-		plan.Annotations[key] = strconv.Itoa(n)
-	} else {
-		plan.DeleteFinalizer()
-	}
-	err := r.Update(context.TODO(), plan)
-	if err != nil {
-		log.Trace(err)
-	}
-
-	return n > 0
 }
 
 // Detect that a plan is been closed and ensure all its referenced

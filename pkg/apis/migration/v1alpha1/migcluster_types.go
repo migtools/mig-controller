@@ -88,41 +88,6 @@ func init() {
 	SchemeBuilder.Register(&MigCluster{}, &MigClusterList{})
 }
 
-// Ensure finalizer.
-func (r *MigCluster) EnsureFinalizer() bool {
-	if !FinalizerEnabled {
-		return false
-	}
-	if r.Finalizers == nil {
-		r.Finalizers = []string{}
-	}
-	for _, f := range r.Finalizers {
-		if f == Finalizer {
-			return false
-		}
-	}
-	r.Finalizers = append(r.Finalizers, Finalizer)
-	return true
-}
-
-// Delete finalizer.
-func (r *MigCluster) DeleteFinalizer() bool {
-	if r.Finalizers == nil {
-		r.Finalizers = []string{}
-	}
-	deleted := false
-	kept := []string{}
-	for _, f := range r.Finalizers {
-		if f == Finalizer {
-			deleted = true
-			continue
-		}
-		kept = append(kept, f)
-	}
-	r.Finalizers = kept
-	return deleted
-}
-
 // Get the service account secret.
 // Returns `nil` when the reference cannot be resolved.
 func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Secret, error) {
