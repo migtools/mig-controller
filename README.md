@@ -126,13 +126,13 @@ For mig-controller to perform migration actions on a remote cluster, you'll need
 To configure the SA token, run the following on the remote cluster:
 ```bash
 # Create a new service account in the mig ns
-oc create namespace openshift-migration-operator
 oc create namespace openshift-migration
-oc create sa -n openshift-migration-operator mig
+oc create namespace openshift-migration
+oc create sa -n openshift-migration mig
 # Grant the 'mig' service account cluster-admin (cluster level root privileges, use with caution!)
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:mig
 # Get the ServiceAccount token in a base64-encoded format to put in the remote MigCluster spec
-oc sa get-token -n openshift-migration-operator mig|base64 -w 0
+oc sa get-token -n openshift-migration mig|base64 -w 0
 
 ```
 Use the base64-encoded SA token from the last command output to fill in `migsamples/sa-secret-remote.yaml`

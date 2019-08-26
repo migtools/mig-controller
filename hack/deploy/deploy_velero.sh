@@ -13,12 +13,12 @@ oc apply -f https://raw.githubusercontent.com/fusor/mig-controller/master/hack/d
 
 echo
 echo "===================================================="
-echo "Adding cluster-admin role to openshift-migration-operator:mig service account"
+echo "Adding cluster-admin role to openshift-migration:mig service account"
 echo "===================================================="
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-migration-operator:mig
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-migration:mig
 
 echo
 echo "===================================================="
 echo "Adding privileged scc to velero service account"
 echo "===================================================="
-oc adm policy add-scc-to-user privileged system:serviceaccount:openshift-migration-operator:velero
+oc adm policy add-scc-to-user privileged system:serviceaccount:openshift-migration:velero
