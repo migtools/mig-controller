@@ -23,6 +23,7 @@ import (
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -153,6 +154,13 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{}, nil
 	}
 
+	// Owner Reference
+	err = r.setOwnerReference(migration)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{}, err
+	}
+
 	// Re-queue (after) in seconds.
 	requeueAfter := time.Duration(0) // not re-queued.
 
@@ -279,6 +287,37 @@ func (r *ReconcileMigMigration) deleted() error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+// Set the owner reference is set to the plan.
+func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration) error {
+	plan, err := migapi.GetPlan(r, migration.Spec.MigPlanRef)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if plan == nil {
+		return nil
+	}
+	for i := range migration.OwnerReferences {
+		ref := &migration.OwnerReferences[i]
+		if ref.Kind == plan.Kind {
+			ref.APIVersion = plan.APIVersion
+			ref.Name = plan.Name
+			ref.UID = plan.UID
+			return nil
+		}
+	}
+	migration.OwnerReferences = append(
+		migration.OwnerReferences,
+		v1.OwnerReference{
+			APIVersion: plan.APIVersion,
+			Kind:       plan.Kind,
+			Name:       plan.Name,
+			UID:        plan.UID,
+		})
 
 	return nil
 }
