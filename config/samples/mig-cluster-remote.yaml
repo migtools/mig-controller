@@ -16,4 +16,4 @@ spec:
 
   serviceAccountSecretRef:
     name: sa-token-remote
-    namespace: openshift-migration-operator
+    namespace: openshift-migration

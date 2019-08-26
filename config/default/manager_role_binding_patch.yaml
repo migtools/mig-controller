@@ -6,4 +6,4 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: openshift-migration-operator
+  namespace: openshift-migration
