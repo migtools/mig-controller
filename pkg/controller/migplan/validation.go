@@ -31,6 +31,9 @@ const (
 	PvNoStorageClassSelection      = "PvNoStorageClassSelection"
 	PvWarnNoCephAvailable          = "PvWarnNoCephAvailable"
 	PvWarnAccessModeUnavailable    = "PvWarnAccessModeUnavailable"
+	PvInvalidCopyMethod            = "PvInvalidCopyMethod"
+	PvNoCopyMethodSelection        = "PvNoCopyMethodSelection"
+	PvWarnCopyMethodSnapshot       = "PvWarnCopyMethodSnapshot"
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
@@ -83,6 +86,9 @@ const (
 	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`."
 	PvWarnNoCephAvailableMessage          = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
 	PvWarnAccessModeUnavailableMessage    = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
+	PvInvalidCopyMethodMessage            = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
+	PvNoCopyMethodSelectionMessage        = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
+	PvWarnCopyMethodSnapshotMessage       = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
@@ -472,6 +478,9 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 	invalidStorageClass := make([]string, 0)
 	invalidAccessMode := make([]string, 0)
 	unavailableAccessMode := make([]string, 0)
+	missingCopyMethod := make([]string, 0)
+	invalidCopyMethod := make([]string, 0)
+	warnCopyMethodSnapshot := make([]string, 0)
 
 	if plan.Status.HasAnyCondition(Suspended) {
 		return nil
@@ -503,7 +512,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			invalidAction = append(invalidAction, pv.Name)
 			continue
 		}
-		// Don't report StorageClass, AccessMode errors if Action != 'copy'
+		// Don't report StorageClass, AccessMode, CopyMethod errors if Action != 'copy'
 		if pv.Selection.Action != migapi.PvCopyAction {
 			continue
 		}
@@ -533,6 +542,22 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 				invalidStorageClass = append(invalidStorageClass, pv.Name)
 			}
 		}
+		if pv.Selection.CopyMethod == "" {
+			missingCopyMethod = append(missingCopyMethod, pv.Name)
+		} else {
+			copyMethods := map[string]bool{}
+			for _, m := range pv.Supported.CopyMethods {
+				copyMethods[m] = true
+			}
+			_, found := copyMethods[pv.Selection.CopyMethod]
+			if !found {
+				invalidCopyMethod = append(invalidCopyMethod, pv.Name)
+			} else if pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
+				// Warn if Snapshot is selected
+				warnCopyMethodSnapshot = append(warnCopyMethodSnapshot, pv.Name)
+			}
+		}
+
 	}
 	if len(invalidAction) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -552,7 +577,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Message:  PvNoSupportedActionMessage,
 			Items:    unsupported,
 		})
-		return nil
 	}
 	if len(invalidStorageClass) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -581,7 +605,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Message:  PvNoStorageClassSelectionMessage,
 			Items:    missingStorageClass,
 		})
-		return nil
 	}
 	if len(unavailableAccessMode) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -591,7 +614,33 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Message:  PvWarnAccessModeUnavailableMessage,
 			Items:    unavailableAccessMode,
 		})
-		return nil
+	}
+	if len(missingCopyMethod) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNoCopyMethodSelection,
+			Status:   True,
+			Category: Error,
+			Message:  PvNoCopyMethodSelectionMessage,
+			Items:    missingCopyMethod,
+		})
+	}
+	if len(invalidCopyMethod) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvInvalidCopyMethod,
+			Status:   True,
+			Category: Error,
+			Message:  PvInvalidCopyMethodMessage,
+			Items:    invalidCopyMethod,
+		})
+	}
+	if len(warnCopyMethodSnapshot) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvWarnCopyMethodSnapshot,
+			Status:   True,
+			Category: Warn,
+			Message:  PvWarnCopyMethodSnapshotMessage,
+			Items:    warnCopyMethodSnapshot,
+		})
 	}
 
 	return nil

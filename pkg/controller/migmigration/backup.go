@@ -329,3 +329,12 @@ func findPVAccessMode(pvList migapi.PersistentVolumes, pvName string) corev1.Per
 	}
 	return ""
 }
+
+func findPVCopyMethod(pvList migapi.PersistentVolumes, pvName string) string {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Selection.CopyMethod
+		}
+	}
+	return ""
+}

@@ -131,7 +131,7 @@ func (r PlanStorage) ensureBSL() error {
 
 // Create the velero VolumeSnapshotLocation has been created.
 func (r PlanStorage) ensureVSL() error {
-	newVSL := r.storage.BuildVSL()
+	newVSL := r.storage.BuildVSL(string(r.plan.UID))
 	newVSL.Labels = r.plan.GetCorrelationLabels()
 	foundVSL, err := r.plan.GetVSL(r.targetClient)
 	if err != nil {

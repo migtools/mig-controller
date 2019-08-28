@@ -73,7 +73,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		if !found {
 			continue
 		}
-		selectedStorageClass, err := r.getDestStorageClass(pv, claim, plan, srcStorageClasses, destStorageClasses)
+		selection, err := r.getDefaultSelection(pv, claim, plan, srcStorageClasses, destStorageClasses)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -83,9 +83,12 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 				Name:         pv.Name,
 				Capacity:     pv.Spec.Capacity[core.ResourceStorage],
 				StorageClass: pv.Spec.StorageClassName,
-				Supported:    migapi.Supported{Actions: r.getSupportedActions(pv)},
-				Selection:    migapi.Selection{StorageClass: selectedStorageClass},
-				PVC:          claim,
+				Supported: migapi.Supported{
+					Actions:     r.getSupportedActions(pv),
+					CopyMethods: r.getSupportedCopyMethods(pv),
+				},
+				Selection: selection,
+				PVC:       claim,
 			})
 	}
 
@@ -188,6 +191,47 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []strin
 	return []string{
 		migapi.PvCopyAction,
 	}
+}
+
+// Determine the supported PV copy methods.
+// This is static for now but should eventually take into account
+// src volume type and dest cluster available storage classes
+func (r *ReconcileMigPlan) getSupportedCopyMethods(pv core.PersistentVolume) []string {
+	return []string{
+		migapi.PvFilesystemCopyMethod,
+		migapi.PvSnapshotCopyMethod,
+	}
+}
+
+// Gets the default selection values for a PV
+func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
+	claim migapi.PVC,
+	plan *migapi.MigPlan,
+	srcStorageClasses []migapi.StorageClass,
+	destStorageClasses []migapi.StorageClass) (migapi.Selection, error) {
+	selectedStorageClass, err := r.getDestStorageClass(pv, claim, plan, srcStorageClasses, destStorageClasses)
+	if err != nil {
+		return migapi.Selection{}, err
+	}
+	actions := r.getSupportedActions(pv)
+	selectedAction := ""
+	// if there's only one action, make that the default, otherwise select "copy" (if available)
+	if len(actions) == 1 {
+		selectedAction = actions[0]
+	} else {
+		for _, a := range actions {
+			if a == migapi.PvCopyAction {
+				selectedAction = a
+				break
+			}
+		}
+	}
+
+	return migapi.Selection{
+		Action:       selectedAction,
+		StorageClass: selectedStorageClass,
+		CopyMethod:   migapi.PvFilesystemCopyMethod,
+	}, nil
 }
 
 // Determine the initial value for the destination storage class.
