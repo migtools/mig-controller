@@ -50,6 +50,10 @@ const (
 	FinalRestoreLabel = "migration-final-restore"
 )
 
+// Set of Service Accounts.
+// Keyed by namespace (name) with value of map keyed by SA name.
+type ServiceAccounts map[string]map[string]bool
+
 // Add annotations and labels.
 // The PvActionAnnotation annotation is added to PV & PVC as needed by the velero plugin.
 // The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
@@ -72,13 +76,19 @@ func (t *Task) annotateStageResources() error {
 		return err
 	}
 	// Pods
-	err = t.annotatePods(client)
+	serviceAccounts, err := t.annotatePods(client)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	// PV & PVCs
 	err = t.annotatePVs(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// Service accounts used by stage pods.
+	err = t.labelServiceAccounts(client, serviceAccounts)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -174,6 +184,10 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 			log.Trace(err)
 			return err
 		}
+		log.Info(
+			"NS annotations/labels added.",
+			"name",
+			namespace.Name)
 	}
 	return nil
 }
@@ -182,14 +196,16 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
 // The IncludedInStageBackupLabel label is added to Pods and is referenced
 // by the velero.Backup label selector.
-func (t *Task) annotatePods(client k8sclient.Client) error {
+// Returns a set of referenced service accounts.
+func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
+	serviceAccounts := ServiceAccounts{}
 	for _, ns := range t.namespaces() {
 		list := corev1.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, &list)
 		if err != nil {
 			log.Trace(err)
-			return err
+			return nil, err
 		}
 		for _, pod := range list.Items {
 			if pod.Labels == nil {
@@ -208,7 +224,7 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 			volumes, err := t.annotatePVCs(client, pod)
 			if err != nil {
 				log.Trace(err)
-				return err
+				return nil, err
 			}
 			if len(volumes) == 0 {
 				continue
@@ -228,7 +244,7 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
 				log.Trace(err)
-				return err
+				return nil, err
 			}
 			log.Info(
 				"Pod annotations/labels added.",
@@ -236,10 +252,17 @@ func (t *Task) annotatePods(client k8sclient.Client) error {
 				pod.Namespace,
 				"name",
 				pod.Name)
+			sa := pod.Spec.ServiceAccountName
+			names, found := serviceAccounts[pod.Namespace]
+			if !found {
+				serviceAccounts[pod.Namespace] = map[string]bool{sa: true}
+			} else {
+				names[sa] = true
+			}
 		}
 	}
 
-	return nil
+	return serviceAccounts, nil
 }
 
 // Add annotations and labels to PVs.
@@ -288,6 +311,45 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 	return nil
 }
 
+// Add label to service accounts.
+func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts ServiceAccounts) error {
+	for _, ns := range t.namespaces() {
+		names, found := serviceAccounts[ns]
+		if !found {
+			continue
+		}
+		list := corev1.ServiceAccountList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(context.TODO(), options, &list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, sa := range list.Items {
+			if _, found := names[sa.Name]; !found {
+				continue
+			}
+			if sa.Labels == nil {
+				sa.Labels = make(map[string]string)
+			}
+			sa.Labels[IncludedInStageBackupLabel] = t.UID()
+			err = client.Update(context.TODO(), &sa)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			log.Info(
+				"SA annotations/labels added.",
+				"ns",
+				sa.Namespace,
+				"name",
+				sa.Name)
+		}
+	}
+
+	return nil
+}
+
 // Delete temporary annotations and labels added.
 func (t *Task) deleteAnnotations() error {
 	clients, err := t.getBothClients()
@@ -313,6 +375,11 @@ func (t *Task) deleteAnnotations() error {
 			return err
 		}
 		err = t.deleteNamespaceLabels(client)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		err = t.deleteServiceAccountLabels(client)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -483,6 +550,36 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 			"PV annotations/labels removed.",
 			"name",
 			pv.Name)
+	}
+
+	return nil
+}
+
+// Delete service account labels.
+func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
+	labels := map[string]string{
+		IncludedInStageBackupLabel: t.UID(),
+	}
+	options := k8sclient.MatchingLabels(labels)
+	pvList := corev1.ServiceAccountList{}
+	err := client.List(context.TODO(), options, &pvList)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, sa := range pvList.Items {
+		delete(sa.Labels, IncludedInStageBackupLabel)
+		err = client.Update(context.TODO(), &sa)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		log.Info(
+			"SA annotations/labels removed.",
+			"ns",
+			sa.Namespace,
+			"name",
+			sa.Name)
 	}
 
 	return nil
