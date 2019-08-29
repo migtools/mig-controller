@@ -5,6 +5,7 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	coreappsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -15,6 +16,10 @@ func (t *Task) quiesceApplications() error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+	err = t.suspendCronJobs(client)
+	if err != nil {
+		log.Trace(err)
 	}
 	err = t.scaleDownDeploymentConfigs(client)
 	if err != nil {
@@ -195,6 +200,36 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 			}
 		}
 	}
+	return nil
+}
+
+// Suspends all CronJobs
+func (t *Task) suspendCronJobs(client k8sclient.Client) error {
+	trueVal := true
+	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+		list := batchv1beta1.CronJobList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			options,
+			&list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, job := range list.Items {
+			if job.Spec.Suspend != nil && *job.Spec.Suspend == true {
+				continue
+			}
+			job.Spec.Suspend = &trueVal
+			err = client.Update(context.TODO(), &job)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
