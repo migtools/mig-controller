@@ -26,6 +26,7 @@ import (
 
 // Backup resources.
 var stagingResources = []string{
+	"serviceaccount",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"namespaces",

@@ -126,13 +126,15 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			Labels: labels,
 		},
 		Spec: corev1.PodSpec{
-			Containers:      []corev1.Container{},
-			Volumes:         []corev1.Volume{},
-			SecurityContext: pod.Spec.SecurityContext,
+			Containers:                   []corev1.Container{},
+			Volumes:                      []corev1.Volume{},
+			SecurityContext:              pod.Spec.SecurityContext,
+			ServiceAccountName:           pod.Spec.ServiceAccountName,
+			AutomountServiceAccountToken: pod.Spec.AutomountServiceAccountToken,
 			Affinity: &corev1.Affinity{
 				PodAffinity: &corev1.PodAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-						corev1.WeightedPodAffinityTerm{
+						{
 							Weight: 100,
 							PodAffinityTerm: corev1.PodAffinityTerm{
 								LabelSelector: &metav1.LabelSelector{
