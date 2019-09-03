@@ -36,6 +36,10 @@ var stagingResources = []string{
 	"configmaps",
 	"pods",
 }
+var excludedInitialResources = []string{
+	"persistentvolumes",
+	"persistentvolumeclaims",
+}
 
 // Perform the migration.
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Duration, error) {
