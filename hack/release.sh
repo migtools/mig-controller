@@ -11,7 +11,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: controller-manager
-  namespace: openshift-migration
+  namespace: migration
 spec:
   template:
     spec:

@@ -185,7 +185,7 @@ $ oc apply -f mig-plan.yaml
 # "The Migration Plan is ready" or a list of issues to resolve.
 $ oc describe migplan migplan-sample -n mig
 Name:         migplan-sample
-Namespace:    openshift-migration
+Namespace:    migration
 API Version:  migration.openshift.io/v1alpha1
 Kind:         MigPlan
 
@@ -213,7 +213,7 @@ $ oc apply -f mig-migration.yaml
 # migration can begin.
 $ oc describe migmigration -n mig migmigration-sample
 Name:         migmigration-sample
-Namespace:    openshift-migration
+Namespace:    migration
 [... snipped ...]
 Status:
   Completion Timestamp:    2019-05-22T21:46:09Z

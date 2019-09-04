@@ -4,7 +4,7 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
   name: migmigration-sample
-  namespace: openshift-migration
+  namespace: migration
 spec:
   # [!] Set 'stage: true' to run a 'Stage Migration' and skip quiescing of Pods on the source cluster.
   stage: false
@@ -13,4 +13,4 @@ spec:
 
   migPlanRef:
     name: migplan-sample
-    namespace: openshift-migration
+    namespace: migration

@@ -6,7 +6,7 @@ import (
 
 const (
 	TouchAnnotation = "touch"
-	VeleroNamespace = "openshift-migration"
+	VeleroNamespace = "migration"
 )
 
 // Migration application CR.

@@ -297,13 +297,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: openshift-migration
+  namespace: migration
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: webhook-server-secret
-  namespace: openshift-migration
+  namespace: migration
 ---
 apiVersion: v1
 kind: Service
@@ -312,7 +312,7 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
   name: controller-manager-service
-  namespace: openshift-migration
+  namespace: migration
 spec:
   ports:
   - port: 443
@@ -327,7 +327,7 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
   name: controller-manager
-  namespace: openshift-migration
+  namespace: migration
 spec:
   selector:
     matchLabels:

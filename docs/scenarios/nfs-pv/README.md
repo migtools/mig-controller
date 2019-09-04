@@ -231,7 +231,7 @@ After creating the MigMigration resource, you can monitor its progress with `oc 
 ```
 $ oc describe migmigration migmigration-sample -n mig
 Name:         migmigration-sample
-Namespace:    openshift-migration
+Namespace:    migration
 Status:
   Migration Started:       true
   Start Timestamp:         2019-05-31T14:22:08Z
@@ -246,7 +246,7 @@ Recall that we set `quiescePods: true` on the MigMigration resource in an earlie
 # Since we are at 'WaitOnBackupReplication', the Pods have already started scaling down.
 $ oc describe migmigration migmigration-sample -n mig
 Name:         migmigration-sample
-Namespace:    openshift-migration
+Namespace:    migration
   Migration Started:       true
   Start Timestamp:         2019-05-31T14:22:08Z
   Task Phase:              WaitOnBackupReplication
@@ -263,7 +263,7 @@ Assuming no errors are encountered, describing the MigMigration will eventually 
 ```
 $ oc describe migmigration migmigration-sample -n mig
 Name:         migmigration-sample
-Namespace:    openshift-migration
+Namespace:    migration
 [...]
   Migration Completed:     true
   Start Timestamp:         2019-05-31T14:22:08Z

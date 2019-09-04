@@ -187,7 +187,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: velero
-  namespace: openshift-migration
+  namespace: migration
   labels:
     component: velero
 
@@ -200,7 +200,7 @@ metadata:
     component: velero
 subjects:
   - kind: ServiceAccount
-    namespace: openshift-migration
+    namespace: migration
     name: velero
 roleRef:
   kind: ClusterRole
