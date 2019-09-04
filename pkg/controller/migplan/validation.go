@@ -83,7 +83,7 @@ const (
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
 	PvInvalidStorageClassMessage          = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
 	PvInvalidAccessModeMessage            = "PV in `persistentVolumes` [] has an invalid `accessMode`."
-	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`."
+	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static persistent volumes exist in the destination cluster."
 	PvWarnNoCephAvailableMessage          = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
 	PvWarnAccessModeUnavailableMessage    = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
 	PvInvalidCopyMethodMessage            = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
@@ -601,7 +601,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoStorageClassSelection,
 			Status:   True,
-			Category: Error,
+			Category: Warn,
 			Message:  PvNoStorageClassSelectionMessage,
 			Items:    missingStorageClass,
 		})
