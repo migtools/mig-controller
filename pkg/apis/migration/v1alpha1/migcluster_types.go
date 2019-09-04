@@ -25,7 +25,7 @@ import (
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
-	"k8s.io/api/apps/v1"
+	"k8s.io/api/apps/v1beta1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -243,7 +243,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 	options := k8sclient.MatchingLabels(labels)
 
 	// Deployment
-	dList := v1.DeploymentList{}
+	dList := v1beta1.DeploymentList{}
 	err = client.List(context.TODO(), options, &dList)
 	if err != nil {
 		return err

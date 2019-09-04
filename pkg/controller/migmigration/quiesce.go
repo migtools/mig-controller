@@ -3,10 +3,12 @@ package migmigration
 import (
 	"context"
 	appsv1 "github.com/openshift/api/apps/v1"
-	coreappsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
+	extv1b1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,6 +22,7 @@ func (t *Task) quiesceApplications() error {
 	err = t.suspendCronJobs(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	err = t.scaleDownDeploymentConfigs(client)
 	if err != nil {
@@ -29,25 +32,30 @@ func (t *Task) quiesceApplications() error {
 	err = t.scaleDownDeployments(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	err = t.scaleDownStatefulSets(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	err = t.scaleDownReplicaSets(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	err = t.scaleDownDaemonSets(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 	err = t.scaleDownJobs(client)
 	if err != nil {
 		log.Trace(err)
+		return err
 	}
 
-	return err
+	return nil
 }
 
 // Scales down DeploymentConfig on source cluster
@@ -83,7 +91,7 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
-		list := coreappsv1.DeploymentList{}
+		list := v1beta1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -113,7 +121,7 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
-		list := coreappsv1.StatefulSetList{}
+		list := v1beta1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -142,7 +150,7 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
-		list := coreappsv1.ReplicaSetList{}
+		list := extv1b1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -176,7 +184,7 @@ const (
 // Scales down all DaemonSets.
 func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
-		list := coreappsv1.DaemonSetList{}
+		list := extv1b1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -204,25 +212,33 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 }
 
 // Suspends all CronJobs
+// Using unstructured because OCP 3.7 supports batch/v2alpha1 which is
+// not supported in newer versions such as OCP 3.11.
 func (t *Task) suspendCronJobs(client k8sclient.Client) error {
-	trueVal := true
+	fields := []string{"spec", "suspend"}
 	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
-		list := batchv1beta1.CronJobList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(
-			context.TODO(),
-			options,
-			&list)
+		list := unstructured.UnstructuredList{}
+		list.SetGroupVersionKind(schema.GroupVersionKind{
+			Group: "batch",
+			Kind:  "cronjob",
+		})
+		err := client.List(context.TODO(), options, &list)
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		for _, job := range list.Items {
-			if job.Spec.Suspend != nil && *job.Spec.Suspend == true {
+		for _, r := range list.Items {
+			suspend, found, err := unstructured.NestedBool(r.Object, fields...)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			if found && suspend {
 				continue
 			}
-			job.Spec.Suspend = &trueVal
-			err = client.Update(context.TODO(), &job)
+			unstructured.SetNestedField(r.Object, true, fields...)
+			err = client.Update(context.TODO(), &r)
 			if err != nil {
 				log.Trace(err)
 				return err
