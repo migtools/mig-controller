@@ -18,8 +18,7 @@ package v1alpha1
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"k8s.io/client-go/kubernetes/scheme"
 	"time"
 
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -30,18 +29,21 @@ import (
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// SA secret keys.
+const (
+	SaToken = "saToken"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
 type MigClusterSpec struct {
 	IsHostCluster           bool                  `json:"isHostCluster"`
-	ClusterRef              *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	URL                     string                `json:"url,omitempty"`
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
+	CABundle                []byte                `json:"caBundle,omitempty"`
 	StorageClasses          []StorageClass        `json:"storageClasses,omitempty"`
 }
 
@@ -96,28 +98,22 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
-
-	// If MigCluster isHostCluster, reuse client
 	if m.Spec.IsHostCluster {
 		return c, nil
 	}
 	/*
 		TODO: re-enable cache after issue with caching secrets is resolved
-
-		// If RemoteWatch exists for this cluster, reuse the remote manager's client
 		remoteWatchMap := remote.GetWatchMap()
 		remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
 		if remoteWatchCluster != nil {
 			return remoteWatchCluster.RemoteManager.GetClient(), nil
 		}
 	*/
-	// If can't reuse a client from anywhere, build one from scratch without a cache
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
-
-	client, err := m.buildClient(restConfig)
+	client, err := k8sclient.New(restConfig, k8sclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		return nil, err
 	}
@@ -125,109 +121,39 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
 	return client, nil
 }
 
-// CheckConnection checks if MigCluster client config is valid by creating a client
-func (m *MigCluster) CheckConnection(c k8sclient.Client, timeout time.Duration) (bool, error) {
-	// If MigCluster isHostCluster, no need to connection check
+// Test the connection settings by building a client.
+func (m *MigCluster) TestConnection(c k8sclient.Client, timeout time.Duration) error {
 	if m.Spec.IsHostCluster {
-		return true, nil
+		return nil
 	}
-
-	// If MigCluster is remote, build a client to check connection
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
-		return false, err
+		return err
 	}
-
-	// Allow setting of custom timeout for connection checking
 	restConfig.Timeout = timeout
-
-	_, err = m.buildClient(restConfig)
+	_, err = k8sclient.New(restConfig, k8sclient.Options{Scheme: scheme.Scheme})
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	return true, nil
+	return nil
 }
 
-// BuildRestConfig creates a remote cluster RestConfig from a MigCluster and a local client
+// Build a REST configuration.
 func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
-	// Get first K8s endpoint from ClusterRef
-	clusterRef := m.Spec.ClusterRef
-	cluster := &crapi.Cluster{}
-	if clusterRef == nil {
-		err := errors.New("ClusterRef is nil.")
+	secret, err := GetSecret(c, m.Spec.ServiceAccountSecretRef)
+	if err != nil {
 		return nil, err
 	}
-
-	err := c.Get(context.TODO(), types.NamespacedName{Name: clusterRef.Name, Namespace: clusterRef.Namespace}, cluster)
-	if err != nil {
-		return nil, err // TODO: introspect error type
+	restConfig := &rest.Config{
+		Host:        m.Spec.URL,
+		BearerToken: string(secret.Data[SaToken]),
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
 	}
-
-	if cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints == nil {
-		return nil, fmt.Errorf("MigCluster [%s/%s] references Cluster [%s/%s] with nil ServerEndpoints",
-			m.Namespace, m.Name, clusterRef.Namespace, clusterRef.Name)
-	}
-
-	k8sEndpoints := cluster.Spec.KubernetesAPIEndpoints.ServerEndpoints
-	if len(k8sEndpoints) < 1 {
-		return nil, fmt.Errorf("MigCluster [%s/%s] references Cluster [%s/%s] with 0 ServerEndpoints",
-			m.Namespace, m.Name, clusterRef.Namespace, clusterRef.Name)
-	}
-
-	if k8sEndpoints[0].ServerAddress == "" {
-		return nil, fmt.Errorf("MigCluster [%s/%s] references Cluster [%s/%s] with an empty ServerAddress at ServerEndpoints[0]",
-			m.Namespace, m.Name, clusterRef.Namespace, clusterRef.Name)
-	}
-	clusterURL := string(k8sEndpoints[0].ServerAddress)
-
-	// Get SA token attached to this MigCluster
-	saSecretRef := m.Spec.ServiceAccountSecretRef
-	saSecret := &kapi.Secret{}
-	if saSecretRef == nil {
-		err := errors.New("ServiceAccountSecretRef not set.")
-		return nil, err
-	}
-
-	err = c.Get(context.TODO(), types.NamespacedName{Name: saSecretRef.Name, Namespace: saSecretRef.Namespace}, saSecret)
-	if err != nil {
-		return nil, err // TODO: introspect error type
-	}
-
-	saTokenKey := "saToken"
-	saTokenData, ok := saSecret.Data[saTokenKey]
-	if !ok {
-		return nil, fmt.Errorf("MigCluster [%s/%s] references SA token secret [%s/%s] with empty 'saToken' field",
-			m.Namespace, m.Name, saSecretRef.Namespace, saSecretRef.Name)
-	}
-	saToken := string(saTokenData)
-
-	// Build insecure rest.Config from gathered data
-	// TODO: get caBundle from MigCluster and use that to construct rest.Config
-	restConfig := m.buildRestConfig(clusterURL, saToken)
 
 	return restConfig, nil
-}
-
-// buildRestConfig creates an insecure REST config from a clusterURL and bearerToken
-// TODO: add support for creating a secure rest.Config
-func (m *MigCluster) buildRestConfig(clusterURL string, bearerToken string) *rest.Config {
-	clusterConfig := &rest.Config{
-		Host:        clusterURL,
-		BearerToken: bearerToken,
-	}
-	clusterConfig.Insecure = true
-	return clusterConfig
-}
-
-// buildClient builds a controller-runtime client for interacting with
-// a K8s cluster.
-func (m *MigCluster) buildClient(config *rest.Config) (k8sclient.Client, error) {
-	c, err := k8sclient.New(config, k8sclient.Options{Scheme: scheme.Scheme})
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
 }
 
 // Delete resources on the cluster by label.

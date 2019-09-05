@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 
-	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -74,20 +73,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
-	// Watch for changes to Clusters referenced by MigClusters
-	err = c.Watch(
-		&source.Kind{Type: &crapi.Cluster{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigCluster{})
-				}),
-		})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
@@ -118,8 +103,6 @@ type ReconcileMigCluster struct {
 // and what is in the MigCluster.Spec
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=clusterregistry.k8s.io,resources=clusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()

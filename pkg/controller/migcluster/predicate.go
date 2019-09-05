@@ -4,7 +4,6 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
-	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -57,18 +56,8 @@ func (r ClusterPredicate) mapRefs(cluster *migapi.MigCluster) {
 		Name:      cluster.Name,
 	}
 
-	// registry cluster
-	ref := cluster.Spec.ClusterRef
-	if migref.RefSet(ref) {
-		refMap.Add(refOwner, migref.RefTarget{
-			Kind:      migref.ToKind(crapi.Cluster{}),
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		})
-	}
-
 	// service account secret
-	ref = cluster.Spec.ServiceAccountSecretRef
+	ref := cluster.Spec.ServiceAccountSecretRef
 	if migref.RefSet(ref) {
 		refMap.Add(refOwner, migref.RefTarget{
 			Kind:      migref.ToKind(kapi.Secret{}),
@@ -87,18 +76,8 @@ func (r ClusterPredicate) unmapRefs(cluster *migapi.MigCluster) {
 		Name:      cluster.Name,
 	}
 
-	// registry cluster
-	ref := cluster.Spec.ClusterRef
-	if migref.RefSet(ref) {
-		refMap.Delete(refOwner, migref.RefTarget{
-			Kind:      migref.ToKind(crapi.Cluster{}),
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		})
-	}
-
 	// service account secret
-	ref = cluster.Spec.ServiceAccountSecretRef
+	ref := cluster.Spec.ServiceAccountSecretRef
 	if migref.RefSet(ref) {
 		refMap.Delete(refOwner, migref.RefTarget{
 			Kind:      migref.ToKind(kapi.Secret{}),

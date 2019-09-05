@@ -1,21 +1,16 @@
 package migcluster
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	crapi "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 )
 
 // Types
 const (
-	InvalidClusterRef  = "InvalidClusterRef"
+	InvalidURL         = "InvalidURL"
 	InvalidSaSecretRef = "InvalidSaSecretRef"
 	InvalidSaToken     = "InvalidSaToken"
 	TestConnectFailed  = "TestConnectFailed"
@@ -42,7 +37,7 @@ const (
 // Messages
 const (
 	ReadyMessage              = "The cluster is ready."
-	InvalidClusterRefMessage  = "The `clusterRef` must reference a `cluster`."
+	InvalidURLMessage         = "The `url` is required when `isHostCluster` is false."
 	InvalidSaSecretRefMessage = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage     = "The `saToken` not found in `serviceAccountSecretRef` secret."
 	TestConnectFailedMessage  = "Test connect failed: %s"
@@ -51,8 +46,8 @@ const (
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
 func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
-	// registry cluster
-	err := r.validateRegistryCluster(cluster)
+	// General settings
+	err := r.validateURL(cluster)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -75,68 +70,22 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 	return nil
 }
 
-func (r ReconcileMigCluster) validateRegistryCluster(cluster *migapi.MigCluster) error {
-	ref := cluster.Spec.ClusterRef
-
+func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
-
-	// NotSet
-	if !migref.RefSet(ref) {
+	if cluster.Spec.URL == "" {
 		cluster.Status.SetCondition(migapi.Condition{
-			Type:     InvalidClusterRef,
+			Type:     InvalidURL,
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidClusterRefMessage,
+			Message:  InvalidURLMessage,
 		})
-		return nil
-	}
-
-	storage, err := r.getCluster(ref)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// NotFound
-	if storage == nil {
-		cluster.Status.SetCondition(migapi.Condition{
-			Type:     InvalidClusterRef,
-			Status:   True,
-			Reason:   NotFound,
-			Category: Critical,
-			Message:  InvalidClusterRefMessage,
-		})
-		return nil
 	}
 
 	return nil
-}
-
-func (r ReconcileMigCluster) getCluster(ref *kapi.ObjectReference) (*crapi.Cluster, error) {
-	if ref == nil {
-		return nil, nil
-	}
-	cluster := crapi.Cluster{}
-	err := r.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Namespace: ref.Namespace,
-			Name:      ref.Name,
-		},
-		&cluster)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		} else {
-			return nil, err
-		}
-	}
-
-	return &cluster, err
 }
 
 func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error {
@@ -178,7 +127,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 	}
 
 	// saToken
-	token, found := secret.Data["saToken"]
+	token, found := secret.Data[migapi.SaToken]
 	if !found {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     InvalidSaToken,
@@ -214,8 +163,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 
 	// Timeout of 5s instead of the default 30s to lessen lockup
 	timeout := time.Duration(time.Second * 5)
-	_, err := cluster.CheckConnection(r.Client, timeout)
-
+	err := cluster.TestConnection(r.Client, timeout)
 	if err != nil {
 		message := fmt.Sprintf(TestConnectFailedMessage, err)
 		cluster.Status.SetCondition(migapi.Condition{
@@ -227,5 +175,6 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		})
 		return nil
 	}
+
 	return nil
 }
