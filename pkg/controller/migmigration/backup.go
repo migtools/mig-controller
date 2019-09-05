@@ -18,13 +18,13 @@ import (
 // Ensure the initial backup on the source cluster has been created
 // and has the proper settings.
 func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
-	includeClusterResources := false
-	newBackup, err := t.buildBackup(&includeClusterResources)
+	newBackup, err := t.buildBackup(nil)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
+	newBackup.Spec.ExcludedResources = excludedInitialResources
 	delete(newBackup.Annotations, QuiesceAnnotation)
 	foundBackup, err := t.getInitialBackup()
 	if err != nil {
