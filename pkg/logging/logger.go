@@ -40,6 +40,11 @@ func (l *Logger) Reset() {
 	l.history = make(map[error]bool)
 }
 
+// Set values.
+func (l *Logger) SetValues(kvpair ...interface{}) {
+	l.Real = l.Real.WithValues(kvpair...)
+}
+
 // Logs at info.
 func (l Logger) Info(message string, kvpair ...interface{}) {
 	l.Real.Info(message, kvpair...)
@@ -77,12 +82,16 @@ func (l Logger) V(level int) logr.InfoLogger {
 
 // Get logger with name.
 func (l Logger) WithName(name string) logr.Logger {
-	l.Real = l.Real.WithName(name)
-	return l
+	return Logger{
+		Real: l.Real.WithName(name),
+		name: l.name,
+	}
 }
 
 // Get logger with values.
 func (l Logger) WithValues(kvpair ...interface{}) logr.Logger {
-	l.Real = l.Real.WithValues(kvpair...)
-	return l
+	return Logger{
+		Real: l.Real.WithValues(kvpair...),
+		name: l.name,
+	}
 }
