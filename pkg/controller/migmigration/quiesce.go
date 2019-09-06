@@ -289,6 +289,11 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 		"DaemonSet":             true,
 		"Job":                   true,
 	}
+	skippedPhases := map[v1.PodPhase]bool{
+		v1.PodSucceeded: true,
+		v1.PodFailed:    true,
+		v1.PodUnknown:   true,
+	}
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
@@ -306,6 +311,9 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			return false, err
 		}
 		for _, pod := range list.Items {
+			if _, found := skippedPhases[pod.Status.Phase]; found {
+				continue
+			}
 			for _, ref := range pod.OwnerReferences {
 				if _, found := kinds[ref.Kind]; found {
 					return false, nil
