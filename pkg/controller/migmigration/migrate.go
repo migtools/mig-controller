@@ -47,6 +47,9 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return 0, nil
 	}
 
+	// Set idenifier
+	log.SetValues("migration", migration.Name)
+
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {

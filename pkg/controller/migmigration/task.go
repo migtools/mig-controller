@@ -1,11 +1,12 @@
 package migmigration
 
 import (
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 // Phases
@@ -116,14 +117,7 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
-	t.Log.Info(
-		"Migration [RUN]",
-		"name",
-		t.Owner.Name,
-		"stage",
-		t.stage(),
-		"phase",
-		t.Phase)
+	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
 	t.Requeue = time.Millisecond * 100
 
@@ -470,10 +464,7 @@ func (t *Task) Run() error {
 	}
 
 	if t.Phase == Completed {
-		t.Log.Info(
-			"Migration [COMPLETED]",
-			"name",
-			t.Owner.Name)
+		t.Log.Info("[COMPLETED]")
 	}
 
 	return nil
