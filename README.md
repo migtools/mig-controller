@@ -76,7 +76,7 @@ As an example, you'll need to provide the following parameters to perform a Migr
 | Parameter | Purpose | Sample CR File |
 | --- | --- | --- |
 | `namespaces` | List of namespaces to migrate from source to destination cluster | `mig-plan.yaml` |
-| `serverAddress` | Endpoint of remote cluster mig-controller will connect to | `cluster-remote.yaml` | 
+| `url` | Endpoint of remote cluster mig-controller will connect to | `cluster-remote.yaml` |
 | `saToken` | Base64 encoded SA token used to authenticate with remote cluster | `sa-secret-remote.yaml` | 
 | `awsBucketName` | Name of the S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
 | `awsRegion` | Region of S3 bucket to be used for temporary Migration storage | `mig-storage.yaml` |
@@ -100,7 +100,6 @@ cd migsamples
 oc apply -f mig-cluster-local.yaml
 
 # Destination cluster definition, coordinates, auth details
-oc apply -f cluster-remote.yaml
 oc apply -f sa-secret-remote.yaml
 oc apply -f mig-cluster-remote.yaml
 

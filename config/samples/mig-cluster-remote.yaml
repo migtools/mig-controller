@@ -10,9 +10,7 @@ spec:
   #     Setting 'isHostCluster' to true will bypass using the clusterRef and serviceAccountSecretRef below.
   isHostCluster: false
 
-  clusterRef:
-    name: remote-cluster
-    namespace: openshift-migration
+  url: "https://my-remote-cluster-ip.nip.io:8443"
 
   serviceAccountSecretRef:
     name: sa-token-remote
