@@ -51,7 +51,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileMigStorage{
 		Client:   mgr.GetClient(),
-		recorder: mgr.GetRecorder("storage-controller"),
+		recorder: mgr.GetRecorder("controller"),
 		scheme:   mgr.GetScheme(),
 	}
 }

@@ -48,7 +48,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileMigPlan{
 		Client:   mgr.GetClient(),
-		recorder: mgr.GetRecorder("plan-controller"),
+		recorder: mgr.GetRecorder("controller"),
 		scheme:   mgr.GetScheme(),
 	}
 }

@@ -50,7 +50,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
 	return &ReconcileMigCluster{
 		Client:   mgr.GetClient(),
-		recorder: mgr.GetRecorder("cluster-controller"),
+		recorder: mgr.GetRecorder("controller"),
 		scheme:   mgr.GetScheme()}
 }
 

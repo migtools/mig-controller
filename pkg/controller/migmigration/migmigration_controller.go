@@ -49,7 +49,7 @@ func Add(mgr manager.Manager) error {
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileMigMigration{
 		Client:   mgr.GetClient(),
-		recorder: mgr.GetRecorder("migration-controller"),
+		recorder: mgr.GetRecorder("controller"),
 		scheme:   mgr.GetScheme(),
 	}
 }
