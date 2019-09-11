@@ -61,7 +61,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	forwardChannel := make(chan event.GenericEvent)
 
 	log.Info("[rWatch] Starting watch on forwardChannel")
-	err = r.Controller.Watch(&source.Channel{Source: forwardChannel}, &handler.EnqueueRequestForObject{})
+	err = r.controller.Watch(&source.Channel{Source: forwardChannel}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.Trace(err)
 		return err

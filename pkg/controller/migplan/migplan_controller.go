@@ -18,6 +18,8 @@ package migplan
 
 import (
 	"context"
+	"k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"strconv"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -44,7 +46,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigPlan{
+		Client:   mgr.GetClient(),
+		recorder: mgr.GetRecorder("plan-controller"),
+		scheme:   mgr.GetScheme(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -138,7 +144,8 @@ var _ reconcile.Reconciler = &ReconcileMigPlan{}
 // ReconcileMigPlan reconciles a MigPlan object
 type ReconcileMigPlan struct {
 	client.Client
-	scheme *runtime.Scheme
+	recorder record.EventRecorder
+	scheme   *runtime.Scheme
 }
 
 // Automatically generate RBAC rules
@@ -175,6 +182,12 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
+		r.recorder.Eventf(
+			plan,
+			v1.EventTypeWarning,
+			"ReconcileFailed",
+			"Reconcile failed [%s].",
+			err)
 		plan.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), plan)
 		if err != nil {
@@ -190,6 +203,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if closed {
+		r.recorder.Event(
+			plan,
+			v1.EventTypeNormal,
+			"Closed",
+			"Plan closed.")
 		return reconcile.Result{}, nil
 	}
 
@@ -212,7 +230,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// PV discovery
 	err = r.updatePvs(plan)
-	if err != nil {
+	if err == nil {
+		r.recorder.Event(
+			plan,
+			v1.EventTypeNormal,
+			"UpdatePVs",
+			"PV list updated.")
+	} else {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -226,14 +250,26 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Storage
 	err = r.ensureStorage(plan)
-	if err != nil {
+	if err == nil {
+		r.recorder.Event(
+			plan,
+			v1.EventTypeNormal,
+			"StorageCreated",
+			"Storage CRs created.")
+	} else {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Migration Registry
 	err = r.ensureMigRegistries(plan)
-	if err != nil {
+	if err == nil {
+		r.recorder.Event(
+			plan,
+			v1.EventTypeNormal,
+			"RegistryCreated",
+			"Registry created.")
+	} else {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}

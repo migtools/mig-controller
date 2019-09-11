@@ -18,6 +18,7 @@ package migmigration
 
 import (
 	"fmt"
+	"k8s.io/api/core/v1"
 	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -82,7 +83,14 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	}
 
 	// Result
-	migration.Status.Phase = task.Phase
+	if migration.Status.Phase != task.Phase {
+		migration.Status.Phase = task.Phase
+		r.recorder.Eventf(
+			migration,
+			v1.EventTypeNormal,
+			task.Phase,
+			"Phase advanced.")
+	}
 
 	// Completed
 	if task.Phase == Completed {

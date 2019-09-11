@@ -22,10 +22,12 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -45,7 +47,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigMigration{
+		Client:   mgr.GetClient(),
+		recorder: mgr.GetRecorder("migration-controller"),
+		scheme:   mgr.GetScheme(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -115,7 +121,8 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
 	client.Client
-	scheme *runtime.Scheme
+	recorder record.EventRecorder
+	scheme   *runtime.Scheme
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
@@ -144,6 +151,12 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
+		r.recorder.Eventf(
+			migration,
+			kapi.EventTypeWarning,
+			"ReconcileFailed",
+			"Reconcile failed: [%s].",
+			err)
 		migration.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), migration)
 		if err != nil {

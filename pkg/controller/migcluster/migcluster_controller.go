@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -47,7 +48,10 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigCluster{
+		Client:   mgr.GetClient(),
+		recorder: mgr.GetRecorder("cluster-controller"),
+		scheme:   mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -61,7 +65,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 
 	// Add reference to controller on ReconcileMigCluster object to be used
 	// for adding remote watches at a later time
-	r.Controller = c
+	r.controller = c
 
 	// Watch for changes to MigCluster
 	err = c.Watch(
@@ -95,8 +99,9 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	k8sclient.Client
+	recorder   record.EventRecorder
 	scheme     *runtime.Scheme
-	Controller controller.Controller
+	controller controller.Controller
 }
 
 // Reconcile reads that state of the cluster for a MigCluster object and makes changes based on the state read
@@ -123,6 +128,12 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
+		r.recorder.Eventf(
+			cluster,
+			kapi.EventTypeWarning,
+			"ReconcileFailed",
+			"Reconcile failed: [%s].",
+			err)
 		cluster.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), cluster)
 		if err != nil {
@@ -144,14 +155,26 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	if !cluster.Status.HasBlockerCondition() {
 		// Remote Watch.
 		err = r.setupRemoteWatch(cluster)
-		if err != nil {
+		if err == nil {
+			r.recorder.Event(
+				cluster,
+				kapi.EventTypeNormal,
+				"RemoteWatchCreated",
+				"Remote watch created.")
+		} else {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 
 		// Storage Classes
 		err = r.setStorageClasses(cluster)
-		if err != nil {
+		if err == nil {
+			r.recorder.Event(
+				cluster,
+				kapi.EventTypeNormal,
+				"StorageClassListUpdated",
+				"Storage Class list updated.")
+		} else {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}

@@ -19,6 +19,7 @@ package migstorage
 import (
 	"context"
 	"github.com/fusor/mig-controller/pkg/logging"
+	"k8s.io/client-go/tools/record"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -48,7 +49,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigStorage{
+		Client:   mgr.GetClient(),
+		recorder: mgr.GetRecorder("storage-controller"),
+		scheme:   mgr.GetScheme(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -92,7 +97,8 @@ var _ reconcile.Reconciler = &ReconcileMigStorage{}
 // ReconcileMigStorage reconciles a MigStorage object
 type ReconcileMigStorage struct {
 	client.Client
-	scheme *runtime.Scheme
+	recorder record.EventRecorder
+	scheme   *runtime.Scheme
 }
 
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
@@ -118,6 +124,12 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
+		r.recorder.Eventf(
+			storage,
+			kapi.EventTypeWarning,
+			"ReconcileFailed",
+			"Reconcile failed: [%s].",
+			err)
 		storage.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), storage)
 		if err != nil {
