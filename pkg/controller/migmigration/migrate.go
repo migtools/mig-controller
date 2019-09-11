@@ -85,11 +85,13 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	// Result
 	if migration.Status.Phase != task.Phase {
 		migration.Status.Phase = task.Phase
-		r.recorder.Eventf(
-			migration,
-			v1.EventTypeNormal,
-			task.Phase,
-			"Phase advanced.")
+		if migration.Status.Phase != Created {
+			r.recorder.Eventf(
+				migration,
+				v1.EventTypeNormal,
+				migration.Status.Phase,
+				"Step completed.")
+		}
 	}
 
 	// Completed
