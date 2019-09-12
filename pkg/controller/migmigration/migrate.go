@@ -122,6 +122,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 // migrateAnnnotationKey
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
 	annotations := make(map[string]string)
+	annotations[ControllerGenerated] = "true"
 	if migration.Spec.Stage {
 		annotations[StageOrFinalAnnotation] = "stage"
 	} else {

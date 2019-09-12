@@ -13,11 +13,12 @@ import (
 
 // Velero Plugin Annotations
 const (
-	StageOrFinalAnnotation   = "openshift.io/migrate-copy-phase"   // (stage|final)
-	PvActionAnnotation       = "openshift.io/migrate-type"         // (move|copy)
-	PvStorageClassAnnotation = "openshift.io/target-storage-class" // storageClassName
-	PvAccessModeAnnotation   = "openshift.io/target-access-mode"   // accessMode
-	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods" // (true|false)
+	ControllerGenerated      = "openshift.io/migration-controller-generated" // (true)
+	StageOrFinalAnnotation   = "openshift.io/migrate-copy-phase"             // (stage|final)
+	PvActionAnnotation       = "openshift.io/migrate-type"                   // (move|copy)
+	PvStorageClassAnnotation = "openshift.io/target-storage-class"           // storageClassName
+	PvAccessModeAnnotation   = "openshift.io/target-access-mode"             // accessMode
+	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods"           // (true|false)
 )
 
 // Restic Annotations
