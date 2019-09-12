@@ -17,6 +17,8 @@ limitations under the License.
 package migmigration
 
 import (
+	"github.com/onsi/gomega"
+	"reflect"
 	"testing"
 	"time"
 
@@ -77,4 +79,32 @@ func TestReconcile(t *testing.T) {
 	// // Manually delete Deployment since GC isn't enabled in the test control plane
 	// g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
 
+}
+
+// Ensure that the stage itinerary is contained within the
+// final itinerary.  At some point the itineraries may diverge
+// but for not they are expected to be the identical.
+func Test_Itineraries(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	stage := StageItinerary[3 : len(StageItinerary)-1]
+
+	begin := 0
+	for i, step := range FinalItinerary {
+		if step.phase == stage[0].phase {
+			begin = i
+			break
+		}
+	}
+	end := 0
+	last := stage[len(stage)-1]
+	for i, step := range FinalItinerary {
+		if step.phase == last.phase {
+			end = i + 1
+			break
+		}
+	}
+
+	g.Expect(begin == 0).To(gomega.BeFalse())
+	g.Expect(end < len(FinalItinerary)).To(gomega.BeTrue())
+	g.Expect(reflect.DeepEqual(stage, FinalItinerary[begin:end])).To(gomega.BeTrue())
 }

@@ -136,6 +136,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Set values.
+	log.SetValues("migration", migration.Name)
+
 	// Report reconcile error.
 	defer func() {
 		if err == nil || errors.IsConflict(err) {
@@ -196,7 +199,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Ready
 	migration.Status.SetReady(
-		!migration.Status.HasAnyCondition(Succeeded, Failed) &&
+		migration.Status.Phase != Completed &&
 			!migration.Status.HasBlockerCondition(),
 		ReadyMessage)
 
@@ -277,7 +280,7 @@ func (r *ReconcileMigMigration) deleted() error {
 		return err
 	}
 	for _, m := range migrations {
-		if m.Status.HasAnyCondition(Succeeded, Failed) || !m.Status.HasCondition(HasFinalMigration) {
+		if m.Status.Phase == Completed || !m.Status.HasCondition(HasFinalMigration) {
 			continue
 		}
 		m.Status.DeleteCondition(HasFinalMigration)

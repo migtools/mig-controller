@@ -229,6 +229,19 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 			return 0, err
 		}
 	}
+
+	if count > 0 {
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     StagePodsCreated,
+			Status:   True,
+			Reason:   Created,
+			Category: Advisory,
+			Message:  "[] Stage pods created.",
+			Items:    []string{strconv.Itoa(count)},
+			Durable:  true,
+		})
+	}
+
 	return count, nil
 }
 
@@ -294,6 +307,8 @@ func (t *Task) ensureStagePodsDeleted() error {
 			}
 		}
 	}
+
+	t.Owner.Status.DeleteCondition(StagePodsCreated)
 
 	return nil
 }
