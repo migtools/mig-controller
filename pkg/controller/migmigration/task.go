@@ -9,6 +9,11 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Requeue
+var FastReQ = time.Duration(time.Millisecond * 100)
+var PollReQ = time.Duration(time.Second * 3)
+var NoReQ = time.Duration(0)
+
 // Phases
 const (
 	Created                       = ""
@@ -40,52 +45,83 @@ const (
 	Completed                     = "Completed"
 )
 
-// Steps
-var Step = []string{
-	Created,
-	Started,
-	Prepare,
-	EnsureInitialBackup,
-	InitialBackupCreated,
-	InitialBackupFailed,
-	AnnotateResources,
-	EnsureStagePods,
-	StagePodsCreated,
-	RestartRestic,
-	ResticRestarted,
-	QuiesceApplications,
-	EnsureQuiesced,
-	EnsureStageBackup,
-	StageBackupCreated,
-	StageBackupFailed,
-	EnsureStageBackupReplicated,
-	EnsureStageRestore,
-	StageRestoreCreated,
-	StageRestoreFailed,
-	EnsureStagePodsDeleted,
-	EnsureAnnotationsDeleted,
-	EnsureInitialBackupReplicated,
-	EnsureFinalRestore,
-	FinalRestoreCreated,
-	FinalRestoreFailed,
-	Completed,
+// Flags
+const (
+	Quiesce      = 0x01 // Only when QuiescePods (true).
+	HasStagePods = 0x02 // Only when stage pods created.
+	HasPVs       = 0x04 // Only when PVs migrated.
+)
+
+type Itinerary []Step
+
+var StageItinerary = Itinerary{
+	{phase: Created},
+	{phase: Started},
+	{phase: Prepare},
+	{phase: AnnotateResources, flags: HasPVs},
+	{phase: EnsureStagePods, flags: HasPVs},
+	{phase: StagePodsCreated, flags: HasStagePods},
+	{phase: RestartRestic, flags: HasStagePods},
+	{phase: ResticRestarted, flags: HasStagePods},
+	{phase: QuiesceApplications, flags: Quiesce},
+	{phase: EnsureQuiesced, flags: Quiesce},
+	{phase: EnsureStageBackup, flags: HasPVs},
+	{phase: StageBackupCreated, flags: HasPVs},
+	{phase: EnsureStageBackupReplicated, flags: HasPVs},
+	{phase: EnsureStageRestore, flags: HasPVs},
+	{phase: StageRestoreCreated, flags: HasPVs},
+	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: Completed},
 }
 
-// End phases.
-var EndPhase = map[string]bool{
-	InitialBackupFailed: true,
-	StageBackupFailed:   true,
-	FinalRestoreFailed:  true,
-	StageRestoreFailed:  true,
-	Completed:           true,
+var FinalItinerary = Itinerary{
+	{phase: Created},
+	{phase: Started},
+	{phase: Prepare},
+	{phase: EnsureInitialBackup},
+	{phase: InitialBackupCreated},
+	{phase: AnnotateResources, flags: HasPVs},
+	{phase: EnsureStagePods, flags: HasPVs},
+	{phase: StagePodsCreated, flags: HasStagePods},
+	{phase: RestartRestic, flags: HasStagePods},
+	{phase: ResticRestarted, flags: HasStagePods},
+	{phase: QuiesceApplications, flags: Quiesce},
+	{phase: EnsureQuiesced, flags: Quiesce},
+	{phase: EnsureStageBackup, flags: HasPVs},
+	{phase: StageBackupCreated, flags: HasPVs},
+	{phase: EnsureStageBackupReplicated, flags: HasPVs},
+	{phase: EnsureStageRestore, flags: HasPVs},
+	{phase: StageRestoreCreated, flags: HasPVs},
+	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: EnsureInitialBackupReplicated},
+	{phase: EnsureFinalRestore},
+	{phase: FinalRestoreCreated},
+	{phase: Completed},
 }
 
-// Error phases.
-var ErrorPhase = map[string]bool{
-	InitialBackupFailed: true,
-	StageBackupFailed:   true,
-	FinalRestoreFailed:  true,
-	StageRestoreFailed:  true,
+// Step
+// phase - Phase name.
+// flags - Used to qualify the step.
+type Step struct {
+	phase string
+	flags uint8
+}
+
+// Get a progress report.
+// Returns: phase, n, total.
+func (r Itinerary) progressReport(phase string) (string, int, int) {
+	n := 0
+	total := len(r)
+	for i, step := range r {
+		if step.phase == phase {
+			n = i + 1
+			break
+		}
+	}
+
+	return phase, n, total
 }
 
 // A Velero task that provides the complete backup & restore workflow.
@@ -97,7 +133,9 @@ var ErrorPhase = map[string]bool{
 // BackupResources - Resource types to be included in the backup.
 // Phase - The task phase.
 // Requeue - The requeueAfter duration. 0 indicates no requeue.
+// Itinerary - The phase itinerary.
 // Errors - Migration errors.
+// Failed - Task phase has failed.
 type Task struct {
 	Log             logr.Logger
 	Client          k8sclient.Client
@@ -107,6 +145,7 @@ type Task struct {
 	BackupResources []string
 	Phase           string
 	Requeue         time.Duration
+	Itinerary       Itinerary
 	Errors          []string
 }
 
@@ -119,13 +158,12 @@ type Task struct {
 func (t *Task) Run() error {
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
-	t.Requeue = time.Millisecond * 100
+	t.init()
 
+	// Run the current phase.
 	switch t.Phase {
-	case Created:
-		t.Phase = Started
-	case Started:
-		t.Phase = Prepare
+	case Created, Started:
+		t.next()
 	case Prepare:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -137,27 +175,15 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		if t.stage() {
-			if t.hasPVs() {
-				t.Phase = AnnotateResources
-			} else {
-				if t.quiesce() {
-					t.Phase = QuiesceApplications
-				} else {
-					t.Phase = Completed
-				}
-			}
-		} else {
-			t.Phase = EnsureInitialBackup
-		}
+		t.next()
 	case EnsureInitialBackup:
 		_, err := t.ensureInitialBackup()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = InitialBackupCreated
-		t.Requeue = 0
+		t.Requeue = NoReQ
+		t.next()
 	case InitialBackupCreated:
 		backup, err := t.ensureInitialBackup()
 		if err != nil {
@@ -174,21 +200,12 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.addErrors(reasons)
-				t.Phase = InitialBackupFailed
+				t.failed(InitialBackupFailed, reasons)
 			} else {
-				if t.hasPVs() {
-					t.Phase = AnnotateResources
-				} else {
-					if t.quiesce() {
-						t.Phase = QuiesceApplications
-					} else {
-						t.Phase = EnsureInitialBackupReplicated
-					}
-				}
+				t.next()
 			}
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case AnnotateResources:
 		err := t.annotateStageResources()
@@ -196,23 +213,14 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = EnsureStagePods
+		t.next()
 	case EnsureStagePods:
-		count, err := t.ensureStagePodsCreated()
+		_, err := t.ensureStagePodsCreated()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		if count > 0 {
-			t.Phase = StagePodsCreated
-			t.Requeue = 0
-		} else {
-			if t.quiesce() {
-				t.Phase = QuiesceApplications
-			} else {
-				t.Phase = EnsureStageBackup
-			}
-		}
+		t.next()
 	case StagePodsCreated:
 		started, err := t.ensureStagePodsStarted()
 		if err != nil {
@@ -220,9 +228,9 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			t.Phase = RestartRestic
+			t.next()
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case RestartRestic:
 		err := t.restartResticPods()
@@ -230,8 +238,8 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = ResticRestarted
-		t.Requeue = time.Second * 3
+		t.Requeue = PollReQ
+		t.next()
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
@@ -239,13 +247,9 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			if t.quiesce() {
-				t.Phase = QuiesceApplications
-			} else {
-				t.Phase = EnsureStageBackup
-			}
+			t.next()
 		} else {
-			t.Requeue = time.Second * 3
+			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
 		err := t.quiesceApplications()
@@ -253,7 +257,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = EnsureQuiesced
+		t.next()
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
@@ -261,17 +265,9 @@ func (t *Task) Run() error {
 			return err
 		}
 		if quiesced {
-			if t.hasPVs() {
-				t.Phase = EnsureStageBackup
-			} else {
-				if t.stage() {
-					t.Phase = Completed
-				} else {
-					t.Phase = EnsureInitialBackupReplicated
-				}
-			}
+			t.next()
 		} else {
-			t.Requeue = time.Second * 3
+			t.Requeue = PollReQ
 		}
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
@@ -279,8 +275,8 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = StageBackupCreated
 		t.Requeue = 0
+		t.next()
 	case StageBackupCreated:
 		backup, err := t.ensureStageBackup()
 		if err != nil {
@@ -297,13 +293,12 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.addErrors(reasons)
-				t.Phase = StageBackupFailed
+				t.failed(StageBackupFailed, reasons)
 			} else {
-				t.Phase = EnsureStageBackupReplicated
+				t.next()
 			}
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
@@ -320,13 +315,9 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			if t.stage() {
-				t.Phase = EnsureStageRestore
-			} else {
-				t.Phase = EnsureStageRestore
-			}
+			t.next()
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case EnsureStageRestore:
 		backup, err := t.getStageBackup()
@@ -342,8 +333,8 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = StageRestoreCreated
-		t.Requeue = 0
+		t.Requeue = NoReQ
+		t.next()
 	case StageRestoreCreated:
 		restore, err := t.ensureStageRestore()
 		if err != nil {
@@ -360,13 +351,12 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.addErrors(reasons)
-				t.Phase = StageRestoreFailed
+				t.failed(StageRestoreFailed, reasons)
 			} else {
-				t.Phase = EnsureStagePodsDeleted
+				t.next()
 			}
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case EnsureStagePodsDeleted:
 		err := t.ensureStagePodsDeleted()
@@ -374,18 +364,14 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = EnsureAnnotationsDeleted
+		t.next()
 	case EnsureAnnotationsDeleted:
 		err := t.deleteAnnotations()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		if t.stage() {
-			t.Phase = Completed
-		} else {
-			t.Phase = EnsureInitialBackupReplicated
-		}
+		t.next()
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -401,9 +387,9 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			t.Phase = EnsureFinalRestore
+			t.next()
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
@@ -419,8 +405,8 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = FinalRestoreCreated
-		t.Requeue = 0
+		t.Requeue = NoReQ
+		t.next()
 	case FinalRestoreCreated:
 		restore, err := t.ensureFinalRestore()
 		if err != nil {
@@ -437,13 +423,12 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.addErrors(reasons)
-				t.Phase = FinalRestoreFailed
+				t.failed(FinalRestoreFailed, reasons)
 			} else {
-				t.Phase = Completed
+				t.next()
 			}
 		} else {
-			t.Requeue = 0
+			t.Requeue = NoReQ
 		}
 	case StageBackupFailed, StageRestoreFailed:
 		err := t.ensureStagePodsDeleted()
@@ -456,18 +441,83 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Phase = Completed
+		t.Requeue = NoReQ
+		t.next()
 	case InitialBackupFailed, FinalRestoreFailed:
-		t.Phase = Completed
+		t.next()
 	case Completed:
-		t.Requeue = 0
 	}
 
 	if t.Phase == Completed {
+		t.Requeue = NoReQ
 		t.Log.Info("[COMPLETED]")
 	}
 
 	return nil
+}
+
+// Initialize.
+func (t *Task) init() {
+	t.Requeue = FastReQ
+	if t.stage() {
+		t.Itinerary = StageItinerary
+	} else {
+		t.Itinerary = FinalItinerary
+	}
+}
+
+// Advance the task to the next phase.
+func (t *Task) next() {
+	current := -1
+	for i, step := range t.Itinerary {
+		if step.phase != t.Phase {
+			continue
+		}
+		current = i
+		break
+	}
+	if current == -1 {
+		t.Phase = Completed
+		return
+	}
+	for n := current + 1; n < len(t.Itinerary); n++ {
+		next := t.Itinerary[n]
+		if next.flags&HasPVs != 0 && !t.hasPVs() {
+			continue
+		}
+		if next.flags&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
+			continue
+		}
+		if next.flags&Quiesce != 0 && !t.quiesce() {
+			continue
+		}
+		t.Phase = next.phase
+		return
+	}
+
+	t.Phase = Completed
+}
+
+// Phase failed.
+func (t *Task) failed(nextPhase string, reasons []string) {
+	t.addErrors(reasons)
+	t.Phase = nextPhase
+	t.Owner.AddErrors(t.Errors)
+	t.Owner.Status.SetCondition(migapi.Condition{
+		Type:     Failed,
+		Status:   True,
+		Reason:   t.Phase,
+		Category: Advisory,
+		Message:  FailedMessage,
+		Durable:  true,
+	})
+}
+
+// Add errors.
+func (t *Task) addErrors(errors []string) {
+	for _, error := range errors {
+		t.Errors = append(t.Errors, error)
+	}
 }
 
 // Migration UID.
@@ -529,25 +579,4 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 	list = append(list, client)
 
 	return list, nil
-}
-
-// Add errors.
-func (t *Task) addErrors(errors []string) {
-	for _, error := range errors {
-		t.Errors = append(t.Errors, error)
-	}
-}
-
-// Get the current step.
-// Returns: name, n, total.
-func (t *Task) getStep() (string, int, int) {
-	n := -1
-	total := len(Step)
-	for i, step := range Step {
-		if step == t.Phase {
-			n = i + 1
-		}
-	}
-
-	return t.Phase, n, total
 }

@@ -43,13 +43,6 @@ var excludedInitialResources = []string{
 
 // Perform the migration.
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Duration, error) {
-	if migration.Status.HasAnyCondition(Succeeded, Failed) {
-		return 0, nil
-	}
-
-	// Set idenifier
-	log.SetValues("migration", migration.Name)
-
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {
@@ -85,13 +78,13 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	err = task.Run()
 	if err != nil {
 		log.Trace(err)
-		return 0, err
+		return NoReQ, err
 	}
 
 	// Result
 	migration.Status.Phase = task.Phase
 
-	// Succeeded
+	// Completed
 	if task.Phase == Completed {
 		migration.Status.DeleteCondition(Running)
 		failed := task.Owner.Status.FindCondition(Failed)
@@ -104,28 +97,12 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 				Message:  SucceededMessage,
 				Durable:  true,
 			})
-		} else {
-			failed.Status = "True"
 		}
-		return task.Requeue, nil
-	}
-	// Failed
-	if _, found := ErrorPhase[task.Phase]; found {
-		migration.AddErrors(task.Errors)
-		migration.Status.DeleteCondition(Running)
-		migration.Status.SetCondition(migapi.Condition{
-			Type:     Failed,
-			Status:   False,
-			Reason:   task.Phase,
-			Category: Advisory,
-			Message:  FailedMessage,
-			Durable:  true,
-		})
-		return task.Requeue, nil
+		return NoReQ, nil
 	}
 
 	// Running
-	step, n, total := task.getStep()
+	step, n, total := task.Itinerary.progressReport(task.Phase)
 	message := fmt.Sprintf(RunningMessage, n, total)
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,

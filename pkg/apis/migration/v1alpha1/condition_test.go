@@ -80,13 +80,19 @@ func TestCondition_ExpandItems(t *testing.T) {
 
 	// Validation
 	g.Expect(condition.Message).To(gomega.Equal("The following [A,B] need to be fixed."))
+}
+
+func TestCondition_BuildItems(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	condition := Condition{
+		Message: "The following [A, B,C] need to be fixed.",
+	}
 
 	// Test
-	condition.Items = append(condition.Items, "C")
-	condition.ExpandItems()
+	condition.BuildItems()
 
 	// Validation
-	g.Expect(condition.Message).To(gomega.Equal("The following [A,B,C] need to be fixed."))
+	g.Expect(condition.Items).To(gomega.Equal([]string{"A", "B", "C"}))
 }
 
 //

@@ -85,9 +85,24 @@ func (r *Condition) Equal(other Condition) bool {
 
 // Replace [] in `Message` with the content of `Items`.
 func (r *Condition) ExpandItems() {
-	re := regexp.MustCompile(`\[[^]]*\]`)
+	re := regexp.MustCompile(`\[\]`)
 	list := fmt.Sprintf("[%s]", strings.Join(r.Items, ","))
 	r.Message = re.ReplaceAllString(r.Message, list)
+}
+
+// Build the `Items` list by parsing the `Message`.
+func (r *Condition) BuildItems() {
+	re := regexp.MustCompile(`\[[^]]+\]`)
+	found := re.FindString(r.Message)
+	if found == "" {
+		return
+	}
+	r.Items = []string{}
+	found = strings.Trim(found, "[]")
+	r.Message = re.ReplaceAllString(r.Message, "[]")
+	for _, s := range strings.Split(found, ",") {
+		r.Items = append(r.Items, strings.TrimSpace(s))
+	}
 }
 
 // Managed collection of conditions.
@@ -120,6 +135,7 @@ func (r *Conditions) BeginStagingConditions() {
 	}
 	for index := range r.List {
 		condition := &r.List[index]
+		condition.BuildItems()
 		condition.staged = condition.Durable
 	}
 }
