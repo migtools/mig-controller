@@ -19,6 +19,7 @@ const (
 	Created                       = ""
 	Started                       = "Started"
 	Prepare                       = "Prepare"
+	EnsureCloudSecretPropagated   = "EnsureCloudSecretPropagated"
 	EnsureInitialBackup           = "EnsureInitialBackup"
 	InitialBackupCreated          = "InitialBackupCreated"
 	InitialBackupFailed           = "InitialBackupFailed"
@@ -58,6 +59,7 @@ var StageItinerary = Itinerary{
 	{phase: Created},
 	{phase: Started},
 	{phase: Prepare},
+	{phase: EnsureCloudSecretPropagated},
 	{phase: AnnotateResources, flags: HasPVs},
 	{phase: EnsureStagePods, flags: HasPVs},
 	{phase: StagePodsCreated, flags: HasStagePods},
@@ -79,6 +81,7 @@ var FinalItinerary = Itinerary{
 	{phase: Created},
 	{phase: Started},
 	{phase: Prepare},
+	{phase: EnsureCloudSecretPropagated},
 	{phase: EnsureInitialBackup},
 	{phase: InitialBackupCreated},
 	{phase: AnnotateResources, flags: HasPVs},
@@ -176,6 +179,25 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
+	case EnsureCloudSecretPropagated:
+		count := 0
+		for _, cluster := range t.getBothClusters() {
+			propagated, err := t.veleroPodCredSecretPropagated(cluster)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			if propagated {
+				count++
+			} else {
+				break
+			}
+		}
+		if count == 2 {
+			t.next()
+		} else {
+			t.Requeue = PollReQ
+		}
 	case EnsureInitialBackup:
 		_, err := t.ensureInitialBackup()
 		if err != nil {
@@ -560,23 +582,24 @@ func (t *Task) hasPVs() bool {
 	return len(t.getPVs().List) > 0
 }
 
+// Get both source and destination clusters.
+func (t *Task) getBothClusters() []*migapi.MigCluster {
+	return []*migapi.MigCluster{
+		t.PlanResources.SrcMigCluster,
+		t.PlanResources.DestMigCluster}
+}
+
 // Get both source and destination clients.
 func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 	list := []k8sclient.Client{}
-	// Source
-	client, err := t.getSourceClient()
-	if err != nil {
-		log.Trace(err)
-		return nil, err
+	for _, cluster := range t.getBothClusters() {
+		client, err := cluster.GetClient(t.Client)
+		if err != nil {
+			log.Trace(err)
+			return nil, err
+		}
+		list = append(list, client)
 	}
-	list = append(list, client)
-	// Destination
-	client, err = t.getDestinationClient()
-	if err != nil {
-		log.Trace(err)
-		return nil, err
-	}
-	list = append(list, client)
 
 	return list, nil
 }
