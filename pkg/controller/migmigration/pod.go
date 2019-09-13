@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -311,4 +312,72 @@ func (t *Task) ensureStagePodsDeleted() error {
 	t.Owner.Status.DeleteCondition(StagePodsCreated)
 
 	return nil
+}
+
+// Find all velero pods on the specified cluster.
+func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) {
+	client, err := cluster.GetClient(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	list := &corev1.PodList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(
+			map[string]string{"component": "velero"}),
+		list)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	return list.Items, nil
+}
+
+// Ensure the velero cloud-credentials secret content has been
+// mounted into all velero pods on both source and destination clusters.
+func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, error) {
+	list, err := t.findVeleroPods(cluster)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	if len(list) == 0 {
+		log.Info("Not velero pods found.")
+		return false, nil
+	}
+	restCfg, err := cluster.BuildRestConfig(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	for _, pod := range list {
+		cmd := pods.PodCommand{
+			Args:    []string{"cat", "/credentials/cloud"},
+			RestCfg: restCfg,
+			Pod:     &pod,
+		}
+		err = cmd.Run()
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+		secret, err := t.PlanResources.MigPlan.GetCloudSecret(t.Client)
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+		if body, found := secret.Data["cloud"]; found {
+			a := string(body)
+			b := cmd.Out.String()
+			if a != b {
+				return false, nil
+			}
+		} else {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }

@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
 
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -141,6 +142,9 @@ func (m *MigCluster) TestConnection(c k8sclient.Client, timeout time.Duration) e
 
 // Build a REST configuration.
 func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
+	if m.Spec.IsHostCluster {
+		return config.GetConfig()
+	}
 	secret, err := GetSecret(c, m.Spec.ServiceAccountSecretRef)
 	if err != nil {
 		return nil, err
