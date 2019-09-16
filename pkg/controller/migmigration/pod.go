@@ -344,7 +344,7 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 		return false, err
 	}
 	if len(list) == 0 {
-		log.Info("Not velero pods found.")
+		log.Info("No velero pods found.")
 		return false, nil
 	}
 	restCfg, err := cluster.BuildRestConfig(t.Client)
