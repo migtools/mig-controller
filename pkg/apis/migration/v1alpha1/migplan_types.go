@@ -228,7 +228,7 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 		return err
 	}
 	if credSecret == nil {
-		return CredSecretNotFound
+		return errors.New("Credentials secret not found.")
 	}
 	secret.Data = map[string][]byte{
 		"access_key": []byte(credSecret.Data[pvdr.AwsAccessKeyId]),
