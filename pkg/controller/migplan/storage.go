@@ -22,7 +22,7 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
-	if storage == nil {
+	if storage == nil || !storage.Status.IsReady() {
 		return nil
 	}
 	clusters, err := r.planClusters(plan)

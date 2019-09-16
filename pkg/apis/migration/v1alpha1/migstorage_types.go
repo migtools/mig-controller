@@ -33,9 +33,6 @@ const (
 	GCP   = pvdr.GCP
 )
 
-// Error
-var CredSecretNotFound = errors.New("Credentials secret not found.")
-
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
 	BackupStorageProvider  string `json:"backupStorageProvider"`
@@ -161,6 +158,9 @@ func (r *MigStorage) UpdateBSLCloudSecret(client k8sclient.Client, cloudSecret *
 	if err != nil {
 		return err
 	}
+	if secret == nil {
+		return errors.New("Credentials secret not found.")
+	}
 	provider := r.GetBackupStorageProvider()
 	provider.UpdateCloudSecret(secret, cloudSecret)
 	return nil
@@ -185,6 +185,9 @@ func (r *MigStorage) UpdateVSLCloudSecret(client k8sclient.Client, cloudSecret *
 	secret, err := r.GetVolumeSnapshotCredSecret(client)
 	if err != nil {
 		return err
+	}
+	if secret == nil {
+		return errors.New("Credentials secret not found.")
 	}
 	provider := r.GetBackupStorageProvider()
 	provider.UpdateCloudSecret(secret, cloudSecret)
