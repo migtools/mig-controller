@@ -6,6 +6,7 @@ import (
 
 const (
 	TouchAnnotation   = "touch"
+	VerifyAnnotation  = "verify"
 	VeleroNamespace   = "openshift-migration"
 	VeleroCloudSecret = "cloud-credentials"
 )
@@ -68,6 +69,26 @@ func (r *MigPlan) Touch() {
 		r.Annotations = make(map[string]string)
 	}
 	r.Annotations[TouchAnnotation] = uuid.New().String()
+}
+
+func (r *MigPlan) GetVerify() (verify bool) {
+	if r.Annotations != nil {
+		_, verify = r.Annotations[TouchAnnotation]
+	}
+	return
+}
+
+func (r *MigPlan) SetVerify() {
+	if r.Annotations == nil {
+		r.Annotations = make(map[string]string)
+	}
+	r.Annotations[VerifyAnnotation] = "true"
+}
+
+func (r *MigPlan) UnsetVerify() {
+	if r.Annotations != nil {
+		delete(r.Annotations, VerifyAnnotation)
+	}
 }
 
 // Storage

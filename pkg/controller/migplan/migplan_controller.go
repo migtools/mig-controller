@@ -238,6 +238,12 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	err = r.handleVerify(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Ready
 	plan.Status.SetReady(
 		plan.Status.HasCondition(StorageEnsured, PvsDiscovered, RegistriesEnsured) &&
