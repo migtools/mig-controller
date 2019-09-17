@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
@@ -360,8 +361,19 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 		}
 		err = cmd.Run()
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			exErr, cast := err.(exec.CodeExitError)
+			if cast && exErr.Code == 126 {
+				log.Info(
+					"Pod command failed:",
+					"solution",
+					"https://access.redhat.com/solutions/3734981",
+					"cmd",
+					cmd.Args)
+				return true, nil
+			} else {
+				log.Trace(err)
+				return false, err
+			}
 		}
 		secret, err := t.PlanResources.MigPlan.GetCloudSecret(t.Client)
 		if err != nil {
