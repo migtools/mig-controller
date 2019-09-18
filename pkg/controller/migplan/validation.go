@@ -3,7 +3,6 @@ package migplan
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/fields"
 	"reflect"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -46,6 +46,7 @@ const (
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
 	Closed                         = "Closed"
+	SourcePodsNotHealthy           = "SourcePodsNotHealthy"
 )
 
 // Categories
@@ -65,6 +66,7 @@ const (
 	NotDone       = "NotDone"
 	Done          = "Done"
 	Conflict      = "Conflict"
+	NotHealthy    = "NotHealthy"
 )
 
 // Statuses
@@ -156,6 +158,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Conflict
 	err = r.validateConflict(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Pods
+	err = r.validatePods(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -736,4 +745,61 @@ func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode k
 		}
 	}
 	return false
+}
+
+// Validate the pods, all should be healthy befor migration
+func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(Suspended) {
+		plan.Status.StageCondition(SourcePodsNotHealthy)
+		return nil
+	}
+
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
+	}
+
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	for _, ns := range plan.Spec.Namespaces {
+		options := k8sclient.InNamespace(ns)
+		podList := kapi.PodList{}
+		err := client.List(context.TODO(), options, &podList)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == kapi.PodRunning || pod.Status.Phase == kapi.PodSucceeded {
+				continue
+			}
+
+			condition := plan.Status.FindCondition(SourcePodsNotHealthy)
+			if condition == nil {
+				condition = &migapi.Condition{
+					Type:     SourcePodsNotHealthy,
+					Status:   True,
+					Reason:   NotHealthy,
+					Category: Warn,
+					Message:  "Pods not healthy on the source cluster [].",
+					Items:    []string{},
+				}
+				plan.Status.SetCondition(*condition)
+			}
+			ref := fmt.Sprintf("%s:%s", pod.Namespace, pod.Name)
+			condition.Items = append(condition.Items, ref)
+		}
+	}
+
+	return nil
 }
