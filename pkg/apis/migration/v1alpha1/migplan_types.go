@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -222,7 +221,7 @@ func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStora
 }
 
 // Update a Registry credentials secret as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, secret *kapi.Secret) error {
+func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, registrySecret *kapi.Secret) error {
 	credSecret, err := storage.GetBackupStorageCredSecret(client)
 	if err != nil {
 		return err
@@ -230,10 +229,8 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 	if credSecret == nil {
 		return errors.New("Credentials secret not found.")
 	}
-	secret.Data = map[string][]byte{
-		"access_key": []byte(credSecret.Data[pvdr.AwsAccessKeyId]),
-		"secret_key": []byte(credSecret.Data[pvdr.AwsSecretAccessKey]),
-	}
+	provider := storage.GetBackupStorageProvider()
+	provider.UpdateRegistrySecret(credSecret, registrySecret)
 	return nil
 }
 
@@ -353,10 +350,6 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
-	region := storage.Spec.BackupStorageConfig.AwsRegion
-	if region == "" {
-		region = pvdr.AwsS3DefaultRegion
-	}
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
@@ -375,46 +368,6 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						Env: []kapi.EnvVar{
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE",
-								Value: "s3",
-							},
-							kapi.EnvVar{
-								Name: "REGISTRY_STORAGE_S3_ACCESSKEY",
-								ValueFrom: &kapi.EnvVarSource{
-									SecretKeyRef: &kapi.SecretKeySelector{
-										LocalObjectReference: kapi.LocalObjectReference{Name: name},
-										Key:                  "access_key",
-									},
-								},
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_BUCKET",
-								Value: storage.Spec.BackupStorageConfig.AwsBucketName,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_REGION",
-								Value: region,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_REGIONENDPOINT",
-								Value: storage.Spec.BackupStorageConfig.AwsS3URL,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_ROOTDIRECTORY",
-								Value: "/" + dirName,
-							},
-							kapi.EnvVar{
-								Name: "REGISTRY_STORAGE_S3_SECRETKEY",
-								ValueFrom: &kapi.EnvVarSource{
-									SecretKeyRef: &kapi.SecretKeySelector{
-										LocalObjectReference: kapi.LocalObjectReference{Name: name},
-										Key:                  "secret_key",
-									},
-								},
-							},
-						},
 						Image: "registry:2",
 						Name:  name,
 						Ports: []kapi.ContainerPort{
@@ -447,6 +400,9 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			},
 		},
 	}
+	provider := storage.GetBackupStorageProvider()
+	provider.UpdateRegistryDC(deploymentconfig, name, dirName)
+
 	return nil
 }
 

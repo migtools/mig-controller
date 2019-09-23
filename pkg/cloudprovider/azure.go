@@ -2,6 +2,7 @@ package cloudprovider
 
 import (
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
@@ -21,6 +22,12 @@ func (p *AzureProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 }
 
 func (p *AzureProvider) UpdateCloudSecret(ecret, cloudSecret *kapi.Secret) {
+}
+
+func (p *AzureProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) {
+}
+
+func (p *AzureProvider) UpdateRegistryDC(deploymentconfig *appsv1.DeploymentConfig, name, dirName string) {
 }
 
 func (p *AzureProvider) Validate(secret *kapi.Secret) []string {
