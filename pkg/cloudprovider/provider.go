@@ -2,6 +2,7 @@ package cloudprovider
 
 import (
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
@@ -23,6 +24,8 @@ type Provider interface {
 	UpdateBSL(location *velero.BackupStorageLocation)
 	UpdateVSL(location *velero.VolumeSnapshotLocation)
 	UpdateCloudSecret(secret, cloudSecret *kapi.Secret)
+	UpdateRegistrySecret(secret, registrySecret *kapi.Secret)
+	UpdateRegistryDC(deploymentconfig *appsv1.DeploymentConfig, name, dirName string)
 	Validate(secret *kapi.Secret) []string
 	Test(secret *kapi.Secret) error
 }
