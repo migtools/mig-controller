@@ -33,9 +33,6 @@ const (
 	// Application pods requiring restic/stage backups.
 	// Used to create stage pods. The value is the Task.UID()
 	ApplicationPodLabel = "migration-application-pod"
-	// For pods included in the stage backup, this label contains a pod-unique
-	// value (namespace "/"+name)
-	StagePodAffinityLabel = "migration-stage-pod-affinity"
 	// Designated as an `initial` Backup.
 	// The value is the Task.UID().
 	InitialBackupLabel = "migration-initial-backup"
@@ -239,7 +236,6 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 				pod.Labels = make(map[string]string)
 			}
 			pod.Labels[ApplicationPodLabel] = t.UID()
-			pod.Labels[StagePodAffinityLabel] = pod.Name
 			// Update
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
@@ -417,10 +413,6 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 				}
 				if _, found := pod.Labels[ApplicationPodLabel]; found {
 					delete(pod.Labels, ApplicationPodLabel)
-					needsUpdate = true
-				}
-				if _, found := pod.Labels[StagePodAffinityLabel]; found {
-					delete(pod.Labels, StagePodAffinityLabel)
 					needsUpdate = true
 				}
 			}
