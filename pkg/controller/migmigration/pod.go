@@ -133,26 +133,10 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			SecurityContext:              pod.Spec.SecurityContext,
 			ServiceAccountName:           pod.Spec.ServiceAccountName,
 			AutomountServiceAccountToken: pod.Spec.AutomountServiceAccountToken,
-			Affinity: &corev1.Affinity{
-				PodAffinity: &corev1.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-						{
-							Weight: 100,
-							PodAffinityTerm: corev1.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										StagePodAffinityLabel: pod.Name,
-									},
-								},
-								Namespaces:  []string{pod.Namespace},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					},
-				},
-			},
 		},
 	}
+	// Set NodeName
+	newPod.Spec.NodeName = pod.Spec.NodeName
 	// Add volumes.
 	for _, volume := range pod.Spec.Volumes {
 		if _, found := resticVolumes[volume.Name]; found {
