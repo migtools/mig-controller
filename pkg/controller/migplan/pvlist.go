@@ -17,6 +17,12 @@ type Claims []migapi.PVC
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if plan.Status.HasCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
+		// preserve Warn PV conditions
+		plan.Status.StageCondition(PvNoSupportedAction)
+		plan.Status.StageCondition(PvNoStorageClassSelection)
+		plan.Status.StageCondition(PvWarnAccessModeUnavailable)
+		plan.Status.StageCondition(PvWarnCopyMethodSnapshot)
+		plan.Status.StageCondition(PvWarnNoCephAvailable)
 		return nil
 	}
 	if plan.Status.HasAnyCondition(
