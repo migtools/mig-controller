@@ -28,6 +28,8 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(
 		InvalidSourceClusterRef,
 		SourceClusterNotReady,
+		InvalidDestinationClusterRef,
+		DestinationClusterNotReady,
 		NsListEmpty,
 		NsNotFoundOnSourceCluster) {
 		return nil
@@ -38,6 +40,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+	if srcMigCluster == nil || !srcMigCluster.Status.IsReady() {
+		return nil
 	}
 
 	client, err := srcMigCluster.GetClient(r)
@@ -51,6 +56,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+	if destMigCluster == nil || !destMigCluster.Status.IsReady() {
+		return nil
 	}
 
 	srcStorageClasses := srcMigCluster.Spec.StorageClasses
