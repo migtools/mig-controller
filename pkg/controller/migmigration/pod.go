@@ -359,7 +359,12 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 				return false, err
 			}
 		}
-		secret, err := t.PlanResources.MigPlan.GetCloudSecret(t.Client)
+		client, err := cluster.GetClient(t.Client)
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+		secret, err := t.PlanResources.MigPlan.GetCloudSecret(client)
 		if err != nil {
 			log.Trace(err)
 			return false, err
