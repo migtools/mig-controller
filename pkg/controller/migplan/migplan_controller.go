@@ -286,6 +286,9 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		return err
 	}
 	for _, cluster := range clusters {
+		if !cluster.Status.IsReady() {
+			continue
+		}
 		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
 		if err != nil {
 			log.Trace(err)
