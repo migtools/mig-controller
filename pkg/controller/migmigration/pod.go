@@ -264,7 +264,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 	cLabel, _ := t.Owner.GetCorrelationLabel()
 	for _, client := range clients {
 		podList := corev1.PodList{}
-		for _, ns := range t.namespaces() {
+		for _, ns := range t.srcNamespaces() {
 			options := k8sclient.InNamespace(ns)
 			err := client.List(context.TODO(), options, &podList)
 			if err != nil {

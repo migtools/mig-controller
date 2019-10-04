@@ -2,12 +2,13 @@ package migplan
 
 import (
 	"context"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 type PvMap map[types.NamespacedName]core.PersistentVolume
@@ -72,7 +73,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
-	namespaces := plan.Spec.Namespaces
+	namespaces := plan.GetSourceNamespaces()
 	claims, err := r.getClaims(client, namespaces)
 	if err != nil {
 		log.Trace(err)

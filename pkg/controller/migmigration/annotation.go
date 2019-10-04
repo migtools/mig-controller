@@ -160,7 +160,7 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 
 // Add label to namespaces
 func (t *Task) labelNamespaces(client k8sclient.Client) error {
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
@@ -196,7 +196,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 // Returns a set of referenced service accounts.
 func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 	serviceAccounts := ServiceAccounts{}
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		list := corev1.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, &list)
@@ -309,7 +309,7 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 
 // Add label to service accounts.
 func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts ServiceAccounts) error {
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		names, found := serviceAccounts[ns]
 		if !found {
 			continue
@@ -387,7 +387,7 @@ func (t *Task) deleteAnnotations() error {
 
 // Delete Pod stage annotations and labels.
 func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		options := k8sclient.InNamespace(ns)
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -438,7 +438,7 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 
 // Delete stage label from namespaces
 func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
@@ -467,7 +467,7 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
 
 // Delete PVC stage annotations and labels.
 func (t *Task) deletePVCAnnotations(client k8sclient.Client) error {
-	for _, ns := range t.namespaces() {
+	for _, ns := range t.srcNamespaces() {
 		options := k8sclient.InNamespace(ns)
 		pvcList := corev1.PersistentVolumeClaimList{}
 		err := client.List(context.TODO(), options, &pvcList)

@@ -573,9 +573,14 @@ func (t *Task) stage() bool {
 	return t.Owner.Spec.Stage
 }
 
-// Get the migration namespaces.
+// Get the migration namespaces with mapping.
 func (t *Task) namespaces() []string {
 	return t.PlanResources.MigPlan.Spec.Namespaces
+}
+
+// Get the migration source namespaces without mapping.
+func (t *Task) srcNamespaces() []string {
+	return t.PlanResources.MigPlan.GetSourceNamespaces()
 }
 
 // Get whether to quiesce pods.
