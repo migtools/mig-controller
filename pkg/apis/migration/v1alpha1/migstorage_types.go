@@ -88,6 +88,7 @@ type BackupStorageConfig struct {
 	AwsSignatureVersion string                `json:"awsSignatureVersion,omitempty"`
 	AzureStorageAccount string                `json:"azureStorageAccount,omitempty"`
 	AzureResourceGroup  string                `json:"azureResourceGroup,omitempty"`
+	GcpBucket           string                `json:"gcpBucket,omitempty"`
 }
 
 func init() {
@@ -144,7 +145,7 @@ func (r *MigStorage) BuildBSLCloudSecret(client k8sclient.Client) (*kapi.Secret,
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		},
 	}
 
@@ -172,7 +173,7 @@ func (r *MigStorage) BuildVSLCloudSecret(client k8sclient.Client) (*kapi.Secret,
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		},
 	}
 
@@ -283,6 +284,7 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.BackupStorage,
 			},
+			Bucket: r.GcpBucket,
 		}
 	}
 

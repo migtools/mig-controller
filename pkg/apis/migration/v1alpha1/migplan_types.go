@@ -561,7 +561,7 @@ func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) 
 		client,
 		&kapi.ObjectReference{
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		})
 }
 

@@ -25,7 +25,7 @@ type Provider interface {
 	UpdateVSL(location *velero.VolumeSnapshotLocation)
 	UpdateCloudSecret(secret, cloudSecret *kapi.Secret)
 	UpdateRegistrySecret(secret, registrySecret *kapi.Secret)
-	UpdateRegistryDC(deploymentconfig *appsv1.DeploymentConfig, name, dirName string)
+	UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string)
 	Validate(secret *kapi.Secret) []string
 	Test(secret *kapi.Secret) error
 }
