@@ -29,9 +29,10 @@ const (
 
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
-	MigPlanRef  *kapi.ObjectReference `json:"migPlanRef,omitempty"`
-	Stage       bool                  `json:"stage"`
-	QuiescePods bool                  `json:"quiescePods,omitempty"`
+	MigPlanRef      *kapi.ObjectReference `json:"migPlanRef,omitempty"`
+	Stage           bool                  `json:"stage"`
+	QuiescePods     bool                  `json:"quiescePods,omitempty"`
+	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration

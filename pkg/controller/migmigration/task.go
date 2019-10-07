@@ -388,10 +388,12 @@ func (t *Task) Run() error {
 		}
 		t.next()
 	case EnsureAnnotationsDeleted:
-		err := t.deleteAnnotations()
-		if err != nil {
-			log.Trace(err)
-			return err
+		if !t.keepAnnotations() {
+			err := t.deleteAnnotations()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
 		t.next()
 	case EnsureInitialBackupReplicated:
@@ -458,10 +460,12 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		err = t.deleteAnnotations()
-		if err != nil {
-			log.Trace(err)
-			return err
+		if !t.keepAnnotations() {
+			err = t.deleteAnnotations()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
 		t.Requeue = NoReQ
 		t.next()
@@ -560,6 +564,11 @@ func (t *Task) namespaces() []string {
 // Get whether to quiesce pods.
 func (t *Task) quiesce() bool {
 	return t.Owner.Spec.QuiescePods
+}
+
+// Get whether to retain annotations
+func (t *Task) keepAnnotations() bool {
+	return t.Owner.Spec.KeepAnnotations
 }
 
 // Get a client for the source cluster.
