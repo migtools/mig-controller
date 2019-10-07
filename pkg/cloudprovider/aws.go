@@ -30,7 +30,7 @@ const (
 )
 
 // Velero cloud-secret.
-var CloudCredentialsTemplete = `
+var AwsCloudCredentialsTemplate = `
 [default]
 aws_access_key_id=%s
 aws_secret_access_key=%s
@@ -95,7 +95,7 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
 	cloudSecret.Data = map[string][]byte{
 		"cloud": []byte(
 			fmt.Sprintf(
-				CloudCredentialsTemplete,
+				AwsCloudCredentialsTemplate,
 				secret.Data[AwsAccessKeyId],
 				secret.Data[AwsSecretAccessKey]),
 		),
@@ -109,17 +109,17 @@ func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	}
 }
 
-func (p *AWSProvider) UpdateRegistryDC(deploymentconfig *appsv1.DeploymentConfig, name, dirName string) {
+func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
 	region := p.Region
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	deploymentconfig.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
-		kapi.EnvVar{
+	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "s3",
 		},
-		kapi.EnvVar{
+		{
 			Name: "REGISTRY_STORAGE_S3_ACCESSKEY",
 			ValueFrom: &kapi.EnvVarSource{
 				SecretKeyRef: &kapi.SecretKeySelector{
@@ -128,23 +128,23 @@ func (p *AWSProvider) UpdateRegistryDC(deploymentconfig *appsv1.DeploymentConfig
 				},
 			},
 		},
-		kapi.EnvVar{
+		{
 			Name:  "REGISTRY_STORAGE_S3_BUCKET",
 			Value: p.Bucket,
 		},
-		kapi.EnvVar{
+		{
 			Name:  "REGISTRY_STORAGE_S3_REGION",
 			Value: region,
 		},
-		kapi.EnvVar{
+		{
 			Name:  "REGISTRY_STORAGE_S3_REGIONENDPOINT",
 			Value: p.S3URL,
 		},
-		kapi.EnvVar{
+		{
 			Name:  "REGISTRY_STORAGE_S3_ROOTDIRECTORY",
 			Value: "/" + dirName,
 		},
-		kapi.EnvVar{
+		{
 			Name: "REGISTRY_STORAGE_S3_SECRETKEY",
 			ValueFrom: &kapi.EnvVarSource{
 				SecretKeyRef: &kapi.SecretKeySelector{
