@@ -578,6 +578,21 @@ func (r *MigPlan) GetSourceNamespaces() []string {
 	return includedNamespaces
 }
 
+// GetDestinationNamespaces get destination namespaces without mapping
+func (r *MigPlan) GetDestinationNamespaces() []string {
+	includedNamespaces := []string{}
+	for _, namespace := range r.Spec.Namespaces {
+		namespaces := strings.Split(namespace, ":")
+		if len(namespaces) > 0 {
+			includedNamespaces = append(includedNamespaces, namespaces[1])
+		} else {
+			includedNamespaces = append(includedNamespaces, namespaces[0])
+		}
+	}
+
+	return includedNamespaces
+}
+
 // Get whether the plan conflicts with another.
 // Plans conflict when:
 //   - Have any of the clusters in common.

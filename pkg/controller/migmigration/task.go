@@ -583,6 +583,11 @@ func (t *Task) srcNamespaces() []string {
 	return t.PlanResources.MigPlan.GetSourceNamespaces()
 }
 
+// Get the migration source namespaces without mapping.
+func (t *Task) destNamespaces() []string {
+	return t.PlanResources.MigPlan.GetDestinationNamespaces()
+}
+
 // Get whether to quiesce pods.
 func (t *Task) quiesce() bool {
 	return t.Owner.Spec.QuiescePods
@@ -626,16 +631,25 @@ func (t *Task) getBothClusters() []*migapi.MigCluster {
 }
 
 // Get both source and destination clients.
-func (t *Task) getBothClients() ([]k8sclient.Client, error) {
-	list := []k8sclient.Client{}
-	for _, cluster := range t.getBothClusters() {
-		client, err := cluster.GetClient(t.Client)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		list = append(list, client)
-	}
+func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
+	clientList := []k8sclient.Client{}
+	namespaceList := [][]string{}
 
-	return list, nil
+	sourceClient, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	clientList = append(clientList, sourceClient)
+	namespaceList = append(namespaceList, t.srcNamespaces())
+
+	destClient, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	clientList = append(clientList, destClient)
+	namespaceList = append(namespaceList, t.destNamespaces())
+
+	return clientList, namespaceList, nil
 }

@@ -348,14 +348,14 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 
 // Delete temporary annotations and labels added.
 func (t *Task) deleteAnnotations() error {
-	clients, err := t.getBothClients()
+	clients, namespaceList, err := t.getBothClientsWithNamespaces()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	for _, client := range clients {
-		err = t.deletePVCAnnotations(client)
+	for i, client := range clients {
+		err = t.deletePVCAnnotations(client, namespaceList[i])
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -365,12 +365,12 @@ func (t *Task) deleteAnnotations() error {
 			log.Trace(err)
 			return err
 		}
-		err = t.deletePodAnnotations(client)
+		err = t.deletePodAnnotations(client, namespaceList[i])
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		err = t.deleteNamespaceLabels(client)
+		err = t.deleteNamespaceLabels(client, namespaceList[i])
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -386,8 +386,8 @@ func (t *Task) deleteAnnotations() error {
 }
 
 // Delete Pod stage annotations and labels.
-func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
-	for _, ns := range t.srcNamespaces() {
+func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []string) error {
+	for _, ns := range namespaceList {
 		options := k8sclient.InNamespace(ns)
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -437,8 +437,8 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client) error {
 }
 
 // Delete stage label from namespaces
-func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
-	for _, ns := range t.srcNamespaces() {
+func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []string) error {
+	for _, ns := range namespaceList {
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
@@ -466,8 +466,8 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client) error {
 }
 
 // Delete PVC stage annotations and labels.
-func (t *Task) deletePVCAnnotations(client k8sclient.Client) error {
-	for _, ns := range t.srcNamespaces() {
+func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []string) error {
+	for _, ns := range namespaceList {
 		options := k8sclient.InNamespace(ns)
 		pvcList := corev1.PersistentVolumeClaimList{}
 		err := client.List(context.TODO(), options, &pvcList)
