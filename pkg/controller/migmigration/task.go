@@ -631,25 +631,28 @@ func (t *Task) getBothClusters() []*migapi.MigCluster {
 }
 
 // Get both source and destination clients.
+func (t *Task) getBothClients() ([]k8sclient.Client, error) {
+	list := []k8sclient.Client{}
+	for _, cluster := range t.getBothClusters() {
+		client, err := cluster.GetClient(t.Client)
+		if err != nil {
+			log.Trace(err)
+			return nil, err
+		}
+		list = append(list, client)
+	}
+
+	return list, nil
+}
+
+// Get both source and destination clients with associated namespaces.
 func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
-	clientList := []k8sclient.Client{}
-	namespaceList := [][]string{}
-
-	sourceClient, err := t.getSourceClient()
+	clientList, err := t.getBothClients()
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
-	clientList = append(clientList, sourceClient)
-	namespaceList = append(namespaceList, t.srcNamespaces())
-
-	destClient, err := t.getSourceClient()
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	clientList = append(clientList, destClient)
-	namespaceList = append(namespaceList, t.destNamespaces())
+	namespaceList := [][]string{t.srcNamespaces(), t.destNamespaces()}
 
 	return clientList, namespaceList, nil
 }
