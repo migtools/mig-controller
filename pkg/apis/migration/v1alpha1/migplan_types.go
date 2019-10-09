@@ -583,7 +583,7 @@ func (r *MigPlan) GetDestinationNamespaces() []string {
 	includedNamespaces := []string{}
 	for _, namespace := range r.Spec.Namespaces {
 		namespaces := strings.Split(namespace, ":")
-		if len(namespaces) > 0 {
+		if len(namespaces) > 1 {
 			includedNamespaces = append(includedNamespaces, namespaces[1])
 		} else {
 			includedNamespaces = append(includedNamespaces, namespaces[0])

@@ -579,12 +579,12 @@ func (t *Task) namespaces() []string {
 }
 
 // Get the migration source namespaces without mapping.
-func (t *Task) srcNamespaces() []string {
+func (t *Task) sourceNamespaces() []string {
 	return t.PlanResources.MigPlan.GetSourceNamespaces()
 }
 
 // Get the migration source namespaces without mapping.
-func (t *Task) destNamespaces() []string {
+func (t *Task) destinationNamespaces() []string {
 	return t.PlanResources.MigPlan.GetDestinationNamespaces()
 }
 
@@ -652,7 +652,7 @@ func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, e
 		log.Trace(err)
 		return nil, nil, err
 	}
-	namespaceList := [][]string{t.srcNamespaces(), t.destNamespaces()}
+	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
 
 	return clientList, namespaceList, nil
 }
