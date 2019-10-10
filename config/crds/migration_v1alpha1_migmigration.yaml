@@ -28,6 +28,8 @@ spec:
           type: object
         spec:
           properties:
+            keepAnnotations:
+              type: boolean
             migPlanRef:
               type: object
             quiescePods:
