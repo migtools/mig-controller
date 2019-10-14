@@ -14,6 +14,23 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Types
+const (
+	UnhealthySourceNamespaces      = "UnhealthySourceNamespaces"
+	UnhealthyDestinationNamespaces = "UnhealthyDestinationNamespaces"
+)
+
+// Reasons
+const (
+	ErrorsDetected = "ErrorsDetected"
+)
+
+// Messages
+const (
+	UnhealthyDestination = "The destination cluster has unhealthy migrated namespaces []. See status.namespaces for details."
+	UnhealthySource      = "The source cluster has unhealthy namespaces []. See status.namespaces for details."
+)
+
 const (
 	// ImagePullBackOff is unhealthy container state
 	ImagePullBackOff = "ImagePullBackOff"
@@ -23,8 +40,7 @@ const (
 
 // UnhealthyResources is a store for unhealthy namespaces across clusters
 type UnhealthyResources struct {
-	Source      []UnhealthyNamespace `json:"source,omitempty"`
-	Destination []UnhealthyNamespace `json:"destination,omitempty"`
+	Namespaces []UnhealthyNamespace `json:"namespaces,omitempty"`
 }
 
 // Workload is a store for unhealthy resource and it's dependents
@@ -35,8 +51,13 @@ type Workload struct {
 
 // UnhealthyNamespace is a store for unhealthy resources in a namespace
 type UnhealthyNamespace struct {
-	UnhealthyNamespace string     `json:"unhealthyNamespace"`
-	Workloads          []Workload `json:"workloads"`
+	Name      string     `json:"name"`
+	Workloads []Workload `json:"workloads"`
+}
+
+// IsHealthy will report if there are any unhealthy namespaces were present
+func (m *MigMigration) IsHealthy() bool {
+	return m.Status.UnhealthyResources.Namespaces == nil || len(m.Status.UnhealthyResources.Namespaces) == 0
 }
 
 // VerifyPods would collect, display and notify about the pod health in a specific namespace
@@ -98,7 +119,7 @@ func containerUnhealthy(pod corev1.Pod) bool {
 func (u *UnhealthyResources) findResources(namespace string, unhealthyResources ...*[]UnhealthyNamespace) *UnhealthyNamespace {
 	for _, namespaces := range unhealthyResources {
 		for _, unhealthyNamespace := range *namespaces {
-			if unhealthyNamespace.UnhealthyNamespace == namespace {
+			if unhealthyNamespace.Name == namespace {
 				return &unhealthyNamespace
 			}
 		}
@@ -120,8 +141,8 @@ func (u *UnhealthyResources) findWorkload(resources *UnhealthyNamespace, name st
 	return nil
 }
 
-// AddWorkload is adding a workload to selected list of unhealthy namespaces
-func (u *UnhealthyResources) AddWorkload(cluster *[]UnhealthyNamespace, namespace, name string, resourceNames ...string) {
+// AddUnhealthyNamespace is adding a workload to selected list of unhealthy namespaces
+func (u *UnhealthyResources) AddUnhealthyNamespace(cluster *[]UnhealthyNamespace, namespace, name string, resourceNames ...string) {
 	workload := Workload{
 		Name:      name,
 		Resources: resourceNames,
@@ -129,8 +150,8 @@ func (u *UnhealthyResources) AddWorkload(cluster *[]UnhealthyNamespace, namespac
 	resources := u.findResources(namespace, cluster)
 	if resources == nil {
 		unhealthyNamespace := UnhealthyNamespace{
-			UnhealthyNamespace: namespace,
-			Workloads:          []Workload{workload},
+			Name:      namespace,
+			Workloads: []Workload{workload},
 		}
 		*cluster = append(*cluster, unhealthyNamespace)
 	} else {
@@ -160,7 +181,7 @@ func (u *UnhealthyResources) AddUnhealthyResources(
 		}
 
 		if len(owners) == 0 {
-			u.AddWorkload(unhealthyNamespaces, res.GetNamespace(), workloadName)
+			u.AddUnhealthyNamespace(unhealthyNamespaces, res.GetNamespace(), workloadName)
 			continue
 		}
 
@@ -176,7 +197,7 @@ func (u *UnhealthyResources) AddUnhealthyResources(
 	}
 
 	for owner, resources := range parentMapping {
-		u.AddWorkload(unhealthyNamespaces, namespace, owner, resources...)
+		u.AddUnhealthyNamespace(unhealthyNamespaces, namespace, owner, resources...)
 	}
 
 	return nil

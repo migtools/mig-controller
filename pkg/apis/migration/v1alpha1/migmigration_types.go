@@ -38,6 +38,7 @@ type MigMigrationSpec struct {
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
 	Conditions
+	UnhealthyResources
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
