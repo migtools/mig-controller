@@ -41,7 +41,7 @@ const (
 	EnsureFinalRestore            = "EnsureFinalRestore"
 	FinalRestoreCreated           = "FinalRestoreCreated"
 	FinalRestoreFailed            = "FinalRestoreFailed"
-	Verify                        = "Verify"
+	Verification                  = "Verification"
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
 	Completed                     = "Completed"
@@ -103,7 +103,7 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
-	{phase: Verify, flags: HasVerify},
+	{phase: Verification, flags: HasVerify},
 	{phase: Completed},
 }
 
@@ -457,8 +457,8 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
-	case Verify:
-		completed, err := t.MigrationCompleted()
+	case Verification:
+		completed, err := t.VerificationCompleted()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -608,8 +608,9 @@ func (t *Task) hasPVs() bool {
 	return len(t.getPVs().List) > 0
 }
 
+// Get whether the verification is desired
 func (t *Task) hasVerify() bool {
-	return t.PlanResources.MigPlan.Spec.Verify
+	return t.Owner.Spec.Verify
 }
 
 // Get both source and destination clusters.

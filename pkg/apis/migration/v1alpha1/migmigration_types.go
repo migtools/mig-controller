@@ -33,6 +33,7 @@ type MigMigrationSpec struct {
 	Stage           bool                  `json:"stage"`
 	QuiescePods     bool                  `json:"quiescePods,omitempty"`
 	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
+	Verify          bool                  `json:"verify,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration

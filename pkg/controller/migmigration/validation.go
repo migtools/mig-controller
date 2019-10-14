@@ -7,14 +7,15 @@ import (
 
 // Types
 const (
-	InvalidPlanRef    = "InvalidPlanRef"
-	PlanNotReady      = "PlanNotReady"
-	PlanClosed        = "PlanClosed"
-	HasFinalMigration = "HasFinalMigration"
-	Postponed         = "Postponed"
-	Running           = "Running"
-	Succeeded         = "Succeeded"
-	Failed            = "Failed"
+	UnhealthyNamespaces = "UnhealthyNamespaces"
+	InvalidPlanRef      = "InvalidPlanRef"
+	PlanNotReady        = "PlanNotReady"
+	PlanClosed          = "PlanClosed"
+	HasFinalMigration   = "HasFinalMigration"
+	Postponed           = "Postponed"
+	Running             = "Running"
+	Succeeded           = "Succeeded"
+	Failed              = "Failed"
 )
 
 // Categories
@@ -25,8 +26,9 @@ const (
 
 // Reasons
 const (
-	NotSet   = "NotSet"
-	NotFound = "NotFound"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	ErrorsDetected = "ErrorsDetected"
 )
 
 // Statuses
@@ -37,15 +39,16 @@ const (
 
 // Messages
 const (
-	ReadyMessage             = "The migration is ready."
-	InvalidPlanRefMessage    = "The `migPlanRef` must reference a `migplan`."
-	PlanNotReadyMessage      = "The referenced `migPlanRef` does not have a `Ready` condition."
-	PlanClosedMessage        = "The associated migration plan is closed."
-	HasFinalMigrationMessage = "The associated MigPlan already has a final migration."
-	PostponedMessage         = "Postponed %d seconds to ensure migrations run serially and in order."
-	RunningMessage           = "Step: %d/%d"
-	FailedMessage            = "The migration has failed.  See: Errors."
-	SucceededMessage         = "The migration has completed successfully."
+	ReadyMessage               = "The migration is ready."
+	InvalidPlanRefMessage      = "The `migPlanRef` must reference a `migplan`."
+	PlanNotReadyMessage        = "The referenced `migPlanRef` does not have a `Ready` condition."
+	PlanClosedMessage          = "The associated migration plan is closed."
+	HasFinalMigrationMessage   = "The associated MigPlan already has a final migration."
+	PostponedMessage           = "Postponed %d seconds to ensure migrations run serially and in order."
+	RunningMessage             = "Step: %d/%d"
+	FailedMessage              = "The migration has failed.  See: Errors."
+	SucceededMessage           = "The migration has completed successfully."
+	UnhealthyNamespacesMessage = "'%s' cluster has unhealthy namespaces. See status.namespaces for details."
 )
 
 // Validate the plan resource.
