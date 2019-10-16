@@ -19,6 +19,7 @@ package migstorage
 import (
 	"context"
 	"github.com/fusor/mig-controller/pkg/logging"
+	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -79,6 +80,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					return migref.GetRequests(a, migapi.MigStorage{})
 				}),
 		})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Watch for changes to cloud providers.
+	err = c.Watch(
+		&ProviderSource{
+			Client:   mgr.GetClient(),
+			Interval: time.Second * 30},
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.Trace(err)
 		return err
