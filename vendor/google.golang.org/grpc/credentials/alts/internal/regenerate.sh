@@ -32,3 +32,4 @@ protoc --go_out=plugins=grpc,paths=source_relative:. -I. grpc/gcp/*.proto
 popd
 rm -f proto/grpc_gcp/*.pb.go
 cp "$TMP"/grpc/gcp/*.pb.go proto/grpc_gcp/
+

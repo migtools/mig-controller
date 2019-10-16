@@ -33,9 +33,9 @@ work, you can get the benchmark result and compare it with the base anytime.
 Assume there are two result files names as "basePerf" and "curPerf" created by adding
 -resultFile=basePerf and -resultFile=curPerf.
 	To format the curPerf, run:
-	go run benchmark/benchresult/main.go curPerf
+  	go run benchmark/benchresult/main.go curPerf
 	To observe how the performance changes based on a base result, run:
-	go run benchmark/benchresult/main.go basePerf curPerf
+  	go run benchmark/benchresult/main.go basePerf curPerf
 */
 package main
 

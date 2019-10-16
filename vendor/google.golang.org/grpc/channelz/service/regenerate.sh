@@ -30,3 +30,4 @@ protoc --go_out=plugins=grpc,paths=source_relative:. -I. grpc/channelz/v1/*.prot
 popd
 rm -f ../grpc_channelz_v1/*.pb.go
 cp "$TMP"/grpc/channelz/v1/*.pb.go ../grpc_channelz_v1/
+

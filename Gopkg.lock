@@ -18,6 +18,34 @@
   version = "v0.37.2"
 
 [[projects]]
+  digest = "1:5e76b44e3c7431e5423451acd5469f6971430fc9f5ade7bcaea97f67ea09b9ce"
+  name = "github.com/Azure/azure-sdk-for-go"
+  packages = [
+    "services/storage/mgmt/2018-02-01/storage",
+    "storage",
+    "version",
+  ]
+  pruneopts = "T"
+  revision = "c831e483e2058e9b2a8f9b4e35248f46f9516b4c"
+  version = "v34.1.0"
+
+[[projects]]
+  digest = "1:1611a92ba512f2a5bb90be868ce304b7aa63e5e52a5f0ba844ee7a2aa8cfbb32"
+  name = "github.com/Azure/go-autorest"
+  packages = [
+    "autorest",
+    "autorest/adal",
+    "autorest/azure",
+    "autorest/date",
+    "autorest/validation",
+    "logger",
+    "tracing",
+  ]
+  pruneopts = "T"
+  revision = "740293c019d8314ce3378d456b4327fa646297e6"
+  version = "v13.2.0"
+
+[[projects]]
   digest = "1:464aef731a5f82ded547c62e249a2e9ec59fbbc9ddab53cda7b9857852630a61"
   name = "github.com/appscode/jsonpatch"
   packages = ["."]
@@ -89,6 +117,14 @@
   pruneopts = "T"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
+
+[[projects]]
+  digest = "1:6b014c67cb522566c30ef02116f9acb50cd60954708cf92c6654e2985696db18"
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
 
 [[projects]]
   branch = "master"
@@ -487,6 +523,14 @@
   pruneopts = "T"
   revision = "1cf9852c553c5b7da2d5a4a091129a7822fed0c9"
   version = "v1.2.2"
+
+[[projects]]
+  digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
+  name = "github.com/satori/go.uuid"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:dee0cc3252ce6fcc3334c9529abd32925f2aaf072c90336a5a38254953564aa5"
@@ -1158,6 +1202,11 @@
   analyzer-version = 1
   input-imports = [
     "cloud.google.com/go/storage",
+    "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage",
+    "github.com/Azure/azure-sdk-for-go/storage",
+    "github.com/Azure/go-autorest/autorest",
+    "github.com/Azure/go-autorest/autorest/adal",
+    "github.com/Azure/go-autorest/autorest/azure",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",
@@ -1168,6 +1217,7 @@
     "github.com/go-logr/logr",
     "github.com/google/uuid",
     "github.com/heptio/velero/pkg/apis/velero/v1",
+    "github.com/joho/godotenv",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",

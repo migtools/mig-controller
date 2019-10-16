@@ -35,7 +35,7 @@ service TestService {
   // demonstrates the idea of full duplexing.
   rpc FullDuplexCall(stream SimpleRequest) returns (stream SimpleResponse);
 
-  // Client stream
+  // Client stream 
   rpc ClientStreamCall(stream SimpleRequest) returns (SimpleResponse);
 
   // Server stream

@@ -13,7 +13,7 @@ Table of Contents
   * [Set gauge values](#set-gauge-values)
   * [Complete Example](#complete-example)
 
-## Summary
+## Summary 
 [top](#Table-of-Contents)
 
 This example shows how to use gauge metrics. The program records two gauges.
@@ -23,7 +23,7 @@ This example shows how to use gauge metrics. The program records two gauges.
 
 It periodically runs a function that retrieves the memory stats and updates the above two metrics.
 These metrics are then exported using log exporter. Metrics can be viewed at
-[file:///tmp/metrics.log](file:///tmp/metrics.log)
+[file:///tmp/metrics.log](file:///tmp/metrics.log) 
 once the program is running. Alternatively you could do `tail -f /tmp/metrics.log` on Linux/OSx.
 
 The program lets you choose the amount of memory (in MB) to consume. Choose different values and query the metrics to see the change in metrics.
