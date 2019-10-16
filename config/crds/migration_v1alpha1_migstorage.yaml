@@ -48,6 +48,8 @@ spec:
                   type: string
                 azureStorageAccount:
                   type: string
+                azureStorageContainer:
+                  type: string
                 credsSecretRef:
                   type: object
                 gcpBucket:

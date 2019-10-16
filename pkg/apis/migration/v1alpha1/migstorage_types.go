@@ -17,12 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+
 	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -78,17 +79,18 @@ type VolumeSnapshotConfig struct {
 
 // BackupStorageConfig defines config for creating and storing Backups
 type BackupStorageConfig struct {
-	CredsSecretRef      *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
-	AwsBucketName       string                `json:"awsBucketName,omitempty"`
-	AwsRegion           string                `json:"awsRegion,omitempty"`
-	AwsS3ForcePathStyle bool                  `json:"awsS3ForcePathStyle,omitempty"`
-	AwsS3URL            string                `json:"awsS3Url,omitempty"`
-	AwsPublicURL        string                `json:"awsPublicUrl,omitempty"`
-	AwsKmsKeyID         string                `json:"awsKmsKeyId,omitempty"`
-	AwsSignatureVersion string                `json:"awsSignatureVersion,omitempty"`
-	AzureStorageAccount string                `json:"azureStorageAccount,omitempty"`
-	AzureResourceGroup  string                `json:"azureResourceGroup,omitempty"`
-	GcpBucket           string                `json:"gcpBucket,omitempty"`
+	CredsSecretRef        *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
+	AwsBucketName         string                `json:"awsBucketName,omitempty"`
+	AwsRegion             string                `json:"awsRegion,omitempty"`
+	AwsS3ForcePathStyle   bool                  `json:"awsS3ForcePathStyle,omitempty"`
+	AwsS3URL              string                `json:"awsS3Url,omitempty"`
+	AwsPublicURL          string                `json:"awsPublicUrl,omitempty"`
+	AwsKmsKeyID           string                `json:"awsKmsKeyId,omitempty"`
+	AwsSignatureVersion   string                `json:"awsSignatureVersion,omitempty"`
+	AzureStorageAccount   string                `json:"azureStorageAccount,omitempty"`
+	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
+	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
+	GcpBucket             string                `json:"gcpBucket,omitempty"`
 }
 
 func init() {
@@ -276,8 +278,9 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.BackupStorage,
 			},
-			ResourceGroup:  r.AzureResourceGroup,
-			StorageAccount: r.AzureStorageAccount,
+			ResourceGroup:    r.AzureResourceGroup,
+			StorageAccount:   r.AzureStorageAccount,
+			StorageContainer: r.AzureStorageContainer,
 		}
 	case GCP:
 		provider = &pvdr.GCPProvider{

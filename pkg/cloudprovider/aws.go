@@ -3,8 +3,11 @@ package cloudprovider
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
+
+	"github.com/google/uuid"
+
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -15,7 +18,6 @@ import (
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
-	"strconv"
 )
 
 // Credentials Secret.
@@ -102,11 +104,12 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
 	}
 }
 
-func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) {
+func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
 	registrySecret.Data = map[string][]byte{
 		"access_key": []byte(secret.Data[AwsAccessKeyId]),
 		"secret_key": []byte(secret.Data[AwsSecretAccessKey]),
 	}
+	return nil
 }
 
 func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
