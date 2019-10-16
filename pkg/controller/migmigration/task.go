@@ -41,6 +41,7 @@ const (
 	EnsureFinalRestore            = "EnsureFinalRestore"
 	FinalRestoreCreated           = "FinalRestoreCreated"
 	FinalRestoreFailed            = "FinalRestoreFailed"
+	Verification                  = "Verification"
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
 	Completed                     = "Completed"
@@ -51,6 +52,7 @@ const (
 	Quiesce      = 0x01 // Only when QuiescePods (true).
 	HasStagePods = 0x02 // Only when stage pods created.
 	HasPVs       = 0x04 // Only when PVs migrated.
+	HasVerify    = 0x08 // Only when the plan has enabled verification
 )
 
 type Itinerary []Step
@@ -101,6 +103,7 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
+	{phase: Verification, flags: HasVerify},
 	{phase: Completed},
 }
 
@@ -454,6 +457,17 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
+	case Verification:
+		completed, err := t.VerificationCompleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			t.next()
+		} else {
+			t.Requeue = PollReQ
+		}
 	case StageBackupFailed, StageRestoreFailed:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -515,6 +529,9 @@ func (t *Task) next() {
 			continue
 		}
 		if next.flags&Quiesce != 0 && !t.quiesce() {
+			continue
+		}
+		if next.flags&HasVerify != 0 && !t.hasVerify() {
 			continue
 		}
 		t.Phase = next.phase
@@ -589,6 +606,11 @@ func (t *Task) getPVs() migapi.PersistentVolumes {
 // Get whether the associated plan lists any PVs.
 func (t *Task) hasPVs() bool {
 	return len(t.getPVs().List) > 0
+}
+
+// Get whether the verification is desired
+func (t *Task) hasVerify() bool {
+	return t.Owner.Spec.Verify
 }
 
 // Get both source and destination clusters.

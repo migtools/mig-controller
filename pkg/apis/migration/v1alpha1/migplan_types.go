@@ -20,6 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"sort"
+
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -28,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sort"
 )
 
 // Cache Indexes.

@@ -33,11 +33,13 @@ type MigMigrationSpec struct {
 	Stage           bool                  `json:"stage"`
 	QuiescePods     bool                  `json:"quiescePods,omitempty"`
 	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
+	Verify          bool                  `json:"verify,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
 	Conditions
+	UnhealthyResources
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
