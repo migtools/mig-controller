@@ -573,9 +573,19 @@ func (t *Task) stage() bool {
 	return t.Owner.Spec.Stage
 }
 
-// Get the migration namespaces.
+// Get the migration namespaces with mapping.
 func (t *Task) namespaces() []string {
 	return t.PlanResources.MigPlan.Spec.Namespaces
+}
+
+// Get the migration source namespaces without mapping.
+func (t *Task) sourceNamespaces() []string {
+	return t.PlanResources.MigPlan.GetSourceNamespaces()
+}
+
+// Get the migration source namespaces without mapping.
+func (t *Task) destinationNamespaces() []string {
+	return t.PlanResources.MigPlan.GetDestinationNamespaces()
 }
 
 // Get whether to quiesce pods.
@@ -633,4 +643,16 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 	}
 
 	return list, nil
+}
+
+// Get both source and destination clients with associated namespaces.
+func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
+	clientList, err := t.getBothClients()
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
+
+	return clientList, namespaceList, nil
 }

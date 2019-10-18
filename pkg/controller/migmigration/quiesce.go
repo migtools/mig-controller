@@ -60,7 +60,7 @@ func (t *Task) quiesceApplications() error {
 
 // Scales down DeploymentConfig on source cluster
 func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := appsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -90,7 +90,7 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 // Scales down all Deployments
 func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 	zero := int32(0)
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := v1beta1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -120,7 +120,7 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 // Scales down all StatefulSets.
 func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 	zero := int32(0)
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := v1beta1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -149,7 +149,7 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 // Scales down all ReplicaSets.
 func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
 	zero := int32(0)
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := extv1b1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -183,7 +183,7 @@ const (
 
 // Scales down all DaemonSets.
 func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := extv1b1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -216,7 +216,7 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 // not supported in newer versions such as OCP 3.11.
 func (t *Task) suspendCronJobs(client k8sclient.Client) error {
 	fields := []string{"spec", "suspend"}
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		options := k8sclient.InNamespace(ns)
 		list := unstructured.UnstructuredList{}
 		list.SetGroupVersionKind(schema.GroupVersionKind{
@@ -252,7 +252,7 @@ func (t *Task) suspendCronJobs(client k8sclient.Client) error {
 // Scales down all Jobs
 func (t *Task) scaleDownJobs(client k8sclient.Client) error {
 	zero := int32(0)
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -299,7 +299,7 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 		log.Trace(err)
 		return false, err
 	}
-	for _, ns := range t.PlanResources.MigPlan.Spec.Namespaces {
+	for _, ns := range t.sourceNamespaces() {
 		list := v1.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(

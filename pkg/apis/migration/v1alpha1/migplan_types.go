@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -564,6 +565,32 @@ func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) 
 			Namespace: VeleroNamespace,
 			Name:      VeleroCloudSecret,
 		})
+}
+
+// GetSourceNamespaces get source namespaces without mapping
+func (r *MigPlan) GetSourceNamespaces() []string {
+	includedNamespaces := []string{}
+	for _, namespace := range r.Spec.Namespaces {
+		namespace = strings.Split(namespace, ":")[0]
+		includedNamespaces = append(includedNamespaces, namespace)
+	}
+
+	return includedNamespaces
+}
+
+// GetDestinationNamespaces get destination namespaces without mapping
+func (r *MigPlan) GetDestinationNamespaces() []string {
+	includedNamespaces := []string{}
+	for _, namespace := range r.Spec.Namespaces {
+		namespaces := strings.Split(namespace, ":")
+		if len(namespaces) > 1 {
+			includedNamespaces = append(includedNamespaces, namespaces[1])
+		} else {
+			includedNamespaces = append(includedNamespaces, namespaces[0])
+		}
+	}
+
+	return includedNamespaces
 }
 
 // Get whether the plan conflicts with another.

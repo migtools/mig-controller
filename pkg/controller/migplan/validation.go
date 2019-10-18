@@ -2,12 +2,14 @@ package migplan
 
 import (
 	"context"
+	"reflect"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 )
 
 // Types
@@ -361,6 +363,8 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
 	for _, name := range namespaces {
+		namespaceMapping := strings.Split(name, ":")
+		name = namespaceMapping[0]
 		key := types.NamespacedName{Name: name}
 		err := client.Get(context.TODO(), key, &ns)
 		if err == nil {

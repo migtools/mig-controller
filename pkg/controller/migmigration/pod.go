@@ -2,6 +2,9 @@ package migmigration
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
@@ -12,8 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 )
 
 // Delete the running restic pods.
@@ -256,15 +257,15 @@ func (t *Task) ensureStagePodsStarted() (bool, error) {
 
 // Ensure the stage pods have been deleted.
 func (t *Task) ensureStagePodsDeleted() error {
-	clients, err := t.getBothClients()
+	clients, namespaceList, err := t.getBothClientsWithNamespaces()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	cLabel, _ := t.Owner.GetCorrelationLabel()
-	for _, client := range clients {
+	for i, client := range clients {
 		podList := corev1.PodList{}
-		for _, ns := range t.namespaces() {
+		for _, ns := range namespaceList[i] {
 			options := k8sclient.InNamespace(ns)
 			err := client.List(context.TODO(), options, &podList)
 			if err != nil {
