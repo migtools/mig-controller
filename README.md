@@ -13,7 +13,23 @@ mig-controller can help you move OpenShift application workloads from a _source_
 
 __2. Use mig-operator to deploy Migration Tools to both the _source_ and _destination_ OpenShift clusters__
 
-See https://github.com/fusor/mig-operator
+Use mig-operator to install selected components of Migration Tooling (mig-controller, mig-ui, velero) onto your source and destination OpenShift clusters.
+
+After installing mig-operator, you can select which of mig-controller, mig-ui, and velero should be installed by creating a [MigrationController CR](https://github.com/fusor/mig-operator#migration-controller-installation):
+
+```
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigrationController
+[...]
+spec:
+  migration_velero: true
+  migration_controller: true
+  migration_ui: true
+ 
+[...]
+```
+
+See mig-operator docs for more details: https://github.com/fusor/mig-operator
 
 ---
 
