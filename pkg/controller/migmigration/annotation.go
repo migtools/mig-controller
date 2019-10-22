@@ -235,7 +235,14 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 			if pod.Labels == nil {
 				pod.Labels = make(map[string]string)
 			}
+
+			labels := t.Owner.GetCorrelationLabels()
+			for label, value := range labels {
+				pod.Labels[label] = value
+			}
+
 			pod.Labels[ApplicationPodLabel] = t.UID()
+			pod.Labels[IncludedInStageBackupLabel] = t.UID()
 			// Update
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
