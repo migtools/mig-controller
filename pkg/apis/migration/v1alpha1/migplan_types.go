@@ -48,6 +48,7 @@ type MigPlanSpec struct {
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 	Closed            bool                  `json:"closed,omitempty"`
+	OwerrideLimit     bool                  `json:"owerrideLimit,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan

@@ -2,7 +2,9 @@ package migplan
 
 import (
 	"context"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -22,6 +24,7 @@ const (
 	DestinationClusterNotReady     = "DestinationClusterNotReady"
 	StorageNotReady                = "StorageNotReady"
 	NsListEmpty                    = "NamespaceListEmpty"
+	NsListTooLarge                 = "NamespaceListTooLarge"
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
@@ -39,6 +42,8 @@ const (
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
+	PvsListTooLarge                = "PvsListTooLarge"
+	PodsListTooLarge               = "PodsListTooLarge"
 	Closed                         = "Closed"
 )
 
@@ -95,10 +100,26 @@ const (
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                         = "The migration plan is closed."
+	NamespaceLimitExceeded                = "The namespace selection exceeds the recomended limit of []."
+	PVLimitExceeded                       = "The nuber of selected PVs exceeds recomended limit of []."
+	PodLimitExceeded                      = "Number of pods in selected namespaces exceeds recomended limit of []."
 )
 
 // Valid AccessMode values
 var validAccessModes = []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany}
+
+// Soft limit holders for resources selected for migration
+const (
+	NamespaceLimit = "NAMESPACE_LIMIT"
+	PVLimit        = "PV_LIMIT"
+	PodLimit       = "POD_LIMIT"
+)
+
+const (
+	defaultNamespaceLimit = "100"
+	defaultPVLimit        = "100"
+	defaultPodLimit       = "100"
+)
 
 // Validate the plan resource.
 func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
@@ -205,6 +226,30 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 			Message:  NsListEmptyMessage,
 		})
 		return nil
+	}
+
+	if plan.Spec.OwerrideLimit {
+		return nil
+	}
+
+	limit, ok := os.LookupEnv(NamespaceLimit)
+	if !ok {
+		limit = defaultNamespaceLimit
+	}
+
+	nsLimit, err := strconv.Atoi(limit)
+	if err != nil {
+		return err
+	}
+
+	if len(plan.Spec.Namespaces) > nsLimit {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsListTooLarge,
+			Status:   True,
+			Category: Error,
+			Message:  NamespaceLimitExceeded,
+			Items:    []string{limit},
+		})
 	}
 
 	return nil
@@ -647,6 +692,28 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		})
 	}
 
+	if plan.Spec.OwerrideLimit {
+		return nil
+	}
+	limit, ok := os.LookupEnv(PVLimit)
+	if !ok {
+		limit = defaultPVLimit
+	}
+
+	pvLimit, err := strconv.Atoi(limit)
+	if err != nil {
+		return err
+	}
+
+	if len(plan.Spec.PersistentVolumes.List) > pvLimit {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvsListTooLarge,
+			Status:   True,
+			Category: Error,
+			Message:  PVLimitExceeded,
+			Items:    []string{limit},
+		})
+	}
 	return nil
 }
 
