@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"time"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -68,6 +69,17 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Watch remote clusters for connection problems
+	err = c.Watch(
+		&RemoteClusterSource{
+			Client:   mgr.GetClient(),
+			Interval: time.Second * 60},
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -155,6 +167,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
+	} else {
+		r.shutdownRemoteWatch(cluster)
 	}
 
 	// Ready
@@ -217,4 +231,15 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	log.Info("Remote watch started.", "cluster", cluster.Name)
 
 	return nil
+}
+
+func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
+	log.Info("Stopping remote watch.", "cluster", cluster.Name)
+	nsName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+
+	StopRemoteWatch(nsName)
+	log.Info("Stopped remote watch.", "cluster", cluster.Name)
 }

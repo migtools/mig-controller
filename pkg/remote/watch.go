@@ -48,7 +48,7 @@ type ManagerConfig struct {
 type WatchCluster struct {
 	ForwardChannel chan event.GenericEvent
 	RemoteManager  manager.Manager
-	//  TODO - setup stop channel for manager so that manager will stop when we close the event channel from parent
+	StopChannel    chan<- struct{}
 }
 
 // WatchMap provides a map between MigCluster nsNames and RemoteWatchClusters
