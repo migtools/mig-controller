@@ -33,6 +33,8 @@ spec:
             caBundle:
               format: byte
               type: string
+            insecureSkipTLSVerify:
+              type: boolean
             isHostCluster:
               type: boolean
             serviceAccountSecretRef:
