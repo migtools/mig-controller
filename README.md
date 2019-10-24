@@ -15,7 +15,7 @@ __2. Use mig-operator to deploy Migration Tools to both the _source_ and _destin
 
 Use mig-operator to install selected components of Migration Tooling (mig-controller, mig-ui, velero) onto your source and destination OpenShift clusters.
 
-After installing mig-operator, you can select which of mig-controller, mig-ui, and velero should be installed by creating a [MigrationController CR](https://github.com/fusor/mig-operator#migration-controller-installation):
+After installing mig-operator, you can select which components should be installed by creating a [MigrationController CR](https://github.com/fusor/mig-operator#migration-controller-installation):
 
 ```
 apiVersion: migration.openshift.io/v1alpha1
