@@ -18,8 +18,9 @@ package migstorage
 
 import (
 	"context"
-	"github.com/fusor/mig-controller/pkg/logging"
 	"time"
+
+	"github.com/fusor/mig-controller/pkg/logging"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -35,11 +36,6 @@ import (
 )
 
 var log = logging.WithName("storage")
-
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
 
 // Add creates a new MigStorage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -107,9 +103,6 @@ type ReconcileMigStorage struct {
 	scheme *runtime.Scheme
 }
 
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migstorages/status,verbs=get;update;patch
 func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()

@@ -188,19 +188,6 @@ type ReconcileRemoteWatcher struct {
 }
 
 // Reconcile reads that state of the cluster for a RemoteWatcher object and makes changes
-// +kubebuilder:rbac:groups=velero.io,resources=*,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=image.openshift.io,resources=*,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=namespaces/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=persistentvolumes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=secret,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=secret/status,verbs=get;update;patch
 func (r *ReconcileRemoteWatcher) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Reset()
 	// Forward a known Event back to the parent controller

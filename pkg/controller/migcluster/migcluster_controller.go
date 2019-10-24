@@ -18,6 +18,8 @@ package migcluster
 
 import (
 	"context"
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"time"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -111,10 +112,6 @@ type ReconcileMigCluster struct {
 	Controller controller.Controller
 }
 
-// Reconcile reads that state of the cluster for a MigCluster object and makes changes based on the state read
-// and what is in the MigCluster.Spec
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
