@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/fusor/mig-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -30,5 +31,11 @@ func AddToManager(m manager.Manager) error {
 			return err
 		}
 	}
+	// Application settings.
+	err := settings.Settings.Load()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

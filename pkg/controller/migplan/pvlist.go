@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -18,12 +19,12 @@ type Claims []migapi.PVC
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if plan.Status.HasCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
-		// preserve Warn PV conditions
 		plan.Status.StageCondition(PvNoSupportedAction)
 		plan.Status.StageCondition(PvNoStorageClassSelection)
 		plan.Status.StageCondition(PvWarnAccessModeUnavailable)
 		plan.Status.StageCondition(PvWarnCopyMethodSnapshot)
 		plan.Status.StageCondition(PvWarnNoCephAvailable)
+		plan.Status.StageCondition(PvLimitExceeded)
 		return nil
 	}
 	if plan.Status.HasAnyCondition(
@@ -31,8 +32,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		SourceClusterNotReady,
 		InvalidDestinationClusterRef,
 		DestinationClusterNotReady,
-		NsListEmpty,
-		NsNotFoundOnSourceCluster) {
+		NsNotFoundOnSourceCluster,
+		NsLimitExceeded,
+		NsListEmpty) {
 		return nil
 	}
 
@@ -117,6 +119,20 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	})
 
 	plan.Spec.PersistentVolumes.EndPvStaging()
+
+	// Limits
+	limit := Settings.Plan.PvLimit
+	count := len(plan.Spec.PersistentVolumes.List)
+	if count > limit {
+		message := fmt.Sprintf(PvLimitExceededMessage, limit, count)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvLimitExceeded,
+			Status:   True,
+			Reason:   LimitExceeded,
+			Category: Warn,
+			Message:  message,
+		})
+	}
 
 	return nil
 }
