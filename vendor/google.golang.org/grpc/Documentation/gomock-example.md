@@ -141,7 +141,7 @@ import (
 )
 ```
 
-Now considering a test that takes the RouteGuide client object as a parameter, makes a RouteChat rpc call and sends a message on the resulting stream. Furthermore, this test expects to see the same message to be received on the stream.
+Now considering a test that takes the RouteGuide client object as a parameter, makes a RouteChat rpc call and sends a message on the resulting stream. Furthermore, this test expects to see the same message to be received on the stream. 
 
 ```go
 var msg = ...

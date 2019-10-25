@@ -17,8 +17,15 @@ data:
   aws-access-key-id: aGVsbG8K
   aws-secret-access-key: aGVsbG8K
 
-  # [!] If using Azure (not yet supported), change parameters below with base64 encoded credentials
-  azure-client-secret: aGVsbG8K
-  azure-subscription-id: aGVsbG8K
-  azure-tenant-id: aGVsbG8K
-  azure-client-id: aGVsbG8K
+  # [!] If using Azure, change `azure-credentials` below to contain base64 encoded credentials
+  #     Azure Credential format (pre b64 encoding)
+  #     AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+  #     AZURE_TENANT_ID=${AZURE_TENANT_ID}
+  #     AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+  #     AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+  #     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+  #     AZURE_CLOUD_NAME=AzurePublicCloud
+  azure-credentials: aGVsbG8K
+
+  # [!] If using GCP, change `gcp-credentials` below to contain base64 encoded credentials
+  gcp-credentials: aGVsbG8K

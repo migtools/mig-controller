@@ -1,8 +1,9 @@
 package cloudprovider
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
+
+	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -44,10 +45,11 @@ func (p *GCPProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
 	}
 }
 
-func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) {
+func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
 	registrySecret.Data = map[string][]byte{
 		"cloud": secret.Data[GcpCredentials],
 	}
+	return nil
 }
 
 func (p *GCPProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {

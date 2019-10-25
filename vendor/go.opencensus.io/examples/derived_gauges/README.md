@@ -13,7 +13,7 @@ Table of Contents
 
 
 
-## Summary
+## Summary 
 [top](#Table-of-Contents)
 
 This example demonstrates the use of derived gauges. It is a simple interactive program of consumer
@@ -28,7 +28,7 @@ There are two metrics collected to monitor the queue.
 This example shows how to use gauge metrics. The program records two gauges.
 
 These metrics are read when exporter scrapes them. In this example log exporter is used to
-log the data into a file. Metrics can be viewed at [file:///tmp/metrics.log](file:///tmp/metrics.log)
+log the data into a file. Metrics can be viewed at [file:///tmp/metrics.log](file:///tmp/metrics.log) 
 once the program is running. Alternatively you could do `tail -f /tmp/metrics.log` on Linux/OSx.
 
 Enter different value for number of items to queue and fetch the metrics using above url to see the variation in the metrics.
