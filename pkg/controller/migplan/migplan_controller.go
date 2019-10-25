@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+	"github.com/fusor/mig-controller/pkg/settings"
 	"strconv"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -35,6 +36,9 @@ import (
 )
 
 var log = logging.WithName("plan")
+
+// Application settings.
+var Settings = &settings.Settings
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.

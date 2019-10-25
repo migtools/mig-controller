@@ -2,12 +2,15 @@ package migplan
 
 import (
 	"context"
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"reflect"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -23,6 +26,8 @@ const (
 	InvalidDestinationCluster      = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
+	NsLimitExceeded                = "NamespaceLimitExceeded"
+	PodLimitExceeded               = "PodLimitExceeded"
 	PlanConflict                   = "PlanConflict"
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
@@ -34,6 +39,7 @@ const (
 	PvInvalidCopyMethod            = "PvInvalidCopyMethod"
 	PvNoCopyMethodSelection        = "PvNoCopyMethodSelection"
 	PvWarnCopyMethodSnapshot       = "PvWarnCopyMethodSnapshot"
+	PvLimitExceeded                = "PvLimitExceeded"
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
@@ -50,12 +56,13 @@ const (
 
 // Reasons
 const (
-	NotSet      = "NotSet"
-	NotFound    = "NotFound"
-	NotDistinct = "NotDistinct"
-	NotDone     = "NotDone"
-	Done        = "Done"
-	Conflict    = "Conflict"
+	NotSet        = "NotSet"
+	NotFound      = "NotFound"
+	NotDistinct   = "NotDistinct"
+	LimitExceeded = "LimitExceeded"
+	NotDone       = "NotDone"
+	Done          = "Done"
+	Conflict      = "Conflict"
 )
 
 // Statuses
@@ -78,6 +85,8 @@ const (
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
+	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
+	PodLimitExceededMessage               = "Pod limit: %d exceeded, found: %d."
 	PlanConflictMessage                   = "The plan is in conflict with []."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
@@ -89,6 +98,7 @@ const (
 	PvInvalidCopyMethodMessage            = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
 	PvNoCopyMethodSelectionMessage        = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
 	PvWarnCopyMethodSnapshotMessage       = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
+	PvLimitExceededMessage                = "PV limit: %d exceeded, found: %d."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
@@ -123,6 +133,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Migrated namespaces.
 	err = r.validateNamespaces(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Pod limit within each namespace.
+	err = r.validatePodLimit(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -195,7 +212,8 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 
 // Validate the referenced assetCollection.
 func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
-	if len(plan.Spec.Namespaces) == 0 {
+	count := len(plan.Spec.Namespaces)
+	if count == 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsListEmpty,
 			Status:   True,
@@ -203,6 +221,69 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 			Message:  NsListEmptyMessage,
 		})
 		return nil
+	}
+	limit := Settings.Plan.NsLimit
+	if count > limit {
+		message := fmt.Sprintf(NsLimitExceededMessage, limit, count)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsLimitExceeded,
+			Status:   True,
+			Reason:   LimitExceeded,
+			Category: Critical,
+			Message:  message,
+		})
+		return nil
+	}
+
+	return nil
+}
+
+// Validate the total number of running pods (limit) across namespaces.
+func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(Suspended, NsLimitExceeded) {
+		plan.Status.StageCondition(PodLimitExceeded)
+		return nil
+	}
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
+	}
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	count := 0
+	limit := Settings.Plan.PodLimit
+	for _, name := range plan.Spec.Namespaces {
+		list := kapi.PodList{}
+		options := k8sclient.ListOptions{
+			FieldSelector: fields.SelectorFromSet(
+				fields.Set{
+					"status.phase": string(kapi.PodRunning),
+				}),
+			Namespace: name,
+		}
+		err := client.List(context.TODO(), &options, &list)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		count += len(list.Items)
+	}
+	if count > limit {
+		message := fmt.Sprintf(PodLimitExceededMessage, limit, count)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PodLimitExceeded,
+			Status:   True,
+			Reason:   LimitExceeded,
+			Category: Warn,
+			Message:  message,
+		})
 	}
 
 	return nil
@@ -318,9 +399,6 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 
 // Validate required namespaces.
 func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error {
-	if plan.Status.HasAnyCondition(Suspended) {
-		return nil
-	}
 	err := r.validateSourceNamespaces(plan)
 	if err != nil {
 		log.Trace(err)
@@ -339,7 +417,8 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	namespaces := []string{migapi.VeleroNamespace}
-	if plan.Status.HasAnyCondition(Suspended) {
+	if plan.Status.HasAnyCondition(Suspended, NsLimitExceeded) {
+		plan.Status.StageCondition(NsNotFoundOnSourceCluster)
 		return nil
 	}
 	for _, ns := range plan.Spec.Namespaces {

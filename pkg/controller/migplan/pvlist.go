@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+	"fmt"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
@@ -17,12 +18,14 @@ type Claims []migapi.PVC
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if plan.Status.HasCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
+		plan.Status.StageCondition(PvLimitExceeded)
 		return nil
 	}
 	if plan.Status.HasAnyCondition(
 		InvalidSourceClusterRef,
 		SourceClusterNotReady,
 		NsListEmpty,
+		NsLimitExceeded,
 		NsNotFoundOnSourceCluster) {
 		return nil
 	}
@@ -102,6 +105,20 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	})
 
 	plan.Spec.PersistentVolumes.EndPvStaging()
+
+	// Limits
+	limit := Settings.Plan.PvLimit
+	count := len(plan.Spec.PersistentVolumes.List)
+	if count > limit {
+		message := fmt.Sprintf(PvLimitExceededMessage, limit, count)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvLimitExceeded,
+			Status:   True,
+			Reason:   LimitExceeded,
+			Category: Warn,
+			Message:  message,
+		})
+	}
 
 	return nil
 }
