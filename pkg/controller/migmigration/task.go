@@ -48,10 +48,9 @@ const (
 
 // Flags
 const (
-	Quiesce      = 0x01 // Only when QuiescePods (true).
-	HasStagePods = 0x02 // Only when stage pods created.
-	HasPVs       = 0x04 // Only when PVs migrated.
-	HasVerify    = 0x08 // Only when the plan has enabled verification
+	Quiesce   = 0x01 // Only when QuiescePods (true).
+	HasPVs    = 0x04 // Only when PVs migrated.
+	HasVerify = 0x08 // Only when the plan has enabled verification
 )
 
 type Itinerary []Step
@@ -62,8 +61,8 @@ var StageItinerary = Itinerary{
 	{phase: Prepare},
 	{phase: EnsureCloudSecretPropagated},
 	{phase: AnnotateResources, flags: HasPVs},
-	{phase: RestartRestic, flags: HasStagePods},
-	{phase: ResticRestarted, flags: HasStagePods},
+	{phase: RestartRestic},
+	{phase: ResticRestarted},
 	{phase: EnsureStageBackup, flags: HasPVs},
 	{phase: StageBackupCreated, flags: HasPVs},
 	{phase: EnsureStageBackupReplicated, flags: HasPVs},
@@ -71,8 +70,8 @@ var StageItinerary = Itinerary{
 	{phase: EnsureQuiesced, flags: Quiesce},
 	{phase: EnsureStageRestore, flags: HasPVs},
 	{phase: StageRestoreCreated, flags: HasPVs},
-	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
-	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
+	{phase: EnsureStagePodsDeleted},
+	{phase: EnsureStagePodsTerminated},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
 	{phase: Completed},
 }
@@ -85,8 +84,8 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureInitialBackup},
 	{phase: InitialBackupCreated},
 	{phase: AnnotateResources, flags: HasPVs},
-	{phase: RestartRestic, flags: HasStagePods},
-	{phase: ResticRestarted, flags: HasStagePods},
+	{phase: RestartRestic},
+	{phase: ResticRestarted},
 	{phase: EnsureStageBackup, flags: HasPVs},
 	{phase: StageBackupCreated, flags: HasPVs},
 	{phase: EnsureStageBackupReplicated, flags: HasPVs},
@@ -94,8 +93,8 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureQuiesced, flags: Quiesce},
 	{phase: EnsureStageRestore, flags: HasPVs},
 	{phase: StageRestoreCreated, flags: HasPVs},
-	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
-	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
+	{phase: EnsureStagePodsDeleted},
+	{phase: EnsureStagePodsTerminated},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},

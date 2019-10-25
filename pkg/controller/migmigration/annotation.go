@@ -30,9 +30,9 @@ const (
 	// Resources included in the stage backup.
 	// Referenced by the Backup.LabelSelector. The value is the Task.UID().
 	IncludedInStageBackupLabel = "migration-included-stage-backup"
-	// Application pods requiring restic/stage backups.
+	// Stage pods requiring restic/stage backups.
 	// Used to create stage pods. The value is the Task.UID()
-	ApplicationPodLabel = "migration-application-pod"
+	StagePodLabel = "migration-stage-pod"
 	// Designated as an `initial` Backup.
 	// The value is the Task.UID().
 	InitialBackupLabel = "migration-initial-backup"
@@ -208,11 +208,6 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 			if pod.Labels == nil {
 				pod.Labels = make(map[string]string)
 			}
-			// Skip stage pods.
-			cLabel, _ := t.Owner.GetCorrelationLabel()
-			if _, found := pod.Labels[cLabel]; found {
-				continue
-			}
 			// Skip stateless pods.
 			if len(pod.Spec.Volumes) == 0 {
 				continue
@@ -236,12 +231,7 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 				pod.Labels = make(map[string]string)
 			}
 
-			labels := t.Owner.GetCorrelationLabels()
-			for label, value := range labels {
-				pod.Labels[label] = value
-			}
-
-			pod.Labels[ApplicationPodLabel] = t.UID()
+			pod.Labels[StagePodLabel] = t.UID()
 			pod.Labels[IncludedInStageBackupLabel] = t.UID()
 			// Update
 			err = client.Update(context.TODO(), &pod)
@@ -418,8 +408,8 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 					delete(pod.Labels, IncludedInStageBackupLabel)
 					needsUpdate = true
 				}
-				if _, found := pod.Labels[ApplicationPodLabel]; found {
-					delete(pod.Labels, ApplicationPodLabel)
+				if _, found := pod.Labels[StagePodLabel]; found {
+					delete(pod.Labels, StagePodLabel)
 					needsUpdate = true
 				}
 			}

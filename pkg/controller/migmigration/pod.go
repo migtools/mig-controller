@@ -113,22 +113,22 @@ func (t *Task) ensureStagePodsDeleted() error {
 		log.Trace(err)
 		return err
 	}
-	cLabel, _ := t.Owner.GetCorrelationLabel()
 	podList := corev1.PodList{}
 	for _, ns := range namespaceList {
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &podList)
+		selector := labels.SelectorFromSet(map[string]string{
+			StagePodLabel: t.UID(),
+		})
+		err := client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&podList)
 		if err != nil {
 			return err
 		}
 		for _, pod := range podList.Items {
-			// Owned by ANY migration.
-			if pod.Labels == nil {
-				continue
-			}
-			if _, found := pod.Labels[cLabel]; !found {
-				continue
-			}
 			// Delete
 			err := client.Delete(context.TODO(), &pod)
 			if err != nil && !errors.IsNotFound(err) {
@@ -240,22 +240,22 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		log.Trace(err)
 		return false, err
 	}
-	cLabel, _ := t.Owner.GetCorrelationLabel()
 	podList := corev1.PodList{}
 	for _, ns := range namespaceList {
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &podList)
+		selector := labels.SelectorFromSet(map[string]string{
+			StagePodLabel: t.UID(),
+		})
+		err := client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&podList)
 		if err != nil {
 			return false, err
 		}
 		for _, pod := range podList.Items {
-			// Owned by ANY migration.
-			if pod.Labels == nil {
-				continue
-			}
-			if _, found := pod.Labels[cLabel]; !found {
-				continue
-			}
 			log.Info("Waiting for stage pod ", pod.Name, " to terminate")
 			return false, nil
 		}
