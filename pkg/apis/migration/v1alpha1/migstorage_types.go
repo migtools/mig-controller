@@ -91,6 +91,7 @@ type BackupStorageConfig struct {
 	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
 	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
 	GcpBucket             string                `json:"gcpBucket,omitempty"`
+	AwsCustomCABundle     []byte                `json:"awsCustomCABundle,omitempty"`
 }
 
 func init() {
@@ -272,6 +273,7 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 			KMSKeyId:         r.AwsKmsKeyID,
 			SignatureVersion: r.AwsSignatureVersion,
 			S3ForcePathStyle: r.AwsS3ForcePathStyle,
+			CustomCABundle:   r.AwsCustomCABundle,
 		}
 	case Azure:
 		provider = &pvdr.AzureProvider{

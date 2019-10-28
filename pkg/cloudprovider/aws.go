@@ -47,6 +47,7 @@ type AWSProvider struct {
 	KMSKeyId         string
 	SignatureVersion string
 	S3ForcePathStyle bool
+	CustomCABundle   []byte
 }
 
 func (p *AWSProvider) GetURL() string {
@@ -244,6 +245,7 @@ func (p *AWSProvider) Test(secret *kapi.Secret) error {
 			forcePathStyle: p.GetForcePathStyle(),
 			bucket:         p.Bucket,
 			secret:         secret,
+			customCABundle: p.CustomCABundle,
 		}
 		err = test.Run()
 	case VolumeSnapshot:
@@ -267,6 +269,7 @@ type S3Test struct {
 	bucket         string
 	disableSSL     bool
 	forcePathStyle bool
+	customCABundle []byte
 	secret         *kapi.Secret
 }
 
@@ -289,16 +292,22 @@ func (r *S3Test) Run() error {
 }
 
 func (r *S3Test) newSession() (*session.Session, error) {
-	return session.NewSession(&aws.Config{
-		Region:           &r.region,
-		Endpoint:         &r.url,
-		DisableSSL:       aws.Bool(r.disableSSL),
-		S3ForcePathStyle: aws.Bool(r.forcePathStyle),
-		Credentials: credentials.NewStaticCredentials(
-			bytes.NewBuffer(r.secret.Data[AwsAccessKeyId]).String(),
-			bytes.NewBuffer(r.secret.Data[AwsSecretAccessKey]).String(),
-			""),
-	})
+	sessionOptions := session.Options{
+		Config: aws.Config{
+			Region:           &r.region,
+			Endpoint:         &r.url,
+			DisableSSL:       aws.Bool(r.disableSSL),
+			S3ForcePathStyle: aws.Bool(r.forcePathStyle),
+			Credentials: credentials.NewStaticCredentials(
+				bytes.NewBuffer(r.secret.Data[AwsAccessKeyId]).String(),
+				bytes.NewBuffer(r.secret.Data[AwsSecretAccessKey]).String(),
+				""),
+		},
+	}
+	if len(r.customCABundle) > 0 {
+		sessionOptions.CustomCABundle = bytes.NewReader(r.customCABundle)
+	}
+	return session.NewSessionWithOptions(sessionOptions)
 }
 
 func (r *S3Test) upload(ssn *session.Session) error {

@@ -32,6 +32,11 @@ func (in *BackupStorageConfig) DeepCopyInto(out *BackupStorageConfig) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
+	if in.AwsCustomCABundle != nil {
+		in, out := &in.AwsCustomCABundle, &out.AwsCustomCABundle
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
