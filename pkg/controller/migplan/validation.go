@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/health"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -771,17 +773,20 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 	}
 
 	for _, ns := range plan.Spec.Namespaces {
-		options := k8sclient.InNamespace(ns)
-		podList := kapi.PodList{}
-		err := client.List(context.TODO(), options, &podList)
+		unhealthyPods, err := health.PodsUnhealthy(client, &k8sclient.ListOptions{
+			Namespace: ns,
+		})
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
 
-		for _, pod := range podList.Items {
-			if pod.Status.Phase == kapi.PodRunning || pod.Status.Phase == kapi.PodSucceeded {
-				continue
+		for _, unstrucredPod := range *unhealthyPods {
+			pod := &kapi.Pod{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrucredPod.UnstructuredContent(), pod)
+			if err != nil {
+				log.Trace(err)
+				return err
 			}
 
 			condition := plan.Status.FindCondition(SourcePodsNotHealthy)
