@@ -132,25 +132,25 @@ func (p *AzureProvider) Validate(secret *kapi.Secret) []string {
 				break
 			}
 		}
-	}
 
-	// Ensure 'azure-credentials' contains all needed vars:
-	// AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	cloudCreds, err := godotenv.Unmarshal(string(secret.Data[AzureCredentials]))
-	if err != nil {
-		return fields
-	}
-	if cloudCreds[tenantIDKey] == "" {
-		fields = append(fields, tenantIDKey)
-	}
-	if cloudCreds[clientIDKey] == "" {
-		fields = append(fields, clientIDKey)
-	}
-	if cloudCreds[clientSecretKey] == "" {
-		fields = append(fields, clientSecretKey)
-	}
-	if cloudCreds[subscriptionIDKey] == "" {
-		fields = append(fields, subscriptionIDKey)
+		// Ensure 'azure-credentials' contains all needed vars:
+		// AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+		cloudCreds, err := godotenv.Unmarshal(string(secret.Data[AzureCredentials]))
+		if err != nil {
+			return fields
+		}
+		if cloudCreds[tenantIDKey] == "" {
+			fields = append(fields, tenantIDKey)
+		}
+		if cloudCreds[clientIDKey] == "" {
+			fields = append(fields, clientIDKey)
+		}
+		if cloudCreds[clientSecretKey] == "" {
+			fields = append(fields, clientSecretKey)
+		}
+		if cloudCreds[subscriptionIDKey] == "" {
+			fields = append(fields, subscriptionIDKey)
+		}
 	}
 
 	if p.ResourceGroup == "" {
