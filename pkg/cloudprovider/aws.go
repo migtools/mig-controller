@@ -186,6 +186,18 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			p.SignatureVersion == "4") {
 			fields = append(fields, "SignatureVersion")
 		}
+		if p.S3URL != "" {
+			u, err := url.Parse(p.S3URL)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+				fields = append(fields, "S3URL")
+			}
+		}
+		if p.PublicURL != "" {
+			u, err := url.Parse(p.PublicURL)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+				fields = append(fields, "PublicURL")
+			}
+		}
 	case VolumeSnapshot:
 	}
 
