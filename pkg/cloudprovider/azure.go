@@ -36,10 +36,11 @@ const (
 
 type AzureProvider struct {
 	BaseProvider
-	StorageAccount   string
-	StorageContainer string
-	ResourceGroup    string
-	APITimeout       string
+	StorageAccount       string
+	StorageContainer     string
+	ResourceGroup        string
+	ClusterResourceGroup string
+	APITimeout           string
 }
 
 func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
@@ -67,6 +68,7 @@ func (p *AzureProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 }
 
 func (p *AzureProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
+	// TODO: Inject AZURE_RESOURCE_GROUP = p.ClusterResourceGroup
 	cloudSecret.Data = map[string][]byte{
 		"cloud": secret.Data[AzureCredentials],
 	}

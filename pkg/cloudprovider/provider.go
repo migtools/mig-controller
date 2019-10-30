@@ -20,6 +20,7 @@ const (
 )
 
 type Provider interface {
+	GetName() string
 	SetRole(role string)
 	UpdateBSL(location *velero.BackupStorageLocation)
 	UpdateVSL(location *velero.VolumeSnapshotLocation)
@@ -31,9 +32,14 @@ type Provider interface {
 }
 
 type BaseProvider struct {
+	Name string
 	Role string
 }
 
 func (p *BaseProvider) SetRole(role string) {
 	p.Role = role
+}
+
+func (p *BaseProvider) GetName() string {
+	return p.Name
 }

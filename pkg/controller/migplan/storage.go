@@ -2,7 +2,10 @@ package migplan
 
 import (
 	"context"
+	"errors"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -41,10 +44,11 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 			return err
 		}
 		pl := PlanStorage{
-			Client:       r,
-			targetClient: client,
-			storage:      storage,
-			plan:         plan,
+			Client:        r,
+			targetCluster: &cluster,
+			targetClient:  client,
+			storage:       storage,
+			plan:          plan,
 		}
 
 		// BSL
@@ -85,6 +89,28 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	return err
 }
 
+// Get clusters referenced by the plan.
+func (r ReconcileMigPlan) planClusters(plan *migapi.MigPlan) ([]migapi.MigCluster, error) {
+	list := []migapi.MigCluster{}
+	// Source
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return nil, err
+	}
+	if cluster != nil {
+		list = append(list, *cluster)
+	}
+	// Destination
+	cluster, err = plan.GetDestinationCluster(r)
+	if err != nil {
+		return nil, err
+	}
+	if cluster != nil {
+		list = append(list, *cluster)
+	}
+	return list, nil
+}
+
 //
 // PlanStorage
 // Client: The controller client.
@@ -94,14 +120,15 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 //
 type PlanStorage struct {
 	k8sclient.Client
-	targetClient k8sclient.Client
-	plan         *migapi.MigPlan
-	storage      *migapi.MigStorage
+	targetCluster *migapi.MigCluster
+	targetClient  k8sclient.Client
+	plan          *migapi.MigPlan
+	storage       *migapi.MigStorage
 }
 
 // Create the velero BackupStorageLocation has been created.
 func (r PlanStorage) ensureBSL() error {
-	newBSL := r.storage.BuildBSL()
+	newBSL := r.BuildBSL()
 	newBSL.Labels = r.plan.GetCorrelationLabels()
 	foundBSL, err := r.plan.GetBSL(r.targetClient)
 	if err != nil {
@@ -119,7 +146,7 @@ func (r PlanStorage) ensureBSL() error {
 	if r.storage.EqualsBSL(foundBSL, newBSL) {
 		return nil
 	}
-	r.storage.UpdateBSL(foundBSL)
+	r.UpdateBSL(foundBSL)
 	err = r.targetClient.Update(context.TODO(), foundBSL)
 	if err != nil {
 		log.Trace(err)
@@ -149,7 +176,7 @@ func (r PlanStorage) ensureVSL() error {
 	if r.storage.EqualsVSL(foundVSL, newVSL) {
 		return nil
 	}
-	r.storage.UpdateVSL(foundVSL)
+	r.UpdateVSL(foundVSL)
 	err = r.targetClient.Update(context.TODO(), foundVSL)
 	if err != nil {
 		log.Trace(err)
@@ -161,11 +188,7 @@ func (r PlanStorage) ensureVSL() error {
 
 // Create the velero BSL cloud secret has been created.
 func (r PlanStorage) ensureCloudSecret() error {
-	newSecret, err := r.storage.BuildBSLCloudSecret(r.Client)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
+	newSecret := r.storage.BuildBSLCloudSecret()
 	newSecret.Labels = r.plan.GetCorrelationLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient)
 	if err != nil {
@@ -183,7 +206,7 @@ func (r PlanStorage) ensureCloudSecret() error {
 	if r.storage.EqualsCloudSecret(foundSecret, newSecret) {
 		return nil
 	}
-	r.storage.UpdateBSLCloudSecret(r.Client, foundSecret)
+	r.UpdateBSLCloudSecret(foundSecret)
 	err = r.targetClient.Update(context.TODO(), foundSecret)
 	if err != nil {
 		log.Trace(err)
@@ -193,24 +216,84 @@ func (r PlanStorage) ensureCloudSecret() error {
 	return nil
 }
 
-// Get clusters referenced by the plan.
-func (r ReconcileMigPlan) planClusters(plan *migapi.MigPlan) ([]migapi.MigCluster, error) {
-	list := []migapi.MigCluster{}
-	// Source
-	cluster, err := plan.GetSourceCluster(r)
+// Build BSL.
+func (r *PlanStorage) BuildBSL() *velero.BackupStorageLocation {
+	bsl := r.storage.BuildBSL()
+	r.UpdateBSL(bsl)
+	return bsl
+}
+
+// Update BSL.
+func (r *PlanStorage) UpdateBSL(bsl *velero.BackupStorageLocation) {
+	provider := r.storage.GetBackupStorageProvider()
+	r.targetCluster.UpdateProvider(provider)
+	provider.UpdateBSL(bsl)
+}
+
+// Build VSL.
+func (r *PlanStorage) BuildVSL() *velero.VolumeSnapshotLocation {
+	vsl := r.storage.BuildVSL(string(r.plan.UID))
+	r.UpdateVSL(vsl)
+	return vsl
+}
+
+// Update VSL.
+func (r *PlanStorage) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
+	provider := r.storage.GetVolumeSnapshotProvider()
+	r.targetCluster.UpdateProvider(provider)
+	provider.UpdateVSL(vsl)
+}
+
+// Build BSL cloud secret.
+func (r *PlanStorage) BuildBSLCloudSecret() (*kapi.Secret, error) {
+	secret := r.storage.BuildVSLCloudSecret()
+	err := r.UpdateBSLCloudSecret(secret)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
-	if cluster != nil {
-		list = append(list, *cluster)
-	}
-	// Destination
-	cluster, err = plan.GetDestinationCluster(r)
+
+	return secret, nil
+}
+
+// Update backup cloud-secret.
+func (r *PlanStorage) UpdateBSLCloudSecret(cloudSecret *kapi.Secret) error {
+	secret, err := r.storage.GetBackupStorageCredSecret(r.Client)
 	if err != nil {
+		return err
+	}
+	if secret == nil {
+		return errors.New("Credentials secret not found.")
+	}
+	provider := r.storage.GetBackupStorageProvider()
+	r.targetCluster.UpdateProvider(provider)
+	provider.UpdateCloudSecret(secret, cloudSecret)
+	return nil
+}
+
+// Build VSL cloud secret.
+func (r *PlanStorage) BuildVSLCloudSecret() (*kapi.Secret, error) {
+	secret := r.storage.BuildVSLCloudSecret()
+	err := r.UpdateVSLCloudSecret(secret)
+	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
-	if cluster != nil {
-		list = append(list, *cluster)
+
+	return secret, nil
+}
+
+// Update snapshot cloud-secret.
+func (r *PlanStorage) UpdateVSLCloudSecret(cloudSecret *kapi.Secret) error {
+	secret, err := r.storage.GetVolumeSnapshotCredSecret(r.Client)
+	if err != nil {
+		return err
 	}
-	return list, nil
+	if secret == nil {
+		return errors.New("Credentials secret not found.")
+	}
+	provider := r.storage.GetVolumeSnapshotProvider()
+	r.targetCluster.UpdateProvider(provider)
+	provider.UpdateCloudSecret(secret, cloudSecret)
+	return nil
 }
