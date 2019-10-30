@@ -36,6 +36,8 @@ spec:
               type: boolean
             stage:
               type: boolean
+            verify:
+              type: boolean
           required:
           - stage
           type: object
