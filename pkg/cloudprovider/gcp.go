@@ -39,10 +39,11 @@ func (p *GCPProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	vsl.Spec.Provider = GCP
 }
 
-func (p *GCPProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
+func (p *GCPProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error {
 	cloudSecret.Data = map[string][]byte{
 		"cloud": secret.Data[GcpCredentials],
 	}
+	return nil
 }
 
 func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {

@@ -94,7 +94,7 @@ func (p *AWSProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	}
 }
 
-func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
+func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error {
 	cloudSecret.Data = map[string][]byte{
 		"cloud": []byte(
 			fmt.Sprintf(
@@ -103,6 +103,7 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
 				secret.Data[AwsSecretAccessKey]),
 		),
 	}
+	return nil
 }
 
 func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
