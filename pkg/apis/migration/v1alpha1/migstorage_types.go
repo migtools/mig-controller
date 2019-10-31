@@ -87,6 +87,7 @@ type BackupStorageConfig struct {
 	AwsPublicURL          string                `json:"awsPublicUrl,omitempty"`
 	AwsKmsKeyID           string                `json:"awsKmsKeyId,omitempty"`
 	AwsSignatureVersion   string                `json:"awsSignatureVersion,omitempty"`
+	S3CustomCABundle      []byte                `json:"s3CustomCABundle,omitempty"`
 	AzureStorageAccount   string                `json:"azureStorageAccount,omitempty"`
 	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
 	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
@@ -272,6 +273,7 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 			KMSKeyId:         r.AwsKmsKeyID,
 			SignatureVersion: r.AwsSignatureVersion,
 			S3ForcePathStyle: r.AwsS3ForcePathStyle,
+			CustomCABundle:   r.S3CustomCABundle,
 		}
 	case Azure:
 		provider = &pvdr.AzureProvider{
