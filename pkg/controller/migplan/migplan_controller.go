@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	"github.com/fusor/mig-controller/pkg/settings"
+	kapi "k8s.io/api/core/v1"
 	"strconv"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -127,6 +128,23 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 			return []string{
 				strconv.FormatBool(p.Spec.Closed),
+			}
+		})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// Pod
+	err = indexer.IndexField(
+		&kapi.Pod{},
+		"status.phase",
+		func(rawObj runtime.Object) []string {
+			p, cast := rawObj.(*kapi.Pod)
+			if !cast {
+				return nil
+			}
+			return []string{
+				string(p.Status.Phase),
 			}
 		})
 	if err != nil {
