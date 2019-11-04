@@ -395,6 +395,7 @@ func (in *MigPlanSpec) DeepCopyInto(out *MigPlanSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
+	in.UnhealthyResources.DeepCopyInto(&out.UnhealthyResources)
 	return
 }
 

@@ -109,6 +109,7 @@ const (
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                         = "The migration plan is closed."
+	SourcePodsNotHealthyMessage           = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
 )
 
 // Valid AccessMode values
@@ -772,6 +773,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 		return err
 	}
 
+	unhealthyResources := migapi.UnhealthyResources{}
 	for _, ns := range plan.Spec.Namespaces {
 		unhealthyPods, err := health.PodsUnhealthy(client, &k8sclient.ListOptions{
 			Namespace: ns,
@@ -781,6 +783,9 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			return err
 		}
 
+		workload := migapi.Workload{
+			Name: "Pods",
+		}
 		for _, unstrucredPod := range *unhealthyPods {
 			pod := &kapi.Pod{}
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrucredPod.UnstructuredContent(), pod)
@@ -789,21 +794,27 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 				return err
 			}
 
-			condition := plan.Status.FindCondition(SourcePodsNotHealthy)
-			if condition == nil {
-				condition = &migapi.Condition{
-					Type:     SourcePodsNotHealthy,
-					Status:   True,
-					Reason:   NotHealthy,
-					Category: Warn,
-					Message:  "Pods not healthy on the source cluster [].",
-					Items:    []string{},
-				}
-				plan.Status.SetCondition(*condition)
-			}
-			ref := fmt.Sprintf("%s:%s", pod.Namespace, pod.Name)
-			condition.Items = append(condition.Items, ref)
+			workload.Resources = append(workload.Resources, pod.Name)
 		}
+
+		if len(workload.Resources) != 0 {
+			unhealthyNamespace := migapi.UnhealthyNamespace{
+				Name:      ns,
+				Workloads: []migapi.Workload{workload},
+			}
+			unhealthyResources.Namespaces = append(unhealthyResources.Namespaces, unhealthyNamespace)
+		}
+	}
+	plan.Spec.UnhealthyResources = unhealthyResources
+
+	if len(plan.Spec.UnhealthyResources.Namespaces) != 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourcePodsNotHealthy,
+			Status:   True,
+			Reason:   NotHealthy,
+			Category: Warn,
+			Message:  SourcePodsNotHealthyMessage,
+		})
 	}
 
 	return nil
