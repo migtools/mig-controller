@@ -20,10 +20,11 @@ const (
 )
 
 type Provider interface {
+	GetName() string
 	SetRole(role string)
 	UpdateBSL(location *velero.BackupStorageLocation)
 	UpdateVSL(location *velero.VolumeSnapshotLocation)
-	UpdateCloudSecret(secret, cloudSecret *kapi.Secret)
+	UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error
 	UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error
 	UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string)
 	Validate(secret *kapi.Secret) []string
@@ -31,9 +32,14 @@ type Provider interface {
 }
 
 type BaseProvider struct {
+	Name string
 	Role string
 }
 
 func (p *BaseProvider) SetRole(role string) {
 	p.Role = role
+}
+
+func (p *BaseProvider) GetName() string {
+	return p.Name
 }

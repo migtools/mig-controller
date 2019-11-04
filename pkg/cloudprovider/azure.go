@@ -22,11 +22,12 @@ import (
 const (
 	AzureCredentials = "azure-credentials"
 
-	tenantIDKey       = "AZURE_TENANT_ID"
-	subscriptionIDKey = "AZURE_SUBSCRIPTION_ID"
-	clientIDKey       = "AZURE_CLIENT_ID"
-	clientSecretKey   = "AZURE_CLIENT_SECRET"
-	cloudNameKey      = "AZURE_CLOUD_NAME"
+	tenantIDKey             = "AZURE_TENANT_ID"
+	subscriptionIDKey       = "AZURE_SUBSCRIPTION_ID"
+	clientIDKey             = "AZURE_CLIENT_ID"
+	clientSecretKey         = "AZURE_CLIENT_SECRET"
+	cloudNameKey            = "AZURE_CLOUD_NAME"
+	clusterResourceGroupKey = "AZURE_RESOURCE_GROUP"
 )
 
 // Registry Credentials Secret
@@ -36,10 +37,11 @@ const (
 
 type AzureProvider struct {
 	BaseProvider
-	StorageAccount   string
-	StorageContainer string
-	ResourceGroup    string
-	APITimeout       string
+	StorageAccount       string
+	StorageContainer     string
+	ResourceGroup        string
+	ClusterResourceGroup string
+	APITimeout           string
 }
 
 func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
@@ -66,10 +68,22 @@ func (p *AzureProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	}
 }
 
-func (p *AzureProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
-	cloudSecret.Data = map[string][]byte{
-		"cloud": secret.Data[AzureCredentials],
+func (p *AzureProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error {
+	cloudCredsMap, err := godotenv.Unmarshal(string(secret.Data[AzureCredentials]))
+	if err != nil {
+		return err
 	}
+	if p.ClusterResourceGroup != "" {
+		cloudCredsMap[clusterResourceGroupKey] = p.ClusterResourceGroup
+	}
+	cloudCredsEnv, err := godotenv.Marshal(cloudCredsMap)
+	if err != nil {
+		return err
+	}
+	cloudSecret.Data = map[string][]byte{
+		"cloud": []byte(cloudCredsEnv),
+	}
+	return nil
 }
 
 func (p *AzureProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
