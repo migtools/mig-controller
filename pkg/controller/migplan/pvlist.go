@@ -280,10 +280,8 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 
 	// For gluster src volumes, migrate to cephfs or cephrbd (warn if unavailable)
 	// For nfs src volumes, migrate to cephfs or cephrbd (no warning if unavailable)
-	// FIXME: Is there a corresponding pv.Spec.<volumeSource> for glusterblock?
-	// FIXME: Do we want to check for a provisioner for NFS or just pv.Spec.NFS?
 	if srcProvisioner == "kubernetes.io/glusterfs" ||
-		srcProvisioner == "gluster.org/glusterblock" ||
+		strings.HasPrefix(srcProvisioner, "gluster.org/glusterblock") ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.NFS != nil {
 		if isRWX(claim.AccessModes) {
