@@ -54,6 +54,9 @@ spec:
                   type: object
                 gcpBucket:
                   type: string
+                s3CustomCABundle:
+                  format: byte
+                  type: string
               type: object
             backupStorageProvider:
               type: string
