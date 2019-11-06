@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -211,14 +212,18 @@ const (
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
+	strippedName, err := toDnsLabel(r.GetName())
+	if err != nil {
+		return nil, err
+	}
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       labels,
-			GenerateName: "registry-" + r.GetName() + "-",
+			GenerateName: "registry-" + strippedName + "-",
 			Namespace:    VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistrySecret(client, storage, secret)
+	err = r.UpdateRegistrySecret(client, storage, secret)
 	return secret, err
 }
 
@@ -371,7 +376,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 				Containers: []kapi.Container{
 					kapi.Container{
 						Image: "registry:2",
-						Name:  name,
+						Name:  "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
@@ -382,14 +387,14 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 						VolumeMounts: []kapi.VolumeMount{
 							kapi.VolumeMount{
 								MountPath: "/var/lib/registry",
-								Name:      name + "-volume-1",
+								Name:      "volume-1",
 							},
 						},
 					},
 				},
 				Volumes: []kapi.Volume{
 					kapi.Volume{
-						Name:         name + "-volume-1",
+						Name:         "volume-1",
 						VolumeSource: kapi.VolumeSource{EmptyDir: &kapi.EmptyDirVolumeSource{}},
 					},
 				},
@@ -790,4 +795,25 @@ func (r *PersistentVolumes) DeletePv(names ...string) {
 			r.buildIndex()
 		}
 	}
+}
+
+// Convert name to a DNS_LABEL-compliant string
+// DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
+//     to the definition of a "label" in RFCs 1035 and 1123. This is captured
+//     by the following regex:
+//         [a-z0-9]([-a-z0-9]*[a-z0-9])?
+func toDnsLabel(name string) (string, error) {
+	// keep lowercase alphanumeric and hyphen
+	reg, err := regexp.Compile("[^-a-z0-9]+")
+	if err != nil {
+		return "", err
+	}
+	processedName := reg.ReplaceAllString(strings.ToLower(name), "")
+	// strip initial and trailing hyphens
+	stripEndsReg, err := regexp.Compile("(^-+|-+$)")
+	if err != nil {
+		return "", err
+	}
+	endsStripped := stripEndsReg.ReplaceAllString(processedName, "")
+	return endsStripped, nil
 }
