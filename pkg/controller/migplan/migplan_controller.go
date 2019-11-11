@@ -163,20 +163,6 @@ type ReconcileMigPlan struct {
 	scheme *runtime.Scheme
 }
 
-// Automatically generate RBAC rules
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migplans/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.openshift.io,resources=*,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=*,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=extensions,resources=*,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=namespaces/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=pods/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=persistentvolumes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=persistentvolumes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=,resources=persistentvolumeclaims/status,verbs=get;update;patch
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
