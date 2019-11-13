@@ -61,6 +61,8 @@ spec:
               properties:
                 awsRegion:
                   type: string
+                awsSnapshotCreationTimeout:
+                  type: string
                 azureApiTimeout:
                   type: string
                 azureResourceGroup:

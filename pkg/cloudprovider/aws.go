@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -40,14 +41,15 @@ aws_secret_access_key=%s
 
 type AWSProvider struct {
 	BaseProvider
-	Bucket           string
-	Region           string
-	S3URL            string
-	PublicURL        string
-	KMSKeyId         string
-	SignatureVersion string
-	S3ForcePathStyle bool
-	CustomCABundle   []byte
+	Bucket                  string
+	Region                  string
+	S3URL                   string
+	PublicURL               string
+	KMSKeyId                string
+	SignatureVersion        string
+	S3ForcePathStyle        bool
+	CustomCABundle          []byte
+	SnapshotCreationTimeout string
 }
 
 func (p *AWSProvider) GetURL() string {
@@ -91,6 +93,9 @@ func (p *AWSProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	vsl.Spec.Provider = AWS
 	vsl.Spec.Config = map[string]string{
 		"region": p.GetRegion(),
+	}
+	if p.SnapshotCreationTimeout != "" {
+		vsl.Spec.Config["snapshotCreationTimeout"] = p.SnapshotCreationTimeout
 	}
 }
 
@@ -201,6 +206,13 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			}
 		}
 	case VolumeSnapshot:
+		if p.SnapshotCreationTimeout != "" {
+			_, err := time.ParseDuration(p.SnapshotCreationTimeout)
+			if err != nil {
+				fields = append(fields, "SnapshotCreationTimeout")
+			}
+		}
+
 	}
 
 	return fields
