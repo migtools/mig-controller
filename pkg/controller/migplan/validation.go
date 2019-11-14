@@ -3,13 +3,15 @@ package migplan
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
+	"reflect"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -259,7 +261,7 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 	}
 	count := 0
 	limit := Settings.Plan.PodLimit
-	for _, name := range plan.Spec.Namespaces {
+	for _, name := range plan.GetSourceNamespaces() {
 		list := kapi.PodList{}
 		options := k8sclient.ListOptions{
 			FieldSelector: fields.SelectorFromSet(
@@ -440,6 +442,8 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
 	for _, name := range namespaces {
+		namespaceMapping := strings.Split(name, ":")
+		name = namespaceMapping[0]
 		key := types.NamespacedName{Name: name}
 		err := client.Get(context.TODO(), key, &ns)
 		if err == nil {

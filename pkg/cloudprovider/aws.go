@@ -3,8 +3,11 @@ package cloudprovider
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
 	"net/url"
+
+	"github.com/google/uuid"
+
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -13,8 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
-	"strconv"
 )
 
 // Credentials Secret.
@@ -29,7 +32,7 @@ const (
 )
 
 // Velero cloud-secret.
-var CloudCredentialsTemplete = `
+var AwsCloudCredentialsTemplate = `
 [default]
 aws_access_key_id=%s
 aws_secret_access_key=%s
@@ -44,6 +47,7 @@ type AWSProvider struct {
 	KMSKeyId         string
 	SignatureVersion string
 	S3ForcePathStyle bool
+	CustomCABundle   []byte
 }
 
 func (p *AWSProvider) GetURL() string {
@@ -90,14 +94,70 @@ func (p *AWSProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	}
 }
 
-func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) {
+func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error {
 	cloudSecret.Data = map[string][]byte{
 		"cloud": []byte(
 			fmt.Sprintf(
-				CloudCredentialsTemplete,
+				AwsCloudCredentialsTemplate,
 				secret.Data[AwsAccessKeyId],
 				secret.Data[AwsSecretAccessKey]),
 		),
+	}
+	return nil
+}
+
+func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
+	registrySecret.Data = map[string][]byte{
+		"access_key": []byte(secret.Data[AwsAccessKeyId]),
+		"secret_key": []byte(secret.Data[AwsSecretAccessKey]),
+	}
+	return nil
+}
+
+func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
+	region := p.Region
+	if region == "" {
+		region = AwsS3DefaultRegion
+	}
+	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+		{
+			Name:  "REGISTRY_STORAGE",
+			Value: "s3",
+		},
+		{
+			Name: "REGISTRY_STORAGE_S3_ACCESSKEY",
+			ValueFrom: &kapi.EnvVarSource{
+				SecretKeyRef: &kapi.SecretKeySelector{
+					LocalObjectReference: kapi.LocalObjectReference{Name: name},
+					Key:                  "access_key",
+				},
+			},
+		},
+		{
+			Name:  "REGISTRY_STORAGE_S3_BUCKET",
+			Value: p.Bucket,
+		},
+		{
+			Name:  "REGISTRY_STORAGE_S3_REGION",
+			Value: region,
+		},
+		{
+			Name:  "REGISTRY_STORAGE_S3_REGIONENDPOINT",
+			Value: p.S3URL,
+		},
+		{
+			Name:  "REGISTRY_STORAGE_S3_ROOTDIRECTORY",
+			Value: "/" + dirName,
+		},
+		{
+			Name: "REGISTRY_STORAGE_S3_SECRETKEY",
+			ValueFrom: &kapi.EnvVarSource{
+				SecretKeyRef: &kapi.SecretKeySelector{
+					LocalObjectReference: kapi.LocalObjectReference{Name: name},
+					Key:                  "secret_key",
+				},
+			},
+		},
 	}
 }
 
@@ -127,6 +187,18 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			p.SignatureVersion == "1" ||
 			p.SignatureVersion == "4") {
 			fields = append(fields, "SignatureVersion")
+		}
+		if p.S3URL != "" {
+			u, err := url.Parse(p.S3URL)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+				fields = append(fields, "S3URL")
+			}
+		}
+		if p.PublicURL != "" {
+			u, err := url.Parse(p.PublicURL)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+				fields = append(fields, "PublicURL")
+			}
 		}
 	case VolumeSnapshot:
 	}
@@ -186,6 +258,7 @@ func (p *AWSProvider) Test(secret *kapi.Secret) error {
 			forcePathStyle: p.GetForcePathStyle(),
 			bucket:         p.Bucket,
 			secret:         secret,
+			customCABundle: p.CustomCABundle,
 		}
 		err = test.Run()
 	case VolumeSnapshot:
@@ -209,6 +282,7 @@ type S3Test struct {
 	bucket         string
 	disableSSL     bool
 	forcePathStyle bool
+	customCABundle []byte
 	secret         *kapi.Secret
 }
 
@@ -231,16 +305,22 @@ func (r *S3Test) Run() error {
 }
 
 func (r *S3Test) newSession() (*session.Session, error) {
-	return session.NewSession(&aws.Config{
-		Region:           &r.region,
-		Endpoint:         &r.url,
-		DisableSSL:       aws.Bool(r.disableSSL),
-		S3ForcePathStyle: aws.Bool(r.forcePathStyle),
-		Credentials: credentials.NewStaticCredentials(
-			bytes.NewBuffer(r.secret.Data[AwsAccessKeyId]).String(),
-			bytes.NewBuffer(r.secret.Data[AwsSecretAccessKey]).String(),
-			""),
-	})
+	sessionOptions := session.Options{
+		Config: aws.Config{
+			Region:           &r.region,
+			Endpoint:         &r.url,
+			DisableSSL:       aws.Bool(r.disableSSL),
+			S3ForcePathStyle: aws.Bool(r.forcePathStyle),
+			Credentials: credentials.NewStaticCredentials(
+				bytes.NewBuffer(r.secret.Data[AwsAccessKeyId]).String(),
+				bytes.NewBuffer(r.secret.Data[AwsSecretAccessKey]).String(),
+				""),
+		},
+	}
+	if len(r.customCABundle) > 0 {
+		sessionOptions.CustomCABundle = bytes.NewReader(r.customCABundle)
+	}
+	return session.NewSessionWithOptions(sessionOptions)
 }
 
 func (r *S3Test) upload(ssn *session.Session) error {

@@ -108,6 +108,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Category: Critical,
 			Message:  InvalidBSCredsSecretRefMessage,
 		})
+		return nil
 	}
 
 	// Secret
@@ -126,6 +127,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Category: Critical,
 			Message:  InvalidBSCredsSecretRefMessage,
 		})
+		return nil
 	}
 
 	// Fields
@@ -194,6 +196,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Category: Critical,
 				Message:  InvalidVSCredsSecretRefMessage,
 			})
+			return nil
 		}
 
 		// NotFound
@@ -205,6 +208,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Category: Critical,
 				Message:  InvalidVSCredsSecretRefMessage,
 			})
+			return nil
 		}
 
 		// Fields

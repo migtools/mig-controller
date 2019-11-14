@@ -113,6 +113,18 @@ func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (*MigStorage
 	return &object, err
 }
 
+// List MigStorage
+// Returns and empty list when none found.
+func ListStorage(client k8sclient.Client) ([]MigStorage, error) {
+	list := MigStorageList{}
+	err := client.List(context.TODO(), nil, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
+}
+
 // List MigMigrations
 // Returns and empty list when none found.
 func ListMigrations(client k8sclient.Client) ([]MigMigration, error) {

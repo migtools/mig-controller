@@ -3,12 +3,13 @@ package migplan
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 type PvMap map[types.NamespacedName]core.PersistentVolume
@@ -18,15 +19,22 @@ type Claims []migapi.PVC
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if plan.Status.HasCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
+		plan.Status.StageCondition(PvNoSupportedAction)
+		plan.Status.StageCondition(PvNoStorageClassSelection)
+		plan.Status.StageCondition(PvWarnAccessModeUnavailable)
+		plan.Status.StageCondition(PvWarnCopyMethodSnapshot)
+		plan.Status.StageCondition(PvWarnNoCephAvailable)
 		plan.Status.StageCondition(PvLimitExceeded)
 		return nil
 	}
 	if plan.Status.HasAnyCondition(
 		InvalidSourceClusterRef,
 		SourceClusterNotReady,
-		NsListEmpty,
+		InvalidDestinationClusterRef,
+		DestinationClusterNotReady,
+		NsNotFoundOnSourceCluster,
 		NsLimitExceeded,
-		NsNotFoundOnSourceCluster) {
+		NsListEmpty) {
 		return nil
 	}
 
@@ -35,6 +43,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+	if srcMigCluster == nil || !srcMigCluster.Status.IsReady() {
+		return nil
 	}
 
 	client, err := srcMigCluster.GetClient(r)
@@ -49,6 +60,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
+	if destMigCluster == nil || !destMigCluster.Status.IsReady() {
+		return nil
+	}
 
 	srcStorageClasses := srcMigCluster.Spec.StorageClasses
 	destStorageClasses := destMigCluster.Spec.StorageClasses
@@ -61,7 +75,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
-	namespaces := plan.Spec.Namespaces
+	namespaces := plan.GetSourceNamespaces()
 	claims, err := r.getClaims(client, namespaces)
 	if err != nil {
 		log.Trace(err)
@@ -266,10 +280,8 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 
 	// For gluster src volumes, migrate to cephfs or cephrbd (warn if unavailable)
 	// For nfs src volumes, migrate to cephfs or cephrbd (no warning if unavailable)
-	// FIXME: Is there a corresponding pv.Spec.<volumeSource> for glusterblock?
-	// FIXME: Do we want to check for a provisioner for NFS or just pv.Spec.NFS?
 	if srcProvisioner == "kubernetes.io/glusterfs" ||
-		srcProvisioner == "gluster.org/glusterblock" ||
+		strings.HasPrefix(srcProvisioner, "gluster.org/glusterblock") ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.NFS != nil {
 		if isRWX(claim.AccessModes) {

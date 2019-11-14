@@ -20,7 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
+	"reflect"
+	"regexp"
+	"sort"
+	"strings"
+
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -29,9 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sort"
 )
 
 // Cache Indexes.
@@ -210,19 +212,23 @@ const (
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
+	strippedName, err := toDnsLabel(r.GetName())
+	if err != nil {
+		return nil, err
+	}
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       labels,
-			GenerateName: "registry-" + r.GetName() + "-",
+			GenerateName: "registry-" + strippedName + "-",
 			Namespace:    VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistrySecret(client, storage, secret)
+	err = r.UpdateRegistrySecret(client, storage, secret)
 	return secret, err
 }
 
 // Update a Registry credentials secret as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, secret *kapi.Secret) error {
+func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, registrySecret *kapi.Secret) error {
 	credSecret, err := storage.GetBackupStorageCredSecret(client)
 	if err != nil {
 		return err
@@ -230,10 +236,8 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 	if credSecret == nil {
 		return errors.New("Credentials secret not found.")
 	}
-	secret.Data = map[string][]byte{
-		"access_key": []byte(credSecret.Data[pvdr.AwsAccessKeyId]),
-		"secret_key": []byte(credSecret.Data[pvdr.AwsSecretAccessKey]),
-	}
+	provider := storage.GetBackupStorageProvider()
+	provider.UpdateRegistrySecret(credSecret, registrySecret)
 	return nil
 }
 
@@ -353,10 +357,6 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
-	region := storage.Spec.BackupStorageConfig.AwsRegion
-	if region == "" {
-		region = pvdr.AwsS3DefaultRegion
-	}
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
@@ -375,48 +375,8 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						Env: []kapi.EnvVar{
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE",
-								Value: "s3",
-							},
-							kapi.EnvVar{
-								Name: "REGISTRY_STORAGE_S3_ACCESSKEY",
-								ValueFrom: &kapi.EnvVarSource{
-									SecretKeyRef: &kapi.SecretKeySelector{
-										LocalObjectReference: kapi.LocalObjectReference{Name: name},
-										Key:                  "access_key",
-									},
-								},
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_BUCKET",
-								Value: storage.Spec.BackupStorageConfig.AwsBucketName,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_REGION",
-								Value: region,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_REGIONENDPOINT",
-								Value: storage.Spec.BackupStorageConfig.AwsS3URL,
-							},
-							kapi.EnvVar{
-								Name:  "REGISTRY_STORAGE_S3_ROOTDIRECTORY",
-								Value: "/" + dirName,
-							},
-							kapi.EnvVar{
-								Name: "REGISTRY_STORAGE_S3_SECRETKEY",
-								ValueFrom: &kapi.EnvVarSource{
-									SecretKeyRef: &kapi.SecretKeySelector{
-										LocalObjectReference: kapi.LocalObjectReference{Name: name},
-										Key:                  "secret_key",
-									},
-								},
-							},
-						},
 						Image: "registry:2",
-						Name:  name,
+						Name:  "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
@@ -427,14 +387,14 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 						VolumeMounts: []kapi.VolumeMount{
 							kapi.VolumeMount{
 								MountPath: "/var/lib/registry",
-								Name:      name + "-volume-1",
+								Name:      "volume-1",
 							},
 						},
 					},
 				},
 				Volumes: []kapi.Volume{
 					kapi.Volume{
-						Name:         name + "-volume-1",
+						Name:         "volume-1",
 						VolumeSource: kapi.VolumeSource{EmptyDir: &kapi.EmptyDirVolumeSource{}},
 					},
 				},
@@ -447,6 +407,9 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			},
 		},
 	}
+	provider := storage.GetBackupStorageProvider()
+	provider.UpdateRegistryDC(deploymentconfig, name, dirName)
+
 	return nil
 }
 
@@ -605,8 +568,34 @@ func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) 
 		client,
 		&kapi.ObjectReference{
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		})
+}
+
+// GetSourceNamespaces get source namespaces without mapping
+func (r *MigPlan) GetSourceNamespaces() []string {
+	includedNamespaces := []string{}
+	for _, namespace := range r.Spec.Namespaces {
+		namespace = strings.Split(namespace, ":")[0]
+		includedNamespaces = append(includedNamespaces, namespace)
+	}
+
+	return includedNamespaces
+}
+
+// GetDestinationNamespaces get destination namespaces without mapping
+func (r *MigPlan) GetDestinationNamespaces() []string {
+	includedNamespaces := []string{}
+	for _, namespace := range r.Spec.Namespaces {
+		namespaces := strings.Split(namespace, ":")
+		if len(namespaces) > 1 {
+			includedNamespaces = append(includedNamespaces, namespaces[1])
+		} else {
+			includedNamespaces = append(includedNamespaces, namespaces[0])
+		}
+	}
+
+	return includedNamespaces
 }
 
 // Get whether the plan conflicts with another.
@@ -806,4 +795,25 @@ func (r *PersistentVolumes) DeletePv(names ...string) {
 			r.buildIndex()
 		}
 	}
+}
+
+// Convert name to a DNS_LABEL-compliant string
+// DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
+//     to the definition of a "label" in RFCs 1035 and 1123. This is captured
+//     by the following regex:
+//         [a-z0-9]([-a-z0-9]*[a-z0-9])?
+func toDnsLabel(name string) (string, error) {
+	// keep lowercase alphanumeric and hyphen
+	reg, err := regexp.Compile("[^-a-z0-9]+")
+	if err != nil {
+		return "", err
+	}
+	processedName := reg.ReplaceAllString(strings.ToLower(name), "")
+	// strip initial and trailing hyphens
+	stripEndsReg, err := regexp.Compile("(^-+|-+$)")
+	if err != nil {
+		return "", err
+	}
+	endsStripped := stripEndsReg.ReplaceAllString(processedName, "")
+	return endsStripped, nil
 }

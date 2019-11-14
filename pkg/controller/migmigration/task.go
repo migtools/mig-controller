@@ -41,6 +41,7 @@ const (
 	EnsureFinalRestore            = "EnsureFinalRestore"
 	FinalRestoreCreated           = "FinalRestoreCreated"
 	FinalRestoreFailed            = "FinalRestoreFailed"
+	Verification                  = "Verification"
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
 	Completed                     = "Completed"
@@ -51,6 +52,7 @@ const (
 	Quiesce      = 0x01 // Only when QuiescePods (true).
 	HasStagePods = 0x02 // Only when stage pods created.
 	HasPVs       = 0x04 // Only when PVs migrated.
+	HasVerify    = 0x08 // Only when the plan has enabled verification
 )
 
 type Itinerary []Step
@@ -101,6 +103,7 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
+	{phase: Verification, flags: HasVerify},
 	{phase: Completed},
 }
 
@@ -388,10 +391,12 @@ func (t *Task) Run() error {
 		}
 		t.next()
 	case EnsureAnnotationsDeleted:
-		err := t.deleteAnnotations()
-		if err != nil {
-			log.Trace(err)
-			return err
+		if !t.keepAnnotations() {
+			err := t.deleteAnnotations()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
 		t.next()
 	case EnsureInitialBackupReplicated:
@@ -452,16 +457,29 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
+	case Verification:
+		completed, err := t.VerificationCompleted()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if completed {
+			t.next()
+		} else {
+			t.Requeue = PollReQ
+		}
 	case StageBackupFailed, StageRestoreFailed:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		err = t.deleteAnnotations()
-		if err != nil {
-			log.Trace(err)
-			return err
+		if !t.keepAnnotations() {
+			err = t.deleteAnnotations()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
 		t.Requeue = NoReQ
 		t.next()
@@ -513,6 +531,9 @@ func (t *Task) next() {
 		if next.flags&Quiesce != 0 && !t.quiesce() {
 			continue
 		}
+		if next.flags&HasVerify != 0 && !t.hasVerify() {
+			continue
+		}
 		t.Phase = next.phase
 		return
 	}
@@ -552,14 +573,29 @@ func (t *Task) stage() bool {
 	return t.Owner.Spec.Stage
 }
 
-// Get the migration namespaces.
+// Get the migration namespaces with mapping.
 func (t *Task) namespaces() []string {
 	return t.PlanResources.MigPlan.Spec.Namespaces
+}
+
+// Get the migration source namespaces without mapping.
+func (t *Task) sourceNamespaces() []string {
+	return t.PlanResources.MigPlan.GetSourceNamespaces()
+}
+
+// Get the migration source namespaces without mapping.
+func (t *Task) destinationNamespaces() []string {
+	return t.PlanResources.MigPlan.GetDestinationNamespaces()
 }
 
 // Get whether to quiesce pods.
 func (t *Task) quiesce() bool {
 	return t.Owner.Spec.QuiescePods
+}
+
+// Get whether to retain annotations
+func (t *Task) keepAnnotations() bool {
+	return t.Owner.Spec.KeepAnnotations
 }
 
 // Get a client for the source cluster.
@@ -582,6 +618,11 @@ func (t *Task) hasPVs() bool {
 	return len(t.getPVs().List) > 0
 }
 
+// Get whether the verification is desired
+func (t *Task) hasVerify() bool {
+	return t.Owner.Spec.Verify
+}
+
 // Get both source and destination clusters.
 func (t *Task) getBothClusters() []*migapi.MigCluster {
 	return []*migapi.MigCluster{
@@ -602,4 +643,16 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 	}
 
 	return list, nil
+}
+
+// Get both source and destination clients with associated namespaces.
+func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
+	clientList, err := t.getBothClients()
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
+
+	return clientList, namespaceList, nil
 }
