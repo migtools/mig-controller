@@ -3,6 +3,8 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
@@ -225,5 +227,27 @@ func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	restore.Spec = velero.RestoreSpec{
 		BackupName: backupName,
 		RestorePVs: &restorePVs,
+	}
+
+	t.updateNamespaceMapping(restore)
+}
+
+// Update namespace mapping for restore
+func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
+	namespaceMapping := make(map[string]string)
+	for _, namespace := range t.namespaces() {
+		mapping := strings.Split(namespace, ":")
+		if len(mapping) == 2 {
+			if mapping[0] == mapping[1] {
+				continue
+			}
+			if mapping[1] != "" {
+				namespaceMapping[mapping[0]] = mapping[1]
+			}
+		}
+	}
+
+	if len(namespaceMapping) != 0 {
+		restore.Spec.NamespaceMapping = namespaceMapping
 	}
 }

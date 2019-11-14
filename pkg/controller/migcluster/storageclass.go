@@ -41,6 +41,7 @@ func (r *ReconcileMigCluster) setStorageClasses(cluster *migapi.MigCluster) erro
 type provisionerAccessModes struct {
 	Provisioner   string
 	MatchBySuffix bool
+	MatchByPrefix bool
 	AccessModes   []kapi.PersistentVolumeAccessMode
 }
 
@@ -77,8 +78,9 @@ var accessModeList = []provisionerAccessModes{
 		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
 	},
 	provisionerAccessModes{
-		Provisioner: "gluster.org/glusterblock",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		Provisioner:   "gluster.org/glusterblock",
+		MatchByPrefix: true,
+		AccessModes:   []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
 	}, // verify glusterblock ROX
 	// ISCSI : {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
 	provisionerAccessModes{
@@ -129,12 +131,16 @@ var accessModeList = []provisionerAccessModes{
 // TODO: allow the in-file mapping to be overridden by a configmap
 func (r *ReconcileMigCluster) accessModesForProvisioner(provisioner string) []kapi.PersistentVolumeAccessMode {
 	for _, pModes := range accessModeList {
-		if !pModes.MatchBySuffix {
-			if pModes.Provisioner == provisioner {
+		if pModes.MatchBySuffix {
+			if strings.HasSuffix(provisioner, pModes.Provisioner) {
+				return pModes.AccessModes
+			}
+		} else if pModes.MatchByPrefix {
+			if strings.HasPrefix(provisioner, pModes.Provisioner) {
 				return pModes.AccessModes
 			}
 		} else {
-			if strings.HasSuffix(provisioner, pModes.Provisioner) {
+			if pModes.Provisioner == provisioner {
 				return pModes.AccessModes
 			}
 		}

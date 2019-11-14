@@ -3,6 +3,9 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
@@ -10,9 +13,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 // Ensure the initial backup on the source cluster has been created
@@ -262,11 +263,12 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 		log.Trace(err)
 		return err
 	}
+
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
 		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      t.namespaces(),
+		IncludedNamespaces:      t.sourceNamespaces(),
 		ExcludedNamespaces:      []string{},
 		IncludedResources:       t.BackupResources,
 		ExcludedResources:       []string{},

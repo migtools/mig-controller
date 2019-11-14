@@ -2,6 +2,7 @@ package migcluster
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -26,6 +27,8 @@ const (
 	NotSet        = "NotSet"
 	NotFound      = "NotFound"
 	ConnectFailed = "ConnectFailed"
+	Malformed     = "Malformed"
+	InvalidScheme = "InvalidScheme"
 )
 
 // Statuses
@@ -37,10 +40,12 @@ const (
 // Messages
 const (
 	ReadyMessage              = "The cluster is ready."
-	InvalidURLMessage         = "The `url` is required when `isHostCluster` is false."
+	MissingURLMessage         = "The `url` is required when `isHostCluster` is false."
 	InvalidSaSecretRefMessage = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage     = "The `saToken` not found in `serviceAccountSecretRef` secret."
 	TestConnectFailedMessage  = "Test connect failed: %s"
+	MalformedURLMessage       = "The `url` is malformed."
+	InvalidURLSchemeMessage   = "The `url` scheme must be 'http' or 'https'."
 )
 
 // Validate the asset collection resource.
@@ -75,16 +80,38 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
+
 	if cluster.Spec.URL == "" {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     InvalidURL,
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidURLMessage,
+			Message:  MissingURLMessage,
 		})
+		return nil
 	}
-
+	u, err := url.Parse(cluster.Spec.URL)
+	if err != nil {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     InvalidURL,
+			Status:   True,
+			Reason:   Malformed,
+			Category: Critical,
+			Message:  MalformedURLMessage,
+		})
+		return nil
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     InvalidURL,
+			Status:   True,
+			Reason:   InvalidScheme,
+			Category: Critical,
+			Message:  InvalidURLSchemeMessage,
+		})
+		return nil
+	}
 	return nil
 }
 

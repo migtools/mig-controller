@@ -17,12 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+
 	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/pkg/errors"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -78,16 +78,19 @@ type VolumeSnapshotConfig struct {
 
 // BackupStorageConfig defines config for creating and storing Backups
 type BackupStorageConfig struct {
-	CredsSecretRef      *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
-	AwsBucketName       string                `json:"awsBucketName,omitempty"`
-	AwsRegion           string                `json:"awsRegion,omitempty"`
-	AwsS3ForcePathStyle bool                  `json:"awsS3ForcePathStyle,omitempty"`
-	AwsS3URL            string                `json:"awsS3Url,omitempty"`
-	AwsPublicURL        string                `json:"awsPublicUrl,omitempty"`
-	AwsKmsKeyID         string                `json:"awsKmsKeyId,omitempty"`
-	AwsSignatureVersion string                `json:"awsSignatureVersion,omitempty"`
-	AzureStorageAccount string                `json:"azureStorageAccount,omitempty"`
-	AzureResourceGroup  string                `json:"azureResourceGroup,omitempty"`
+	CredsSecretRef        *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
+	AwsBucketName         string                `json:"awsBucketName,omitempty"`
+	AwsRegion             string                `json:"awsRegion,omitempty"`
+	AwsS3ForcePathStyle   bool                  `json:"awsS3ForcePathStyle,omitempty"`
+	AwsS3URL              string                `json:"awsS3Url,omitempty"`
+	AwsPublicURL          string                `json:"awsPublicUrl,omitempty"`
+	AwsKmsKeyID           string                `json:"awsKmsKeyId,omitempty"`
+	AwsSignatureVersion   string                `json:"awsSignatureVersion,omitempty"`
+	S3CustomCABundle      []byte                `json:"s3CustomCABundle,omitempty"`
+	AzureStorageAccount   string                `json:"azureStorageAccount,omitempty"`
+	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
+	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
+	GcpBucket             string                `json:"gcpBucket,omitempty"`
 }
 
 func init() {
@@ -105,14 +108,7 @@ func (r *MigStorage) BuildBSL() *velero.BackupStorageLocation {
 		},
 	}
 
-	r.UpdateBSL(bsl)
 	return bsl
-}
-
-// Update BSL.
-func (r *MigStorage) UpdateBSL(bsl *velero.BackupStorageLocation) {
-	provider := r.GetBackupStorageProvider()
-	provider.UpdateBSL(bsl)
 }
 
 // Build VSL.
@@ -128,70 +124,33 @@ func (r *MigStorage) BuildVSL(planUID string) *velero.VolumeSnapshotLocation {
 		},
 	}
 
-	r.UpdateVSL(vsl)
 	return vsl
 }
 
-// Update VSL.
-func (r *MigStorage) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
-	provider := r.GetVolumeSnapshotProvider()
-	provider.UpdateVSL(vsl)
-}
-
 // Build backup cloud-secret.
-func (r *MigStorage) BuildBSLCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+func (r *MigStorage) BuildBSLCloudSecret() *kapi.Secret {
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		},
 	}
 
-	err := r.UpdateBSLCloudSecret(client, secret)
-	return secret, err
-}
-
-// Update backup cloud-secret.
-func (r *MigStorage) UpdateBSLCloudSecret(client k8sclient.Client, cloudSecret *kapi.Secret) error {
-	secret, err := r.GetBackupStorageCredSecret(client)
-	if err != nil {
-		return err
-	}
-	if secret == nil {
-		return errors.New("Credentials secret not found.")
-	}
-	provider := r.GetBackupStorageProvider()
-	provider.UpdateCloudSecret(secret, cloudSecret)
-	return nil
+	return secret
 }
 
 // Build snapshot cloud-secret.
-func (r *MigStorage) BuildVSLCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+func (r *MigStorage) BuildVSLCloudSecret() *kapi.Secret {
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      "cloud-credentials",
+			Name:      VeleroCloudSecret,
 		},
 	}
 
-	err := r.UpdateVSLCloudSecret(client, secret)
-	return secret, err
-}
-
-// Update snapshot cloud-secret.
-func (r *MigStorage) UpdateVSLCloudSecret(client k8sclient.Client, cloudSecret *kapi.Secret) error {
-	secret, err := r.GetVolumeSnapshotCredSecret(client)
-	if err != nil {
-		return err
-	}
-	if secret == nil {
-		return errors.New("Credentials secret not found.")
-	}
-	provider := r.GetBackupStorageProvider()
-	provider.UpdateCloudSecret(secret, cloudSecret)
-	return nil
+	return secret
 }
 
 // Determine if two BSLs are equal based on relevant fields in the Spec.
@@ -261,6 +220,7 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 		provider = &pvdr.AWSProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.BackupStorage,
+				Name: name,
 			},
 			Region:           r.AwsRegion,
 			Bucket:           r.AwsBucketName,
@@ -269,20 +229,25 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 			KMSKeyId:         r.AwsKmsKeyID,
 			SignatureVersion: r.AwsSignatureVersion,
 			S3ForcePathStyle: r.AwsS3ForcePathStyle,
+			CustomCABundle:   r.S3CustomCABundle,
 		}
 	case Azure:
 		provider = &pvdr.AzureProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.BackupStorage,
+				Name: name,
 			},
-			ResourceGroup:  r.AzureResourceGroup,
-			StorageAccount: r.AzureStorageAccount,
+			ResourceGroup:    r.AzureResourceGroup,
+			StorageAccount:   r.AzureStorageAccount,
+			StorageContainer: r.AzureStorageContainer,
 		}
 	case GCP:
 		provider = &pvdr.GCPProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.BackupStorage,
+				Name: name,
 			},
+			Bucket: r.GcpBucket,
 		}
 	}
 

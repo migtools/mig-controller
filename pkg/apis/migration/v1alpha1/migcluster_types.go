@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
@@ -46,6 +47,7 @@ type MigClusterSpec struct {
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 	CABundle                []byte                `json:"caBundle,omitempty"`
 	StorageClasses          []StorageClass        `json:"storageClasses,omitempty"`
+	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
@@ -316,4 +318,14 @@ func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]storageapi.St
 		return nil, err
 	}
 	return list.Items, nil
+}
+
+func (r *MigCluster) UpdateProvider(provider pvdr.Provider) {
+	switch provider.GetName() {
+	case pvdr.Azure:
+		p, cast := provider.(*pvdr.AzureProvider)
+		if cast {
+			p.ClusterResourceGroup = r.Spec.AzureResourceGroup
+		}
+	}
 }

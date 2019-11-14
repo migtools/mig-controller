@@ -11,37 +11,29 @@ mig-controller can help you move OpenShift application workloads from a _source_
 
 ---
 
-__2. Deploy Velero to both the _source_ and _destination_ OpenShift clusters__
+__2. Use mig-operator to deploy Migration Tools to both the _source_ and _destination_ OpenShift clusters__
 
-```bash
-# Download bash script to deploy Velero along with required plugins
-wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_velero.sh
+Use mig-operator to install selected components of Migration Tooling (mig-controller, mig-ui, velero) onto your source and destination OpenShift clusters.
 
-# Login to source cluster, run 'deploy_velero.sh' against it
-oc login https://my-source-cluster:8443
-bash deploy_velero.sh
+After installing mig-operator, you can select which components should be installed by creating a [MigrationController CR](https://github.com/fusor/mig-operator#migration-controller-installation):
 
-# Login to destination cluster, run 'deploy_velero.sh' against it
-oc login https://my-destination-cluster:8443
-bash deploy_velero.sh
 ```
+apiVersion: migration.openshift.io/v1alpha1
+kind: MigrationController
+[...]
+spec:
+  migration_velero: true
+  migration_controller: true
+  migration_ui: true
+ 
+[...]
+```
+
+See mig-operator docs for more details: https://github.com/fusor/mig-operator
 
 ---
 
-__3. Deploy _mig-controller_ to one of the two involved clusters__
-
-```bash
-# Download bash script to deploy the latest mig-controller image as a StatefulSet
-wget https://raw.githubusercontent.com/fusor/mig-controller/master/hack/deploy/deploy_mig.sh
-
-# Login to cluster where mig-controller will run, 'deploy_mig.sh' against it
-oc login https://my-cluster:8443
-bash deploy_mig.sh
-```
-
----
-
-__4. Create Mig CRs to describe the Migration that will be performed__
+__3. Create Mig CRs to describe the Migration that will be performed__
 
 Before mig-controller can run a Migration, you'll need to provide it with:
  - Coordinates & auth info for 2 OpenShift clusters (source + destination)

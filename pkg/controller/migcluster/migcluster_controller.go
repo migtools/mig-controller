@@ -18,6 +18,8 @@ package migcluster
 
 import (
 	"context"
+	"time"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -73,6 +75,17 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
+	// Watch remote clusters for connection problems
+	err = c.Watch(
+		&RemoteClusterSource{
+			Client:   mgr.GetClient(),
+			Interval: time.Second * 60},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
@@ -99,10 +112,6 @@ type ReconcileMigCluster struct {
 	Controller controller.Controller
 }
 
-// Reconcile reads that state of the cluster for a MigCluster object and makes changes based on the state read
-// and what is in the MigCluster.Spec
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migclusters/status,verbs=get;update;patch
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
@@ -155,6 +164,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
+	} else {
+		r.shutdownRemoteWatch(cluster)
 	}
 
 	// Ready
@@ -217,4 +228,15 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	log.Info("Remote watch started.", "cluster", cluster.Name)
 
 	return nil
+}
+
+func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
+	log.Info("Stopping remote watch.", "cluster", cluster.Name)
+	nsName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+
+	StopRemoteWatch(nsName)
+	log.Info("Stopped remote watch.", "cluster", cluster.Name)
 }
