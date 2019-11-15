@@ -2,6 +2,7 @@ package cloudprovider
 
 import (
 	"context"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
@@ -18,8 +19,9 @@ const (
 
 type GCPProvider struct {
 	BaseProvider
-	Bucket   string
-	KMSKeyId string
+	Bucket                  string
+	KMSKeyId                string
+	SnapshotCreationTimeout string
 }
 
 func (p *GCPProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
@@ -37,6 +39,9 @@ func (p *GCPProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 
 func (p *GCPProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	vsl.Spec.Provider = GCP
+	if p.SnapshotCreationTimeout != "" {
+		vsl.Spec.Config["snapshotCreationTimeout"] = p.SnapshotCreationTimeout
+	}
 }
 
 func (p *GCPProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error {
@@ -112,6 +117,12 @@ func (p *GCPProvider) Validate(secret *kapi.Secret) []string {
 			fields = append(fields, "Bucket")
 		}
 	case VolumeSnapshot:
+		if p.SnapshotCreationTimeout != "" {
+			_, err := time.ParseDuration(p.SnapshotCreationTimeout)
+			if err != nil {
+				fields = append(fields, "SnapshotCreationTimeout")
+			}
+		}
 	}
 
 	return fields
