@@ -212,7 +212,6 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 				fields = append(fields, "SnapshotCreationTimeout")
 			}
 		}
-
 	}
 
 	return fields

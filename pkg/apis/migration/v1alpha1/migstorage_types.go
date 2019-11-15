@@ -70,11 +70,11 @@ type MigStorageList struct {
 
 // VolumeSnapshotConfig defines config for taking Volume Snapshots
 type VolumeSnapshotConfig struct {
-	CredsSecretRef             *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
-	AwsRegion                  string                `json:"awsRegion,omitempty"`
-	AwsSnapshotCreationTimeout string                `json:"awsSnapshotCreationTimeout,omitempty"`
-	AzureAPITimeout            string                `json:"azureApiTimeout,omitempty"`
-	AzureResourceGroup         string                `json:"azureResourceGroup,omitempty"`
+	CredsSecretRef          *kapi.ObjectReference `json:"credsSecretRef,omitempty"`
+	SnapshotCreationTimeout string                `json:"snapshotCreationTimeout,omitempty"`
+	AwsRegion               string                `json:"awsRegion,omitempty"`
+	AzureAPITimeout         string                `json:"azureApiTimeout,omitempty"`
+	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
 }
 
 // BackupStorageConfig defines config for creating and storing Backups
@@ -270,7 +270,7 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 				Role: pvdr.VolumeSnapshot,
 			},
 			Region:                  r.AwsRegion,
-			SnapshotCreationTimeout: r.AwsSnapshotCreationTimeout,
+			SnapshotCreationTimeout: r.SnapshotCreationTimeout,
 		}
 	case Azure:
 		provider = &pvdr.AzureProvider{
@@ -285,6 +285,7 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.VolumeSnapshot,
 			},
+			SnapshotCreationTimeout: r.SnapshotCreationTimeout,
 		}
 	}
 
