@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"strings"
+	"time"
 
 	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
@@ -37,11 +38,12 @@ const (
 
 type AzureProvider struct {
 	BaseProvider
-	StorageAccount       string
-	StorageContainer     string
-	ResourceGroup        string
-	ClusterResourceGroup string
-	APITimeout           string
+	StorageAccount          string
+	StorageContainer        string
+	ResourceGroup           string
+	ClusterResourceGroup    string
+	APITimeout              string
+	SnapshotCreationTimeout string
 }
 
 func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
@@ -65,6 +67,9 @@ func (p *AzureProvider) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 	vsl.Spec.Config = map[string]string{
 		"resourceGroup": p.ResourceGroup,
 		"apiTimeout":    p.APITimeout,
+	}
+	if p.SnapshotCreationTimeout != "" {
+		vsl.Spec.Config["snapshotCreationTimeout"] = p.SnapshotCreationTimeout
 	}
 }
 
@@ -182,6 +187,12 @@ func (p *AzureProvider) Validate(secret *kapi.Secret) []string {
 	case VolumeSnapshot:
 		if p.APITimeout == "" {
 			fields = append(fields, "APITimeout")
+		}
+		if p.SnapshotCreationTimeout != "" {
+			_, err := time.ParseDuration(p.SnapshotCreationTimeout)
+			if err != nil {
+				fields = append(fields, "SnapshotCreationTimeout")
+			}
 		}
 	}
 

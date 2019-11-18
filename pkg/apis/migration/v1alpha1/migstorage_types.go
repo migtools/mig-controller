@@ -277,8 +277,9 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.VolumeSnapshot,
 			},
-			ResourceGroup: r.AzureResourceGroup,
-			APITimeout:    r.AzureAPITimeout,
+			ResourceGroup:           r.AzureResourceGroup,
+			APITimeout:              r.AzureAPITimeout,
+			SnapshotCreationTimeout: r.SnapshotCreationTimeout,
 		}
 	case GCP:
 		provider = &pvdr.GCPProvider{
