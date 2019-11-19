@@ -14,7 +14,9 @@ import (
 
 // Credentials secret.
 const (
-	GcpCredentials = "gcp-credentials"
+	GcpCredentials          = "gcp-credentials"
+	GcpCloudSecretName      = "gcp-cloud-credentials"
+	GcpCloudCredentialsPath = "credentials-gcp/cloud"
 )
 
 type GCPProvider struct {
@@ -22,6 +24,14 @@ type GCPProvider struct {
 	Bucket                  string
 	KMSKeyId                string
 	SnapshotCreationTimeout string
+}
+
+func (p *GCPProvider) GetCloudSecretName() string {
+	return GcpCloudSecretName
+}
+
+func (p *GCPProvider) GetCloudCredentialsPath() string {
+	return GcpCloudCredentialsPath
 }
 
 func (p *GCPProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {

@@ -65,8 +65,15 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 			return err
 		}
 
-		// Cloud Secret
-		err = pl.ensureCloudSecret()
+		// BSL Cloud Secret
+		err = pl.ensureBSLCloudSecret()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		// VSL Cloud Secret
+		err = pl.ensureVSLCloudSecret()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -187,10 +194,14 @@ func (r PlanStorage) ensureVSL() error {
 }
 
 // Create the velero BSL cloud secret has been created.
-func (r PlanStorage) ensureCloudSecret() error {
-	newSecret := r.storage.BuildBSLCloudSecret()
+func (r PlanStorage) ensureBSLCloudSecret() error {
+	newSecret, err := r.BuildBSLCloudSecret()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 	newSecret.Labels = r.plan.GetCorrelationLabels()
-	foundSecret, err := r.plan.GetCloudSecret(r.targetClient)
+	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetBackupStorageProvider())
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -207,6 +218,46 @@ func (r PlanStorage) ensureCloudSecret() error {
 		return nil
 	}
 	r.UpdateBSLCloudSecret(foundSecret)
+	err = r.targetClient.Update(context.TODO(), foundSecret)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+// Create the velero VSL cloud secret has been created.
+// If BSL and VSL have the same provider, no action for now
+// since only one secret per provider is supported
+func (r PlanStorage) ensureVSLCloudSecret() error {
+	if r.storage.Spec.VolumeSnapshotProvider == "" ||
+		r.storage.Spec.VolumeSnapshotProvider == r.storage.Spec.BackupStorageProvider {
+		return nil
+	}
+	newSecret, err := r.BuildVSLCloudSecret()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	newSecret.Labels = r.plan.GetCorrelationLabels()
+	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetVolumeSnapshotProvider())
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if foundSecret == nil {
+		err = r.targetClient.Create(context.TODO(), newSecret)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		return nil
+	}
+	if r.storage.EqualsCloudSecret(foundSecret, newSecret) {
+		return nil
+	}
+	r.UpdateVSLCloudSecret(foundSecret)
 	err = r.targetClient.Update(context.TODO(), foundSecret)
 	if err != nil {
 		log.Trace(err)
@@ -246,7 +297,7 @@ func (r *PlanStorage) UpdateVSL(vsl *velero.VolumeSnapshotLocation) {
 
 // Build BSL cloud secret.
 func (r *PlanStorage) BuildBSLCloudSecret() (*kapi.Secret, error) {
-	secret := r.storage.BuildVSLCloudSecret()
+	secret := r.storage.BuildBSLCloudSecret()
 	err := r.UpdateBSLCloudSecret(secret)
 	if err != nil {
 		log.Trace(err)

@@ -21,7 +21,9 @@ import (
 
 // Credentials secret.
 const (
-	AzureCredentials = "azure-credentials"
+	AzureCredentials          = "azure-credentials"
+	AzureCloudSecretName      = "azure-cloud-credentials"
+	AzureCloudCredentialsPath = "credentials-azure/cloud"
 
 	tenantIDKey             = "AZURE_TENANT_ID"
 	subscriptionIDKey       = "AZURE_SUBSCRIPTION_ID"
@@ -46,6 +48,13 @@ type AzureProvider struct {
 	SnapshotCreationTimeout string
 }
 
+func (p *AzureProvider) GetCloudSecretName() string {
+	return AzureCloudSecretName
+}
+
+func (p *AzureProvider) GetCloudCredentialsPath() string {
+	return AzureCloudCredentialsPath
+}
 func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 	bsl.Spec.Provider = Azure
 	bsl.Spec.StorageType = velero.StorageType{
