@@ -3,14 +3,16 @@ package migplan
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/fields"
 	"reflect"
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/fusor/mig-controller/pkg/health"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -46,6 +48,7 @@ const (
 	RegistriesEnsured              = "RegistriesEnsured"
 	PvsDiscovered                  = "PvsDiscovered"
 	Closed                         = "Closed"
+	SourcePodsNotHealthy           = "SourcePodsNotHealthy"
 )
 
 // Categories
@@ -65,6 +68,7 @@ const (
 	NotDone       = "NotDone"
 	Done          = "Done"
 	Conflict      = "Conflict"
+	NotHealthy    = "NotHealthy"
 )
 
 // Statuses
@@ -105,6 +109,7 @@ const (
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                         = "The migration plan is closed."
+	SourcePodsNotHealthyMessage           = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
 )
 
 // Valid AccessMode values
@@ -156,6 +161,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Conflict
 	err = r.validateConflict(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Pods
+	err = r.validatePods(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -736,4 +748,74 @@ func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode k
 		}
 	}
 	return false
+}
+
+// Validate the pods, all should be healthy befor migration
+func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(Suspended) {
+		plan.Status.StageCondition(SourcePodsNotHealthy)
+		return nil
+	}
+
+	cluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
+	}
+
+	client, err := cluster.GetClient(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	unhealthyResources := migapi.UnhealthyResources{}
+	for _, ns := range plan.Spec.Namespaces {
+		unhealthyPods, err := health.PodsUnhealthy(client, &k8sclient.ListOptions{
+			Namespace: ns,
+		})
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		workload := migapi.Workload{
+			Name: "Pods",
+		}
+		for _, unstrucredPod := range *unhealthyPods {
+			pod := &kapi.Pod{}
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrucredPod.UnstructuredContent(), pod)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+
+			workload.Resources = append(workload.Resources, pod.Name)
+		}
+
+		if len(workload.Resources) != 0 {
+			unhealthyNamespace := migapi.UnhealthyNamespace{
+				Name:      ns,
+				Workloads: []migapi.Workload{workload},
+			}
+			unhealthyResources.Namespaces = append(unhealthyResources.Namespaces, unhealthyNamespace)
+		}
+	}
+	plan.Spec.UnhealthyResources = unhealthyResources
+
+	if len(plan.Spec.UnhealthyResources.Namespaces) != 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourcePodsNotHealthy,
+			Status:   True,
+			Reason:   NotHealthy,
+			Category: Warn,
+			Message:  SourcePodsNotHealthyMessage,
+		})
+	}
+
+	return nil
 }
