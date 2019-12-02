@@ -5,9 +5,8 @@ import (
 )
 
 const (
-	TouchAnnotation   = "touch"
-	VeleroNamespace   = "openshift-migration"
-	VeleroCloudSecret = "cloud-credentials"
+	TouchAnnotation = "touch"
+	VeleroNamespace = "openshift-migration"
 )
 
 // Migration application CR.

@@ -21,6 +21,8 @@ const (
 
 type Provider interface {
 	GetName() string
+	GetCloudSecretName() string
+	GetCloudCredentialsPath() string
 	SetRole(role string)
 	UpdateBSL(location *velero.BackupStorageLocation)
 	UpdateVSL(location *velero.VolumeSnapshotLocation)

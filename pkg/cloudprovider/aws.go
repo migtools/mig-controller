@@ -23,8 +23,10 @@ import (
 
 // Credentials Secret.
 const (
-	AwsAccessKeyId     = "aws-access-key-id"
-	AwsSecretAccessKey = "aws-secret-access-key"
+	AwsAccessKeyId          = "aws-access-key-id"
+	AwsSecretAccessKey      = "aws-secret-access-key"
+	AwsCloudSecretName      = "cloud-credentials"
+	AwsCloudCredentialsPath = "credentials/cloud"
 )
 
 // S3 constants
@@ -63,6 +65,13 @@ func (p *AWSProvider) GetURL() string {
 	return ""
 }
 
+func (p *AWSProvider) GetCloudSecretName() string {
+	return AwsCloudSecretName
+}
+
+func (p *AWSProvider) GetCloudCredentialsPath() string {
+	return AwsCloudCredentialsPath
+}
 func (p *AWSProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 	bsl.Spec.Provider = AWS
 	bsl.Spec.StorageType = velero.StorageType{
