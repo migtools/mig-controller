@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	"github.com/fusor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -339,45 +340,55 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 		return false, err
 	}
 	for _, pod := range list {
-		cmd := pods.PodCommand{
-			Args:    []string{"cat", "/credentials/cloud"},
-			RestCfg: restCfg,
-			Pod:     &pod,
-		}
-		err = cmd.Run()
+		storage, err := t.PlanResources.MigPlan.GetStorage(t.Client)
 		if err != nil {
-			exErr, cast := err.(exec.CodeExitError)
-			if cast && exErr.Code == 126 {
-				log.Info(
-					"Pod command failed:",
-					"solution",
-					"https://access.redhat.com/solutions/3734981",
-					"cmd",
-					cmd.Args)
-				return true, nil
-			} else {
+			log.Trace(err)
+			return false, err
+		}
+
+		bslProvider := storage.GetBackupStorageProvider()
+		vslProvider := storage.GetVolumeSnapshotProvider()
+		for _, provider := range []pvdr.Provider{bslProvider, vslProvider} {
+			cmd := pods.PodCommand{
+				Args:    []string{"cat", provider.GetCloudCredentialsPath()},
+				RestCfg: restCfg,
+				Pod:     &pod,
+			}
+			err = cmd.Run()
+			if err != nil {
+				exErr, cast := err.(exec.CodeExitError)
+				if cast && exErr.Code == 126 {
+					log.Info(
+						"Pod command failed:",
+						"solution",
+						"https://access.redhat.com/solutions/3734981",
+						"cmd",
+						cmd.Args)
+					return true, nil
+				} else {
+					log.Trace(err)
+					return false, err
+				}
+			}
+			client, err := cluster.GetClient(t.Client)
+			if err != nil {
 				log.Trace(err)
 				return false, err
 			}
-		}
-		client, err := cluster.GetClient(t.Client)
-		if err != nil {
-			log.Trace(err)
-			return false, err
-		}
-		secret, err := t.PlanResources.MigPlan.GetCloudSecret(client)
-		if err != nil {
-			log.Trace(err)
-			return false, err
-		}
-		if body, found := secret.Data["cloud"]; found {
-			a := string(body)
-			b := cmd.Out.String()
-			if a != b {
+			secret, err := t.PlanResources.MigPlan.GetCloudSecret(client, provider)
+			if err != nil {
+				log.Trace(err)
+				return false, err
+			}
+			if body, found := secret.Data["cloud"]; found {
+				a := string(body)
+				b := cmd.Out.String()
+				if a != b {
+					return false, nil
+				}
+			} else {
 				return false, nil
 			}
-		} else {
-			return false, nil
 		}
 	}
 

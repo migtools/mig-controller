@@ -134,7 +134,7 @@ func (r *MigStorage) BuildBSLCloudSecret() *kapi.Secret {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      VeleroCloudSecret,
+			Name:      r.GetBackupStorageProvider().GetCloudSecretName(),
 		},
 	}
 
@@ -147,7 +147,7 @@ func (r *MigStorage) BuildVSLCloudSecret() *kapi.Secret {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    r.GetCorrelationLabels(),
 			Namespace: VeleroNamespace,
-			Name:      VeleroCloudSecret,
+			Name:      r.GetVolumeSnapshotProvider().GetCloudSecretName(),
 		},
 	}
 
@@ -268,6 +268,7 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 		provider = &pvdr.AWSProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.VolumeSnapshot,
+				Name: name,
 			},
 			Region:                  r.AwsRegion,
 			SnapshotCreationTimeout: r.SnapshotCreationTimeout,
@@ -276,6 +277,7 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 		provider = &pvdr.AzureProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.VolumeSnapshot,
+				Name: name,
 			},
 			ResourceGroup:           r.AzureResourceGroup,
 			APITimeout:              r.AzureAPITimeout,
@@ -285,6 +287,7 @@ func (r *VolumeSnapshotConfig) GetProvider(name string) pvdr.Provider {
 		provider = &pvdr.GCPProvider{
 			BaseProvider: pvdr.BaseProvider{
 				Role: pvdr.VolumeSnapshot,
+				Name: name,
 			},
 			SnapshotCreationTimeout: r.SnapshotCreationTimeout,
 		}

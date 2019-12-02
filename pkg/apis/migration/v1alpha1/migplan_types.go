@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
@@ -562,13 +563,13 @@ func (r *MigPlan) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocatio
 	return nil, nil
 }
 
-// Get the cloud credentials secret by labels.
-func (r *MigPlan) GetCloudSecret(client k8sclient.Client) (*kapi.Secret, error) {
+// Get the cloud credentials secret by labels for the provider.
+func (r *MigPlan) GetCloudSecret(client k8sclient.Client, provider pvdr.Provider) (*kapi.Secret, error) {
 	return GetSecret(
 		client,
 		&kapi.ObjectReference{
 			Namespace: VeleroNamespace,
-			Name:      VeleroCloudSecret,
+			Name:      provider.GetCloudSecretName(),
 		})
 }
 
