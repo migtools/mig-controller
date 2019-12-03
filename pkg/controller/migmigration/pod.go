@@ -309,10 +309,16 @@ func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) 
 		return nil, err
 	}
 	list := &corev1.PodList{}
+	selector := labels.SelectorFromSet(
+		map[string]string{
+			"component": "velero",
+		})
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(
-			map[string]string{"component": "velero"}),
+		&k8sclient.ListOptions{
+			Namespace:     migapi.VeleroNamespace,
+			LabelSelector: selector,
+		},
 		list)
 	if err != nil {
 		log.Trace(err)
