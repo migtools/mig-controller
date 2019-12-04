@@ -17,12 +17,14 @@ limitations under the License.
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/fusor/mig-controller/pkg/apis"
 	"github.com/fusor/mig-controller/pkg/controller"
 	"github.com/fusor/mig-controller/pkg/webhook"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -34,6 +36,11 @@ import (
 func main() {
 	logf.SetLogger(logf.ZapLogger(false))
 	log := logf.Log.WithName("entrypoint")
+
+	// Start prometheus metrics HTTP handler
+	log.Info("setting up prometheus endpoint :2112/metrics")
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":2112", nil)
 
 	// Get a config to talk to the apiserver
 	log.Info("setting up client for manager")

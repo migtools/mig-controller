@@ -24,6 +24,8 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/logging"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +39,17 @@ import (
 )
 
 var log = logging.WithName("migration")
+
+var (
+	// 'status' - [ idle, running, completed, error ]
+	// 'type'   - [ stage, final ]
+	migrationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "mig_migrations",
+		Help: "Count of MigMigrations sorted by status and type",
+	},
+		[]string{"type", "status"},
+	)
+)
 
 // Add creates a new MigMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -108,10 +121,105 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Gather migration metrics every 10 seconds
+	recordMetrics(mgr.GetClient())
+
 	return nil
 }
 
 var _ reconcile.Reconciler = &ReconcileMigMigration{}
+
+func recordMetrics(client client.Client) {
+	const (
+		// Metrics const values
+		//   Separate from mig-controller consts to keep a stable interface for metrics systems
+		//   configured to pull from static metrics endpoints.
+
+		// Migration Type
+		stage = "stage"
+		final = "final"
+
+		// Migration Status
+		idle      = "idle"
+		running   = "running"
+		completed = "completed"
+		failed    = "error"
+	)
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			// get all migmigration objects
+			migrations, err := migapi.ListMigrations(client)
+
+			// if error occurs, gracefully retry later
+			if err != nil {
+				log.Trace(err)
+				continue
+			}
+
+			// Holding counter vars used to make gauge update "atomic"
+			var stageIdle, stageRunning, stageCompleted, stageFailed float64
+			var finalIdle, finalRunning, finalCompleted, finalFailed float64
+
+			// for all migmigrations, count # in idle, running, completed, error
+			for _, m := range migrations {
+				// Stage
+				if m.Spec.Stage && m.Status.HasCondition(Running) {
+					stageRunning++
+					continue
+				}
+				if m.Spec.Stage && m.Status.HasCondition(Succeeded) {
+					stageCompleted++
+					continue
+				}
+				if m.Spec.Stage && m.Status.HasCondition(Failed) {
+					stageFailed++
+					continue
+				}
+				if m.Spec.Stage {
+					stageIdle++
+					continue
+				}
+
+				// Final
+				if !m.Spec.Stage && m.Status.HasCondition(Running) {
+					finalRunning++
+					continue
+				}
+				if !m.Spec.Stage && m.Status.HasCondition(Succeeded) {
+					finalCompleted++
+					continue
+				}
+				if !m.Spec.Stage && m.Status.HasCondition(Failed) {
+					finalFailed++
+				}
+				if !m.Spec.Stage {
+					finalIdle++
+				}
+			}
+
+			// Stage
+			migrationGauge.With(
+				prometheus.Labels{"type": stage, "status": idle}).Set(stageIdle)
+			migrationGauge.With(
+				prometheus.Labels{"type": stage, "status": running}).Set(stageRunning)
+			migrationGauge.With(
+				prometheus.Labels{"type": stage, "status": completed}).Set(stageCompleted)
+			migrationGauge.With(
+				prometheus.Labels{"type": stage, "status": failed}).Set(stageFailed)
+			// Final
+			migrationGauge.With(
+				prometheus.Labels{"type": final, "status": idle}).Set(finalIdle)
+			migrationGauge.With(
+				prometheus.Labels{"type": final, "status": running}).Set(finalRunning)
+			migrationGauge.With(
+				prometheus.Labels{"type": final, "status": completed}).Set(finalCompleted)
+			migrationGauge.With(
+				prometheus.Labels{"type": final, "status": failed}).Set(finalFailed)
+		}
+	}()
+}
 
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
