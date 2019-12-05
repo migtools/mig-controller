@@ -50,7 +50,7 @@ func recordMetrics(client client.Client) {
 		idle      = "idle"
 		running   = "running"
 		completed = "completed"
-		failed    = "error"
+		failed    = "failed"
 	)
 
 	go func() {
@@ -70,7 +70,7 @@ func recordMetrics(client client.Client) {
 			var stageIdle, stageRunning, stageCompleted, stageFailed float64
 			var finalIdle, finalRunning, finalCompleted, finalFailed float64
 
-			// for all migmigrations, count # in idle, running, completed, error
+			// for all migmigrations, count # in idle, running, completed, failed
 			for _, m := range migrations {
 				// Stage
 				if m.Spec.Stage && m.Status.HasCondition(Running) {
