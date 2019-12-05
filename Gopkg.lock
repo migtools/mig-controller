@@ -478,6 +478,7 @@
   packages = [
     "prometheus",
     "prometheus/internal",
+    "prometheus/promauto",
     "prometheus/promhttp",
   ]
   pruneopts = "T"
@@ -1229,6 +1230,9 @@
     "github.com/openshift/api/project/v1",
     "github.com/openshift/api/route/v1",
     "github.com/pkg/errors",
+    "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promauto",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     "golang.org/x/net/context",
     "google.golang.org/api/option",
     "k8s.io/api/apps/v1beta1",
