@@ -108,6 +108,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Gather migration metrics every 10 seconds
+	recordMetrics(mgr.GetClient())
+
 	return nil
 }
 

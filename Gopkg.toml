@@ -20,6 +20,9 @@ required = [
     "github.com/openshift/api/build/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/api/network/v1",
+    "github.com/prometheus/client_golang/prometheus",
+    "github.com/prometheus/client_golang/prometheus/promauto",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     ]
 
 [prune]
