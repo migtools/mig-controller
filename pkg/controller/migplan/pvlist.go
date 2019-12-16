@@ -99,7 +99,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 			migapi.PV{
 				Name:         pv.Name,
 				Capacity:     pv.Spec.Capacity[core.ResourceStorage],
-				StorageClass: pv.Spec.StorageClassName,
+				StorageClass: getStorageClassName(pv),
 				Supported: migapi.Supported{
 					Actions:     r.getSupportedActions(pv),
 					CopyMethods: r.getSupportedCopyMethods(pv),
@@ -234,6 +234,15 @@ func (r *ReconcileMigPlan) getSupportedCopyMethods(pv core.PersistentVolume) []s
 	}
 }
 
+// Gets the StorageClass name for the PV
+func getStorageClassName(pv core.PersistentVolume) string {
+	storageClassName := pv.Spec.StorageClassName
+	if storageClassName == "" {
+		storageClassName = pv.Annotations[core.BetaStorageClassAnnotation]
+	}
+	return storageClassName
+}
+
 // Gets the default selection values for a PV
 func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 	claim migapi.PVC,
@@ -271,7 +280,7 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 	plan *migapi.MigPlan,
 	srcStorageClasses []migapi.StorageClass,
 	destStorageClasses []migapi.StorageClass) (string, error) {
-	srcStorageClassName := pv.Spec.StorageClassName
+	srcStorageClassName := getStorageClassName(pv)
 
 	srcProvisioner := findProvisionerForName(srcStorageClassName, srcStorageClasses)
 	targetProvisioner := ""
