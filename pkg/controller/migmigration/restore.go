@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/pkg/errors"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )

@@ -20,7 +20,7 @@ import (
 	"reflect"
 
 	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"

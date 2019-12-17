@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
 
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/api/apps/v1beta1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"

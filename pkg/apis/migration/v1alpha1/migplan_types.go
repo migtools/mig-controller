@@ -27,9 +27,9 @@ import (
 
 	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	migref "github.com/fusor/mig-controller/pkg/reference"
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
