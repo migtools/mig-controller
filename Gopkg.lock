@@ -281,14 +281,6 @@
   version = "v0.5.1"
 
 [[projects]]
-  digest = "1:0f475ba305c18117f4408cbf73047c325e4c75a9f04fa7a74590623563c16f38"
-  name = "github.com/heptio/velero"
-  packages = ["pkg/apis/velero/v1"]
-  pruneopts = "T"
-  revision = "72f5cadc3a865019ab9dc043d4952c9bfd5f2ecb"
-  version = "v1.0.0"
-
-[[projects]]
   digest = "1:8f20c8dd713564fa97299fbcb77d729c6de9c33f3222812a76e6ecfaef80fd61"
   name = "github.com/hpcloud/tail"
   packages = [
@@ -559,6 +551,15 @@
   pruneopts = "T"
   revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
   version = "v1.0.3"
+
+[[projects]]
+  branch = "fusor-dev"
+  digest = "1:25abf99b984c97d7e817b55c5ea9b5c1f6b944d8326e8973697d324990b4e275"
+  name = "github.com/vmware-tanzu/velero"
+  packages = ["pkg/apis/velero/v1"]
+  pruneopts = "T"
+  revision = "d35335021acf4d2535dd734caece505484688523"
+  source = "github.com/fusor/velero.git"
 
 [[projects]]
   digest = "1:281e8d3e74fa7e37f6381d337cbc1e3a610afd60d349e522decc7bc0e60caebc"
@@ -1217,7 +1218,6 @@
     "github.com/emicklei/go-restful",
     "github.com/go-logr/logr",
     "github.com/google/uuid",
-    "github.com/heptio/velero/pkg/apis/velero/v1",
     "github.com/joho/godotenv",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
@@ -1233,6 +1233,7 @@
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
+    "github.com/vmware-tanzu/velero/pkg/apis/velero/v1",
     "golang.org/x/net/context",
     "google.golang.org/api/option",
     "k8s.io/api/apps/v1beta1",

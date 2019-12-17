@@ -12,10 +12,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/google/uuid"
-	velero "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/joho/godotenv"
 	appsv1 "github.com/openshift/api/apps/v1"
 	"github.com/pkg/errors"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
