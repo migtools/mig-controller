@@ -29,7 +29,7 @@ var (
 	// 'status' - [ idle, running, completed, error ]
 	// 'type'   - [ stage, final ]
 	migrationGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mig_migrations_count",
+		Name: "cam_app_workload_migration_total",
 		Help: "Count of MigMigrations sorted by status and type",
 	},
 		[]string{"type", "status"},
