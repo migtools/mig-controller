@@ -109,6 +109,24 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 			})
 	}
 
+	// Remove PvWarnNoCephAvailable for move operations
+	existingWarnCondition := plan.Status.FindCondition(PvWarnNoCephAvailable)
+	if existingWarnCondition != nil {
+		for _, pv := range plan.Spec.PersistentVolumes.List {
+			if pv.Selection.Action == migapi.PvMoveAction {
+				for i, pvName := range existingWarnCondition.Items {
+					if pvName == pv.Name {
+						existingWarnCondition.Items = append(existingWarnCondition.Items[:i], existingWarnCondition.Items[i+1:]...)
+						break
+					}
+				}
+			}
+		}
+		if len(existingWarnCondition.Items) == 0 {
+			plan.Status.DeleteCondition(PvWarnNoCephAvailable)
+		}
+	}
+
 	// Set the condition to indicate that discovery has been performed.
 	plan.Status.SetCondition(migapi.Condition{
 		Type:     PvsDiscovered,
