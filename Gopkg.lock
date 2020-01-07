@@ -157,6 +157,35 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:938dd3228e4dd905b5abb0a4fb9257ba5677295717224b1a6dcfcaec54afc533"
+  name = "github.com/gin-contrib/cors"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "5f50d4fb4e0306dcacc6f8e9bea2dcee784dbbdf"
+  version = "v1.3.0"
+
+[[projects]]
+  digest = "1:3ee1d175a75b911a659fbd860060874c4f503e793c5870d13e5a0ede529a63cf"
+  name = "github.com/gin-contrib/sse"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "54d8467d122d380a14768b6b4e5cd7ca4755938f"
+  version = "v0.1.0"
+
+[[projects]]
+  digest = "1:3249428127881e6b40fa645c767dd42a0327c625d29589e6f98121b86e3df8ac"
+  name = "github.com/gin-gonic/gin"
+  packages = [
+    ".",
+    "binding",
+    "internal/json",
+    "render",
+  ]
+  pruneopts = "T"
+  revision = "b75d67cd51eb53c3c3a2fc406524c940021ffbda"
+  version = "v1.4.0"
+
+[[projects]]
   digest = "1:65587005c6fa4293c0b8a2e457e689df7fda48cc5e1f5449ea2c1e7784551558"
   name = "github.com/go-logr/logr"
   packages = ["."]
@@ -340,6 +369,22 @@
   pruneopts = "T"
   revision = "24b83195037b3bc61fcda2d28b7b0518bce293b6"
   version = "v1.0.4"
+
+[[projects]]
+  digest = "1:542eed1c9c3e794985f067cad69b115917cb51517b5a8b16f68847746903bdb7"
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "88ba11cfdc67c7588b30042edf244b2875f892b6"
+  version = "v0.0.10"
+
+[[projects]]
+  digest = "1:b4142ed8c12946057e19021358943c0aca25fa4794975196a3cdeb25f6a8bc80"
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "590d44c02bca83987d23f6eab75e6d0ddf95f644"
+  version = "v1.13.0"
 
 [[projects]]
   digest = "1:a8e3d14801bed585908d130ebfc3b925ba642208e6f30d879437ddfc7bb9b413"
@@ -551,6 +596,14 @@
   pruneopts = "T"
   revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
   version = "v1.0.3"
+
+[[projects]]
+  digest = "1:6649958220b38832a3f3fd1bbac6c3c1d9c430e626839ac49807e73ad9016589"
+  name = "github.com/ugorji/go"
+  packages = ["codec"]
+  pruneopts = "T"
+  revision = "23ab95ef5dc3b70286760af84ce2327a2b64ed62"
+  version = "v1.1.7"
 
 [[projects]]
   branch = "fusor-dev"
@@ -835,6 +888,14 @@
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
   source = "https://github.com/fsnotify/fsnotify.git"
   version = "v1.4.7"
+
+[[projects]]
+  digest = "1:02714116710abce990f3fa478f52c8e7029590ef13f35aab723beecdf829f136"
+  name = "gopkg.in/go-playground/validator.v8"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "5f1438d3fca68893a817e4a66806cea46a9e4ebf"
+  version = "v8.18.2"
 
 [[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
@@ -1216,9 +1277,12 @@
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/emicklei/go-restful",
+    "github.com/gin-contrib/cors",
+    "github.com/gin-gonic/gin",
     "github.com/go-logr/logr",
     "github.com/google/uuid",
     "github.com/joho/godotenv",
+    "github.com/mattn/go-sqlite3",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/apps/v1",
@@ -1237,6 +1301,7 @@
     "golang.org/x/net/context",
     "google.golang.org/api/option",
     "k8s.io/api/apps/v1beta1",
+    "k8s.io/api/authorization/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/extensions/v1beta1",
@@ -1254,7 +1319,9 @@
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apiserver/pkg/storage/names",
+    "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
+    "k8s.io/client-go/kubernetes/typed/core/v1",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/remotecommand",
