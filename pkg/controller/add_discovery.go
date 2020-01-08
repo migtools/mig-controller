@@ -17,25 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/fusor/mig-controller/pkg/settings"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"github.com/fusor/mig-controller/pkg/controller/discovery"
 )
 
-// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
-var AddToManagerFuncs []func(manager.Manager) error
-
-// AddToManager adds all Controllers to the Manager
-func AddToManager(m manager.Manager) error {
-	// Application settings.
-	err := settings.Settings.Load()
-	if err != nil {
-		return err
-	}
-	for _, f := range AddToManagerFuncs {
-		if err := f(m); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func init() {
+	AddToManagerFuncs = append(AddToManagerFuncs, discovery.Add)
 }

@@ -1,0 +1,60 @@
+package web
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+
+const (
+	NamespacesRoot = ClusterRoot + "/namespaces"
+	NamespaceRoot  = NamespacesRoot + "/:ns2"
+)
+
+//
+// Namespaces (route) handler.
+type NsHandler struct {
+	// Base
+	ClusterHandler
+}
+
+//
+// Add routes.
+func (h *NsHandler) AddRoutes(r *gin.Engine) {
+	r.GET(NamespacesRoot, h.List)
+	r.GET(NamespacesRoot+"/", h.List)
+	r.GET(NamespaceRoot, h.Get)
+}
+
+//
+// List namespaces on a cluster.
+func (h *NsHandler) List(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		h.ctx.Status(status)
+		return
+	}
+	list, err := h.cluster.NsList(h.container.Db, &h.page)
+	if err != nil {
+		Log.Trace(err)
+		h.ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := []string{}
+	for _, m := range list {
+		content = append(content, m.Name)
+	}
+
+	h.ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Get a specific namespace on a cluster.
+func (h *NsHandler) Get(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		h.ctx.Status(status)
+		return
+	}
+
+	h.ctx.JSON(http.StatusOK, h.cluster.Namespace)
+}

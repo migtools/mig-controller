@@ -8,7 +8,7 @@ COPY cmd/    cmd/
 COPY vendor/ vendor/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o manager github.com/fusor/mig-controller/cmd/manager
+RUN CGO_ENABLED=1 GOOS=linux go build -a -o manager github.com/fusor/mig-controller/cmd/manager
 
 # Copy the controller-manager into a thin image
 FROM registry.access.redhat.com/ubi8-minimal
