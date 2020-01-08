@@ -92,7 +92,7 @@ type BackupStorageConfig struct {
 	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
 	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
 	GcpBucket             string                `json:"gcpBucket,omitempty"`
-	InsecureSkipTLSVerify bool                  `json:"insecureSkipTLSVerify"`
+	Insecure              bool                  `json:"insecure"`
 }
 
 func init() {
@@ -224,15 +224,15 @@ func (r *BackupStorageConfig) GetProvider(name string) pvdr.Provider {
 				Role: pvdr.BackupStorage,
 				Name: name,
 			},
-			Region:                r.AwsRegion,
-			Bucket:                r.AwsBucketName,
-			S3URL:                 r.AwsS3URL,
-			PublicURL:             r.AwsPublicURL,
-			KMSKeyId:              r.AwsKmsKeyID,
-			SignatureVersion:      r.AwsSignatureVersion,
-			S3ForcePathStyle:      r.AwsS3ForcePathStyle,
-			CustomCABundle:        r.S3CustomCABundle,
-			InsecureSkipTLSVerify: r.InsecureSkipTLSVerify,
+			Region:           r.AwsRegion,
+			Bucket:           r.AwsBucketName,
+			S3URL:            r.AwsS3URL,
+			PublicURL:        r.AwsPublicURL,
+			KMSKeyId:         r.AwsKmsKeyID,
+			SignatureVersion: r.AwsSignatureVersion,
+			S3ForcePathStyle: r.AwsS3ForcePathStyle,
+			CustomCABundle:   r.S3CustomCABundle,
+			Insecure:         r.Insecure,
 		}
 	case Azure:
 		provider = &pvdr.AzureProvider{

@@ -54,13 +54,13 @@ spec:
                   type: object
                 gcpBucket:
                   type: string
-                insecureSkipTLSVerify:
+                insecure:
                   type: boolean
                 s3CustomCABundle:
                   format: byte
                   type: string
               required:
-              - insecureSkipTLSVerify
+              - insecure
               type: object
             backupStorageProvider:
               type: string
