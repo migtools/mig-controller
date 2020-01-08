@@ -12,13 +12,22 @@ var Settings = _Settings{}
 // Settings
 //   Plan: Plan settings.
 type _Settings struct {
-	Plan Plan
+	Discovery
+	Plan
 }
 
 // Load settings.
 func (r *_Settings) Load() error {
 	err := r.Plan.Load()
-	return err
+	if err != nil {
+		return err
+	}
+	err = r.Discovery.Load()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Get positive integer limit from the environment
@@ -39,4 +48,17 @@ func getEnvLimit(name string, def int) (int, error) {
 	}
 
 	return limit, nil
+}
+
+// Get boolean.
+func getEnvBool(name string, def bool) bool {
+	boolean := def
+	if s, found := os.LookupEnv(name); found {
+		parsed, err := strconv.ParseBool(s)
+		if err == nil {
+			boolean = parsed
+		}
+	}
+
+	return boolean
 }
