@@ -27,7 +27,7 @@ type PlanHandler struct {
 
 //
 // Add routes.
-func (h *PlanHandler) AddRoutes(r *gin.Engine) {
+func (h PlanHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PlansRoot, h.List)
 	r.GET(PlansRoot+"/", h.List)
 	r.GET(PlanRoot, h.Get)
@@ -83,8 +83,36 @@ func (h *PlanHandler) getSAR() auth.SelfSubjectAccessReview {
 }
 
 //
+// List all of the plans in the namespace.
+func (h PlanHandler) List(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		h.ctx.Status(status)
+		return
+	}
+	list, err := model.PlanList(h.container.Db, &h.page)
+	if err != nil {
+		Log.Trace(err)
+		h.ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := []Plan{}
+	for _, m := range list {
+		d := Plan{
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			Source:      m.DecodeSource(),
+			Destination: m.DecodeDestination(),
+		}
+		content = append(content, d)
+	}
+
+	h.ctx.JSON(http.StatusOK, content)
+}
+
+//
 // Get a specific plan.
-func (h *PlanHandler) Get(ctx *gin.Context) {
+func (h PlanHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -113,42 +141,14 @@ func (h *PlanHandler) Get(ctx *gin.Context) {
 
 //
 // Get the `PlanPods` for the plan.
-func (h *PlanHandler) Pods(ctx *gin.Context) {
+func (h PlanHandler) Pods(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
 		return
 	}
 	content := PlanPods{}
-	content.With(h)
-
-	h.ctx.JSON(http.StatusOK, content)
-}
-
-//
-// List all of the plans in the namespace.
-func (h *PlanHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		h.ctx.Status(status)
-		return
-	}
-	list, err := model.PlanList(h.container.Db, &h.page)
-	if err != nil {
-		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	content := []Plan{}
-	for _, m := range list {
-		d := Plan{
-			Namespace:   m.Namespace,
-			Name:        m.Name,
-			Source:      m.DecodeSource(),
-			Destination: m.DecodeDestination(),
-		}
-		content = append(content, d)
-	}
+	content.With(&h)
 
 	h.ctx.JSON(http.StatusOK, content)
 }

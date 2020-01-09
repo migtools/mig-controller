@@ -25,12 +25,12 @@ const (
 // Pod (route) handler.
 type PodHandler struct {
 	// Base
-	ClusterHandler
+	ClusterScoped
 }
 
 //
 // Add routes.
-func (h *PodHandler) AddRoutes(r *gin.Engine) {
+func (h PodHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PodsRoot, h.List)
 	r.GET(PodsRoot+"/", h.List)
 	r.GET(PodRoot, h.Get)
@@ -38,7 +38,7 @@ func (h *PodHandler) AddRoutes(r *gin.Engine) {
 
 //
 // Get a specific pod.
-func (h *PodHandler) Get(ctx *gin.Context) {
+func (h PodHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -75,7 +75,7 @@ func (h *PodHandler) Get(ctx *gin.Context) {
 
 //
 // List pods on a cluster in a namespace.
-func (h *PodHandler) List(ctx *gin.Context) {
+func (h PodHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -113,17 +113,23 @@ func (h *PodHandler) List(ctx *gin.Context) {
 // Pod-log (route) handler.
 type LogHandler struct {
 	// Base
-	ClusterHandler
+	ClusterScoped
 }
 
 // Add routes.
-func (h *LogHandler) AddRoutes(r *gin.Engine) {
+func (h LogHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PodRoot+"/log", h.List)
 }
 
 //
+// Not supported.
+func (h LogHandler) Get(ctx *gin.Context) {
+	ctx.Status(http.StatusMethodNotAllowed)
+}
+
+//
 // List all logs (entries) for a pod (and optional container).
-func (h *LogHandler) List(ctx *gin.Context) {
+func (h LogHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
