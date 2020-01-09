@@ -83,42 +83,50 @@ func (w *WebServer) buildOrigins() {
 // Add the routes.
 func (w *WebServer) addRoutes(r *gin.Engine) {
 	handlers := []RequestHandler{
-		&RootHandler{
-			BaseHandler: BaseHandler{
-				container: w.Container,
-			},
+		SchemaHandler{
 			router: r,
 		},
-		&ClusterHandler{
+		RootNsHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
 			},
 		},
-		&NsHandler{ClusterHandler: ClusterHandler{
-			BaseHandler: BaseHandler{
-				container: w.Container,
+		ClusterHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
 			},
 		},
-		},
-		&PodHandler{ClusterHandler: ClusterHandler{
-			BaseHandler: BaseHandler{
-				container: w.Container,
+		NsHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
 			},
 		},
-		},
-		&LogHandler{ClusterHandler: ClusterHandler{
-			BaseHandler: BaseHandler{
-				container: w.Container,
+		PodHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
 			},
 		},
-		},
-		&PvHandler{ClusterHandler: ClusterHandler{
-			BaseHandler: BaseHandler{
-				container: w.Container,
+		LogHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
 			},
 		},
+		PvHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
 		},
-		&PlanHandler{
+		PlanHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
 			},
@@ -148,6 +156,10 @@ func (w *WebServer) allow(origin string) bool {
 type RequestHandler interface {
 	// Add routes to the `gin` router.
 	AddRoutes(*gin.Engine)
+	// List resources in a REST collection.
+	List(*gin.Context)
+	// Get a specific REST resource.
+	Get(*gin.Context)
 }
 
 //
@@ -268,23 +280,19 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 }
 
 //
-// Root endpoints handler.
-type RootHandler struct {
-	// Base
-	BaseHandler
+// Schema (route) handler.
+type SchemaHandler struct {
 	// The `gin` router.
 	router *gin.Engine
 }
 
-func (h *RootHandler) AddRoutes(r *gin.Engine) {
-	r.GET("/schema", h.Schema)
-	r.GET(strings.Split(Root, "/")[1], h.ListNamespaces)
-	r.GET(strings.Split(Root, "/")[1]+"/", h.ListNamespaces)
+func (h SchemaHandler) AddRoutes(r *gin.Engine) {
+	r.GET("/schema", h.List)
 }
 
 //
-// Show the schema.
-func (h *RootHandler) Schema(ctx *gin.Context) {
+// List schema.
+func (h SchemaHandler) List(ctx *gin.Context) {
 	type Schema struct {
 		Version string
 		Release int
@@ -303,8 +311,26 @@ func (h *RootHandler) Schema(ctx *gin.Context) {
 }
 
 //
+// Not supported.
+func (h SchemaHandler) Get(ctx *gin.Context) {
+	ctx.Status(http.StatusMethodNotAllowed)
+}
+
+//
+// Root namespace (route) handler.
+type RootNsHandler struct {
+	// Base
+	BaseHandler
+}
+
+func (h RootNsHandler) AddRoutes(r *gin.Engine) {
+	r.GET(strings.Split(Root, "/")[1], h.List)
+	r.GET(strings.Split(Root, "/")[1]+"/", h.List)
+}
+
+//
 // List all root level namespaces.
-func (h *RootHandler) ListNamespaces(ctx *gin.Context) {
+func (h RootNsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -341,4 +367,10 @@ func (h *RootHandler) ListNamespaces(ctx *gin.Context) {
 	sort.Strings(list)
 	h.page.Slice(&list)
 	h.ctx.JSON(http.StatusOK, list)
+}
+
+//
+// Not supported.
+func (h RootNsHandler) Get(ctx *gin.Context) {
+	ctx.Status(http.StatusMethodNotAllowed)
 }

@@ -14,12 +14,12 @@ const (
 // Namespaces (route) handler.
 type NsHandler struct {
 	// Base
-	ClusterHandler
+	ClusterScoped
 }
 
 //
 // Add routes.
-func (h *NsHandler) AddRoutes(r *gin.Engine) {
+func (h NsHandler) AddRoutes(r *gin.Engine) {
 	r.GET(NamespacesRoot, h.List)
 	r.GET(NamespacesRoot+"/", h.List)
 	r.GET(NamespaceRoot, h.Get)
@@ -27,7 +27,7 @@ func (h *NsHandler) AddRoutes(r *gin.Engine) {
 
 //
 // List namespaces on a cluster.
-func (h *NsHandler) List(ctx *gin.Context) {
+func (h NsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -39,7 +39,7 @@ func (h *NsHandler) List(ctx *gin.Context) {
 		h.ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []string{}
+	content := []Namespace{}
 	for _, m := range list {
 		content = append(content, m.Name)
 	}
@@ -49,7 +49,7 @@ func (h *NsHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific namespace on a cluster.
-func (h *NsHandler) Get(ctx *gin.Context) {
+func (h NsHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
@@ -58,3 +58,6 @@ func (h *NsHandler) Get(ctx *gin.Context) {
 
 	h.ctx.JSON(http.StatusOK, h.cluster.Namespace)
 }
+
+// Namespace REST resource
+type Namespace = string

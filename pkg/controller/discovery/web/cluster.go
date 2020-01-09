@@ -9,15 +9,15 @@ import (
 	"time"
 )
 
-// Cluster-based route roots.
+// Cluster-scoped route roots.
 const (
 	ClustersRoot = Root + "/clusters"
 	ClusterRoot  = ClustersRoot + "/:cluster"
 )
 
 //
-// Cluster (route) Handler
-type ClusterHandler struct {
+// Base handler for cluster scoped routes.
+type ClusterScoped struct {
 	// Base
 	BaseHandler
 	// The cluster specified in the request.
@@ -25,18 +25,10 @@ type ClusterHandler struct {
 }
 
 //
-// Add routes.
-func (h *ClusterHandler) AddRoutes(r *gin.Engine) {
-	r.GET(ClustersRoot, h.List)
-	r.GET(ClustersRoot+"/", h.List)
-	r.GET(ClusterRoot, h.Get)
-}
-
-//
 // Prepare to fulfil the request.
 // Set the `cluster` field and ensure the related DataSource is `ready`.
 // Perform SAR authorization.
-func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
+func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 	status := h.BaseHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		return status
@@ -60,55 +52,12 @@ func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
 }
 
 //
-// List clusters in the namespace.
-func (h *ClusterHandler) List(ctx *gin.Context) {
-	status := h.BaseHandler.Prepare(ctx)
-	if status != http.StatusOK {
-		h.ctx.Status(status)
-		return
-	}
-	list, err := model.ClusterList(h.container.Db, &h.page)
-	if err != nil {
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	content := []Cluster{}
-	for _, m := range list {
-		r := Cluster{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-			Secret:    m.DecodeSecret(),
-		}
-		content = append(content, r)
-	}
-
-	h.ctx.JSON(http.StatusOK, content)
-}
-
-//
-// Get a specific cluster.
-func (h *ClusterHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		h.ctx.Status(status)
-		return
-	}
-	content := Cluster{
-		Namespace: h.cluster.Namespace,
-		Name:      h.cluster.Name,
-		Secret:    h.cluster.DecodeSecret(),
-	}
-
-	h.ctx.JSON(http.StatusOK, content)
-}
-
-//
 // Build the appropriate SAR object.
 // For clusters without a secret, the cluster itself is the subject.
 // For clusters with a secret, the secret is the subject.
 // Eventually all clusters should reference secrets and this can
 // be simplified.
-func (h *ClusterHandler) getSAR() auth.SelfSubjectAccessReview {
+func (h *ClusterScoped) getSAR() auth.SelfSubjectAccessReview {
 	var attributes *auth.ResourceAttributes
 	if h.cluster.Secret != "" {
 		sr := h.cluster.DecodeSecret()
@@ -138,7 +87,7 @@ func (h *ClusterHandler) getSAR() auth.SelfSubjectAccessReview {
 
 //
 // Ensure the DataSource associated with the cluster is `ready`.
-func (h *ClusterHandler) dsReady() int {
+func (h *ClusterScoped) dsReady() int {
 	wait := time.Second * 30
 	poll := time.Microsecond * 100
 	for {
@@ -168,9 +117,70 @@ func (h *ClusterHandler) dsReady() int {
 }
 
 //
+// Cluster (route) handler.
+type ClusterHandler struct {
+	// Base
+	ClusterScoped
+}
+
+//
+// Add routes.
+func (h ClusterHandler) AddRoutes(r *gin.Engine) {
+	r.GET(ClustersRoot, h.List)
+	r.GET(ClustersRoot+"/", h.List)
+	r.GET(ClusterRoot, h.Get)
+}
+
+//
+// List clusters in the namespace.
+func (h ClusterHandler) List(ctx *gin.Context) {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		h.ctx.Status(status)
+		return
+	}
+	list, err := model.ClusterList(h.container.Db, &h.page)
+	if err != nil {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := []Cluster{}
+	for _, m := range list {
+		r := Cluster{
+			Namespace: m.Namespace,
+			Name:      m.Name,
+			Secret:    m.DecodeSecret(),
+		}
+		content = append(content, r)
+	}
+
+	h.ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Get a specific cluster.
+func (h ClusterHandler) Get(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		h.ctx.Status(status)
+		return
+	}
+	content := Cluster{
+		Namespace: h.cluster.Namespace,
+		Name:      h.cluster.Name,
+		Secret:    h.cluster.DecodeSecret(),
+	}
+
+	h.ctx.JSON(http.StatusOK, content)
+}
+
+//
 // Cluster REST resource.
 type Cluster struct {
-	Namespace string              `json:"namespace"`
-	Name      string              `json:"name"`
-	Secret    *v1.ObjectReference `json:"secret"`
+	// Cluster k8s namespace.
+	Namespace string `json:"namespace"`
+	// Cluster k8s name.
+	Name string `json:"name"`
+	// Cluster json-encode secret ref.
+	Secret *v1.ObjectReference `json:"secret"`
 }
