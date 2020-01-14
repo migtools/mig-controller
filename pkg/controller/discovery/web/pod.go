@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
 	"io"
@@ -19,6 +20,7 @@ import (
 const (
 	PodsRoot = NamespaceRoot + "/pods"
 	PodRoot  = PodsRoot + "/:pod"
+	LogRoot  = PodRoot + "/log"
 )
 
 //
@@ -64,12 +66,8 @@ func (h PodHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	d := Pod{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-		Log:       ctx.Request.URL.Path + "/log",
-	}
-
+	d := Pod{}
+	d.With(&pod, &h.cluster)
 	h.ctx.JSON(http.StatusOK, d)
 }
 
@@ -95,14 +93,8 @@ func (h PodHandler) List(ctx *gin.Context) {
 	}
 	content := []Pod{}
 	for _, m := range list {
-		href := strings.TrimSuffix(
-			ctx.Request.URL.Path+"/"+m.Name,
-			"/") + "/log"
-		d := Pod{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-			Log:       href,
-		}
+		d := Pod{}
+		d.With(m, &h.cluster)
 		content = append(content, d)
 	}
 
@@ -118,7 +110,7 @@ type LogHandler struct {
 
 // Add routes.
 func (h LogHandler) AddRoutes(r *gin.Engine) {
-	r.GET(PodRoot+"/log", h.List)
+	r.GET(LogRoot, h.List)
 }
 
 //
@@ -290,12 +282,71 @@ func (h *LogHandler) getContainer() string {
 }
 
 //
+// Container REST resource.
+type Container struct {
+	// Pod k8s name.
+	Name string `json:"name"`
+	// The URI used to obtain logs.
+	Log string `json:"log"`
+}
+
+//
 // Pod REST resource.
 type Pod struct {
 	// Pod k8s namespace.
 	Namespace string `json:"namespace"`
 	// Pod k8s name.
 	Name string `json:"name"`
-	// A log entry.
-	Log string `json:"log"`
+	// List of containers.
+	Containers []Container `json:"containers"`
+}
+
+//
+// Container filter.
+type ContainerFilter func(*v1.Container) bool
+
+//
+// Update fields using the specified models.
+func (p *Pod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerFilter) {
+	p.Containers = []Container{}
+	p.Namespace = pod.Namespace
+	p.Name = pod.Name
+	path := LogRoot
+	path = strings.Replace(path, ":namespace", cluster.Namespace, 1)
+	path = strings.Replace(path, ":cluster", cluster.Name, 1)
+	path = strings.Replace(path, ":ns2", p.Namespace, 1)
+	path = strings.Replace(path, ":pod", p.Name, 1)
+	for _, container := range p.filterContainers(pod, filters) {
+		lp := fmt.Sprintf("%s?container=%s", path, container.Name)
+		p.Containers = append(
+			p.Containers, Container{
+				Name: container.Name,
+				Log:  lp,
+			})
+	}
+}
+
+//
+// Get a filtered list of containers.
+func (p *Pod) filterContainers(pod *model.Pod, filters []ContainerFilter) []v1.Container {
+	list := []v1.Container{}
+	v1pod := pod.DecodeDefinition()
+	podContainers := v1pod.Spec.Containers
+	if podContainers == nil {
+		return list
+	}
+	for _, container := range podContainers {
+		excluded := false
+		for _, filter := range filters {
+			if !filter(&container) {
+				excluded = true
+				break
+			}
+		}
+		if !excluded {
+			list = append(list, container)
+		}
+	}
+
+	return list
 }

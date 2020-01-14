@@ -103,8 +103,22 @@ func (m *PV) With(object *v1.PersistentVolume) {
 	m.Base.Version = object.ResourceVersion
 	m.Base.Namespace = object.Namespace
 	m.Base.Name = object.Name
-	definition, _ := json.Marshal(object)
+	m.EncodeDefinition(object)
+}
+
+//
+// Encode definition
+func (m *PV) EncodeDefinition(pv *v1.PersistentVolume) {
+	definition, _ := json.Marshal(pv)
 	m.Definition = string(definition)
+}
+
+//
+// Encode definition
+func (m *PV) DecodeDefinition() *v1.PersistentVolume {
+	pv := &v1.PersistentVolume{}
+	json.Unmarshal([]byte(m.Definition), pv)
+	return pv
 }
 
 //

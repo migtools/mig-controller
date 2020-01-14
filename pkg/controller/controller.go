@@ -17,24 +17,63 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/fusor/mig-controller/pkg/controller/discovery"
+	"github.com/fusor/mig-controller/pkg/controller/migcluster"
+	"github.com/fusor/mig-controller/pkg/controller/migmigration"
+	"github.com/fusor/mig-controller/pkg/controller/migplan"
+	"github.com/fusor/mig-controller/pkg/controller/migstorage"
 	"github.com/fusor/mig-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
-var AddToManagerFuncs []func(manager.Manager) error
+//
+// Function provided by controller packages to add
+// them self to the manager.
+type AddFunction func(manager.Manager) error
 
-// AddToManager adds all Controllers to the Manager
+//
+// List of controller add functions for the CAM role.
+var CamControllers = []AddFunction{
+	migcluster.Add,
+	migmigration.Add,
+	migstorage.Add,
+	migplan.Add,
+}
+
+//
+// List of controller add functions for the Discovery role.
+var DiscoveryControllers = []AddFunction{
+	discovery.Add,
+}
+
+//
+// Add controllers to the manager based on role.
 func AddToManager(m manager.Manager) error {
-	// Application settings.
 	err := settings.Settings.Load()
 	if err != nil {
 		return err
 	}
-	for _, f := range AddToManagerFuncs {
-		if err := f(m); err != nil {
+	load := func(functions []AddFunction) error {
+		for _, f := range functions {
+			if err := f(m); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if settings.Settings.HasRole(settings.CamRole) {
+		err := load(CamControllers)
+		if err != nil {
 			return err
 		}
+
+	}
+	if settings.Settings.HasRole(settings.DiscoveryRole) {
+		err := load(DiscoveryControllers)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
