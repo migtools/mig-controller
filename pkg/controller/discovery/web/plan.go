@@ -7,7 +7,6 @@ import (
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"
-	"strings"
 )
 
 // Plan route root.
@@ -227,23 +226,23 @@ func (p *PlanPods) buildController(h *PlanHandler) ([]Pod, error) {
 		h.ctx.Status(http.StatusInternalServerError)
 		return nil, err
 	}
-	if len(list) > 0 {
-		m := list[0]
-		cluster, err := m.GetCluster(h.container.Db)
-		if err != nil {
-			if err != sql.ErrNoRows {
-				Log.Trace(err)
-				return nil, err
-			}
+	if len(list) == 0 {
+		return pods, nil
+	}
+	m := list[0]
+	cluster, err := m.GetCluster(h.container.Db)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			return nil, err
 		} else {
-			pod := Pod{
-				Namespace: m.Namespace,
-				Name:      m.Name,
-				Log:       LogPath(cluster, m),
-			}
-			pods = append(pods, pod)
+			return pods, nil
 		}
 	}
+	pod := Pod{}
+	filter := func(c *v1.Container) bool { return c.Name == "cam" }
+	pod.With(m, cluster, filter)
+	pods = append(pods, pod)
 
 	return pods, nil
 }
@@ -274,36 +273,17 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]Pod, er
 	}
 	for _, lb := range labels {
 		filter := model.LabelFilter{lb}
-		list, err := cluster.PodListByLabel(h.container.Db, filter, nil)
+		podModels, err := cluster.PodListByLabel(h.container.Db, filter, nil)
 		if err != nil {
 			Log.Trace(err)
 			return nil, err
 		}
-		for _, m := range list {
-			pod := Pod{
-				Namespace: m.Namespace,
-				Name:      m.Name,
-				Log:       LogPath(&cluster, m),
-			}
+		for _, model := range podModels {
+			pod := Pod{}
+			pod.With(model, &cluster)
 			pods = append(pods, pod)
 		}
 	}
 
 	return pods, nil
-}
-
-//
-// Build the URI (path) for fetching logs.
-func LogPath(cluster *model.Cluster, pod *model.Pod) string {
-	return strings.Join([]string{
-		"/namespaces",
-		cluster.Namespace,
-		"clusters",
-		cluster.Name,
-		"namespaces",
-		pod.Namespace,
-		"pods",
-		pod.Name,
-		"log",
-	}, "/")
 }

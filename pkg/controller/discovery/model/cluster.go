@@ -351,6 +351,7 @@ func (m *Cluster) PodList(db DB, page *Page) ([]*Pod, error) {
 			&pod.Version,
 			&pod.Namespace,
 			&pod.Name,
+			&pod.Definition,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
@@ -390,6 +391,7 @@ func (m *Cluster) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Pod,
 			&pod.Version,
 			&pod.Namespace,
 			&pod.Name,
+			&pod.Definition,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)

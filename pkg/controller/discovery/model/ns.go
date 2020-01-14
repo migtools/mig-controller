@@ -167,6 +167,7 @@ func (m *Namespace) PodList(db DB, page *Page) ([]*Pod, error) {
 			&pod.Version,
 			&pod.Namespace,
 			&pod.Name,
+			&pod.Definition,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
@@ -191,7 +192,7 @@ func (m *Namespace) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Po
 	cursor, err := db.Query(
 		r.Replace(NsPodListByLabelSQL),
 		sql.Named("cluster", m.Cluster),
-		sql.Named("namespace", m.PK),
+		sql.Named("namespace", m.Name),
 		sql.Named("limit", page.Limit),
 		sql.Named("offset", page.Offset))
 	if err != nil {
@@ -207,6 +208,7 @@ func (m *Namespace) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Po
 			&pod.Version,
 			&pod.Namespace,
 			&pod.Name,
+			&pod.Definition,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)

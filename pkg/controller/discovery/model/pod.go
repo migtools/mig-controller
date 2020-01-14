@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/mattn/go-sqlite3"
 	"k8s.io/api/core/v1"
@@ -12,11 +13,12 @@ import (
 // DDL
 var PodTableDDL = `
 CREATE TABLE IF NOT EXISTS pod (
-  pk        TEXT PRIMARY KEY,
-  uid       TEXT NOT NULL,
-  version   TEXT NOT NULL,
-  namespace TEXT NOT NULL,
-  name      TEXT NOT NULL,
+  pk         TEXT PRIMARY KEY,
+  uid        TEXT NOT NULL,
+  version    TEXT NOT NULL,
+  namespace  TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  definition TEXT NOT NULL,
   cluster   TEXT NOT NULL,
 UNIQUE (cluster, uid),
 UNIQUE (cluster, namespace, name),
@@ -55,6 +57,7 @@ INSERT INTO pod (
   version,
   namespace,
   name,
+  definition,
   cluster
 )
 VALUES (
@@ -63,6 +66,7 @@ VALUES (
   :version,
   :namespace,
   :name,
+  :definition,
   :cluster
 );
 `
@@ -70,7 +74,8 @@ VALUES (
 var PodUpdateSQL = `
 UPDATE pod
 SET
-  version = :version
+  version = :version,
+  definition = :definition
 WHERE
   pk = :pk;
 `
@@ -82,6 +87,7 @@ SELECT
   version,
   namespace,
   name,
+  definition,
   cluster
 FROM pod
 WHERE
@@ -97,6 +103,7 @@ SELECT
   version,
   namespace,
   name,
+  definition,
   cluster
 FROM pod
 WHERE
@@ -112,6 +119,7 @@ SELECT
   version,
   namespace,
   name,
+  definition,
   cluster
 FROM pod
 WHERE
@@ -128,11 +136,30 @@ SELECT
   version,
   namespace,
   name,
+  definition,
   cluster
 FROM pod
 WHERE
   cluster = :cluster AND
   namespace = :namespace
+ORDER BY namespace, name
+LIMIT :limit OFFSET :offset;
+`
+
+var NsPodListByLabelSQL = `
+SELECT
+  pk,
+  uid,
+  version,
+  namespace,
+  name,
+  definition,
+  cluster
+FROM pod
+WHERE
+  cluster = :cluster AND
+  namespace = :namespace AND
+  pk in ( :pods )
 ORDER BY namespace, name
 LIMIT :limit OFFSET :offset;
 `
@@ -144,6 +171,7 @@ SELECT
   version,
   namespace,
   name,
+  definition,
   cluster
 FROM pod
 WHERE
@@ -185,23 +213,6 @@ WHERE
   value = '%s'
 `
 
-var NsPodListByLabelSQL = `
-SELECT
-  pk,
-  uid,
-  version,
-  namespace,
-  name,
-  cluster
-FROM pod
-WHERE
-  cluster = :cluster AND
-  namespace = :namespace AND
-  pk in ( :pods )
-ORDER BY namespace, name
-LIMIT :limit OFFSET :offset;
-`
-
 //
 // Pod model
 type Pod struct {
@@ -209,6 +220,8 @@ type Pod struct {
 	Base
 	// Pod labels.
 	labels Labels
+	// The json-encoded k8s Pod object.
+	Definition string
 }
 
 //
@@ -219,6 +232,22 @@ func (m *Pod) With(object *v1.Pod) {
 	m.Base.Namespace = object.Namespace
 	m.Base.Name = object.Name
 	m.labels = object.Labels
+	m.EncodeDefinition(object)
+}
+
+//
+// Encode definition
+func (m *Pod) EncodeDefinition(pod *v1.Pod) {
+	definition, _ := json.Marshal(pod)
+	m.Definition = string(definition)
+}
+
+//
+// Encode definition
+func (m *Pod) DecodeDefinition() *v1.Pod {
+	pod := &v1.Pod{}
+	json.Unmarshal([]byte(m.Definition), pod)
+	return pod
 }
 
 //
@@ -236,6 +265,7 @@ func (m *Pod) Select(db DB) error {
 		&m.Version,
 		&m.Namespace,
 		&m.Name,
+		&m.Definition,
 		&m.Cluster)
 	if err != nil && err != sql.ErrNoRows {
 		Log.Trace(err)
@@ -256,6 +286,7 @@ func (m *Pod) Insert(db DB) error {
 		sql.Named("version", m.Version),
 		sql.Named("namespace", m.Namespace),
 		sql.Named("name", m.Name),
+		sql.Named("definition", m.Definition),
 		sql.Named("cluster", m.Cluster))
 	if err != nil {
 		if sql3Err, cast := err.(sqlite3.Error); cast {
@@ -296,6 +327,7 @@ func (m *Pod) Update(db DB) error {
 	r, err := db.Exec(
 		PodUpdateSQL,
 		sql.Named("version", m.Version),
+		sql.Named("definition", m.Definition),
 		sql.Named("pk", m.PK))
 	if err != nil {
 		Log.Trace(err)
@@ -429,6 +461,7 @@ func PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Pod, error) {
 			&pod.Version,
 			&pod.Namespace,
 			&pod.Name,
+			&pod.Definition,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
