@@ -70,7 +70,8 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	options := controller.Options{
-		Reconciler: r,
+		MaxConcurrentReconciles: 10,
+		Reconciler:              r,
 	}
 	c, err := controller.New("discovery", mgr, options)
 	if err != nil {

@@ -46,8 +46,10 @@ func (r *NsCollection) Reconcile() error {
 	r.hasReconciled = true
 	Log.Info(
 		"NsCollection reconciled.",
-		"cluster",
-		r.ds.cluster,
+		"ns",
+		r.ds.Cluster.Namespace,
+		"name",
+		r.ds.Cluster.Name,
 		"duration",
 		time.Since(mark))
 
@@ -57,7 +59,7 @@ func (r *NsCollection) Reconcile() error {
 func (r *NsCollection) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.NamespaceList{}
-	err := r.ds.client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -65,7 +67,7 @@ func (r *NsCollection) GetDiscovered() ([]model.Model, error) {
 	for _, discovered := range onCluster.Items {
 		ns := &model.Namespace{
 			Base: model.Base{
-				Cluster: r.ds.cluster.PK,
+				Cluster: r.ds.Cluster.PK,
 			},
 		}
 		ns.With(&discovered)
@@ -77,7 +79,7 @@ func (r *NsCollection) GetDiscovered() ([]model.Model, error) {
 
 func (r *NsCollection) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := r.ds.cluster.NsList(r.ds.Container.Db, nil)
+	list, err := r.ds.Cluster.NsList(r.ds.Container.Db, nil)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -101,14 +103,11 @@ func (r *NsCollection) Create(e event.CreateEvent) bool {
 	}
 	ns := model.Namespace{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	ns.With(object)
-	err := ns.Insert(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Create(&ns)
 
 	return false
 }
@@ -125,14 +124,11 @@ func (r *NsCollection) Delete(e event.DeleteEvent) bool {
 	}
 	ns := model.Namespace{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	ns.With(object)
-	err := ns.Delete(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Delete(&ns)
 
 	return false
 }

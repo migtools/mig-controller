@@ -1,11 +1,15 @@
 package container
 
 import (
+	"database/sql"
+	"errors"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"time"
 )
@@ -22,16 +26,25 @@ type Collections []Collection
 type DataSource struct {
 	// The associated (owner) container.
 	Container *Container
-	// The k8s manager/controller `stop` channel.
-	StopChannel chan struct{}
 	// Collections.
 	Collections Collections
 	// The REST configuration for the cluster.
 	RestCfg *rest.Config
 	// The k8s client for the cluster.
-	client client.Client
+	Client client.Client
 	// The corresponding cluster in the DB.
-	cluster model.Cluster
+	Cluster model.Cluster
+	// The k8s manager.
+	manager controllerruntime.Manager
+	// The k8s manager/controller `stop` channel.
+	stopChannel chan struct{}
+	// Model event channel.
+	eventChannel chan ModelEvent
+	// The model version threshold used to determine if a
+	// model event is obsolete. An event (model) with a version
+	// lower than the threshold is redundant to changes made
+	// during collection reconciliation.
+	versionThreshold uint64
 }
 
 //
@@ -45,21 +58,6 @@ func (r *DataSource) IsReady() bool {
 	}
 
 	return true
-}
-
-//
-// Add resource watches.
-// Delegated to the collections.
-func (r *DataSource) AddWatches(dsController controller.Controller) error {
-	for _, collection := range r.Collections {
-		err := collection.AddWatch(dsController)
-		if err != nil {
-			Log.Trace(err)
-			return err
-		}
-	}
-
-	return nil
 }
 
 //
@@ -79,41 +77,54 @@ func (r *DataSource) Reconcile(request reconcile.Request) (reconcile.Result, err
 //   - Reconcile each collection.
 func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	var err error
-	mark := time.Now()
-	client, err := cluster.GetClient(r.Container.Client)
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-	d1 := time.Since(mark)
-	mark = time.Now()
-	r.client = client
-	r.cluster = model.Cluster{}
-	r.cluster.With(cluster)
-	err = r.cluster.Insert(r.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
+	r.versionThreshold = 0
+	r.eventChannel = make(chan ModelEvent, 100)
+	r.stopChannel = make(chan struct{})
 	for _, collection := range r.Collections {
 		collection.Bind(r)
+	}
+	r.Cluster = model.Cluster{}
+	r.Cluster.With(cluster)
+	err = r.Cluster.Insert(r.Container.Db)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	mark := time.Now()
+	err = r.buildClient(cluster)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	connectDuration := time.Since(mark)
+	mark = time.Now()
+	err = r.buildManager(cluster.Name)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	go r.manager.Start(r.stopChannel)
+	for _, collection := range r.Collections {
 		err = collection.Reconcile()
 		if err != nil {
 			Log.Trace(err)
 			return err
 		}
 	}
+	go r.applyEvents()
 
-	d2 := time.Since(mark)
+	startDuration := time.Since(mark)
 
 	Log.Info(
 		"DataSource Started.",
-		"cluster",
-		r.cluster,
+		"ns",
+		r.Cluster.Namespace,
+		"name",
+		r.Cluster.Name,
 		"connected",
-		d1,
+		connectDuration,
 		"reconciled",
-		d2)
+		startDuration)
 
 	return nil
 }
@@ -124,8 +135,186 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 // of the associated data in the DB. The data should be deleted
 // when the DataSource is not being restarted.
 func (r *DataSource) Stop(purge bool) {
-	close(r.StopChannel)
-	if purge {
-		r.cluster.Delete(r.Container.Db)
+	close(r.stopChannel)
+	close(r.eventChannel)
+	for _, collection := range r.Collections {
+		collection.Reset()
 	}
+	if purge {
+		r.Cluster.Delete(r.Container.Db)
+	}
+
+	Log.Info(
+		"DataSource Stopped.",
+		"ns",
+		r.Cluster.Namespace,
+		"name",
+		r.Cluster.Name)
+}
+
+// The specified model has been discovered.
+// The `versionThreshold` will be updated as needed.
+func (r *DataSource) HasDiscovered(m model.Model) {
+	version := m.GetBase().IntVersion()
+	if version > r.versionThreshold {
+		r.versionThreshold = version
+	}
+}
+
+//
+// Enqueue create model event.
+// Used by watch predicates.
+// Swallow panic: send on closed channel.
+func (r *DataSource) Create(m model.Model) {
+	defer func() {
+		if p := recover(); p != nil {
+			Log.Info("channel send failed")
+		}
+	}()
+	r.eventChannel <- ModelEvent{}.Create(m)
+}
+
+//
+// Enqueue update model event.
+// Used by watch predicates.
+// Swallow panic: send on closed channel.
+func (r *DataSource) Update(m model.Model) {
+	defer func() {
+		if p := recover(); p != nil {
+			Log.Info("channel send failed")
+		}
+	}()
+	r.eventChannel <- ModelEvent{}.Update(m)
+}
+
+//
+// Enqueue delete model event.
+// Used by watch predicates.
+// Swallow panic: send on closed channel.
+func (r *DataSource) Delete(m model.Model) {
+	defer func() {
+		if p := recover(); p != nil {
+			Log.Info("channel send failed")
+		}
+	}()
+	r.eventChannel <- ModelEvent{}.Delete(m)
+}
+
+//
+// Build k8s client.
+func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
+	var err error
+	r.RestCfg, err = cluster.BuildRestConfig(r.Container.Client)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	r.Client, err = cluster.GetClient(r.Container.Client)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+//
+// Build the k8s manager.
+func (r *DataSource) buildManager(name string) error {
+	var err error
+	r.manager, err = manager.New(r.RestCfg, manager.Options{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	dsController, err := controller.New(
+		name,
+		r.manager,
+		controller.Options{
+			Reconciler: r,
+		})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, collection := range r.Collections {
+		err := collection.AddWatch(dsController)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+//
+// Apply model events.
+func (r *DataSource) applyEvents() {
+	for event := range r.eventChannel {
+		err := event.Apply(r.Container.Db, r.versionThreshold)
+		if err != nil {
+			Log.Trace(err)
+		}
+	}
+}
+
+//
+// Model event.
+// Used with `eventChannel`.
+type ModelEvent struct {
+	// Model the changed.
+	model model.Model
+	// Action performed on the model:
+	//   0x01 Create.
+	//   0x02 Update.
+	//   0x04 Delete.
+	action byte
+}
+
+//
+// Apply the change to the DB.
+func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) error {
+	var err error
+	version := r.model.GetBase().IntVersion()
+	switch r.action {
+	case 0x01:
+		if version > versionThreshold {
+			err = r.model.Insert(db)
+		}
+	case 0x02:
+		if version > versionThreshold {
+			err = r.model.Update(db)
+		}
+	case 0x04:
+		err = r.model.Delete(db)
+	default:
+		return errors.New("unknown action")
+	}
+
+	return err
+}
+
+//
+// Set the event model and action.
+func (r ModelEvent) Create(m model.Model) ModelEvent {
+	r.model = m
+	r.action = 0x01
+	return r
+}
+
+//
+// Set the event model and action.
+func (r ModelEvent) Update(m model.Model) ModelEvent {
+	r.model = m
+	r.action = 0x02
+	return r
+}
+
+//
+// Set the event model and action.
+func (r ModelEvent) Delete(m model.Model) ModelEvent {
+	r.model = m
+	r.action = 0x04
+	return r
 }
