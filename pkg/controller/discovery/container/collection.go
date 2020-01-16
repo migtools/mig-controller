@@ -28,6 +28,8 @@ type Collection interface {
 	// Associate with a DataSource.
 	// Mainly to support two phase construction.
 	Bind(ds *DataSource)
+	// Get the associated DataSource.
+	GetDs() *DataSource
 	// Add k8s watches.
 	// Each watch MUST include a predicate that performs the
 	// appropriate changes in the DB instead of creating
@@ -42,6 +44,9 @@ type Collection interface {
 	// Mainly, that it has been fully initialized (reconciled) and
 	// protects against partial data sets.
 	IsReady() bool
+	// Reset the collection to a like-new state.
+	// A reset collection is no longer ready and needs to be reconciled again.
+	Reset()
 	// Get a list of resources discovered on the cluster.
 	// Intended to support `Reconcile()`.
 	GetDiscovered() ([]model.Model, error)
@@ -60,12 +65,29 @@ type BaseCollection struct {
 	ds *DataSource
 }
 
+//
+// Get whether the collection has reconciled.
 func (r *BaseCollection) IsReady() bool {
 	return r.hasReconciled
 }
 
+//
+// Reset `hasReconciled` and association with a DataSource.
+func (r *BaseCollection) Reset() {
+	r.hasReconciled = false
+	r.ds = nil
+}
+
+//
+// Bind to a DataSource.
 func (r *BaseCollection) Bind(ds *DataSource) {
 	r.ds = ds
+}
+
+//
+// Get the associated DataSource.
+func (r *BaseCollection) GetDs() *DataSource {
+	return r.ds
 }
 
 //
@@ -101,6 +123,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 	}
 	for _, m := range discovered {
 		m.SetPk()
+		collection.GetDs().HasDiscovered(m)
 		if dpn, found := dispositions[m.GetBase().PK]; !found {
 			dispositions[m.GetBase().PK] = &Disposition{
 				discovered: m,

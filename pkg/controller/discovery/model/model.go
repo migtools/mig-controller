@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	pathlib "path"
 	"reflect"
+	"strconv"
 )
 
 // Shared logger.
@@ -155,6 +156,17 @@ func (m *Base) SetPk() {
 // Get base.
 func (m *Base) GetBase() *Base {
 	return m
+}
+
+// Get `version` as a unit64.
+// Returns `0` on parse error.
+func (m *Base) IntVersion() uint64 {
+	version, err := strconv.ParseUint(m.GetBase().Version, 10, 64)
+	if err != nil {
+		Log.Trace(err)
+		return 0
+	}
+	return version
 }
 
 //

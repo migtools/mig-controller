@@ -9,8 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sync"
 )
 
@@ -77,8 +75,7 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 		ds.Stop(false)
 	}
 	ds := &DataSource{
-		Container:   r,
-		StopChannel: make(chan struct{}),
+		Container: r,
 		Collections: Collections{
 			&NsCollection{},
 			&PvCollection{},
@@ -88,45 +85,17 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 	r.sources[key] = ds
 	r.mutex.RUnlock()
 	// Start
-	restCfg, err := cluster.BuildRestConfig(r.Client)
+	err := ds.Start(cluster)
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	ds.RestCfg = restCfg
-	dsManager, err := manager.New(restCfg, manager.Options{})
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-	dsController, err := controller.New(
-		cluster.Name,
-		dsManager,
-		controller.Options{
-			Reconciler: ds,
-		})
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-	err = ds.AddWatches(dsController)
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-	err = ds.Start(cluster)
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-
-	go dsManager.Start(ds.StopChannel)
 
 	return nil
 }
 
 //
-// Delete the DataSrource for a deleted MigCluster.
+// Delete the DataSource for a deleted MigCluster.
 func (r *Container) Delete(cluster types.NamespacedName) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()

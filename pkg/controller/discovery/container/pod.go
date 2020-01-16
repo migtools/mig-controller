@@ -44,8 +44,10 @@ func (r *PodCollection) Reconcile() error {
 	r.hasReconciled = true
 	Log.Info(
 		"PodCollection reconciled.",
-		"cluster",
-		r.ds.cluster,
+		"ns",
+		r.ds.Cluster.Namespace,
+		"name",
+		r.ds.Cluster.Name,
 		"duration",
 		time.Since(mark))
 
@@ -55,7 +57,7 @@ func (r *PodCollection) Reconcile() error {
 func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PodList{}
-	err := r.ds.client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -63,7 +65,7 @@ func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
 	for _, discovered := range onCluster.Items {
 		ns := &model.Pod{
 			Base: model.Base{
-				Cluster: r.ds.cluster.PK,
+				Cluster: r.ds.Cluster.PK,
 			},
 		}
 		ns.With(&discovered)
@@ -75,7 +77,7 @@ func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
 
 func (r *PodCollection) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := r.ds.cluster.PodList(r.ds.Container.Db, nil)
+	list, err := r.ds.Cluster.PodList(r.ds.Container.Db, nil)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -99,14 +101,11 @@ func (r *PodCollection) Create(e event.CreateEvent) bool {
 	}
 	pod := model.Pod{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pod.With(object)
-	err := pod.Insert(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Create(&pod)
 
 	return false
 }
@@ -119,14 +118,11 @@ func (r *PodCollection) Update(e event.UpdateEvent) bool {
 	}
 	pod := model.Pod{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pod.With(object)
-	err := pod.Update(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Update(&pod)
 
 	return false
 }
@@ -139,14 +135,11 @@ func (r *PodCollection) Delete(e event.DeleteEvent) bool {
 	}
 	pod := model.Pod{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pod.With(object)
-	err := pod.Delete(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Delete(&pod)
 
 	return false
 }

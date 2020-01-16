@@ -45,8 +45,10 @@ func (r *PvCollection) Reconcile() error {
 	r.hasReconciled = true
 	Log.Info(
 		"PvCollection reconciled.",
-		"cluster",
-		r.ds.cluster,
+		"ns",
+		r.ds.Cluster.Namespace,
+		"name",
+		r.ds.Cluster.Name,
 		"duration",
 		time.Since(mark))
 
@@ -56,7 +58,7 @@ func (r *PvCollection) Reconcile() error {
 func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PersistentVolumeList{}
-	err := r.ds.client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -64,7 +66,7 @@ func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
 	for _, discovered := range onCluster.Items {
 		pv := &model.PV{
 			Base: model.Base{
-				Cluster: r.ds.cluster.PK,
+				Cluster: r.ds.Cluster.PK,
 			},
 		}
 		pv.With(&discovered)
@@ -76,7 +78,7 @@ func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
 
 func (r *PvCollection) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := r.ds.cluster.PvList(r.ds.Container.Db, nil)
+	list, err := r.ds.Cluster.PvList(r.ds.Container.Db, nil)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -100,14 +102,11 @@ func (r *PvCollection) Create(e event.CreateEvent) bool {
 	}
 	pv := model.PV{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pv.With(object)
-	err := pv.Insert(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Create(&pv)
 
 	return false
 }
@@ -120,14 +119,11 @@ func (r *PvCollection) Update(e event.UpdateEvent) bool {
 	}
 	pv := model.PV{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pv.With(object)
-	err := pv.Update(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Update(&pv)
 
 	return false
 }
@@ -140,14 +136,11 @@ func (r *PvCollection) Delete(e event.DeleteEvent) bool {
 	}
 	pv := model.PV{
 		Base: model.Base{
-			Cluster: r.ds.cluster.PK,
+			Cluster: r.ds.Cluster.PK,
 		},
 	}
 	pv.With(object)
-	err := pv.Delete(r.ds.Container.Db)
-	if err != nil {
-		Log.Trace(err)
-	}
+	r.ds.Delete(&pv)
 
 	return false
 }
