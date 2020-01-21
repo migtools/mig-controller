@@ -75,7 +75,6 @@ func (r *BaseCollection) IsReady() bool {
 // Reset `hasReconciled` and association with a DataSource.
 func (r *BaseCollection) Reset() {
 	r.hasReconciled = false
-	r.ds = nil
 }
 
 //
@@ -132,6 +131,8 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 			dpn.discovered = m
 		}
 	}
+	model.Mutex.RLock()
+	defer model.Mutex.RUnlock()
 	tx, err := r.Db.Begin()
 	if err != nil {
 		Log.Trace(err)

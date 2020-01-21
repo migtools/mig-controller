@@ -83,6 +83,8 @@ func (m *Namespace) With(object *v1.Namespace) {
 // Insert the model into the DB.
 func (m *Namespace) Insert(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		NsInsertSQL,
 		sql.Named("pk", m.PK),
@@ -121,6 +123,8 @@ func (m *Namespace) Update(db DB) error {
 // Delete the model in the DB.
 func (m *Namespace) Delete(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(NsDeleteSQL, sql.Named("pk", m.PK))
 	if err != nil {
 		Log.Trace(err)

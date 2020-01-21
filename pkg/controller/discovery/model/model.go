@@ -10,6 +10,7 @@ import (
 	pathlib "path"
 	"reflect"
 	"strconv"
+	"sync"
 )
 
 // Shared logger.
@@ -20,6 +21,15 @@ var Settings = &settings.Settings
 
 // Not found error.
 var NotFound = sql.ErrNoRows
+
+//
+// DB driver cannot be used for concurrent writes.
+// Model methods must use:
+//   - Insert()
+//   - Update()
+//   - Delete()
+// And, all transactions.
+var Mutex sync.RWMutex
 
 const (
 	Pragma = "PRAGMA foreign_keys = ON"
@@ -43,6 +53,8 @@ func Create() (*sql.DB, error) {
 		PodLabelIndexDDL,
 		PlanTableDDL,
 	}
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	for _, ddl := range statements {
 		_, err = db.Exec(ddl)
 		if err != nil {
