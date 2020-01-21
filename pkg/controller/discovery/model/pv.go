@@ -84,7 +84,7 @@ WHERE  pk = :pk;
 var PvDeleteSQL = `
 DELETE FROM pv
 WHERE
-  pk = ;pk;
+  pk = :pk;
 `
 
 //

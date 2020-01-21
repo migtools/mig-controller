@@ -134,6 +134,8 @@ func TestModels(t *testing.T) {
 	g.Expect(len(pvList) == 1).To(gomega.BeTrue())
 
 	// Delete all.
+	err = pv.Delete(db)
+	g.Expect(err).To(gomega.BeNil())
 	err = ns.Delete(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = pod.Delete(db)
