@@ -33,6 +33,7 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -49,7 +50,14 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	pollStopped := make(chan bool)
+	pollStopped <- true
+	return &ReconcileMigCluster{
+		Client:      mgr.GetClient(),
+		scheme:      mgr.GetScheme(),
+		pollStopped: pollStopped,
+		pollRequeue: make(chan event.GenericEvent),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -97,8 +105,10 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	k8sclient.Client
-	scheme     *runtime.Scheme
-	Controller controller.Controller
+	scheme      *runtime.Scheme
+	Controller  controller.Controller
+	pollStopped chan bool
+	pollRequeue chan<- event.GenericEvent
 }
 
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {

@@ -7,6 +7,7 @@ import (
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 )
 
 // Types
@@ -200,8 +201,31 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 			Category: Critical,
 			Message:  message,
 		})
+		select {
+		case <-r.pollStopped:
+			go r.pollConnection(cluster)
+		}
 		return nil
 	}
 
 	return nil
+}
+
+func (r ReconcileMigCluster) pollConnection(cluster *migapi.MigCluster) {
+	pollingTimeout := time.Second * 60
+	for {
+		err := cluster.TestConnection(r.Client, timeout)
+		if err == nil {
+			break
+		}
+		time.Sleep(pollingTimeout)
+	}
+
+	evnt := event.GenericEvent{
+		Meta:   cluster.GetObjectMeta(),
+		Object: cluster,
+	}
+
+	r.pollStopped <- true
+	r.pollRequeue <- evnt
 }
