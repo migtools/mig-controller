@@ -181,7 +181,7 @@ var _ reconcile.Reconciler = &ReconcileRemoteWatcher{}
 type ReconcileRemoteWatcher struct {
 	client.Client
 	scheme *runtime.Scheme
-	// channel to forward GenericEvents to
+	// Channel to forward GenericEvents to
 	ForwardChannel chan event.GenericEvent
 	// Event to forward when this controller gets event
 	ForwardEvent event.GenericEvent

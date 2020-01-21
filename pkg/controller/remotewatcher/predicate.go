@@ -4,7 +4,6 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
@@ -30,6 +29,10 @@ func (r SecretPredicate) Create(e event.CreateEvent) bool {
 
 // Watched resource has been updated.
 func (r SecretPredicate) Update(e event.UpdateEvent) bool {
+	if !r.GenerationChangedPredicate.Update(e) {
+		return false
+	}
+
 	secret, cast := e.ObjectOld.(*kapi.Secret)
 	if cast {
 		return hasCorrelationLabel(secret.Labels)
@@ -186,19 +189,6 @@ func (r PodPredicate) Create(e event.CreateEvent) bool {
 		return pod.Spec.Volumes != nil
 	}
 	return false
-}
-
-// Watched resource has been updated.
-func (r PodPredicate) Update(e event.UpdateEvent) bool {
-	oldPod, cast := e.ObjectOld.(*kapi.Pod)
-	if !cast {
-		return false
-	}
-	newPod, cast := e.ObjectNew.(*kapi.Pod)
-	if !cast {
-		return false
-	}
-	return reflect.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes)
 }
 
 // Watched resource has been deleted.
