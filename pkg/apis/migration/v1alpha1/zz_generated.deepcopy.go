@@ -127,7 +127,7 @@ func (in *MigCluster) DeepCopyObject() runtime.Object {
 func (in *MigClusterList) DeepCopyInto(out *MigClusterList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MigCluster, len(*in))
@@ -238,7 +238,7 @@ func (in *MigMigration) DeepCopyObject() runtime.Object {
 func (in *MigMigrationList) DeepCopyInto(out *MigMigrationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MigMigration, len(*in))
@@ -347,7 +347,7 @@ func (in *MigPlan) DeepCopyObject() runtime.Object {
 func (in *MigPlanList) DeepCopyInto(out *MigPlanList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MigPlan, len(*in))
@@ -463,7 +463,7 @@ func (in *MigStorage) DeepCopyObject() runtime.Object {
 func (in *MigStorageList) DeepCopyInto(out *MigStorageList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MigStorage, len(*in))

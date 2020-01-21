@@ -83,6 +83,15 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
+	err = c.Watch(
+		&source.Channel{Source: r.pollRequeue},
+		&handler.EnqueueRequestForObject{},
+		&ClusterPredicate{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
@@ -108,7 +117,7 @@ type ReconcileMigCluster struct {
 	scheme      *runtime.Scheme
 	Controller  controller.Controller
 	pollStopped chan bool
-	pollRequeue chan<- event.GenericEvent
+	pollRequeue chan event.GenericEvent
 }
 
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
