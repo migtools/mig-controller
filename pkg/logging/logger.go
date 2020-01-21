@@ -6,7 +6,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"sync"
 )
+
+//
+// Protect the history.
+// Cannot be part of Logger as logr interface requires
+// some by-value method receivers.
+var mutex sync.RWMutex
 
 // Logger
 // Delegates functionality to the wrapped `Real` logger.
@@ -34,6 +41,8 @@ func WithName(name string) Logger {
 // Updates the generated correlation suffix in the name and
 // clears the reported error history.
 func (l *Logger) Reset() {
+	mutex.RLock()
+	defer mutex.RUnlock()
 	name := fmt.Sprintf("%s|", l.name)
 	name = names.SimpleNameGenerator.GenerateName(name)
 	l.Real = logf.Log.WithName(name)
@@ -57,6 +66,8 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
 		return
 	}
+	mutex.RLock()
+	defer mutex.RUnlock()
 	_, found := l.history[err]
 	if found || errors.IsConflict(err) {
 		return

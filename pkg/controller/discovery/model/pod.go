@@ -279,6 +279,8 @@ func (m *Pod) Select(db DB) error {
 // Update on duplicate key.
 func (m *Pod) Insert(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PodInsertSQL,
 		sql.Named("pk", m.PK),
@@ -324,6 +326,8 @@ func (m *Pod) Insert(db DB) error {
 // Update the model in the DB.
 func (m *Pod) Update(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PodUpdateSQL,
 		sql.Named("version", m.Version),
@@ -354,6 +358,8 @@ func (m *Pod) Update(db DB) error {
 // Delete the model in the DB.
 func (m *Pod) Delete(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(PodDeleteSQL, sql.Named("pk", m.PK))
 	if err != nil {
 		Log.Trace(err)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -209,7 +210,11 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 		Log.Trace(err)
 		return err
 	}
-	r.Client, err = cluster.GetClient(r.Container.Client)
+	r.Client, err = client.New(
+		r.RestCfg,
+		client.Options{
+			Scheme: scheme.Scheme,
+		})
 	if err != nil {
 		Log.Trace(err)
 		return err

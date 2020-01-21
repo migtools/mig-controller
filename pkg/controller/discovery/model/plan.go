@@ -177,6 +177,8 @@ func (m *Plan) Select(db DB) error {
 // Update on duplicate key.
 func (m *Plan) Insert(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PlanInsertSQL,
 		sql.Named("pk", m.PK),
@@ -211,6 +213,8 @@ func (m *Plan) Insert(db DB) error {
 // Update the model in the DB.
 func (m *Plan) Update(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PlanUpdateSQL,
 		sql.Named("pk", m.PK),
@@ -237,6 +241,8 @@ func (m *Plan) Update(db DB) error {
 // Delete the model in the DB.
 func (m *Plan) Delete(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(PlanDeleteSQL, sql.Named("pk", m.PK))
 	if err != nil {
 		Log.Trace(err)

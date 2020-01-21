@@ -36,19 +36,23 @@ import (
 	"time"
 )
 
-var log = logging.WithName("discovery")
+var log logging.Logger
 
 // Application settings.
 var Settings = &settings.Settings
+
+func init() {
+	log = logging.WithName("discovery")
+	model.Log = &log
+	container.Log = &log
+	web.Log = &log
+}
 
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
 
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	model.Log = &log
-	container.Log = &log
-	web.Log = &log
 	db, err := model.Create()
 	if err != nil {
 		panic(err)

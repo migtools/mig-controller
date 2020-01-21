@@ -170,6 +170,8 @@ func (m *Cluster) Select(db DB) error {
 // Update on duplicate key.
 func (m *Cluster) Insert(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		ClusterInsertSQL,
 		sql.Named("pk", m.PK),
@@ -203,6 +205,8 @@ func (m *Cluster) Insert(db DB) error {
 // Update the model in the DB.
 func (m *Cluster) Update(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		ClusterUpdateSQL,
 		sql.Named("pk", m.PK),
@@ -228,6 +232,8 @@ func (m *Cluster) Update(db DB) error {
 // Delete the model in the DB.
 func (m *Cluster) Delete(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		ClusterDeleteSQL,
 		sql.Named("namespace", m.Namespace),
@@ -278,6 +284,7 @@ func (m *Cluster) NsList(db DB, page *Page) ([]*Namespace, error) {
 			&ns.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &ns)
 	}
@@ -316,6 +323,7 @@ func (m *Cluster) PvList(db DB, page *Page) ([]*PV, error) {
 			&pv.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &pv)
 	}
@@ -355,6 +363,7 @@ func (m *Cluster) PodList(db DB, page *Page) ([]*Pod, error) {
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &pod)
 	}
@@ -395,6 +404,7 @@ func (m *Cluster) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Pod,
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &pod)
 	}
@@ -432,6 +442,7 @@ func ClusterList(db DB, page *Page) ([]Cluster, error) {
 			&cluster.Secret)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, cluster)
 	}

@@ -148,6 +148,8 @@ func (m *PV) Select(db DB) error {
 // Update on duplicate key.
 func (m *PV) Insert(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PvInsertSQL,
 		sql.Named("pk", m.PK),
@@ -181,6 +183,8 @@ func (m *PV) Insert(db DB) error {
 // Update the model in the DB.
 func (m *PV) Update(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(
 		PvUpdateSQL,
 		sql.Named("version", m.Version),
@@ -206,6 +210,8 @@ func (m *PV) Update(db DB) error {
 // Delete the model in the DB.
 func (m *PV) Delete(db DB) error {
 	m.SetPk()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	r, err := db.Exec(PvDeleteSQL, sql.Named("pk", m.PK))
 	if err != nil {
 		Log.Trace(err)
