@@ -16,7 +16,7 @@ func hasCorrelationLabel(labels map[string]string) bool {
 
 // Secret
 type SecretPredicate struct {
-	predicate.Funcs
+	predicate.GenerationChangedPredicate
 }
 
 // Watched resource has been created.
@@ -176,7 +176,7 @@ func (r VSLPredicate) Delete(e event.DeleteEvent) bool {
 
 // Pods
 type PodPredicate struct {
-	predicate.Funcs
+	predicate.GenerationChangedPredicate
 }
 
 // Watched resource has been created.

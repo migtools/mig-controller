@@ -75,17 +75,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
-	// Watch remote clusters for connection problems
-	err = c.Watch(
-		&RemoteClusterSource{
-			Client:   mgr.GetClient(),
-			Interval: time.Second * 60},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
@@ -118,6 +107,21 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
+
+	// Report reconcile error.
+	defer func() {
+		if cluster == nil || err == nil || errors.IsConflict(err) {
+			return
+		}
+		cluster.Status.SetReconcileFailed(err)
+		r.shutdownRemoteWatch(cluster)
+		err := r.Update(context.TODO(), cluster)
+		if err != nil {
+			log.Trace(err)
+			return
+		}
+	}()
+
 	err = r.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -126,19 +130,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
-
-	// Report reconcile error.
-	defer func() {
-		if err == nil || errors.IsConflict(err) {
-			return
-		}
-		cluster.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), cluster)
-		if err != nil {
-			log.Trace(err)
-			return
-		}
-	}()
 
 	// Begin staging conditions.
 	cluster.Status.BeginStagingConditions()
@@ -179,9 +170,16 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Apply changes.
 	cluster.Touch()
 	err = r.Update(context.TODO(), cluster)
-	if err != nil {
+	if err != nil && !errors.IsConflict(err) {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	if cluster.Status.HasCondition(TestConnectFailed) {
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: time.Second * 60,
+		}, nil
 	}
 
 	// Done
