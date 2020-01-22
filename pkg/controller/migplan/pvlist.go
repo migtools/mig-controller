@@ -229,8 +229,6 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []strin
 	}
 	if pv.Spec.NFS != nil ||
 		pv.Spec.Glusterfs != nil ||
-		pv.Spec.AzureDisk != nil ||
-		pv.Spec.AzureFile != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
 		return []string{
 			migapi.PvCopyAction,
