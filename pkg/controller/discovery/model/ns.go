@@ -175,6 +175,7 @@ func (m *Namespace) PodList(db DB, page *Page) ([]*Pod, error) {
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &pod)
 	}
@@ -216,6 +217,7 @@ func (m *Namespace) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Po
 			&pod.Cluster)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &pod)
 	}

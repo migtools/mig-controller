@@ -64,7 +64,7 @@ func (r *Container) GetDs(cluster *model.Cluster) (*DataSource, bool) {
 //
 // Add a cluster to the container.
 // Build/update a DataSource for the cluster as needed.
-func (r *Container) Add(cluster *migapi.MigCluster) error {
+func (r *Container) Add(cluster *migapi.MigCluster, collections Collections) error {
 	// Build
 	r.mutex.RLock()
 	key := DsKey{
@@ -75,12 +75,8 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 		ds.Stop(false)
 	}
 	ds := &DataSource{
-		Container: r,
-		Collections: Collections{
-			&NsCollection{},
-			&PvCollection{},
-			&PodCollection{},
-		},
+		Collections: collections,
+		Container:   r,
 	}
 	r.sources[key] = ds
 	r.mutex.RUnlock()
@@ -133,6 +129,9 @@ func (r *Container) Prune() error {
 		wanted[string(cluster.UID)] = true
 	}
 	for _, cluster := range stored {
+		if cluster.Name == "" {
+			continue
+		}
 		if _, found := wanted[cluster.UID]; !found {
 			cluster.Delete(r.Db)
 		}
@@ -146,14 +145,17 @@ func (r *Container) Prune() error {
 //
 // Determine of a MigCluster actually exists.
 func (r *Container) HasCluster(cluster *model.Cluster) (bool, error) {
-	found := migapi.MigCluster{}
-	err := r.Client.Get(
+	host, found := r.GetDs(&model.Cluster{})
+	if !found {
+		return false, nil
+	}
+	err := host.Client.Get(
 		context.TODO(),
 		types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
-		&found)
+		&migapi.MigCluster{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return false, nil

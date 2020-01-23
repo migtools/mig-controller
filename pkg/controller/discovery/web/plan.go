@@ -2,9 +2,9 @@ package web
 
 import (
 	"database/sql"
+	"github.com/fusor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
-	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"
 )
@@ -36,9 +36,12 @@ func (h PlanHandler) AddRoutes(r *gin.Engine) {
 //
 // Prepare to fulfil the request.
 // Fetch the referenced plan.
-// Perform SAR authorization.
 func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
 	if status != http.StatusOK {
 		return status
 	}
@@ -48,37 +51,29 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 			Name:      h.ctx.Param("plan"),
 		},
 	}
-	err := h.plan.Select(h.container.Db)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			Log.Trace(err)
-			return http.StatusInternalServerError
-		} else {
-			return http.StatusNotFound
-		}
-	}
-	status = h.allow(h.getSAR())
-	if status != http.StatusOK {
-		return status
-	}
 
 	return http.StatusOK
 }
 
-// Build the appropriate SAR object.
-// The subject is the MigPlan.
-func (h *PlanHandler) getSAR() auth.SelfSubjectAccessReview {
-	return auth.SelfSubjectAccessReview{
-		Spec: auth.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: &auth.ResourceAttributes{
-				Group:     "apps",
-				Resource:  "MigPlan",
-				Namespace: h.plan.Namespace,
-				Name:      h.plan.Name,
-				Verb:      "get",
-			},
+//
+// RBAC authorization.
+func (h *PlanHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Request{
+		Resource:  auth.Namespace,
+		Namespace: h.cluster.Namespace,
+		Verbs: []string{
+			auth.GET,
 		},
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
 	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //

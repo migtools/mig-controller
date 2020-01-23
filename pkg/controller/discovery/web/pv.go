@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/fusor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
 	"k8s.io/api/core/v1"
@@ -18,7 +19,7 @@ const (
 // PV (route) handler.
 type PvHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -27,6 +28,43 @@ func (h PvHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvsRoot, h.List)
 	r.GET(PvsRoot+"/", h.List)
 	r.GET(PvRoot, h.Get)
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *PvHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *PvHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Request{
+		Resource: auth.PV,
+		Verbs: []string{
+			auth.LIST,
+			auth.GET,
+		},
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //

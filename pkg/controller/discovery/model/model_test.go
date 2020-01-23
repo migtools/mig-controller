@@ -2,7 +2,9 @@ package model
 
 import (
 	"github.com/fusor/mig-controller/pkg/logging"
+	"github.com/google/uuid"
 	"github.com/onsi/gomega"
+	rbac "k8s.io/api/rbac/v1beta1"
 	"os"
 	pathlib "path"
 	"testing"
@@ -12,6 +14,11 @@ func init() {
 	Settings.Load()
 	log := logging.WithName("Test")
 	Log = &log
+}
+
+func uid() string {
+	uid, _ := uuid.NewUUID()
+	return uid.String()
 }
 
 func TestModels(t *testing.T) {
@@ -25,6 +32,8 @@ func TestModels(t *testing.T) {
 	// Cluster
 	cluster := Cluster{
 		Base: Base{
+			UID:       uid(),
+			Version:   uid(),
 			Namespace: "ns1",
 			Name:      "cl",
 		},
@@ -39,6 +48,8 @@ func TestModels(t *testing.T) {
 	// Plan
 	plan := Plan{
 		Base: Base{
+			UID:       uid(),
+			Version:   uid(),
 			Namespace: "ns1",
 			Name:      "cl",
 		},
@@ -56,8 +67,10 @@ func TestModels(t *testing.T) {
 	// Namespaces
 	ns := Namespace{
 		Base: Base{
-			Name:    "ns1",
+			UID:     uid(),
+			Version: uid(),
 			Cluster: cluster.PK,
+			Name:    "ns1",
 		},
 	}
 	err = ns.Insert(db)
@@ -66,9 +79,11 @@ func TestModels(t *testing.T) {
 	// Pod
 	pod := Pod{
 		Base: Base{
+			Cluster:   cluster.PK,
+			UID:       uid(),
+			Version:   uid(),
 			Namespace: ns.Name,
 			Name:      "pod1",
-			Cluster:   cluster.PK,
 		},
 		Definition: "{}",
 		labels:     Labels{"app": "cam"},
@@ -85,9 +100,11 @@ func TestModels(t *testing.T) {
 	// PV
 	pv := PV{
 		Base: Base{
+			Cluster:   cluster.PK,
+			UID:       uid(),
+			Version:   uid(),
 			Namespace: ns.Name,
 			Name:      "pv1",
-			Cluster:   cluster.PK,
 		},
 		Definition: "{}",
 	}
@@ -96,6 +113,82 @@ func TestModels(t *testing.T) {
 	err = pv.Select(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = pv.Update(db)
+	g.Expect(err).To(gomega.BeNil())
+
+	// RoleBinding
+	rb := RoleBinding{
+		Base: Base{
+			Cluster:   cluster.PK,
+			UID:       uid(),
+			Version:   uid(),
+			Namespace: ns.Name,
+			Name:      "rb",
+		},
+		Role: "admin",
+		subjects: []rbac.Subject{
+			{
+				Kind:      "User",
+				Namespace: ns.Name,
+				Name:      "user1",
+			},
+			{
+				Kind:      "ServiceAccount",
+				Namespace: ns.Name,
+				Name:      "sa1",
+			},
+		},
+	}
+	err = rb.Insert(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = rb.Select(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = rb.Update(db)
+	g.Expect(err).To(gomega.BeNil())
+
+	// RoleBinding
+	crb := RoleBinding{
+		Base: Base{
+			Cluster: cluster.PK,
+			UID:     uid(),
+			Version: uid(),
+			Name:    "rb",
+		},
+		Role: "admin",
+		subjects: []rbac.Subject{
+			{
+				Kind: "User",
+				Name: "user1",
+			},
+			{
+				Kind:      "ServiceAccount",
+				Namespace: ns.Name,
+				Name:      "sa1",
+			},
+		},
+	}
+	err = crb.Insert(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = crb.Select(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = crb.Update(db)
+	g.Expect(err).To(gomega.BeNil())
+
+	// role
+	role := Role{
+		Base: Base{
+			Cluster:   cluster.PK,
+			UID:       uid(),
+			Version:   uid(),
+			Namespace: ns.Name,
+			Name:      "role1",
+		},
+		Rules: "[]",
+	}
+	err = role.Insert(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = role.Select(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = role.Update(db)
 	g.Expect(err).To(gomega.BeNil())
 
 	// Listing
@@ -133,10 +226,27 @@ func TestModels(t *testing.T) {
 	g.Expect(err).To(gomega.BeNil())
 	g.Expect(len(pvList) == 1).To(gomega.BeTrue())
 
+	rbList, err := cluster.RoleBindingList(db)
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(len(rbList) == 2).To(gomega.BeTrue())
+
+	rbList, err = cluster.RoleBindingListBySubject(db, Subject{Kind: SubjectUser, Name: "user1"})
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(len(rbList) == 1).To(gomega.BeTrue())
+
+	roleList, err := cluster.RoleList(db)
+	g.Expect(err).To(gomega.BeNil())
+	g.Expect(len(roleList) == 1).To(gomega.BeTrue())
+
 	// Delete all.
-	err = pv.Delete(db)
+	err = role.Delete(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = rb.Delete(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = ns.Delete(db)
+	g.Expect(err).To(gomega.BeNil())
+	err = pv.Delete(db)
+	g.Expect(err).To(gomega.BeNil())
 	g.Expect(err).To(gomega.BeNil())
 	err = pod.Delete(db)
 	g.Expect(err).To(gomega.BeNil())

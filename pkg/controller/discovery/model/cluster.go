@@ -413,6 +413,85 @@ func (m *Cluster) PodListByLabel(db DB, labels LabelFilter, page *Page) ([]*Pod,
 }
 
 //
+// List role-bindings on cluster.
+func (m *Cluster) RoleBindingList(db DB) ([]*RoleBinding, error) {
+	list := []*RoleBinding{}
+	cursor, err := db.Query(
+		RoleBindingListSQL,
+		sql.Named("cluster", m.PK))
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	defer cursor.Close()
+	for cursor.Next() {
+		rb := RoleBinding{}
+		err := rb.Scan(cursor)
+		if err != nil {
+			Log.Trace(err)
+			return nil, err
+		}
+		list = append(list, &rb)
+	}
+
+	return list, nil
+}
+
+//
+// List role-bindings by user.
+func (m *Cluster) RoleBindingListBySubject(db DB, subject Subject) ([]*RoleBinding, error) {
+	list := []*RoleBinding{}
+	cursor, err := db.Query(
+		RoleBindingBySubjectSQL,
+		sql.Named("cluster", m.PK),
+		sql.Named("kind", subject.Kind),
+		sql.Named("namespace", subject.Namespace),
+		sql.Named("name", subject.Name),
+	)
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	defer cursor.Close()
+	for cursor.Next() {
+		rb := RoleBinding{}
+		err := rb.Scan(cursor)
+		if err != nil {
+			Log.Trace(err)
+			return nil, err
+		}
+		list = append(list, &rb)
+	}
+
+	return list, nil
+}
+
+//
+// List roles.
+func (m *Cluster) RoleList(db DB) ([]*Role, error) {
+	list := []*Role{}
+	cursor, err := db.Query(
+		RoleListSQL,
+		sql.Named("cluster", m.PK))
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	defer cursor.Close()
+	for cursor.Next() {
+		role := Role{}
+		err := role.Scan(cursor)
+		if err != nil {
+			Log.Trace(err)
+			return nil, err
+		}
+		list = append(list, &role)
+	}
+
+	return list, nil
+}
+
+//
 // List all clusters.
 func ClusterList(db DB, page *Page) ([]Cluster, error) {
 	list := []Cluster{}

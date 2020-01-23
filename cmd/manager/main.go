@@ -17,16 +17,16 @@ limitations under the License.
 package main
 
 import (
-	"net/http"
-	"os"
-
 	"github.com/fusor/mig-controller/pkg/apis"
 	"github.com/fusor/mig-controller/pkg/controller"
 	"github.com/fusor/mig-controller/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	rbac "k8s.io/api/rbac/v1beta1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	clusterregv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
+	"net/http"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -64,6 +64,10 @@ func main() {
 	log.Info("setting up scheme")
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable add K8s APIs to scheme")
+		os.Exit(1)
+	}
+	if err := rbac.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable add K8s RBAC APIs to scheme")
 		os.Exit(1)
 	}
 	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {

@@ -52,6 +52,10 @@ func Create() (*sql.DB, error) {
 		PodLabelTableDDL,
 		PodLabelIndexDDL,
 		PlanTableDDL,
+		RoleBindingTableDDL,
+		RoleBindingSubjectTableDDL,
+		RoleBindingSubjectIndexDDL,
+		RoleTableDDL,
 	}
 	Mutex.RLock()
 	defer Mutex.RUnlock()
@@ -76,6 +80,13 @@ type DB interface {
 	Exec(string, ...interface{}) (sql.Result, error)
 	Query(string, ...interface{}) (*sql.Rows, error)
 	QueryRow(string, ...interface{}) *sql.Row
+}
+
+//
+// Database interface.
+// Support model `Scan` taking either sql.Row or sql.Rows.
+type Row interface {
+	Scan(...interface{}) error
 }
 
 //

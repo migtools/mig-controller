@@ -1,6 +1,7 @@
 package web
 
 import (
+	"github.com/fusor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -14,7 +15,7 @@ const (
 // Namespaces (route) handler.
 type NsHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -40,8 +41,22 @@ func (h NsHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := []Namespace{}
-	for _, m := range list {
-		content = append(content, m.Name)
+	subject := &auth.Request{
+		Resource: auth.ANY,
+		Verbs:    auth.EDIT,
+		Local:    true,
+	}
+	for _, ns := range list {
+		subject.Namespace = ns.Name
+		allow, err := h.rbac.Allow(subject)
+		if err != nil {
+			Log.Trace(err)
+			h.ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		if allow {
+			content = append(content, ns.Name)
+		}
 	}
 
 	h.ctx.JSON(http.StatusOK, content)
@@ -50,14 +65,9 @@ func (h NsHandler) List(ctx *gin.Context) {
 //
 // Get a specific namespace on a cluster.
 func (h NsHandler) Get(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		h.ctx.Status(status)
-		return
-	}
-
-	h.ctx.JSON(http.StatusOK, h.cluster.Namespace)
+	h.ctx.Status(http.StatusMethodNotAllowed)
 }
 
+//
 // Namespace REST resource
 type Namespace = string

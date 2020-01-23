@@ -1,12 +1,11 @@
 package web
 
 import (
+	"github.com/fusor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
-	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"
-	"time"
 )
 
 // Cluster-scoped route roots.
@@ -16,111 +15,10 @@ const (
 )
 
 //
-// Base handler for cluster scoped routes.
-type ClusterScoped struct {
-	// Base
-	BaseHandler
-	// The cluster specified in the request.
-	cluster model.Cluster
-}
-
-//
-// Prepare to fulfil the request.
-// Set the `cluster` field and ensure the related DataSource is `ready`.
-// Perform SAR authorization.
-func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
-	status := h.BaseHandler.Prepare(ctx)
-	if status != http.StatusOK {
-		return status
-	}
-	h.cluster = model.Cluster{
-		Base: model.Base{
-			Namespace: h.ctx.Param("namespace"),
-			Name:      h.ctx.Param("cluster"),
-		},
-	}
-	status = h.dsReady()
-	if status != http.StatusOK {
-		return status
-	}
-	status = h.allow(h.getSAR())
-	if status != http.StatusOK {
-		return status
-	}
-
-	return http.StatusOK
-}
-
-//
-// Build the appropriate SAR object.
-// For clusters without a secret, the cluster itself is the subject.
-// For clusters with a secret, the secret is the subject.
-// Eventually all clusters should reference secrets and this can
-// be simplified.
-func (h *ClusterScoped) getSAR() auth.SelfSubjectAccessReview {
-	var attributes *auth.ResourceAttributes
-	if h.cluster.Secret != "" {
-		sr := h.cluster.DecodeSecret()
-		attributes = &auth.ResourceAttributes{
-			Group:     "apps",
-			Resource:  "secret",
-			Namespace: sr.Namespace,
-			Name:      sr.Name,
-			Verb:      "get",
-		}
-	} else {
-		attributes = &auth.ResourceAttributes{
-			Group:     "apps",
-			Resource:  "MigCluster",
-			Namespace: h.cluster.Namespace,
-			Name:      h.cluster.Name,
-			Verb:      "get",
-		}
-	}
-
-	return auth.SelfSubjectAccessReview{
-		Spec: auth.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: attributes,
-		},
-	}
-}
-
-//
-// Ensure the DataSource associated with the cluster is `ready`.
-func (h *ClusterScoped) dsReady() int {
-	wait := time.Second * 30
-	poll := time.Microsecond * 100
-	for {
-		mark := time.Now()
-		if ds, found := h.container.GetDs(&h.cluster); found {
-			if ds.IsReady() {
-				h.cluster.Select(h.container.Db)
-				return http.StatusOK
-			}
-		}
-		hasCluster, err := h.container.HasCluster(&h.cluster)
-		if err != nil {
-			return http.StatusInternalServerError
-		}
-		if !hasCluster {
-			return http.StatusNotFound
-		}
-		if wait > 0 {
-			time.Sleep(poll)
-			wait -= time.Since(mark)
-		} else {
-			break
-		}
-	}
-
-	return http.StatusPartialContent
-}
-
-//
 // Cluster (route) handler.
 type ClusterHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -132,9 +30,46 @@ func (h ClusterHandler) AddRoutes(r *gin.Engine) {
 }
 
 //
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *ClusterHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Request{
+		Resource:  auth.Namespace,
+		Namespace: h.cluster.Namespace,
+		Verbs: []string{
+			auth.GET,
+		},
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
+}
+
+//
 // List clusters in the namespace.
 func (h ClusterHandler) List(ctx *gin.Context) {
-	status := h.BaseHandler.Prepare(ctx)
+	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		h.ctx.Status(status)
 		return

@@ -291,6 +291,7 @@ func PlanList(db DB, page *Page) ([]*Plan, error) {
 			&plan.Destination)
 		if err != nil {
 			Log.Trace(err)
+			return nil, err
 		}
 		list = append(list, &plan)
 	}
