@@ -74,8 +74,6 @@ type Request struct {
 	Namespace string
 	// Verbs
 	Verbs []string
-	// Match only RoleBindings.
-	Local bool
 }
 
 //
@@ -121,9 +119,6 @@ func (r *RBAC) Allow(request *Request) (bool, error) {
 	for _, rb := range r.roleBindings {
 		role, err := rb.GetRole(r.Db)
 		if err != nil {
-			continue
-		}
-		if rb.Namespace == "" && request.Local {
 			continue
 		}
 		if rb.Namespace == "" || rb.Namespace == request.Namespace {

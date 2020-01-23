@@ -44,7 +44,6 @@ func (h NsHandler) List(ctx *gin.Context) {
 	subject := &auth.Request{
 		Resource: auth.ANY,
 		Verbs:    auth.EDIT,
-		Local:    true,
 	}
 	for _, ns := range list {
 		subject.Namespace = ns.Name
