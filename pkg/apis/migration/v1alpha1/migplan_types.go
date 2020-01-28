@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -207,8 +208,19 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 
 // Registry label for controller-created migration registry resoruces
 const (
-	MigrationRegistryLabel = "migration-registry"
+	MigrationRegistryLabel        = "migration-registry"
+	MigrationRegistryDefaultImage = "registry:2"
+	MigrationRegistryImageEnvVar  = "MIGRATION_REGISTRY_IMAGE"
 )
+
+// Return the image reference for the migration registry (defaults to "registry:2")
+func migRegistryImageRef() string {
+	envImage := os.Getenv(MigrationRegistryImageEnvVar)
+	if envImage == "" {
+		return MigrationRegistryDefaultImage
+	}
+	return envImage
+}
 
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
@@ -292,11 +304,11 @@ func (r *MigPlan) UpdateRegistryImageStream(imagestream *imagev1.ImageStream) er
 			imagev1.TagReference{
 				Name: "2",
 				Annotations: map[string]string{
-					"openshift.io/imported-from": "registry:2",
+					"openshift.io/imported-from": migRegistryImageRef(),
 				},
 				From: &kapi.ObjectReference{
 					Kind: "DockerImage",
-					Name: "registry:2",
+					Name: migRegistryImageRef(),
 				},
 				Generation:      nil,
 				ImportPolicy:    imagev1.TagImportPolicy{},
@@ -377,7 +389,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						Image: "registry:2",
+						Image: migRegistryImageRef(),
 						Name:  "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
