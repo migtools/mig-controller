@@ -1,11 +1,11 @@
 package migcluster
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-	"time"
-	"context"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"time"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"

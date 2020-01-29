@@ -1,6 +1,8 @@
 package remotewatcher
 
 import (
+	"reflect"
+
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
@@ -179,7 +181,20 @@ func (r VSLPredicate) Delete(e event.DeleteEvent) bool {
 
 // Pods
 type PodPredicate struct {
-	predicate.GenerationChangedPredicate
+	predicate.Funcs
+}
+
+// Watched resource has been updated.
+func (r PodPredicate) Update(e event.UpdateEvent) bool {
+	oldPod, cast := e.ObjectOld.(*kapi.Pod)
+	if !cast {
+		return false
+	}
+	newPod, cast := e.ObjectNew.(*kapi.Pod)
+	if !cast {
+		return false
+	}
+	return reflect.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes)
 }
 
 // Watched resource has been created.
