@@ -50,7 +50,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	pollStopped := make(chan bool)
+	pollStopped := make(chan bool, 1)
 	pollStopped <- true
 	return &ReconcileMigCluster{
 		Client:      mgr.GetClient(),
@@ -123,6 +123,13 @@ type ReconcileMigCluster struct {
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+
+	// Start cluster connection polling, ensure only one will run at a time
+	select {
+	case <-r.pollStopped:
+		go r.pollConnection(request)
+	default:
+	}
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
@@ -256,4 +263,30 @@ func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
 
 	StopRemoteWatch(nsName)
 	log.Info("Stopped remote watch.", "cluster", cluster.Name)
+}
+
+func (r *ReconcileMigCluster) pollConnection(req reconcile.Request) {
+	cluster := &migapi.MigCluster{}
+	pollingTimeout := time.Second * 60
+	for {
+		err := c.Get(context.TODO(), req.NamespacedName, cluster)
+		if err != nil {
+			break
+		}
+		err = cluster.TestConnection(r.Client, timeout)
+		if (err == nil && cluster.Status.HasCondition(TestConnectFailed)) ||
+			(err != nil && !cluster.Status.HasCondition(TestConnectFailed)) {
+			break
+		}
+		time.Sleep(pollingTimeout)
+	}
+
+	if cluster != nil {
+		r.pollRequeue <- event.GenericEvent{
+			Meta:   cluster.GetObjectMeta(),
+			Object: cluster,
+		}
+	}
+
+	r.pollStopped <- true
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"time"
+	"context"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/fusor/mig-controller/pkg/reference"
@@ -48,6 +50,8 @@ const (
 	MalformedURLMessage       = "The `url` is malformed."
 	InvalidURLSchemeMessage   = "The `url` scheme must be 'http' or 'https'."
 )
+
+const timeout = time.Second * 5
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
@@ -190,7 +194,6 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	}
 
 	// Timeout of 5s instead of the default 30s to lessen lockup
-	timeout := time.Duration(time.Second * 5)
 	err := cluster.TestConnection(r.Client, timeout)
 	if err != nil {
 		message := fmt.Sprintf(TestConnectFailedMessage, err)
@@ -201,31 +204,8 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 			Category: Critical,
 			Message:  message,
 		})
-		select {
-		case <-r.pollStopped:
-			go r.pollConnection(cluster)
-		}
 		return nil
 	}
 
 	return nil
-}
-
-func (r ReconcileMigCluster) pollConnection(cluster *migapi.MigCluster) {
-	pollingTimeout := time.Second * 60
-	for {
-		err := cluster.TestConnection(r.Client, timeout)
-		if err == nil {
-			break
-		}
-		time.Sleep(pollingTimeout)
-	}
-
-	evnt := event.GenericEvent{
-		Meta:   cluster.GetObjectMeta(),
-		Object: cluster,
-	}
-
-	r.pollStopped <- true
-	r.pollRequeue <- evnt
 }
