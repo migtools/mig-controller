@@ -55,17 +55,6 @@ const (
 )
 
 //
-// Edit verbs.
-var EDIT = []string{
-	LIST,
-	GET,
-	CREATE,
-	DELETE,
-	PATCH,
-	UPDATE,
-}
-
-//
 // RBAC request.
 type Request struct {
 	// The k8s API resource.

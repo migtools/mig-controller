@@ -40,14 +40,21 @@ func (h NsHandler) List(ctx *gin.Context) {
 		h.ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Namespace{}
-	subject := &auth.Request{
+	request := &auth.Request{
 		Resource: auth.ANY,
-		Verbs:    auth.EDIT,
+		Verbs: []string{
+			auth.LIST,
+			auth.GET,
+			auth.CREATE,
+			auth.DELETE,
+			auth.PATCH,
+			auth.UPDATE,
+		},
 	}
+	content := []Namespace{}
 	for _, ns := range list {
-		subject.Namespace = ns.Name
-		allow, err := h.rbac.Allow(subject)
+		request.Namespace = ns.Name
+		allow, err := h.rbac.Allow(request)
 		if err != nil {
 			Log.Trace(err)
 			h.ctx.Status(http.StatusInternalServerError)
