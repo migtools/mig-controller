@@ -250,7 +250,7 @@ func (h *BaseHandler) setToken() int {
 
 	Log.Info("`Authorization: Bearer <token>` header required but not found.")
 
-	return http.StatusBadRequest
+	return http.StatusUnauthorized
 }
 
 //
