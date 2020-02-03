@@ -1,19 +1,10 @@
 package v1alpha1
 
-import (
-	"github.com/google/uuid"
-)
-
 const (
-	TouchAnnotation = "touch"
 	VeleroNamespace = "openshift-migration"
 )
 
 // Migration application CR.
-// The `touch` UUID is set by the controller after reconcile
-// and needed to support relay of remote watch events. Also to
-// provide remote watch predicates the ability to determine
-// when an updated referenced resource has been fully reconciled.
 type MigResource interface {
 	// Get a map containing the correlation label.
 	GetCorrelationLabels() map[string]string
@@ -23,10 +14,10 @@ type MigResource interface {
 	GetNamespace() string
 	// Get the resource name.
 	GetName() string
-	// Get the `touch` UUID annotation.
-	GetTouch() string
-	// Set the `touch` UUID annotation.
-	Touch()
+	// Mark the resource as having been reconciled.
+	MarkReconciled()
+	// Get whether the resource has been reconciled.
+	HasReconciled() bool
 }
 
 // Plan
@@ -50,23 +41,12 @@ func (r *MigPlan) GetName() string {
 	return r.Name
 }
 
-func (r *MigPlan) GetTouch() string {
-	if r.Annotations == nil {
-		return ""
-	}
-	id, found := r.Annotations[TouchAnnotation]
-	if found {
-		return id
-	}
-
-	return ""
+func (r *MigPlan) MarkReconciled() {
+	r.Status.ObservedGeneration = r.Generation + 1
 }
 
-func (r *MigPlan) Touch() {
-	if r.Annotations == nil {
-		r.Annotations = make(map[string]string)
-	}
-	r.Annotations[TouchAnnotation] = uuid.New().String()
+func (r *MigPlan) HasReconciled() bool {
+	return r.Status.ObservedGeneration == r.Generation
 }
 
 // Storage
@@ -90,23 +70,12 @@ func (r *MigStorage) GetName() string {
 	return r.Name
 }
 
-func (r *MigStorage) GetTouch() string {
-	if r.Annotations == nil {
-		return ""
-	}
-	id, found := r.Annotations[TouchAnnotation]
-	if found {
-		return id
-	}
-
-	return ""
+func (r *MigStorage) MarkReconciled() {
+	r.Status.ObservedGeneration = r.Generation + 1
 }
 
-func (r *MigStorage) Touch() {
-	if r.Annotations == nil {
-		r.Annotations = make(map[string]string)
-	}
-	r.Annotations[TouchAnnotation] = uuid.New().String()
+func (r *MigStorage) HasReconciled() bool {
+	return r.Status.ObservedGeneration == r.Generation
 }
 
 // Cluster
@@ -130,23 +99,12 @@ func (r *MigCluster) GetName() string {
 	return r.Name
 }
 
-func (r *MigCluster) GetTouch() string {
-	if r.Annotations == nil {
-		return ""
-	}
-	id, found := r.Annotations[TouchAnnotation]
-	if found {
-		return id
-	}
-
-	return ""
+func (r *MigCluster) MarkReconciled() {
+	r.Status.ObservedGeneration = r.Generation + 1
 }
 
-func (r *MigCluster) Touch() {
-	if r.Annotations == nil {
-		r.Annotations = make(map[string]string)
-	}
-	r.Annotations[TouchAnnotation] = uuid.New().String()
+func (r *MigCluster) HasReconciled() bool {
+	return r.Status.ObservedGeneration == r.Generation
 }
 
 // Migration
@@ -170,21 +128,10 @@ func (r *MigMigration) GetName() string {
 	return r.Name
 }
 
-func (r *MigMigration) GetTouch() string {
-	if r.Annotations == nil {
-		return ""
-	}
-	id, found := r.Annotations[TouchAnnotation]
-	if found {
-		return id
-	}
-
-	return ""
+func (r *MigMigration) MarkReconciled() {
+	r.Status.ObservedGeneration = r.Generation + 1
 }
 
-func (r *MigMigration) Touch() {
-	if r.Annotations == nil {
-		r.Annotations = make(map[string]string)
-	}
-	r.Annotations[TouchAnnotation] = uuid.New().String()
+func (r *MigMigration) HasReconciled() bool {
+	return r.Status.ObservedGeneration == r.Generation
 }

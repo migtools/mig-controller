@@ -96,15 +96,10 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	old, cast := e.ObjectOld.(*migapi.MigPlan)
-	if !cast {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
 	if !cast {
 		return false
 	}
-	// Updated by the controller.
-	touched := old.GetTouch() != new.GetTouch()
-	return touched
+	// Reconciled by the controller.
+	return new.HasReconciled()
 }

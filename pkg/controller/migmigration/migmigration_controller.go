@@ -209,7 +209,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.Status.EndStagingConditions()
 
 	// Apply changes.
-	migration.Touch()
+	migration.MarkReconciled()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
 		log.Trace(err)

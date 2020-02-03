@@ -136,17 +136,12 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
-	old, cast := e.ObjectOld.(*migapi.MigCluster)
-	if !cast {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
 	if !cast {
 		return false
 	}
-	// Updated by the controller.
-	touched := old.GetTouch() != new.GetTouch()
-	return touched
+	// Reconciled by the controller.
+	return new.HasReconciled()
 }
 
 type StoragePredicate struct {
@@ -158,17 +153,12 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
-	old, cast := e.ObjectOld.(*migapi.MigStorage)
-	if !cast {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
 	if !cast {
 		return false
 	}
-	// Updated by the controller.
-	touched := old.GetTouch() != new.GetTouch()
-	return touched
+	// Reconciled by the controller.
+	return new.HasReconciled()
 }
 
 type MigrationPredicate struct {
