@@ -177,7 +177,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	cluster.Status.EndStagingConditions()
 
 	// Apply changes.
-	cluster.Touch()
+	cluster.MarkReconciled()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		log.Trace(err)

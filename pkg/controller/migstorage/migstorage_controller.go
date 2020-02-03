@@ -150,7 +150,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	storage.Status.EndStagingConditions()
 
 	// Apply changes.
-	storage.Touch()
+	storage.MarkReconciled()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		log.Trace(err)
