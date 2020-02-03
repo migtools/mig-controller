@@ -534,6 +534,11 @@ func (in *PV) DeepCopyInto(out *PV) {
 	in.Supported.DeepCopyInto(&out.Supported)
 	out.Selection = in.Selection
 	in.PVC.DeepCopyInto(&out.PVC)
+	if in.NFS != nil {
+		in, out := &in.NFS, &out.NFS
+		*out = new(v1.NFSVolumeSource)
+		**out = **in
+	}
 	return
 }
 

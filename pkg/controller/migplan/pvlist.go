@@ -106,6 +106,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 				},
 				Selection: selection,
 				PVC:       claim,
+				NFS:       pv.Spec.NFS,
 			})
 	}
 
