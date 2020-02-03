@@ -3,18 +3,21 @@ package migplan
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
-
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/fusor/mig-controller/pkg/health"
+	"github.com/fusor/mig-controller/pkg/pods"
 	migref "github.com/fusor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/exec"
+	"net"
+	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 )
 
 // Types
@@ -43,6 +46,8 @@ const (
 	PvInvalidCopyMethod            = "PvInvalidCopyMethod"
 	PvNoCopyMethodSelection        = "PvNoCopyMethodSelection"
 	PvWarnCopyMethodSnapshot       = "PvWarnCopyMethodSnapshot"
+	NfsNotAccessible               = "NfsNotAccessible"
+	NfsAccessCannotBeValidated     = "NfsAccessCannotBeValidated"
 	PvLimitExceeded                = "PvLimitExceeded"
 	StorageEnsured                 = "StorageEnsured"
 	RegistriesEnsured              = "RegistriesEnsured"
@@ -105,6 +110,8 @@ const (
 	PvNoCopyMethodSelectionMessage        = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
 	PvWarnCopyMethodSnapshotMessage       = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
 	PvLimitExceededMessage                = "PV limit: %d exceeded, found: %d."
+	NfsNotAccessibleMessage               = "NFS servers [] not accessible on the destination cluster."
+	NfsAccessCannotBeValidatedMessage     = "NFS access cannot be validated on the destination cluster."
 	StorageEnsuredMessage                 = "The storage resources have been created."
 	RegistriesEnsuredMessage              = "The migration registry resources have been created."
 	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
@@ -461,7 +468,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 		if err == nil {
 			continue
 		}
-		if errors.IsNotFound(err) {
+		if k8serror.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
 			log.Trace(err)
@@ -511,7 +518,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 		if err == nil {
 			continue
 		}
-		if errors.IsNotFound(err) {
+		if k8serror.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
 			log.Trace(err)
@@ -741,15 +748,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode kapi.PersistentVolumeAccessMode) bool {
-	for _, mode := range modeList {
-		if mode == accessMode {
-			return true
-		}
-	}
-	return false
-}
-
 // Validate the pods, all should be healthy befor migration
 func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(Suspended) {
@@ -818,4 +816,205 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 	}
 
 	return nil
+}
+
+func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode kapi.PersistentVolumeAccessMode) bool {
+	for _, mode := range modeList {
+		if mode == accessMode {
+			return true
+		}
+	}
+	return false
+}
+
+//
+// NFS validation
+//
+const (
+	NfsPort = "2049"
+)
+
+// NFS validation.
+//   Plan - A migration plan.
+//   cluster - The destination cluster.
+//   client - A client for the destination.
+//   restCfg - A rest configuration for the destination.
+//   pod - The pod to be used to execute commands.
+type NfsValidation struct {
+	Plan    *migapi.MigPlan
+	cluster *migapi.MigCluster
+	client  k8sclient.Client
+	restCfg *rest.Config
+	pod     *kapi.Pod
+}
+
+// Validate the NFS servers referenced by PVs have network accessible
+// on the destination cluster. PVs referencing inaccessible NFS servers
+// will be updated to not support the `move` action.
+func (r *NfsValidation) Run(client k8sclient.Client) error {
+	if !r.Plan.Status.HasAnyCondition(PvsDiscovered) {
+		return nil
+	}
+	if r.Plan.Status.HasAnyCondition(Suspended) {
+		r.Plan.Status.StageCondition(NfsNotAccessible)
+		return nil
+	}
+	err := r.init(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !r.Plan.Status.HasCondition(NfsAccessCannotBeValidated) {
+		err = r.validate()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Set the cluster, client, restCfg, pod attributes.
+func (r *NfsValidation) init(client k8sclient.Client) error {
+	var err error
+	r.cluster, err = r.Plan.GetDestinationCluster(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !r.cluster.Spec.IsHostCluster {
+		r.client, err = r.cluster.GetClient(client)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		r.restCfg, err = r.cluster.BuildRestConfig(r.client)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		err = r.findPod()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Validate PVs.
+func (r *NfsValidation) validate() error {
+	server := map[string]bool{}
+	for i := range r.Plan.Spec.PersistentVolumes.List {
+		pv := &r.Plan.Spec.PersistentVolumes.List[i]
+		if pv.NFS == nil {
+			continue
+		}
+		if passed, found := server[pv.NFS.Server]; found {
+			if !passed {
+				r.validationFailed(pv)
+			}
+			continue
+		}
+		passed := true
+		if !r.cluster.Spec.IsHostCluster {
+			command := pods.PodCommand{
+				Args:    []string{"/usr/bin/nc", "-zv", pv.NFS.Server, NfsPort},
+				RestCfg: r.restCfg,
+				Pod:     r.pod,
+			}
+			err := command.Run()
+			if err != nil {
+				_, cast := err.(exec.CodeExitError)
+				if cast {
+					passed = false
+				} else {
+					log.Trace(err)
+					return err
+				}
+			}
+		} else {
+			address := fmt.Sprintf("%s:%s", pv.NFS.Server, NfsPort)
+			conn, err := net.Dial("tcp", address)
+			if err == nil {
+				conn.Close()
+			} else {
+				passed = false
+			}
+		}
+		server[pv.NFS.Server] = passed
+		if !passed {
+			r.validationFailed(pv)
+		}
+	}
+	notAccessible := []string{}
+	for s, passed := range server {
+		if !passed {
+			notAccessible = append(notAccessible, s)
+		}
+	}
+	if len(notAccessible) > 0 {
+		r.Plan.Status.SetCondition(migapi.Condition{
+			Type:     NfsNotAccessible,
+			Status:   True,
+			Category: Warn,
+			Message:  NfsNotAccessibleMessage,
+			Items:    notAccessible,
+		})
+	}
+
+	return nil
+}
+
+// Find a pod suitable for command execution.
+func (r *NfsValidation) findPod() error {
+	list := kapi.PodList{}
+	err := r.client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(
+			map[string]string{"component": "velero"}),
+		&list)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for i := range list.Items {
+		r.pod = &list.Items[i]
+		command := pods.PodCommand{
+			Args:    []string{"/usr/bin/nc", "-h"},
+			RestCfg: r.restCfg,
+			Pod:     r.pod,
+		}
+		err := command.Run()
+		if err != nil {
+			r.pod = nil
+		}
+	}
+	if r.pod == nil {
+		r.Plan.Status.SetCondition(migapi.Condition{
+			Type:     NfsAccessCannotBeValidated,
+			Status:   True,
+			Category: Error,
+			Reason:   NotFound,
+			Message:  NfsAccessCannotBeValidatedMessage,
+		})
+		return nil
+	}
+
+	return nil
+}
+
+// Validation failed.
+// The `move` action is removed.
+func (r *NfsValidation) validationFailed(pv *migapi.PV) {
+	kept := []string{}
+	for _, action := range pv.Supported.Actions {
+		if action != migapi.PvMoveAction {
+			kept = append(kept, action)
+		}
+	}
+
+	pv.Supported.Actions = kept
 }

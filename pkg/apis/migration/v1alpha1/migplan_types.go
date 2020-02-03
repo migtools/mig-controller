@@ -657,16 +657,19 @@ const (
 // Name - The PV name.
 // Capacity - The PV storage capacity.
 // StorageClass - The PV storage class name.
-// Supported - Lists of what is supported
-// Selection - Choices made from supported
+// Supported - Lists of what is supported.
+// Selection - Choices made from supported.
+// PVC - Associated PVC.
+// NFS - NFS properties.
 // staged - A PV has been explicitly added/updated.
 type PV struct {
-	Name         string            `json:"name,omitempty"`
-	Capacity     resource.Quantity `json:"capacity,omitempty"`
-	StorageClass string            `json:"storageClass,omitempty"`
-	Supported    Supported         `json:"supported"`
-	Selection    Selection         `json:"selection"`
-	PVC          PVC               `json:"pvc,omitempty"`
+	Name         string                `json:"name,omitempty"`
+	Capacity     resource.Quantity     `json:"capacity,omitempty"`
+	StorageClass string                `json:"storageClass,omitempty"`
+	Supported    Supported             `json:"supported"`
+	Selection    Selection             `json:"selection"`
+	PVC          PVC                   `json:"pvc,omitempty"`
+	NFS          *kapi.NFSVolumeSource `json:"-"`
 	staged       bool
 }
 
@@ -704,6 +707,7 @@ func (r *PV) Update(pv PV) {
 	r.Supported.CopyMethods = pv.Supported.CopyMethods
 	r.Capacity = pv.Capacity
 	r.PVC = pv.PVC
+	r.NFS = pv.NFS
 	if len(r.Supported.Actions) == 1 {
 		r.Selection.Action = r.Supported.Actions[0]
 	}
