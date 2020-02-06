@@ -58,11 +58,77 @@ const (
 // RBAC request.
 type Request struct {
 	// The k8s API resource.
-	Resource string
+	Resources []string
 	// The namespace.
 	Namespace string
 	// Verbs
 	Verbs []string
+	// Matrix of expand the Resources and Verbs
+	matrix Matrix
+}
+
+//
+// Expand the Resources and Verbs into the `matrix`.
+func (r *Request) expand() {
+	r.matrix = Matrix{}
+	for _, resource := range r.Resources {
+		for _, verb := range r.Verbs {
+			r.matrix = append(r.matrix, MxItem{resource: resource, verb: verb})
+		}
+	}
+}
+
+//
+// Apply the rule to the matrix.
+func (r *Request) apply(rule *rbac.PolicyRule) {
+	matrix := Matrix{}
+	for _, resource := range rule.Resources {
+		for _, verb := range rule.Verbs {
+			matrix = append(matrix, MxItem{resource: resource, verb: verb})
+		}
+	}
+	for i := range r.matrix {
+		for _, m2 := range matrix {
+			m := &r.matrix[i]
+			if !m.matched {
+				m.match(&m2)
+			}
+		}
+	}
+}
+
+//
+// Return `true` when all of the matrix items have been matched.
+func (r *Request) satisfied() bool {
+	for _, m := range r.matrix {
+		if !m.matched {
+			return false
+		}
+	}
+
+	return true
+}
+
+//
+// The matrix is a de-normalized set of Resources and verbs.
+type Matrix = []MxItem
+
+//
+// A matrix item.
+type MxItem struct {
+	resource string
+	verb     string
+	matched  bool
+}
+
+//
+// Match another matrix item.
+func (m *MxItem) match(m2 *MxItem) {
+	if m.resource == ANY || m2.resource == ANY || m.resource == m2.resource {
+		if m.verb == ANY || m2.verb == ANY || m.verb == m2.verb {
+			m.matched = true
+		}
+	}
 }
 
 //
@@ -105,6 +171,7 @@ func (r *RBAC) Allow(request *Request) (bool, error) {
 	if _, found := AllowUsers[r.user]; found {
 		return true, nil
 	}
+	request.expand()
 	for _, rb := range r.roleBindings {
 		role, err := rb.GetRole(r.Db)
 		if err != nil {
@@ -125,33 +192,8 @@ func (r *RBAC) Allow(request *Request) (bool, error) {
 func (r *RBAC) matchRules(request *Request, role *model.Role) bool {
 	rules := role.DecodeRules()
 	for _, rule := range rules {
-		for _, resource := range rule.Resources {
-			if request.Resource == ANY || resource == ANY || resource == request.Resource {
-				if r.matchVerb(request, &rule) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-//
-// Match the verb.
-func (r *RBAC) matchVerb(request *Request, rule *rbac.PolicyRule) bool {
-	needed := len(request.Verbs)
-	for i := range request.Verbs {
-		for _, verb := range rule.Verbs {
-			if verb == ALL {
-				return true
-			}
-			if verb == request.Verbs[i] {
-				needed -= 1
-				break
-			}
-		}
-		if needed == 0 {
+		request.apply(&rule)
+		if request.satisfied() {
 			return true
 		}
 	}

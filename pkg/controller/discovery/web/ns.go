@@ -41,7 +41,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 		return
 	}
 	request := &auth.Request{
-		Resource: auth.ANY,
+		Resources: []string{auth.ANY},
 		Verbs: []string{
 			auth.LIST,
 			auth.GET,

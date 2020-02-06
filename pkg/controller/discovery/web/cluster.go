@@ -49,8 +49,10 @@ func (h *ClusterHandler) Prepare(ctx *gin.Context) int {
 // RBAC authorization.
 func (h *ClusterHandler) allow(ctx *gin.Context) int {
 	allowed, err := h.rbac.Allow(&auth.Request{
-		Resource:  auth.Namespace,
 		Namespace: h.cluster.Namespace,
+		Resources: []string{
+			auth.Namespace,
+		},
 		Verbs: []string{
 			auth.GET,
 		},
