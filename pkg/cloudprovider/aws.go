@@ -120,14 +120,16 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error 
 				secret.Data[AwsAccessKeyId],
 				secret.Data[AwsSecretAccessKey]),
 		),
+		"ca_bundle.pem": p.CustomCABundle,
 	}
 	return nil
 }
 
 func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
 	registrySecret.Data = map[string][]byte{
-		"access_key": []byte(secret.Data[AwsAccessKeyId]),
-		"secret_key": []byte(secret.Data[AwsSecretAccessKey]),
+		"access_key":    []byte(secret.Data[AwsAccessKeyId]),
+		"secret_key":    []byte(secret.Data[AwsSecretAccessKey]),
+		"ca_bundle.pem": p.CustomCABundle,
 	}
 	return nil
 }
@@ -180,6 +182,24 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Name:  "REGISTRY_STORAGE_S3_SKIPVERIFY",
 			Value: strconv.FormatBool(p.Insecure),
 		},
+	}
+	if len(p.CustomCABundle) > 0 {
+		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
+			kapi.VolumeMount{
+				Name:             "registry-secret",
+				ReadOnly:         true,
+				MountPath:        "/etc/ssl/certs/ca_bundle.pem",
+				SubPath:          "ca_bundle.pem",
+			})
+		dc.Spec.Template.Spec.Volumes = append(dc.Spec.Template.Spec.Volumes, kapi.Volume{
+			Name: "registry-secret",
+			VolumeSource: kapi.VolumeSource{
+				Secret: &kapi.SecretVolumeSource{
+					SecretName:  name,
+				},
+			},
+		})
 	}
 }
 
