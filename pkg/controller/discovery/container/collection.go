@@ -27,14 +27,14 @@ type Disposition struct {
 type Collection interface {
 	// Associate with a DataSource.
 	// Mainly to support two phase construction.
-	Bind(ds *DataSource)
+	Bind(*DataSource)
 	// Get the associated DataSource.
 	GetDs() *DataSource
 	// Add k8s watches.
 	// Each watch MUST include a predicate that performs the
 	// appropriate changes in the DB instead of creating
 	// reconcile events.
-	AddWatch(c controller.Controller) error
+	AddWatch(controller.Controller) error
 	// Reconcile the cluster and the DB.
 	// Discover resources on the cluster modify the DB as needed.
 	// Intended to be performed once when the collection is initialized.

@@ -57,7 +57,7 @@ func (r *RoleBindingCollection) Reconcile() error {
 	Log.Info(
 		"RoleBindingCollection reconciled.",
 		"cluster",
-		r.ds.Cluster,
+		r.ds.Name(),
 		"duration",
 		time.Since(mark))
 
