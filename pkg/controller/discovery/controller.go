@@ -26,7 +26,10 @@ import (
 	"github.com/fusor/mig-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -57,11 +60,24 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	if err != nil {
 		panic(err)
 	}
-	container := container.NewContainer(mgr.GetClient(), db)
+	restCfg, _ := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+	nClient, err := client.New(
+		restCfg,
+		client.Options{
+			Scheme: scheme.Scheme,
+		})
+	if err != nil {
+		panic(err)
+	}
+	container := container.NewContainer(nClient, db)
 	web := &web.WebServer{
 		Container: container,
 	}
 	reconciler := ReconcileDiscovery{
+		client:    nClient,
 		scheme:    mgr.GetScheme(),
 		container: container,
 		web:       web,
@@ -111,6 +127,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileDiscovery{}
 
 type ReconcileDiscovery struct {
+	client    client.Client
 	scheme    *runtime.Scheme
 	container *container.Container
 	web       *web.WebServer
@@ -125,7 +142,7 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 		return reQueue, nil
 	}
 	cluster := &migapi.MigCluster{}
-	err = r.container.Client.Get(context.TODO(), request.NamespacedName, cluster)
+	err = r.client.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.container.Delete(request.NamespacedName)
@@ -154,7 +171,7 @@ func (r *ReconcileDiscovery) IsValid(cluster *migapi.MigCluster) bool {
 	if ref == nil {
 		return false
 	}
-	secret, err := cluster.GetServiceAccountSecret(r.container.Client)
+	secret, err := cluster.GetServiceAccountSecret(r.client)
 	if err != nil {
 		log.Trace(err)
 		return false
