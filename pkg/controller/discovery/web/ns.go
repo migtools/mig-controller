@@ -30,13 +30,13 @@ func (h NsHandler) AddRoutes(r *gin.Engine) {
 func (h NsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list, err := h.cluster.NsList(h.container.Db, &h.page)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []Namespace{}
@@ -44,7 +44,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 		content = append(content, m.Name)
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -52,11 +52,11 @@ func (h NsHandler) List(ctx *gin.Context) {
 func (h NsHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 
-	h.ctx.JSON(http.StatusOK, h.cluster.Namespace)
+	ctx.JSON(http.StatusOK, h.cluster.Namespace)
 }
 
 // Namespace REST resource
