@@ -47,7 +47,7 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	}
 	h.plan = model.Plan{
 		Base: model.Base{
-			Namespace: ctx.Param("namespace"),
+			Namespace: ctx.Param("ns1"),
 			Name:      ctx.Param("plan"),
 		},
 	}
@@ -142,6 +142,17 @@ func (h PlanHandler) Pods(ctx *gin.Context) {
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
+	}
+	err := h.plan.Select(h.container.Db)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		} else {
+			ctx.Status(http.StatusNotFound)
+			return
+		}
 	}
 	content := PlanPods{}
 	content.With(ctx, &h)

@@ -24,7 +24,7 @@ var Log *logging.Logger
 
 // Root - all routes.
 const (
-	Root = "/namespaces/:namespace"
+	Root = "/namespaces/:ns1"
 )
 
 //
@@ -253,7 +253,7 @@ func (h *BaseHandler) setToken(ctx *gin.Context) int {
 //
 // Set the cluster.
 func (h *BaseHandler) setCluster(ctx *gin.Context) {
-	namespace := ctx.Param("namespace")
+	namespace := ctx.Param("ns1")
 	cluster := ctx.Param("cluster")
 	if cluster == "" {
 		h.cluster = model.Cluster{

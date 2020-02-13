@@ -392,7 +392,7 @@ func (p *Pod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerF
 	p.Namespace = pod.Namespace
 	p.Name = pod.Name
 	path := LogRoot
-	path = strings.Replace(path, ":namespace", cluster.Namespace, 1)
+	path = strings.Replace(path, ":ns1", cluster.Namespace, 1)
 	path = strings.Replace(path, ":cluster", cluster.Name, 1)
 	path = strings.Replace(path, ":ns2", p.Namespace, 1)
 	path = strings.Replace(path, ":pod", p.Name, 1)
