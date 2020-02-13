@@ -44,7 +44,7 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	}
 	h.plan = model.Plan{
 		Base: model.Base{
-			Namespace: h.ctx.Param("namespace"),
+			Namespace: h.ctx.Param("ns1"),
 			Name:      h.ctx.Param("plan"),
 		},
 	}

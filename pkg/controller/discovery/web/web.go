@@ -28,7 +28,7 @@ var Log *logging.Logger
 
 // Root - all routes.
 const (
-	Root = "/namespaces/:namespace"
+	Root = "/namespaces/:ns1"
 )
 
 //

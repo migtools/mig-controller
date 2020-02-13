@@ -35,7 +35,7 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 	}
 	h.cluster = model.Cluster{
 		Base: model.Base{
-			Namespace: h.ctx.Param("namespace"),
+			Namespace: h.ctx.Param("ns1"),
 			Name:      h.ctx.Param("cluster"),
 		},
 	}
