@@ -160,8 +160,6 @@ type Page = model.Page
 type BaseHandler struct {
 	// Reference to the container used to fulfil requests.
 	container *container.Container
-	// Request context.
-	ctx *gin.Context
 	// The bearer token passed in the `Authorization` header.
 	token string
 	// The `page` parameter passed in the request.
@@ -179,13 +177,12 @@ type BaseHandler struct {
 // Set the `token` and `page` fields using passed parameters.
 func (h *BaseHandler) Prepare(ctx *gin.Context) int {
 	Log.Reset()
-	h.ctx = ctx
-	h.setCluster()
-	status := h.setToken()
+	h.setCluster(ctx)
+	status := h.setToken(ctx)
 	if status != http.StatusOK {
 		return status
 	}
-	status = h.setPage()
+	status = h.setPage(ctx)
 	if status != http.StatusOK {
 		return status
 	}
@@ -237,8 +234,8 @@ func (h *BaseHandler) setDs() int {
 
 //
 // Set the `token` field.
-func (h *BaseHandler) setToken() int {
-	header := h.ctx.GetHeader("Authorization")
+func (h *BaseHandler) setToken(ctx *gin.Context) int {
+	header := ctx.GetHeader("Authorization")
 	fields := strings.Fields(header)
 	if len(fields) == 2 && fields[0] == "Bearer" {
 		h.token = fields[1]
@@ -255,9 +252,9 @@ func (h *BaseHandler) setToken() int {
 
 //
 // Set the cluster.
-func (h *BaseHandler) setCluster() {
-	namespace := h.ctx.Param("namespace")
-	cluster := h.ctx.Param("cluster")
+func (h *BaseHandler) setCluster(ctx *gin.Context) {
+	namespace := ctx.Param("namespace")
+	cluster := ctx.Param("cluster")
 	if cluster == "" {
 		h.cluster = model.Cluster{
 			Base: model.Base{
@@ -277,8 +274,8 @@ func (h *BaseHandler) setCluster() {
 
 //
 // Set the `token` field.
-func (h *BaseHandler) setPage() int {
-	q := h.ctx.Request.URL.Query()
+func (h *BaseHandler) setPage(ctx *gin.Context) int {
+	q := ctx.Request.URL.Query()
 	page := Page{
 		Limit:  int(^uint(0) >> 1),
 		Offset: 0,
@@ -361,7 +358,7 @@ func (h RootNsHandler) AddRoutes(r *gin.Engine) {
 func (h RootNsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list := []Namespace{}
@@ -398,7 +395,7 @@ func (h RootNsHandler) List(ctx *gin.Context) {
 	}
 	sort.Strings(list)
 	h.page.Slice(&list)
-	h.ctx.JSON(http.StatusOK, list)
+	ctx.JSON(http.StatusOK, list)
 }
 
 //

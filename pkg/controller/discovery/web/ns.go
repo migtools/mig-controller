@@ -31,13 +31,13 @@ func (h NsHandler) AddRoutes(r *gin.Engine) {
 func (h NsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list, err := h.cluster.NsList(h.container.Db, &h.page)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	request := &auth.Request{
@@ -57,7 +57,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 		allow, err := h.rbac.Allow(request)
 		if err != nil {
 			Log.Trace(err)
-			h.ctx.Status(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		}
 		if allow {
@@ -65,13 +65,13 @@ func (h NsHandler) List(ctx *gin.Context) {
 		}
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
 // Get a specific namespace on a cluster.
 func (h NsHandler) Get(ctx *gin.Context) {
-	h.ctx.Status(http.StatusMethodNotAllowed)
+	ctx.Status(http.StatusMethodNotAllowed)
 }
 
 //

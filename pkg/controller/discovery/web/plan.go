@@ -47,8 +47,8 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	}
 	h.plan = model.Plan{
 		Base: model.Base{
-			Namespace: h.ctx.Param("namespace"),
-			Name:      h.ctx.Param("plan"),
+			Namespace: ctx.Param("namespace"),
+			Name:      ctx.Param("plan"),
 		},
 	}
 
@@ -83,13 +83,13 @@ func (h *PlanHandler) allow(ctx *gin.Context) int {
 func (h PlanHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list, err := model.PlanList(h.container.Db, &h.page)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []Plan{}
@@ -103,7 +103,7 @@ func (h PlanHandler) List(ctx *gin.Context) {
 		content = append(content, d)
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -111,17 +111,17 @@ func (h PlanHandler) List(ctx *gin.Context) {
 func (h PlanHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	err := h.plan.Select(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
-			h.ctx.Status(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
-			h.ctx.Status(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 			return
 		}
 	}
@@ -132,7 +132,7 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 		Destination: h.plan.DecodeDestination(),
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -140,13 +140,13 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 func (h PlanHandler) Pods(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	content := PlanPods{}
-	content.With(&h)
+	content.With(ctx, &h)
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -180,14 +180,14 @@ type PlanPods struct {
 //
 // Update the model `with` a PlanHandler
 // Fetch and build the pod lists.
-func (p *PlanPods) With(h *PlanHandler) error {
+func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 	var err error
 	p.Namespace = h.plan.Namespace
 	p.Name = h.plan.Name
 	p.Controller = []Pod{}
 	p.Source = []Pod{}
 	p.Destination = []Pod{}
-	p.Controller, err = p.buildController(h)
+	p.Controller, err = p.buildController(ctx, h)
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -209,7 +209,7 @@ func (p *PlanPods) With(h *PlanHandler) error {
 //
 // Build the controller pods list.
 // Finds pods by label.
-func (p *PlanPods) buildController(h *PlanHandler) ([]Pod, error) {
+func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, error) {
 	pods := []Pod{}
 	list, err := model.PodListByLabel(
 		h.container.Db,
@@ -220,7 +220,7 @@ func (p *PlanPods) buildController(h *PlanHandler) ([]Pod, error) {
 		nil)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return nil, err
 	}
 	if len(list) == 0 {

@@ -74,13 +74,13 @@ func (h *PvHandler) allow(ctx *gin.Context) int {
 func (h PvHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list, err := h.cluster.PvList(h.container.Db, &h.page)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []v1.PersistentVolume{}
@@ -90,7 +90,7 @@ func (h PvHandler) List(ctx *gin.Context) {
 		content = append(content, r)
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -98,29 +98,29 @@ func (h PvHandler) List(ctx *gin.Context) {
 func (h PvHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	pv := model.PV{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
-			Name:    h.ctx.Param("pv"),
+			Name:    ctx.Param("pv"),
 		},
 	}
 	err := pv.Select(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
-			h.ctx.Status(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
-			h.ctx.Status(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 			return
 		}
 	}
 	r := PV{}
 	json.Unmarshal([]byte(pv.Definition), &r)
-	h.ctx.JSON(http.StatusOK, r)
+	ctx.JSON(http.StatusOK, r)
 }
 
 // PV REST resource
