@@ -187,16 +187,16 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
 			kapi.VolumeMount{
-				Name:             "registry-secret",
-				ReadOnly:         true,
-				MountPath:        "/etc/ssl/certs/ca_bundle.pem",
-				SubPath:          "ca_bundle.pem",
+				Name:      "registry-secret",
+				ReadOnly:  true,
+				MountPath: "/etc/ssl/certs/ca_bundle.pem",
+				SubPath:   "ca_bundle.pem",
 			})
 		dc.Spec.Template.Spec.Volumes = append(dc.Spec.Template.Spec.Volumes, kapi.Volume{
 			Name: "registry-secret",
 			VolumeSource: kapi.VolumeSource{
 				Secret: &kapi.SecretVolumeSource{
-					SecretName:  name,
+					SecretName: name,
 				},
 			},
 		})
