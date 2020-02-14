@@ -31,8 +31,6 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 		return err
 	}
 
-	// plan.updateReport(report)
-
 	return nil
 }
 
@@ -85,10 +83,14 @@ func (r *GVKCompare) compare() error {
 		return err
 	}
 
-	err = r.collectNamespaceReport(unsupportedGVRs)
+	unsupportedNamspaces, err := r.collectNamespaceReport(unsupportedGVRs)
 	if err != nil {
 		log.Error(err, "Unable to evaluate GVR gaps for migrated resources")
 		return err
+	}
+
+	if len(unsupportedNamspaces) > 0 {
+		r.plan.Status.UnsupportedNamespaces = unsupportedNamspaces
 	}
 
 	return nil
@@ -178,23 +180,32 @@ func (r *GVKCompare) compareGroupVersions() ([]metav1.APIGroup, error) {
 	return append(missingGroups, missingVersions...), nil
 }
 
-func (r *GVKCompare) collectNamespaceReport(unsupportedResources []schema.GroupVersionResource) error {
-	for _, gvr := range unsupportedResources {
-		for _, namespace := range r.plan.GetSourceNamespaces() {
-
+func (r *GVKCompare) collectNamespaceReport(unsupportedResources []schema.GroupVersionResource) ([]migapi.UnsupportedNamespace, error) {
+	unsupportedNamespaces := []migapi.UnsupportedNamespace{}
+	for _, namespace := range r.plan.GetSourceNamespaces() {
+		unsupportedGVRs := []string{}
+		for _, gvr := range unsupportedResources {
 			options := metav1.ListOptions{}
 			resourceList, err := r.srcClient.Resource(gvr).Namespace(namespace).List(options)
 			if err != nil {
-				return errors.Wrapf(err, "error listing '%s' in namespace %s", gvr, namespace)
+				return nil, errors.Wrapf(err, "error listing '%s' in namespace %s", gvr, namespace)
 			}
 
 			if len(resourceList.Items) > 0 {
-				log.Info("Found: " + gvr.String())
+				unsupportedGVRs = append(unsupportedGVRs, gvr.String())
 			}
+		}
+
+		if len(unsupportedGVRs) > 0 {
+			unsupportedNamespace := migapi.UnsupportedNmespace{
+				Name: namespace,
+				UnsupportedResources: unsupportedGVRs,
+			}
+			unsupportedNamespaces = append(unsupportedNamespaces, unsupportedNamespace)
 		}
 	}
 
-	return nil
+	return unsupportedNamespaces, nil
 }
 
 func (r *GVKCompare) unsupportedServerResources(gvDiff []metav1.APIGroup) ([]schema.GroupVersionResource, error) {
