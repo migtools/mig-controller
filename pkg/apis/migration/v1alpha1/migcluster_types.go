@@ -48,7 +48,7 @@ type MigClusterSpec struct {
 	CABundle                []byte                `json:"caBundle,omitempty"`
 	StorageClasses          []StorageClass        `json:"storageClasses,omitempty"`
 	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
-	Insecure                bool                  `json:"insecure"`
+	Insecure                bool                  `json:"insecure,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
