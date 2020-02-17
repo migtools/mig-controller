@@ -1,6 +1,7 @@
 package migplan
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -20,6 +21,8 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 	if plan.HasReconciled() {
 		return nil
 	}
+
+	plan.Status.UnsupportedNamespaces = nil
 
 	gvkCompare, err := r.prepareGVKCompare(plan)
 	if err != nil {
@@ -197,8 +200,8 @@ func (r *GVKCompare) collectNamespaceReport(unsupportedResources []schema.GroupV
 		}
 
 		if len(unsupportedGVRs) > 0 {
-			unsupportedNamespace := migapi.UnsupportedNmespace{
-				Name: namespace,
+			unsupportedNamespace := migapi.UnsupportedNamespace{
+				Name:                 namespace,
 				UnsupportedResources: unsupportedGVRs,
 			}
 			unsupportedNamespaces = append(unsupportedNamespaces, unsupportedNamespace)
