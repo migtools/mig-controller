@@ -43,7 +43,7 @@ func (h PodHandler) AddRoutes(r *gin.Engine) {
 func (h PodHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	namespace := ctx.Param("ns2")
@@ -59,16 +59,16 @@ func (h PodHandler) Get(ctx *gin.Context) {
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
-			h.ctx.Status(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
-			h.ctx.Status(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 			return
 		}
 	}
 	d := Pod{}
 	d.With(&pod, &h.cluster)
-	h.ctx.JSON(http.StatusOK, d)
+	ctx.JSON(http.StatusOK, d)
 }
 
 //
@@ -76,7 +76,7 @@ func (h PodHandler) Get(ctx *gin.Context) {
 func (h PodHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	ns := model.Namespace{
@@ -88,7 +88,7 @@ func (h PodHandler) List(ctx *gin.Context) {
 	list, err := ns.PodList(h.container.Db, &h.page)
 	if err != nil {
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	content := []Pod{}
@@ -98,7 +98,7 @@ func (h PodHandler) List(ctx *gin.Context) {
 		content = append(content, d)
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -124,7 +124,7 @@ func (h LogHandler) Get(ctx *gin.Context) {
 func (h LogHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	namespace := ctx.Param("ns2")
@@ -140,28 +140,28 @@ func (h LogHandler) List(ctx *gin.Context) {
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
-			h.ctx.Status(http.StatusInternalServerError)
+			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
-			h.ctx.Status(http.StatusNotFound)
+			ctx.Status(http.StatusNotFound)
 			return
 		}
 	}
 
-	h.getLog(&pod)
+	h.getLog(ctx, &pod)
 }
 
 //
 // Get the k8s logs.
-func (h *LogHandler) getLog(pod *model.Pod) {
-	options, status := h.buildOptions()
+func (h *LogHandler) getLog(ctx *gin.Context, pod *model.Pod) {
+	options, status := h.buildOptions(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	podClient, status := h.buildClient(pod)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	request := podClient.GetLogs(pod.Name, options)
@@ -169,24 +169,24 @@ func (h *LogHandler) getLog(pod *model.Pod) {
 	if err != nil {
 		stErr, cast := err.(*errors.StatusError)
 		if cast {
-			h.ctx.String(int(stErr.ErrStatus.Code), stErr.ErrStatus.Message)
+			ctx.String(int(stErr.ErrStatus.Code), stErr.ErrStatus.Message)
 			return
 		}
 		Log.Trace(err)
-		h.ctx.Status(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	h.writeBody(stream)
+	h.writeBody(ctx, stream)
 	stream.Close()
-	h.ctx.Status(http.StatusOK)
+	ctx.Status(http.StatusOK)
 }
 
 //
 // Write the json-encoded logs in the response.
-func (h *LogHandler) writeBody(stream io.ReadCloser) {
-	h.ctx.Header("Content-Type", "application/json; charset=utf-8")
+func (h *LogHandler) writeBody(ctx *gin.Context, stream io.ReadCloser) {
+	ctx.Header("Content-Type", "application/json; charset=utf-8")
 	// Begin `[`
-	_, err := h.ctx.Writer.Write([]byte("["))
+	_, err := ctx.Writer.Write([]byte("["))
 	if err != nil {
 		return
 	}
@@ -201,20 +201,20 @@ func (h *LogHandler) writeBody(stream io.ReadCloser) {
 			break
 		}
 		if ln > 0 {
-			_, err = h.ctx.Writer.Write([]byte(","))
+			_, err = ctx.Writer.Write([]byte(","))
 			if err != nil {
 				return
 			}
 		}
 		line, _ := json.Marshal(scanner.Text())
-		_, err = h.ctx.Writer.Write(line)
+		_, err = ctx.Writer.Write(line)
 		if err != nil {
 			return
 		}
 		ln++
 	}
 	// End `]`
-	_, err = h.ctx.Writer.Write([]byte("]"))
+	_, err = ctx.Writer.Write([]byte("]"))
 	if err != nil {
 		return
 	}
@@ -224,13 +224,13 @@ func (h *LogHandler) writeBody(stream io.ReadCloser) {
 // Build the k8s log API options based on parameters.
 // The `tail` parameter indicates that pagination is relative
 // to the last log entry.
-func (h *LogHandler) buildOptions() (*v1.PodLogOptions, int) {
+func (h *LogHandler) buildOptions(ctx *gin.Context) (*v1.PodLogOptions, int) {
 	options := v1.PodLogOptions{}
-	container := h.getContainer()
+	container := h.getContainer(ctx)
 	if container != "" {
 		options.Container = container
 	}
-	tail, status := h.getTail()
+	tail, status := h.getTail(ctx)
 	if status != http.StatusOK {
 		return nil, status
 	}
@@ -260,8 +260,8 @@ func (h *LogHandler) buildClient(pod *model.Pod) (capi.PodInterface, int) {
 
 //
 // Get the `tail` parameter.
-func (h *LogHandler) getTail() (bool, int) {
-	q := h.ctx.Request.URL.Query()
+func (h *LogHandler) getTail(ctx *gin.Context) (bool, int) {
+	q := ctx.Request.URL.Query()
 	s := q.Get("tail")
 	if s == "" {
 		return false, http.StatusOK
@@ -276,8 +276,8 @@ func (h *LogHandler) getTail() (bool, int) {
 
 //
 // Get the `container` parameter.
-func (h *LogHandler) getContainer() string {
-	q := h.ctx.Request.URL.Query()
+func (h *LogHandler) getContainer(ctx *gin.Context) string {
+	q := ctx.Request.URL.Query()
 	return q.Get("container")
 }
 
@@ -312,7 +312,7 @@ func (p *Pod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerF
 	p.Namespace = pod.Namespace
 	p.Name = pod.Name
 	path := LogRoot
-	path = strings.Replace(path, ":namespace", cluster.Namespace, 1)
+	path = strings.Replace(path, ":ns1", cluster.Namespace, 1)
 	path = strings.Replace(path, ":cluster", cluster.Name, 1)
 	path = strings.Replace(path, ":ns2", p.Namespace, 1)
 	path = strings.Replace(path, ":pod", p.Name, 1)

@@ -35,8 +35,8 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 	}
 	h.cluster = model.Cluster{
 		Base: model.Base{
-			Namespace: h.ctx.Param("namespace"),
-			Name:      h.ctx.Param("cluster"),
+			Namespace: ctx.Param("ns1"),
+			Name:      ctx.Param("cluster"),
 		},
 	}
 	status = h.dsReady()
@@ -136,7 +136,7 @@ func (h ClusterHandler) AddRoutes(r *gin.Engine) {
 func (h ClusterHandler) List(ctx *gin.Context) {
 	status := h.BaseHandler.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	list, err := model.ClusterList(h.container.Db, &h.page)
@@ -154,7 +154,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		content = append(content, r)
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -162,7 +162,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 func (h ClusterHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
-		h.ctx.Status(status)
+		ctx.Status(status)
 		return
 	}
 	content := Cluster{
@@ -171,7 +171,7 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		Secret:    h.cluster.DecodeSecret(),
 	}
 
-	h.ctx.JSON(http.StatusOK, content)
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
