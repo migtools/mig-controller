@@ -95,7 +95,7 @@ const (
 	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
 	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	NsNotSupported                        = "Namespaces [] not supported. See: `unsupportedNamespaces` for details."
+	NsNotSupported                        = "Some namespaces are unsupported. See: `unsupportedNamespaces` for details."
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
 	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
@@ -177,6 +177,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Pods
 	err = r.validatePods(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// GVK
+	err = r.compareGVK(plan)
 	if err != nil {
 		log.Trace(err)
 		return err

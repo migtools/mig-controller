@@ -1,4 +1,4 @@
-package gvkcompare
+package gvk
 
 import (
 	"sort"
@@ -25,23 +25,18 @@ type GVKCompare struct {
 
 // Compare GVKs on both clusters, find unsupported GVRs
 // and check each plan source namespace for existence of unsupported GVRs
-func (r *GVKCompare) Compare() error {
+func (r *GVKCompare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	gvDiff, err := r.compareGroupVersions()
 	if err != nil {
-		return errors.Wrap(err, "Unable to compare GroupVersions between clusters")
+		return nil, errors.Wrap(err, "Unable to compare GroupVersions between clusters")
 	}
 
 	unsupportedGVRs, err := r.unsupportedServerResources(gvDiff)
 	if err != nil {
-		return errors.Wrap(err, "Unable to get unsupported resources for scrCluster")
+		return nil, errors.Wrap(err, "Unable to get unsupported resources for scrCluster")
 	}
 
-	err = r.collectNamespaceReport(unsupportedGVRs)
-	if err != nil {
-		return errors.Wrap(err, "Unable to evaluate GVR gaps for migrated resources")
-	}
-
-	return nil
+	return r.collectUnsupportedMapping(unsupportedGVRs)
 }
 
 func (r *GVKCompare) PrepareSourceDiscovery(c client.Client) error {
@@ -128,27 +123,44 @@ func (r *GVKCompare) compareGroupVersions() ([]metav1.APIGroup, error) {
 	return append(missingGroups, missingVersions...), nil
 }
 
-func (r *GVKCompare) collectNamespaceReport(unsupportedResources []schema.GroupVersionResource) error {
-	for _, namespace := range r.Plan.GetSourceNamespaces() {
-		unsupportedGVRs := []string{}
-		for _, gvr := range unsupportedResources {
-			options := metav1.ListOptions{}
-			resourceList, err := r.SrcClient.Resource(gvr).Namespace(namespace).List(options)
-			if err != nil {
-				return errors.Wrapf(err, "error listing '%s' in namespace %s", gvr, namespace)
-			}
-
-			if len(resourceList.Items) > 0 {
-				unsupportedGVRs = append(unsupportedGVRs, gvr.String())
-			}
+func (r *GVKCompare) collectUnsupportedMapping(unsupportedResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
+	unsupportedNamespaces := map[string][]schema.GroupVersionResource{}
+	for _, gvr := range unsupportedResources {
+		namespaceOccurence, err := r.occureIn(gvr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Unable to collect namespace occurences for GVR: %s", gvr)
 		}
 
-		if len(unsupportedGVRs) > 0 {
-			r.Plan.Status.AppendUnsupported(namespace, unsupportedGVRs)
+		for _, namespace := range namespaceOccurence {
+			if inNamespaces(namespace, r.Plan.GetSourceNamespaces()) {
+				_, exist := unsupportedNamespaces[namespace]
+				if exist {
+					unsupportedNamespaces[namespace] = append(unsupportedNamespaces[namespace], gvr)
+				} else {
+					unsupportedNamespaces[namespace] = []schema.GroupVersionResource{gvr}
+				}
+			}
 		}
 	}
 
-	return nil
+	return unsupportedNamespaces, nil
+}
+
+func (r *GVKCompare) occureIn(gvr schema.GroupVersionResource) ([]string, error) {
+	namespacesOccured := []string{}
+	options := metav1.ListOptions{}
+	resourceList, err := r.SrcClient.Resource(gvr).List(options)
+	if err != nil {
+		return namespacesOccured, errors.Wrapf(err, "Error while listing: %s", gvr)
+	}
+
+	for _, res := range resourceList.Items {
+		if !inNamespaces(res.GetNamespace(), namespacesOccured) {
+			namespacesOccured = append(namespacesOccured, res.GetNamespace())
+		}
+	}
+
+	return namespacesOccured, nil
 }
 
 func (r *GVKCompare) unsupportedServerResources(gvDiff []metav1.APIGroup) ([]schema.GroupVersionResource, error) {
@@ -273,4 +285,14 @@ func matchGroups(src *metav1.APIGroupList, dst *metav1.APIGroupList, missing []m
 
 	src.Groups = reducedSrc
 	dst.Groups = reducedDst
+}
+
+func inNamespaces(item string, namespaces []string) bool {
+	for _, ns := range namespaces {
+		if item == ns {
+			return true
+		}
+	}
+
+	return false
 }
