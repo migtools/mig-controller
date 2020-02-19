@@ -55,8 +55,6 @@ spec:
             startTimestamp:
               format: date-time
               type: string
-          required:
-          - observedGeneration
           type: object
   version: v1alpha1
 status:
