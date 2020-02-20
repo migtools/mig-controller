@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

@@ -1,8 +1,8 @@
 package migcluster
 
 import (
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"

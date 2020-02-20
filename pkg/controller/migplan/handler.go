@@ -1,8 +1,8 @@
 package migplan
 
 import (
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"

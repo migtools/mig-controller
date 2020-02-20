@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/fusor/mig-controller/pkg/apis"
-	"github.com/fusor/mig-controller/pkg/controller"
-	"github.com/fusor/mig-controller/pkg/webhook"
+	"github.com/konveyor/mig-controller/pkg/apis"
+	"github.com/konveyor/mig-controller/pkg/controller"
+	"github.com/konveyor/mig-controller/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"

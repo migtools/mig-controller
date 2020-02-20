@@ -23,7 +23,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/fusor/mig-controller/pkg/apis"
+	"github.com/konveyor/mig-controller/pkg/apis"
 	"github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"

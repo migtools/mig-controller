@@ -1,8 +1,8 @@
 package web
 
 import (
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"

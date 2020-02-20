@@ -3,8 +3,8 @@ package web
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
 	"net/http"
 )

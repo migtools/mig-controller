@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"

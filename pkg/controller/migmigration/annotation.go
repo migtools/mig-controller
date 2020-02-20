@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"

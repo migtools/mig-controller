@@ -17,9 +17,9 @@ limitations under the License.
 package migcluster
 
 import (
-	"github.com/fusor/mig-controller/pkg/controller/remotewatcher"
-	"github.com/fusor/mig-controller/pkg/imagescheme"
-	"github.com/fusor/mig-controller/pkg/remote"
+	"github.com/konveyor/mig-controller/pkg/controller/remotewatcher"
+	"github.com/konveyor/mig-controller/pkg/imagescheme"
+	"github.com/konveyor/mig-controller/pkg/remote"
 	appsv1 "github.com/openshift/api/apps/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/types"

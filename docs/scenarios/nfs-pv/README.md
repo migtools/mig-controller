@@ -13,7 +13,7 @@ This scenario walks through Migration of a stateful OpenShift app with Persisten
 
 ### 1. Prerequisites
 
-Referring to the getting started [README.md](https://github.com/fusor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
+Referring to the getting started [README.md](https://github.com/konveyor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
 
 |Resource|Purpose|
 |---|---|
@@ -21,10 +21,10 @@ Referring to the getting started [README.md](https://github.com/fusor/mig-contro
 |`Cluster`|describes coordinates of any _remote_ clusters (at least one)|
 |`MigStorage`|provides config for storing resource YAML in transit between clusters |
 
-Before proceeding, be sure that you have at least one available NFS PV on your *source cluster* that our sample MySQL app will be able to bind to. You can set up the NFS server however you like. We used Ansible Playbooks from the [mig-ci](https://github.com/fusor/mig-ci) repo to provision the NFS PVs used in this scenario, but other NFS server + PV configurations compatible with OpenShift should work equally well.
+Before proceeding, be sure that you have at least one available NFS PV on your *source cluster* that our sample MySQL app will be able to bind to. You can set up the NFS server however you like. We used Ansible Playbooks from the [mig-ci](https://github.com/konveyor/mig-ci) repo to provision the NFS PVs used in this scenario, but other NFS server + PV configurations compatible with OpenShift should work equally well.
 
-- [nfs_server_deploy.yml](https://github.com/fusor/mig-ci/blob/master/nfs_server_deploy.yml)
-- [nfs_provision_pvs.yml](https://github.com/fusor/mig-ci/blob/master/nfs_provision_pvs.yml)
+- [nfs_server_deploy.yml](https://github.com/konveyor/mig-ci/blob/master/nfs_server_deploy.yml)
+- [nfs_provision_pvs.yml](https://github.com/konveyor/mig-ci/blob/master/nfs_provision_pvs.yml)
 
 Once you have at least one PV available with '10Gi' capacity (required by the mysql template we'll be using), you can proceed with the scenario.
 
@@ -35,7 +35,7 @@ pv1       100Gi      RWO,ROX,RWX    Retain           Available
 pv2       100Gi      RWO,ROX,RWX    Retain           Available
 ```
 
-The sample app used in this scenario has been adapted from the [mysql_pvc](https://github.com/fusor/ocp-mig-test-data/tree/master/roles/pvc/mysql_pvc) Ansible role.
+The sample app used in this scenario has been adapted from the [mysql_pvc](https://github.com/konveyor/ocp-mig-test-data/tree/master/roles/pvc/mysql_pvc) Ansible role.
 
 #### 1.1. Prerequisites - _Copy_
 
@@ -121,7 +121,7 @@ Filesystem                                1K-blocks  Used      Available  Use%  
 
 To migrate our `mysql-persistent` namespace, we'll ensure that the `namespaces` field of our MigPlan includes mysql-persistent. 
 
-Modify the contents of [config/samples/mig-plan.yaml](https://github.com/fusor/mig-controller/blob/master/config/samples/mig-plan.yaml), adding 'mysql-persistent' to 'namespaces'.
+Modify the contents of [config/samples/mig-plan.yaml](https://github.com/konveyor/mig-controller/blob/master/config/samples/mig-plan.yaml), adding 'mysql-persistent' to 'namespaces'.
 
 ```yaml
 apiVersion: migration.openshift.io/v1alpha1
@@ -137,7 +137,7 @@ spec:
 
 We also need to create a MigMigration with `quiescePods: true` since only one MySQL Pod can hold the lock at once, and this scenario covers the 'move' PV action that re-mounts the *source cluster* NFS PVs on the *destination cluster*
 
-Modify the contents of [config/samples/mig-migration.yaml](https://github.com/fusor/mig-controller/blob/master/config/samples/mig-migration.yaml), changing `quiescePods` to 'true'.
+Modify the contents of [config/samples/mig-migration.yaml](https://github.com/konveyor/mig-controller/blob/master/config/samples/mig-migration.yaml), changing `quiescePods` to 'true'.
 
 ```yaml
 apiVersion: migration.openshift.io/v1alpha1

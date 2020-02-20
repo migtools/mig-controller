@@ -1,9 +1,9 @@
 package migplan
 
 import (
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migctl "github.com/fusor/mig-controller/pkg/controller/migmigration"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"

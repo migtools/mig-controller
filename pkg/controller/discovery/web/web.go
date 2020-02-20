@@ -1,12 +1,12 @@
 package web
 
 import (
-	"github.com/fusor/mig-controller/pkg/controller/discovery/container"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
-	"github.com/fusor/mig-controller/pkg/logging"
-	"github.com/fusor/mig-controller/pkg/settings"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/container"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	"github.com/konveyor/mig-controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"

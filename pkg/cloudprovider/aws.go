@@ -312,7 +312,7 @@ func (p *AWSProvider) Test(secret *kapi.Secret) error {
 		err = test.Run()
 	case VolumeSnapshot:
 		// Disable volume snapshot test until
-		// https://github.com/fusor/mig-controller/issues/256 is resolved
+		// https://github.com/konveyor/mig-controller/issues/256 is resolved
 		/*test := Ec2Test{
 			url:    p.GetURL(),
 			region: p.GetRegion(),

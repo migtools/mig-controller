@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"

@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 func init() {

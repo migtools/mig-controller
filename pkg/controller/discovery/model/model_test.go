@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/fusor/mig-controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/logging"
 	"github.com/onsi/gomega"
 	"os"
 	pathlib "path"

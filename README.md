@@ -15,7 +15,7 @@ __2. Use mig-operator to deploy Migration Tools to both the _source_ and _destin
 
 Use mig-operator to install selected components of Migration Tooling (mig-controller, mig-ui, velero) onto your source and destination OpenShift clusters.
 
-After installing mig-operator, you can select which components should be installed by creating a [MigrationController CR](https://github.com/fusor/mig-operator#migration-controller-installation):
+After installing mig-operator, you can select which components should be installed by creating a [MigrationController CR](https://github.com/konveyor/mig-operator#migration-controller-installation):
 
 ```
 apiVersion: migration.openshift.io/v1alpha1
@@ -29,7 +29,7 @@ spec:
 [...]
 ```
 
-See mig-operator docs for more details: https://github.com/fusor/mig-operator
+See mig-operator docs for more details: https://github.com/konveyor/mig-operator
 
 ---
 
@@ -42,15 +42,15 @@ Before mig-controller can run a Migration, you'll need to provide it with:
 
  These items can be specified by "Mig" CRs. For the source of truth on what will be accepted in CR fields, see the appropriate _types.go_ file.
 
-- [MigPlan](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migplan_types.go)
-- [MigCluster](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migcluster_types.go)
-- [MigStorage](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migstorage_types.go)
-- [MigMigration](https://github.com/fusor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migmigration_types.go)
+- [MigPlan](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migplan_types.go)
+- [MigCluster](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migcluster_types.go)
+- [MigStorage](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migstorage_types.go)
+- [MigMigration](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migmigration_types.go)
 - [Cluster](https://github.com/kubernetes/cluster-registry/blob/master/pkg/apis/clusterregistry/v1alpha1/types.go)
 
 ---
 
-*__To make it easier to run your first Migration with mig-controller__*, we've published a set of annotated sample CRs in [config/samples](https://github.com/fusor/mig-controller/tree/master/config/samples) that you can walk through and fill out values on. The first step will be to run `make samples`, which will copy these to `migsamples`.
+*__To make it easier to run your first Migration with mig-controller__*, we've published a set of annotated sample CRs in [config/samples](https://github.com/konveyor/mig-controller/tree/master/config/samples) that you can walk through and fill out values on. The first step will be to run `make samples`, which will copy these to `migsamples`.
 
 ```
 make samples

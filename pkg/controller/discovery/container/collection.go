@@ -2,7 +2,7 @@ package container
 
 import (
 	"database/sql"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 

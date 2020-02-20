@@ -3,7 +3,7 @@ package model
 import (
 	"database/sql"
 	"encoding/json"
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/mattn/go-sqlite3"
 	"k8s.io/api/core/v1"
 )

@@ -3,9 +3,9 @@ package container
 import (
 	"context"
 	"database/sql"
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
-	"github.com/fusor/mig-controller/pkg/logging"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	"github.com/konveyor/mig-controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"

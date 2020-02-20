@@ -26,8 +26,8 @@ import (
 	"sort"
 	"strings"
 
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
