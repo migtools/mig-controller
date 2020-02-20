@@ -30,22 +30,22 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.GVKCompare, error) {
-	gvkCompare := &gvk.GVKCompare{
+func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, error) {
+	gvkCompare := &gvk.Compare{
 		Plan: plan,
 	}
 
-	err := gvkCompare.PrepareSourceDiscovery(r)
+	err := gvkCompare.NewSourceDiscovery(r)
 	if err != nil {
 		return nil, err
 	}
 
-	err = gvkCompare.PrepareDestinationDiscovery(r)
+	err = gvkCompare.NewDestinationDiscovery(r)
 	if err != nil {
 		return nil, err
 	}
 
-	err = gvkCompare.PrepareSourceClient(r)
+	err = gvkCompare.NewSourceClient(r)
 	if err != nil {
 		return nil, err
 	}
