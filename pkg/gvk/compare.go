@@ -15,23 +15,35 @@ import (
 	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
+var crdGVR = schema.GroupVersionResource{
+	Group:    "apiextensions.k8s.io",
+	Version:  "v1beta1",
+	Resource: "customresourcedefinitions",
+}
+
 // Compare is a store for discovery and dynamic clients to do GVK compare
 type Compare struct {
 	Plan         *migapi.MigPlan
-	SrcDiscovery *discovery.DiscoveryClient
-	DstDiscovery *discovery.DiscoveryClient
+	SrcDiscovery discovery.DiscoveryInterface
+	DstDiscovery discovery.DiscoveryInterface
 	SrcClient    dynamic.Interface
 }
 
 // Compare GVKs on both clusters, find unsupported GVRs
 // and check each plan source namespace for existence of unsupported GVRs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
-	gvDiff, err := r.compareGroupVersions()
+	srcGroupList, err := r.SrcDiscovery.ServerGroups()
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to compare GroupVersions between clusters")
+		return nil, errors.Wrap(err, "Unable to fetch server groups for a srcCluster")
 	}
 
-	unsupportedGVRs, err := r.unsupportedServerResources(gvDiff)
+	dstGroupList, err := r.DstDiscovery.ServerGroups()
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to fetch server groups for a dstCluster")
+	}
+
+	gvDiff := compareGroupVersions(srcGroupList, dstGroupList)
+	unsupportedGVRs, err := r.unsupportedResources(gvDiff)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to get unsupported resources for scrCluster")
 	}
@@ -113,22 +125,12 @@ func (r *Compare) getClient(c client.Client, cluster *migapi.MigCluster) (dynami
 	return dynamic.NewForConfig(config)
 }
 
-func (r *Compare) compareGroupVersions() ([]metav1.APIGroup, error) {
-	srcGroupList, err := r.SrcDiscovery.ServerGroups()
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server groups for a srcCluster")
-	}
+func compareGroupVersions(src *metav1.APIGroupList, dst *metav1.APIGroupList) []metav1.APIGroup {
+	missingGroups := missingGroups(src.Groups, dst.Groups)
+	matchGroups(src, dst, missingGroups)
+	missingVersions := missingVersions(src.Groups, dst.Groups)
 
-	dstGroupList, err := r.DstDiscovery.ServerGroups()
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server groups for a dstCluster")
-	}
-
-	missingGroups := missingGroups(srcGroupList.Groups, dstGroupList.Groups)
-	matchGroups(srcGroupList, dstGroupList, missingGroups)
-	missingVersions := missingVersions(srcGroupList.Groups, dstGroupList.Groups)
-
-	return append(missingGroups, missingVersions...), nil
+	return append(missingGroups, missingVersions...)
 }
 
 func (r *Compare) collectUnsupportedMapping(unsupportedResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
@@ -171,7 +173,7 @@ func (r *Compare) occureIn(gvr schema.GroupVersionResource) ([]string, error) {
 	return namespacesOccured, nil
 }
 
-func (r *Compare) unsupportedServerResources(gvDiff []metav1.APIGroup) ([]schema.GroupVersionResource, error) {
+func (r *Compare) unsupportedResources(gvDiff []metav1.APIGroup) ([]schema.GroupVersionResource, error) {
 	unsupportedGVRs := []schema.GroupVersionResource{}
 	for _, gr := range gvDiff {
 		for _, version := range gr.Versions {
@@ -199,14 +201,8 @@ func (r *Compare) unsupportedServerResources(gvDiff []metav1.APIGroup) ([]schema
 }
 
 func (r *Compare) excludeCRDs(unsupportedGVRs *[]schema.GroupVersionResource) error {
-	crd := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  "v1beta1",
-		Resource: "customresourcedefinitions",
-	}
-
 	options := metav1.ListOptions{}
-	crdList, err := r.SrcClient.Resource(crd).List(options)
+	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
 	if err != nil {
 		return errors.Wrap(err, "Error while listing CRDs")
 	}
