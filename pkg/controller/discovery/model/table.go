@@ -399,7 +399,7 @@ func (t Table) Get(model interface{}) error {
 		Log.Trace(err)
 	}
 
-	return nil
+	return err
 }
 
 //
@@ -460,7 +460,8 @@ func (t Table) Count(model interface{}, options ListOptions) (int, error) {
 		return 0, err
 	}
 	count := 0
-	row := t.Db.QueryRow(stmt)
+	params := t.Params(fields)
+	row := t.Db.QueryRow(stmt, params...)
 	if err != nil {
 		Log.Trace(err)
 		return 0, err
