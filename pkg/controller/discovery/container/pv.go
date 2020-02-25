@@ -78,7 +78,13 @@ func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
 
 func (r *PvCollection) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := r.ds.Cluster.PvList(r.ds.Container.Db, nil)
+	list, err := model.PV{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}.List(
+		r.ds.Container.Db,
+		model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		return nil, err

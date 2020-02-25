@@ -43,15 +43,21 @@ func Create() (*sql.DB, error) {
 	if err != nil {
 		panic(err)
 	}
-	statements := []string{
-		Pragma,
-		ClusterTableDDL,
-		NamespaceTableDDL,
-		PvTableDDL,
-		PodTableDDL,
-		PodLabelTableDDL,
-		PodLabelIndexDDL,
-		PlanTableDDL,
+	statements := []string{Pragma}
+	models := []interface{}{
+		&Label{},
+		&Cluster{},
+		&Plan{},
+		&Namespace{},
+		&Pod{},
+		&PV{},
+	}
+	for _, m := range models {
+		ddl, err := Table{}.DDL(m)
+		if err != nil {
+			panic(err)
+		}
+		statements = append(statements, ddl...)
 	}
 	Mutex.RLock()
 	defer Mutex.RUnlock()
@@ -76,6 +82,13 @@ type DB interface {
 	Exec(string, ...interface{}) (sql.Result, error)
 	Query(string, ...interface{}) (*sql.Rows, error)
 	QueryRow(string, ...interface{}) *sql.Row
+}
+
+//
+// Database interface.
+// Support model `Scan` taking either sql.Row or sql.Rows.
+type Row interface {
+	Scan(...interface{}) error
 }
 
 //
@@ -120,36 +133,64 @@ func (p *Page) Slice(collection interface{}) {
 // Model
 // Each model represents a table in the DB.
 type Model interface {
+	// Get the primary key.
+	Pk() string
 	// Set the primary key based on attributes.
 	SetPk()
-	// Get the model.Base.
-	GetBase() *Base
+	// Get model meta-data.
+	Meta() *Meta
 	// Fetch the model from the DB and update the fields.
 	// Returns error=`NotFound` when not found.
-	Select(DB) error
+	Get(DB) error
 	// Insert into the DB.
 	Insert(DB) error
 	// Update in the DB.
 	Update(DB) error
 	// Delete from the DB.
 	Delete(DB) error
+	// Get labels.
+	Labels() Labels
+}
+
+//
+// Model meta-data.
+type Meta struct {
+	// Primary key.
+	PK string
+	// The k8s resource UID.
+	UID string
+	// The k8s resourceVersion.
+	Version uint64
+	// The k8s resource namespace.
+	Namespace string
+	// The k8s resource name.
+	Name string
 }
 
 //
 // Base Model
 type Base struct {
 	// Primary key (digest).
-	PK string
+	PK string `sql:"pk"`
 	// The k8s resource UID.
-	UID string
+	UID string `sql:"const,unique(a)"`
 	// The k8s resourceVersion.
-	Version string
+	Version string `sql:""`
 	// The k8s resource namespace.
-	Namespace string
+	Namespace string `sql:"const,unique(b),key"`
 	// The k8s resource name.
-	Name string
+	Name string `sql:"const,unique(b),key"`
+	// The raw json-encoded k8s resource.
+	Object string `sql:""`
 	// The (optional) cluster foreign key.
-	Cluster string
+	Cluster string `sql:"const,fk:Cluster(pk),unique(a),unique(b),key"`
+	// Labels.
+	labels Labels
+}
+
+// Get the primary key.
+func (m *Base) Pk() string {
+	return m.PK
 }
 
 //
@@ -165,58 +206,82 @@ func (m *Base) SetPk() {
 }
 
 //
-// Get base.
-func (m *Base) GetBase() *Base {
-	return m
-}
-
-// Get `version` as a unit64.
-// Returns `0` on parse error.
-func (m *Base) IntVersion() uint64 {
-	version, err := strconv.ParseUint(m.GetBase().Version, 10, 64)
-	if err != nil {
-		Log.Trace(err)
-		return 0
+// Get the meta-data.
+func (m *Base) Meta() *Meta {
+	n, _ := strconv.ParseUint(m.Version, 10, 64)
+	return &Meta{
+		PK:        m.PK,
+		UID:       m.UID,
+		Version:   n,
+		Namespace: m.Namespace,
+		Name:      m.Name,
 	}
-	return version
 }
 
 //
-// Fetch the model from the DB.
-// Optional for some models.
-func (m *Base) Select(db DB) error {
-	return NotFound
+// Get labels.
+func (m *Base) Labels() Labels {
+	return m.labels
 }
 
 //
 // Fetch referenced cluster.
 func (m *Base) GetCluster(db DB) (*Cluster, error) {
 	cluster := &Cluster{
-		Base: Base{
+		CR: CR{
 			PK: m.Cluster,
 		},
 	}
-	err := cluster.Select(db)
+	err := cluster.Get(db)
 	return cluster, err
 }
 
 //
-// Labels
-type Labels map[string]string
-
-//
-// A label.
-type Label struct {
-	// Label name.
-	Name string
-	// Label value.
-	Value string
+// Custom Resource.
+type CR struct {
+	// Primary key (digest).
+	PK string `sql:"pk"`
+	// The k8s resource UID.
+	UID string `sql:"const,unique(a)"`
+	// The k8s resourceVersion.
+	Version string `sql:""`
+	// The k8s resource namespace.
+	Namespace string `sql:"const,unique(b),key"`
+	// The k8s resource name.
+	Name string `sql:"const,unique(b),key"`
+	// The raw json-encoded k8s resource.
+	Object string `sql:""`
 }
 
 //
-// Labels used in label queries.
-type LabelFilter []Label
+// Get the primary key.
+func (m *CR) Pk() string {
+	return m.PK
+}
 
-func AsLabel(name, value string) Label {
-	return Label{Name: name, Value: value}
+//
+// Set the primary key.
+func (m *CR) SetPk() {
+	h := sha1.New()
+	h.Write([]byte(m.UID))
+	m.PK = fmt.Sprintf("%x", h.Sum(nil))
+}
+
+//
+// Get the model meta-data.
+func (m *CR) Meta() *Meta {
+	n, _ := strconv.ParseUint(m.Version, 10, 64)
+	return &Meta{
+		PK:        m.PK,
+		UID:       m.UID,
+		Version:   n,
+		Namespace: m.Namespace,
+		Name:      m.Name,
+	}
+}
+
+//
+// Get associated labels.
+func (m *CR) Labels() Labels {
+	return Labels{}
 }

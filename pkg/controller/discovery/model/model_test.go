@@ -8,10 +8,17 @@ import (
 	"testing"
 )
 
+var uid = 0
+
 func init() {
 	Settings.Load()
 	log := logging.WithName("Test")
 	Log = &log
+}
+
+func UID() string {
+	uid++
+	return string(uid)
 }
 
 func TestModels(t *testing.T) {
@@ -24,31 +31,32 @@ func TestModels(t *testing.T) {
 
 	// Cluster
 	cluster := Cluster{
-		Base: Base{
+		CR: CR{
+			UID:       UID(),
 			Namespace: "ns1",
-			Name:      "cl",
+			Name:      "c1",
 		},
 	}
 	err = cluster.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
-	err = cluster.Select(db)
+	err = cluster.Get(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = cluster.Update(db)
 	g.Expect(err).To(gomega.BeNil())
 
 	// Plan
 	plan := Plan{
-		Base: Base{
+		CR: CR{
+			UID:       UID(),
 			Namespace: "ns1",
-			Name:      "cl",
+			Name:      "p1",
+			Object:    "{}",
 		},
-		Source:      "{}",
-		Destination: "{}",
 	}
 
 	err = plan.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
-	err = plan.Select(db)
+	err = plan.Get(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = plan.Update(db)
 	g.Expect(err).To(gomega.BeNil())
@@ -56,82 +64,127 @@ func TestModels(t *testing.T) {
 	// Namespaces
 	ns := Namespace{
 		Base: Base{
+			UID:     UID(),
 			Name:    "ns1",
 			Cluster: cluster.PK,
 		},
 	}
 	err = ns.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
+	ns2 := Namespace{
+		Base: Base{
+			UID:     UID(),
+			Name:    "ns2",
+			Cluster: cluster.PK,
+		},
+	}
+	err = ns2.Insert(db)
+	g.Expect(err).To(gomega.BeNil())
 
 	// Pod
-	pod := Pod{
+	labels := Labels{
+		"app":     "cam",
+		"owner":   "redhat",
+		"purpose": "testing",
+	}
+
+	pod := &Pod{
 		Base: Base{
+			UID:       UID(),
 			Namespace: ns.Name,
 			Name:      "pod1",
 			Cluster:   cluster.PK,
+			Object:    "{}",
+			labels:    labels,
 		},
-		Definition: "{}",
-		labels:     Labels{"app": "cam"},
 	}
 	err = pod.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
-	err = pod.addLabels(db)
 	g.Expect(err).To(gomega.BeNil())
-	err = pod.Select(db)
+	err = pod.Get(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = pod.Update(db)
+	g.Expect(err).To(gomega.BeNil())
+	pod2 := Pod{
+		Base: Base{
+			UID:       UID(),
+			Namespace: "ns2",
+			Name:      "pod2",
+			Cluster:   cluster.PK,
+			Object:    "{}",
+		},
+	}
+	err = pod2.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
 
 	// PV
 	pv := PV{
 		Base: Base{
+			UID:       UID(),
 			Namespace: ns.Name,
 			Name:      "pv1",
 			Cluster:   cluster.PK,
+			Object:    "{}",
 		},
-		Definition: "{}",
 	}
 	err = pv.Insert(db)
 	g.Expect(err).To(gomega.BeNil())
-	err = pv.Select(db)
+	err = pv.Get(db)
 	g.Expect(err).To(gomega.BeNil())
 	err = pv.Update(db)
 	g.Expect(err).To(gomega.BeNil())
 
 	// Listing
-	labelFilter := LabelFilter{Label{Name: "app", Value: "cam"}}
 
-	cList, err := ClusterList(db, &Page{Limit: 1})
+	cList, err := Cluster{}.List(db, ListOptions{})
 	g.Expect(err).To(gomega.BeNil())
 	g.Expect(len(cList)).To(gomega.Equal(1))
 
-	nsList, err := cluster.NsList(db, &Page{Limit: 1})
+	nsList, err := Namespace{
+		Base: Base{
+			Cluster: cluster.PK,
+		},
+	}.List(db, ListOptions{Sort: []int{4, 5}})
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(len(nsList)).To(gomega.Equal(1))
+	g.Expect(len(nsList)).To(gomega.Equal(2))
 
-	podList, err := cluster.PodList(db, &Page{Limit: 1})
+	podList, err := Pod{
+		Base: Base{
+			Cluster:   cluster.PK,
+			Namespace: ns.Name,
+		},
+	}.List(db, ListOptions{})
 	g.Expect(err).To(gomega.BeNil())
 	g.Expect(len(podList)).To(gomega.Equal(1))
 
-	podList, err = ns.PodList(db, &Page{Limit: 1})
+	podList, err = Pod{
+		Base: Base{
+			Cluster: cluster.PK,
+		},
+	}.List(db,
+		ListOptions{
+			Page: &Page{Limit: 10},
+			Labels: Labels{
+				"app": "cam",
+			},
+		})
 	g.Expect(err).To(gomega.BeNil())
 	g.Expect(len(podList)).To(gomega.Equal(1))
+	g.Expect(podList[0].Name).To(gomega.Equal(pod.Name))
 
-	podList, err = cluster.PodListByLabel(db, labelFilter, &Page{Limit: 1})
+	// count
+	count, err := Table{db}.Count(&Pod{}, ListOptions{})
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(len(podList) == 1).To(gomega.BeTrue())
+	g.Expect(count).To(gomega.Equal(2))
 
-	podList, err = ns.PodListByLabel(db, labelFilter, &Page{Limit: 1})
+	count, err = Table{db}.Count(
+		&Pod{}, ListOptions{
+			Labels: Labels{
+				"app": "cam",
+			},
+		})
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(len(podList)).To(gomega.Equal(1))
-
-	podList, err = PodListByLabel(db, labelFilter, &Page{Limit: 1})
-	g.Expect(err).To(gomega.BeNil())
-	g.Expect(len(podList)).To(gomega.Equal(1))
-
-	pvList, err := cluster.PvList(db, &Page{Limit: 1})
-	g.Expect(err).To(gomega.BeNil())
-	g.Expect(len(pvList) == 1).To(gomega.BeTrue())
+	g.Expect(count).To(gomega.Equal(1))
 
 	// Delete all.
 	err = pv.Delete(db)
@@ -144,4 +197,5 @@ func TestModels(t *testing.T) {
 	g.Expect(err).To(gomega.BeNil())
 	err = cluster.Delete(db)
 	g.Expect(err).To(gomega.BeNil())
+
 }

@@ -55,7 +55,7 @@ func (h PodHandler) Get(ctx *gin.Context) {
 			Name:      name,
 		},
 	}
-	err := pod.Select(h.container.Db)
+	err := pod.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -79,13 +79,16 @@ func (h PodHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	ns := model.Namespace{
+	list, err := model.Pod{
 		Base: model.Base{
-			Cluster: h.cluster.PK,
-			Name:    ctx.Param("ns2"),
+			Cluster:   h.cluster.PK,
+			Namespace: ctx.Param("ns2"),
 		},
-	}
-	list, err := ns.PodList(h.container.Db, &h.page)
+	}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -136,7 +139,7 @@ func (h LogHandler) List(ctx *gin.Context) {
 			Name:      name,
 		},
 	}
-	err := pod.Select(h.container.Db)
+	err := pod.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -330,7 +333,7 @@ func (p *Pod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerF
 // Get a filtered list of containers.
 func (p *Pod) filterContainers(pod *model.Pod, filters []ContainerFilter) []v1.Container {
 	list := []v1.Container{}
-	v1pod := pod.DecodeDefinition()
+	v1pod := pod.DecodeObject()
 	podContainers := v1pod.Spec.Containers
 	if podContainers == nil {
 		return list

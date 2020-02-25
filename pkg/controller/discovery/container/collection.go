@@ -111,7 +111,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 		return err
 	}
 	for _, m := range stored {
-		dispositions[m.GetBase().PK] = &Disposition{
+		dispositions[m.Meta().PK] = &Disposition{
 			stored: m,
 		}
 	}
@@ -123,8 +123,8 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 	for _, m := range discovered {
 		m.SetPk()
 		collection.GetDs().HasDiscovered(m)
-		if dpn, found := dispositions[m.GetBase().PK]; !found {
-			dispositions[m.GetBase().PK] = &Disposition{
+		if dpn, found := dispositions[m.Meta().PK]; !found {
+			dispositions[m.Meta().PK] = &Disposition{
 				discovered: m,
 			}
 		} else {
@@ -164,7 +164,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 		if dpn.discovered == nil || dpn.stored == nil {
 			continue
 		}
-		if dpn.discovered.GetBase().Version == dpn.stored.GetBase().Version {
+		if dpn.discovered.Meta().Version == dpn.stored.Meta().Version {
 			continue
 		}
 		err := dpn.discovered.Update(tx)
@@ -173,7 +173,6 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 			return err
 		}
 	}
-
 	err = tx.Commit()
 	if err != nil {
 		Log.Trace(err)

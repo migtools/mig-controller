@@ -2,9 +2,9 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	auth "k8s.io/api/authorization/v1"
-	"k8s.io/api/core/v1"
 	"net/http"
 	"time"
 )
@@ -34,7 +34,7 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 		return status
 	}
 	h.cluster = model.Cluster{
-		Base: model.Base{
+		CR: model.CR{
 			Namespace: ctx.Param("ns1"),
 			Name:      ctx.Param("cluster"),
 		},
@@ -59,8 +59,8 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 // be simplified.
 func (h *ClusterScoped) getSAR() auth.SelfSubjectAccessReview {
 	var attributes *auth.ResourceAttributes
-	if h.cluster.Secret != "" {
-		sr := h.cluster.DecodeSecret()
+	sr := h.cluster.DecodeObject().Spec.ServiceAccountSecretRef
+	if sr != nil {
 		attributes = &auth.ResourceAttributes{
 			Group:     "apps",
 			Resource:  "secret",
@@ -94,7 +94,7 @@ func (h *ClusterScoped) dsReady() int {
 		mark := time.Now()
 		if ds, found := h.container.GetDs(&h.cluster); found {
 			if ds.IsReady() {
-				h.cluster.Select(h.container.Db)
+				h.cluster.Get(h.container.Db)
 				return http.StatusOK
 			}
 		}
@@ -139,7 +139,11 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.ClusterList(h.container.Db, &h.page)
+	list, err := model.Cluster{}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+		})
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
@@ -149,7 +153,7 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		r := Cluster{
 			Namespace: m.Namespace,
 			Name:      m.Name,
-			Secret:    m.DecodeSecret(),
+			Object:    m.DecodeObject(),
 		}
 		content = append(content, r)
 	}
@@ -168,7 +172,7 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	content := Cluster{
 		Namespace: h.cluster.Namespace,
 		Name:      h.cluster.Name,
-		Secret:    h.cluster.DecodeSecret(),
+		Object:    h.cluster.DecodeObject(),
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -181,6 +185,6 @@ type Cluster struct {
 	Namespace string `json:"namespace"`
 	// Cluster k8s name.
 	Name string `json:"name"`
-	// Cluster json-encode secret ref.
-	Secret *v1.ObjectReference `json:"secret"`
+	// Raw k8s object.
+	Object *migapi.MigCluster `json:"object"`
 }

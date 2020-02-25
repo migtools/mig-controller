@@ -336,7 +336,11 @@ func (h RootNsHandler) List(ctx *gin.Context) {
 	list := []string{}
 	set := map[string]bool{}
 	// Cluster
-	clusters, err := model.ClusterList(h.container.Db, &h.page)
+	clusters, err := model.Cluster{}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+		})
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
@@ -349,7 +353,11 @@ func (h RootNsHandler) List(ctx *gin.Context) {
 
 	}
 	// Plan
-	plans, err := model.PlanList(h.container.Db, &h.page)
+	plans, err := model.Plan{}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+		})
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return

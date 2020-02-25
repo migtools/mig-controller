@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"net/http"
 )
 
@@ -33,7 +34,16 @@ func (h NsHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := h.cluster.NsList(h.container.Db, &h.page)
+	list, err := model.Namespace{
+		Base: model.Base{
+			Cluster: h.cluster.PK,
+		},
+	}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+			Sort: []int{5},
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
