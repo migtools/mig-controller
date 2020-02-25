@@ -119,7 +119,7 @@ func (r *Container) Prune() error {
 	if r.pruned {
 		return nil
 	}
-	stored, err := model.ClusterList(r.Db, nil)
+	stored, err := model.Cluster{}.List(r.Db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		return err

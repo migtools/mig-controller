@@ -2,7 +2,6 @@ package web
 
 import (
 	"database/sql"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
@@ -37,16 +36,27 @@ func (h PvHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := h.cluster.PvList(h.container.Db, &h.page)
+	list, err := model.PV{
+		Base: model.Base{
+			Cluster: h.cluster.PK,
+		},
+	}.List(
+		h.container.Db,
+		model.ListOptions{
+			Page: &h.page,
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []v1.PersistentVolume{}
+	content := []PV{}
 	for _, pv := range list {
-		r := v1.PersistentVolume{}
-		json.Unmarshal([]byte(pv.Definition), &r)
+		r := PV{
+			Namespace: pv.Namespace,
+			Name:      pv.Name,
+			Object:    pv.DecodeObject(),
+		}
 		content = append(content, r)
 	}
 
@@ -67,7 +77,7 @@ func (h PvHandler) Get(ctx *gin.Context) {
 			Name:    ctx.Param("pv"),
 		},
 	}
-	err := pv.Select(h.container.Db)
+	err := pv.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -78,10 +88,18 @@ func (h PvHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	r := PV{}
-	json.Unmarshal([]byte(pv.Definition), &r)
+	r := PV{
+		Namespace: pv.Namespace,
+		Name:      pv.Name,
+		Object:    pv.DecodeObject(),
+	}
+
 	ctx.JSON(http.StatusOK, r)
 }
 
 // PV REST resource
-type PV = v1.PersistentVolume
+type PV struct {
+	Namespace string
+	Name      string
+	Object    *v1.PersistentVolume
+}

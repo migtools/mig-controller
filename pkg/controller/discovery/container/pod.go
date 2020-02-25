@@ -77,7 +77,13 @@ func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
 
 func (r *PodCollection) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := r.ds.Cluster.PodList(r.ds.Container.Db, nil)
+	list, err := model.Pod{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}.List(
+		r.ds.Container.Db,
+		model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		return nil, err

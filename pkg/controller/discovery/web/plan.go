@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"github.com/gin-gonic/gin"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
@@ -43,12 +44,12 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 		return status
 	}
 	h.plan = model.Plan{
-		Base: model.Base{
+		CR: model.CR{
 			Namespace: ctx.Param("ns1"),
 			Name:      ctx.Param("plan"),
 		},
 	}
-	err := h.plan.Select(h.container.Db)
+	err := h.plan.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -89,7 +90,7 @@ func (h PlanHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.PlanList(h.container.Db, &h.page)
+	list, err := model.Plan{}.List(h.container.Db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -98,10 +99,9 @@ func (h PlanHandler) List(ctx *gin.Context) {
 	content := []Plan{}
 	for _, m := range list {
 		d := Plan{
-			Namespace:   m.Namespace,
-			Name:        m.Name,
-			Source:      m.DecodeSource(),
-			Destination: m.DecodeDestination(),
+			Namespace: m.Namespace,
+			Name:      m.Name,
+			Object:    m.DecodeObject(),
 		}
 		content = append(content, d)
 	}
@@ -117,7 +117,7 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	err := h.plan.Select(h.container.Db)
+	err := h.plan.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -129,10 +129,9 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 		}
 	}
 	content := Plan{
-		Namespace:   h.plan.Namespace,
-		Name:        h.plan.Name,
-		Source:      h.plan.DecodeSource(),
-		Destination: h.plan.DecodeDestination(),
+		Namespace: h.plan.Namespace,
+		Name:      h.plan.Name,
+		Object:    h.plan.DecodeObject(),
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -159,10 +158,8 @@ type Plan struct {
 	Namespace string `json:"namespace"`
 	// The k8s name.
 	Name string `json:"name"`
-	// A reference to the source cluster.
-	Source *v1.ObjectReference `json:"source"`
-	// A reference to the destination cluster.
-	Destination *v1.ObjectReference `json:"destination"`
+	// Raw k8s object.
+	Object *migapi.MigPlan `json:"object"`
 }
 
 //
@@ -191,16 +188,17 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 	p.Source = []Pod{}
 	p.Destination = []Pod{}
 	p.Controller, err = p.buildController(ctx, h)
+	object := h.plan.DecodeObject()
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	p.Destination, err = p.buildPods(h, h.plan.DecodeDestination())
+	p.Destination, err = p.buildPods(h, object.Spec.SrcMigClusterRef)
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	p.Source, err = p.buildPods(h, h.plan.DecodeSource())
+	p.Source, err = p.buildPods(h, object.Spec.DestMigClusterRef)
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -214,13 +212,18 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 // Finds pods by label.
 func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, error) {
 	pods := []Pod{}
-	list, err := model.PodListByLabel(
-		h.container.Db,
-		model.LabelFilter{
-			model.AsLabel("control-plane", "controller-manager"),
-			model.AsLabel("app", "migration"),
+	list, err := model.Pod{
+		Base: model.Base{
+			Namespace: h.plan.Namespace,
 		},
-		nil)
+	}.List(
+		h.container.Db,
+		model.ListOptions{
+			Labels: model.Labels{
+				"control-plane": "controller-manager",
+				"app":           "migration",
+			},
+		})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
@@ -253,12 +256,12 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, err
 func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]Pod, error) {
 	pods := []Pod{}
 	cluster := model.Cluster{
-		Base: model.Base{
+		CR: model.CR{
 			Namespace: ref.Namespace,
 			Name:      ref.Name,
 		},
 	}
-	err := cluster.Select(h.container.Db)
+	err := cluster.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -267,13 +270,21 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]Pod, er
 			return nil, nil
 		}
 	}
-	labels := []model.Label{
-		model.AsLabel("component", "velero"),
-		model.AsLabel("name", "restic"),
+	labels := []model.Labels{
+		{"component": "velero"},
+		{"name": "restic"},
 	}
 	for _, lb := range labels {
-		filter := model.LabelFilter{lb}
-		podModels, err := cluster.PodListByLabel(h.container.Db, filter, nil)
+		podModels, err := model.Pod{
+			Base: model.Base{
+				Cluster:   cluster.PK,
+				Namespace: cluster.Namespace,
+			},
+		}.List(
+			h.container.Db,
+			model.ListOptions{
+				Labels: lb,
+			})
 		if err != nil {
 			Log.Trace(err)
 			return nil, err

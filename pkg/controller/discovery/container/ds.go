@@ -156,7 +156,7 @@ func (r *DataSource) Stop(purge bool) {
 // The specified model has been discovered.
 // The `versionThreshold` will be updated as needed.
 func (r *DataSource) HasDiscovered(m model.Model) {
-	version := m.GetBase().IntVersion()
+	version := m.Meta().Version
 	if version > r.versionThreshold {
 		r.versionThreshold = version
 	}
@@ -280,24 +280,45 @@ type ModelEvent struct {
 //
 // Apply the change to the DB.
 func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) error {
-	var err error
-	version := r.model.GetBase().IntVersion()
+	tx, err := db.Begin()
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	version := r.model.Meta().Version
 	switch r.action {
-	case 0x01:
+	case 0x01: // Create
 		if version > versionThreshold {
-			err = r.model.Insert(db)
+			err := r.model.Insert(tx)
+			if err != nil {
+				Log.Trace(err)
+				return err
+			}
 		}
-	case 0x02:
+	case 0x02: // Update
 		if version > versionThreshold {
-			err = r.model.Update(db)
+			err := r.model.Update(tx)
+			if err != nil {
+				Log.Trace(err)
+				return err
+			}
 		}
-	case 0x04:
-		err = r.model.Delete(db)
+	case 0x04: // Delete
+		err := r.model.Delete(tx)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
 	default:
 		return errors.New("unknown action")
 	}
+	err = tx.Commit()
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
 
-	return err
+	return nil
 }
 
 //
