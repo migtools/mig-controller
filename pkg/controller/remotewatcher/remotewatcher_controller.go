@@ -14,7 +14,7 @@ limitations under the License.
 package remotewatcher
 
 import (
-	"github.com/fusor/mig-controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"

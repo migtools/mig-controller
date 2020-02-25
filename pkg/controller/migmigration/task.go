@@ -3,8 +3,8 @@ package migmigration
 import (
 	"time"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/go-logr/logr"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )

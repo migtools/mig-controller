@@ -606,13 +606,13 @@
   version = "v1.1.7"
 
 [[projects]]
-  branch = "fusor-dev"
+  branch = "konveyor-dev"
   digest = "1:25abf99b984c97d7e817b55c5ea9b5c1f6b944d8326e8973697d324990b4e275"
   name = "github.com/vmware-tanzu/velero"
   packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
   revision = "d35335021acf4d2535dd734caece505484688523"
-  source = "github.com/fusor/velero.git"
+  source = "github.com/konveyor/velero.git"
 
 [[projects]]
   digest = "1:281e8d3e74fa7e37f6381d337cbc1e3a610afd60d349e522decc7bc0e60caebc"

@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -19,10 +19,10 @@ mkdir -p $HOME/code/go
 export GOPATH="$HOME/code/go"
 
 # Running 'go get -d' will clone the mig-controller repo into the proper location on your $GOPATH
-go get -d github.com/fusor/mig-controller
+go get -d github.com/konveyor/mig-controller
 
 # Take a peek at the newly cloned files
-ls -al $GOPATH/src/github.com/fusor/mig-controller
+ls -al $GOPATH/src/github.com/konveyor/mig-controller
 ```
 
 __3. Create required CRDs (MigMigration, MigPlan, MigCluster, Cluster...)__

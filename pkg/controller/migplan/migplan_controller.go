@@ -18,14 +18,14 @@ package migplan
 
 import (
 	"context"
-	"github.com/fusor/mig-controller/pkg/settings"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
 	"strconv"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migctl "github.com/fusor/mig-controller/pkg/controller/migmigration"
-	"github.com/fusor/mig-controller/pkg/logging"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
+	"github.com/konveyor/mig-controller/pkg/logging"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

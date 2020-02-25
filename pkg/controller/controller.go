@@ -17,12 +17,12 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/fusor/mig-controller/pkg/controller/discovery"
-	"github.com/fusor/mig-controller/pkg/controller/migcluster"
-	"github.com/fusor/mig-controller/pkg/controller/migmigration"
-	"github.com/fusor/mig-controller/pkg/controller/migplan"
-	"github.com/fusor/mig-controller/pkg/controller/migstorage"
-	"github.com/fusor/mig-controller/pkg/settings"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery"
+	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
+	"github.com/konveyor/mig-controller/pkg/controller/migmigration"
+	"github.com/konveyor/mig-controller/pkg/controller/migplan"
+	"github.com/konveyor/mig-controller/pkg/controller/migstorage"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 

@@ -1,7 +1,7 @@
 package v1alpha1
 
 import (
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/types"
 	"strings"
 )

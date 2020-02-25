@@ -6,7 +6,7 @@ This scenario walks through Migration of a stateless OpenShift app, meaning that
 
 ### 1. Prerequisites
 
-Referring to the getting started [README.md](https://github.com/fusor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
+Referring to the getting started [README.md](https://github.com/konveyor/mig-controller/blob/master/README.md), you'll first need to deploy mig-controller and Velero, and then create the following 'Mig' resources on the cluster where mig-controller is running to prepare for Migration:
 
 |Resource|Purpose|
 |---|---|
@@ -67,7 +67,7 @@ Next, let's fill out our 'MigPlan' specifying the `nginx-example` namespace shou
 
 ### 3. Create a 'MigPlan' that references our 'nginx-example' namespace
 
-To migrate our `nginx-example` namespace, we'll ensure that the `namespaces` field of our MigPlan includes nginx-example. Luckily [config/samples/mig-plan.yaml](https://github.com/fusor/mig-controller/blob/master/config/samples/mig-plan.yaml) does exactly this.
+To migrate our `nginx-example` namespace, we'll ensure that the `namespaces` field of our MigPlan includes nginx-example. Luckily [config/samples/mig-plan.yaml](https://github.com/konveyor/mig-controller/blob/master/config/samples/mig-plan.yaml) does exactly this.
 
 ```yaml
 apiVersion: migration.openshift.io/v1alpha1

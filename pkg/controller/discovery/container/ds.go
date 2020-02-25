@@ -3,8 +3,8 @@ package container
 import (
 	"database/sql"
 	"errors"
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime"

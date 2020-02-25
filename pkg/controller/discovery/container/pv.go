@@ -2,7 +2,7 @@ package container
 
 import (
 	"context"
-	"github.com/fusor/mig-controller/pkg/controller/discovery/model"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"

@@ -20,10 +20,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/fusor/mig-controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/logging"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

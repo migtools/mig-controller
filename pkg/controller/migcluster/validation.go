@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"time"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Types

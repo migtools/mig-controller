@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )

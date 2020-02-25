@@ -5,8 +5,8 @@ import (
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	health "github.com/fusor/mig-controller/pkg/health"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	health "github.com/konveyor/mig-controller/pkg/health"
 )
 
 // VerificationCompleted will determine when the verification should be stopped

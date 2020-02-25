@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
-	"github.com/fusor/mig-controller/pkg/pods"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	"github.com/konveyor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
