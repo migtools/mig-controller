@@ -46,7 +46,7 @@ required = [
 
 [[constraint]]
   name="github.com/vmware-tanzu/velero"
-  branch = "fusor-dev"
+  branch = "konveyor-dev"
   source = "github.com/konveyor/velero.git"
 
 [[constraint]]
