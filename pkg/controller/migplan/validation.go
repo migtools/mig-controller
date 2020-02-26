@@ -3,6 +3,11 @@ package migplan
 import (
 	"context"
 	"fmt"
+
+	"net"
+	"reflect"
+	"strings"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -14,10 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
-	"net"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 // Types

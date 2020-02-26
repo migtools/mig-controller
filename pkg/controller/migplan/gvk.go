@@ -3,8 +3,8 @@ package migplan
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	migapi "github.com/fusor/mig-controller/pkg/apis/migration/v1alpha1"
-	gvk "github.com/fusor/mig-controller/pkg/gvk"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	gvk "github.com/konveyor/mig-controller/pkg/gvk"
 )
 
 func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {

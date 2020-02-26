@@ -1,10 +1,11 @@
 package migplan
 
 import (
+	"reflect"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )

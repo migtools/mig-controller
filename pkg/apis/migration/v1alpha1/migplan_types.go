@@ -34,8 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
-	migref "github.com/fusor/mig-controller/pkg/reference"
+
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Cache Indexes.
