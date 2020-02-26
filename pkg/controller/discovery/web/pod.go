@@ -9,11 +9,12 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	capi "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 )
 
 const (

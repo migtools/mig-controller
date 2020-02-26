@@ -12,6 +12,9 @@ import (
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	auth "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 )
 
 // Plan route root.
