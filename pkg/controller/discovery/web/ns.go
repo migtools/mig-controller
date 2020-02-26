@@ -50,42 +50,41 @@ func (h NsHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	table := model.Table{Db: h.container.Db}
 	content := []Namespace{}
 	for _, m := range list {
-		podCount, err := table.Count(
-			&model.Pod{
-				Base: model.Base{
-					Cluster:   h.cluster.PK,
-					Namespace: m.Name,
-				},
+		podCount, err := model.Pod{
+			Base: model.Base{
+				Cluster:   h.cluster.PK,
+				Namespace: m.Name,
 			},
+		}.Count(
+			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
 			Log.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		pvcCount, err := table.Count(
-			&model.PVC{
-				Base: model.Base{
-					Cluster:   h.cluster.PK,
-					Namespace: m.Name,
-				},
+		pvcCount, err := model.PVC{
+			Base: model.Base{
+				Cluster:   h.cluster.PK,
+				Namespace: m.Name,
 			},
+		}.Count(
+			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
 			Log.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		SrvCount, err := table.Count(
-			&model.Service{
-				Base: model.Base{
-					Cluster:   h.cluster.PK,
-					Namespace: m.Name,
-				},
+		SrvCount, err := model.Service{
+			Base: model.Base{
+				Cluster:   h.cluster.PK,
+				Namespace: m.Name,
 			},
+		}.Count(
+			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
 			Log.Trace(err)
@@ -126,9 +125,9 @@ type Namespace struct {
 	// Raw k8s object.
 	Object *v1.Namespace `json:"object,omitempty"`
 	// Number of services.
-	ServiceCount int `json:"serviceCount"`
+	ServiceCount int64 `json:"serviceCount"`
 	// Number of pods.
-	PodCount int `json:"podCount"`
+	PodCount int64 `json:"podCount"`
 	// Number of PVCs.
-	PvcCount int `json:"pvcCount"`
+	PvcCount int64 `json:"pvcCount"`
 }

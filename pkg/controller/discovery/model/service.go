@@ -53,6 +53,12 @@ func (m Service) List(db DB, options ListOptions) ([]*Service, error) {
 }
 
 //
+// Count in the DB.
+func (m Service) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the model from the DB.
 func (m *Service) Get(db DB) error {
 	return Table{db}.Get(m)

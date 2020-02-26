@@ -39,6 +39,12 @@ func (m *Pod) DecodeObject() *v1.Pod {
 }
 
 //
+// Count in the DB.
+func (m Pod) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the model from in the DB.
 func (m Pod) List(db DB, options ListOptions) ([]*Pod, error) {
 	list := []*Pod{}

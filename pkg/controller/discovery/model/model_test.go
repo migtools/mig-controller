@@ -175,7 +175,7 @@ func TestModels(t *testing.T) {
 	// count
 	count, err := Table{db}.Count(&Pod{}, ListOptions{})
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(count).To(gomega.Equal(2))
+	g.Expect(count).To(gomega.Equal(int64(2)))
 
 	count, err = Table{db}.Count(
 		&Pod{}, ListOptions{
@@ -184,7 +184,7 @@ func TestModels(t *testing.T) {
 			},
 		})
 	g.Expect(err).To(gomega.BeNil())
-	g.Expect(count).To(gomega.Equal(1))
+	g.Expect(count).To(gomega.Equal(int64(1)))
 
 	// Delete all.
 	err = pv.Delete(db)

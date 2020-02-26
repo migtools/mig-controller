@@ -12,12 +12,12 @@ import (
 )
 
 // A collection of k8s PVC resources.
-type PvcCollection struct {
+type PVC struct {
 	// Base
 	BaseCollection
 }
 
-func (r *PvcCollection) AddWatch(dsController controller.Controller) error {
+func (r *PVC) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &v1.PersistentVolumeClaim{},
@@ -32,7 +32,7 @@ func (r *PvcCollection) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *PvcCollection) Reconcile() error {
+func (r *PVC) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -44,7 +44,7 @@ func (r *PvcCollection) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"PVC Collection reconciled.",
+		"PVC (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -55,7 +55,7 @@ func (r *PvcCollection) Reconcile() error {
 	return nil
 }
 
-func (r *PvcCollection) GetDiscovered() ([]model.Model, error) {
+func (r *PVC) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PersistentVolumeClaimList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -76,7 +76,7 @@ func (r *PvcCollection) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *PvcCollection) GetStored() ([]model.Model, error) {
+func (r *PVC) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.PVC{
 		Base: model.Base{
@@ -100,7 +100,7 @@ func (r *PvcCollection) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *PvcCollection) Create(e event.CreateEvent) bool {
+func (r *PVC) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.PersistentVolumeClaim)
 	if !cast {
@@ -117,7 +117,7 @@ func (r *PvcCollection) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *PvcCollection) Update(e event.UpdateEvent) bool {
+func (r *PVC) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*v1.PersistentVolumeClaim)
 	if !cast {
@@ -134,7 +134,7 @@ func (r *PvcCollection) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *PvcCollection) Delete(e event.DeleteEvent) bool {
+func (r *PVC) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.PersistentVolumeClaim)
 	if !cast {
@@ -151,6 +151,6 @@ func (r *PvcCollection) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *PvcCollection) Generic(e event.GenericEvent) bool {
+func (r *PVC) Generic(e event.GenericEvent) bool {
 	return false
 }

@@ -447,7 +447,7 @@ func (t Table) List(model interface{}, options ListOptions) ([]interface{}, erro
 // Qualified by the model field values and list options.
 // Expects natural keys to be set.
 // Else, ALL models counted.
-func (t Table) Count(model interface{}, options ListOptions) (int, error) {
+func (t Table) Count(model interface{}, options ListOptions) (int64, error) {
 	fields, err := t.Fields(model)
 	if err != nil {
 		Log.Trace(err)
@@ -459,7 +459,7 @@ func (t Table) Count(model interface{}, options ListOptions) (int, error) {
 		Log.Trace(err)
 		return 0, err
 	}
-	count := 0
+	count := int64(0)
 	params := t.Params(fields)
 	row := t.Db.QueryRow(stmt, params...)
 	if err != nil {

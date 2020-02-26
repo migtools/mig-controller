@@ -37,6 +37,12 @@ func (m *PVC) DecodeObject() *v1.PersistentVolumeClaim {
 }
 
 //
+// Count in the DB.
+func (m PVC) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the from in the DB.
 func (m PVC) List(db DB, options ListOptions) ([]*PVC, error) {
 	list := []*PVC{}
