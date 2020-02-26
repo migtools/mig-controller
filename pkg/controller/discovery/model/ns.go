@@ -20,6 +20,12 @@ func (m *Namespace) With(object *v1.Namespace) {
 }
 
 //
+// Count in the DB.
+func (m Namespace) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the from in the DB.
 func (m Namespace) List(db DB, options ListOptions) ([]*Namespace, error) {
 	list := []*Namespace{}

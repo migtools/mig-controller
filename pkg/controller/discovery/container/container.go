@@ -78,11 +78,11 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 		ds := &DataSource{
 			Container: r,
 			Collections: Collections{
-				&NsCollection{},
-				&ServiceCollection{},
-				&PvcCollection{},
-				&PodCollection{},
-				&PvCollection{},
+				&Namespace{},
+				&Service{},
+				&PVC{},
+				&Pod{},
+				&PV{},
 			},
 		}
 		r.sources[key] = ds

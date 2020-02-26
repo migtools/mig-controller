@@ -37,6 +37,12 @@ func (m *Plan) DecodeObject() *migapi.MigPlan {
 }
 
 //
+// Count in the DB.
+func (m Plan) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the model from the DB.
 func (m Plan) List(db DB, options ListOptions) ([]*Plan, error) {
 	list := []*Plan{}

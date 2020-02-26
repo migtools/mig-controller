@@ -13,12 +13,12 @@ import (
 
 //
 // A collection of k8s Namespace resources.
-type NsCollection struct {
+type Namespace struct {
 	// Base
 	BaseCollection
 }
 
-func (r *NsCollection) AddWatch(dsController controller.Controller) error {
+func (r *Namespace) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &v1.Namespace{},
@@ -33,7 +33,7 @@ func (r *NsCollection) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *NsCollection) Reconcile() error {
+func (r *Namespace) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -45,7 +45,7 @@ func (r *NsCollection) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"NsCollection reconciled.",
+		"Namespace (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -56,7 +56,7 @@ func (r *NsCollection) Reconcile() error {
 	return nil
 }
 
-func (r *NsCollection) GetDiscovered() ([]model.Model, error) {
+func (r *Namespace) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.NamespaceList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -77,7 +77,7 @@ func (r *NsCollection) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *NsCollection) GetStored() ([]model.Model, error) {
+func (r *Namespace) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.Namespace{
 		Base: model.Base{
@@ -101,7 +101,7 @@ func (r *NsCollection) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *NsCollection) Create(e event.CreateEvent) bool {
+func (r *Namespace) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Namespace)
 	if !cast {
@@ -118,11 +118,11 @@ func (r *NsCollection) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *NsCollection) Update(e event.UpdateEvent) bool {
+func (r *Namespace) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *NsCollection) Delete(e event.DeleteEvent) bool {
+func (r *Namespace) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Namespace)
 	if !cast {
@@ -139,6 +139,6 @@ func (r *NsCollection) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *NsCollection) Generic(e event.GenericEvent) bool {
+func (r *Namespace) Generic(e event.GenericEvent) bool {
 	return false
 }

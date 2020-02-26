@@ -12,12 +12,12 @@ import (
 )
 
 // A collection of k8s PV resources.
-type PvCollection struct {
+type PV struct {
 	// Base
 	BaseCollection
 }
 
-func (r *PvCollection) AddWatch(dsController controller.Controller) error {
+func (r *PV) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &v1.PersistentVolume{},
@@ -32,7 +32,7 @@ func (r *PvCollection) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *PvCollection) Reconcile() error {
+func (r *PV) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -44,7 +44,7 @@ func (r *PvCollection) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"PvCollection reconciled.",
+		"PV (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -55,7 +55,7 @@ func (r *PvCollection) Reconcile() error {
 	return nil
 }
 
-func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
+func (r *PV) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PersistentVolumeList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -76,7 +76,7 @@ func (r *PvCollection) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *PvCollection) GetStored() ([]model.Model, error) {
+func (r *PV) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.PV{
 		Base: model.Base{
@@ -100,7 +100,7 @@ func (r *PvCollection) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *PvCollection) Create(e event.CreateEvent) bool {
+func (r *PV) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.PersistentVolume)
 	if !cast {
@@ -117,7 +117,7 @@ func (r *PvCollection) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *PvCollection) Update(e event.UpdateEvent) bool {
+func (r *PV) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*v1.PersistentVolume)
 	if !cast {
@@ -134,7 +134,7 @@ func (r *PvCollection) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *PvCollection) Delete(e event.DeleteEvent) bool {
+func (r *PV) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.PersistentVolume)
 	if !cast {
@@ -151,6 +151,6 @@ func (r *PvCollection) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *PvCollection) Generic(e event.GenericEvent) bool {
+func (r *PV) Generic(e event.GenericEvent) bool {
 	return false
 }

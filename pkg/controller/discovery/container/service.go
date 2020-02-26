@@ -12,12 +12,12 @@ import (
 )
 
 // A collection of k8s Service resources.
-type ServiceCollection struct {
+type Service struct {
 	// Base
 	BaseCollection
 }
 
-func (r *ServiceCollection) AddWatch(dsController controller.Controller) error {
+func (r *Service) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &v1.Service{},
@@ -32,7 +32,7 @@ func (r *ServiceCollection) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *ServiceCollection) Reconcile() error {
+func (r *Service) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -44,7 +44,7 @@ func (r *ServiceCollection) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"Service Collection reconciled.",
+		"Service (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -55,7 +55,7 @@ func (r *ServiceCollection) Reconcile() error {
 	return nil
 }
 
-func (r *ServiceCollection) GetDiscovered() ([]model.Model, error) {
+func (r *Service) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.ServiceList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -76,7 +76,7 @@ func (r *ServiceCollection) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *ServiceCollection) GetStored() ([]model.Model, error) {
+func (r *Service) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.Service{
 		Base: model.Base{
@@ -100,7 +100,7 @@ func (r *ServiceCollection) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *ServiceCollection) Create(e event.CreateEvent) bool {
+func (r *Service) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Service)
 	if !cast {
@@ -117,7 +117,7 @@ func (r *ServiceCollection) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *ServiceCollection) Update(e event.UpdateEvent) bool {
+func (r *Service) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*v1.Service)
 	if !cast {
@@ -134,7 +134,7 @@ func (r *ServiceCollection) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *ServiceCollection) Delete(e event.DeleteEvent) bool {
+func (r *Service) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Service)
 	if !cast {
@@ -151,6 +151,6 @@ func (r *ServiceCollection) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *ServiceCollection) Generic(e event.GenericEvent) bool {
+func (r *Service) Generic(e event.GenericEvent) bool {
 	return false
 }

@@ -13,12 +13,12 @@ import (
 
 //
 // A collection of k8s Pod resources.
-type PodCollection struct {
+type Pod struct {
 	// Base
 	BaseCollection
 }
 
-func (r *PodCollection) AddWatch(dsController controller.Controller) error {
+func (r *Pod) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &v1.Pod{},
@@ -33,7 +33,7 @@ func (r *PodCollection) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *PodCollection) Reconcile() error {
+func (r *Pod) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{Db: r.ds.Container.Db}
 	err := sr.Reconcile(r)
@@ -43,7 +43,7 @@ func (r *PodCollection) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"PodCollection reconciled.",
+		"Pod (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -54,7 +54,7 @@ func (r *PodCollection) Reconcile() error {
 	return nil
 }
 
-func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
+func (r *Pod) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PodList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -75,7 +75,7 @@ func (r *PodCollection) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *PodCollection) GetStored() ([]model.Model, error) {
+func (r *Pod) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.Pod{
 		Base: model.Base{
@@ -99,7 +99,7 @@ func (r *PodCollection) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *PodCollection) Create(e event.CreateEvent) bool {
+func (r *Pod) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Pod)
 	if !cast {
@@ -116,7 +116,7 @@ func (r *PodCollection) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *PodCollection) Update(e event.UpdateEvent) bool {
+func (r *Pod) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*v1.Pod)
 	if !cast {
@@ -133,7 +133,7 @@ func (r *PodCollection) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *PodCollection) Delete(e event.DeleteEvent) bool {
+func (r *Pod) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*v1.Pod)
 	if !cast {
@@ -150,6 +150,6 @@ func (r *PodCollection) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *PodCollection) Generic(e event.GenericEvent) bool {
+func (r *Pod) Generic(e event.GenericEvent) bool {
 	return false
 }
