@@ -607,11 +607,11 @@
 
 [[projects]]
   branch = "konveyor-dev"
-  digest = "1:25abf99b984c97d7e817b55c5ea9b5c1f6b944d8326e8973697d324990b4e275"
+  digest = "1:7ee1d20ebea6a6f2472452e10aafc34a530e688287517c5785e95e533d331c72"
   name = "github.com/vmware-tanzu/velero"
   packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
-  revision = "d35335021acf4d2535dd734caece505484688523"
+  revision = "53b3e5029c9d0ce8c6bbca305f991af0031dbd51"
   source = "github.com/konveyor/velero.git"
 
 [[projects]]
@@ -1187,12 +1187,15 @@
   digest = "1:5aa50779f75cc439edd3455a6dee7cf179b52f8dde764a47cc929693485d1afb"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
+    ".",
+    "pkg/builder",
     "pkg/cache",
     "pkg/cache/internal",
     "pkg/client",
     "pkg/client/apiutil",
     "pkg/client/config",
     "pkg/controller",
+    "pkg/controller/controllerutil",
     "pkg/envtest",
     "pkg/envtest/printer",
     "pkg/event",
@@ -1330,6 +1333,7 @@
     "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "sigs.k8s.io/controller-runtime",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/apiutil",
     "sigs.k8s.io/controller-runtime/pkg/client/config",

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -235,7 +236,19 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		}
 		resticCmd.Env = env
 	}
-
+	var insecureSkipTLSVerify bool
+	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
+		if err != nil {
+			log.WithError(err).Errorf("Error getting BackupStorageLocation %s", req.Spec.BackupStorageLocation)
+			return errors.WithStack(err)
+		}
+		insecureSkipTLSVerify, err = strconv.ParseBool(bsl.Spec.Config["insecureSkipTLSVerify"])
+		if err != nil {
+			insecureSkipTLSVerify = false
+		}
+		resticCmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
+	}
 	// If this is a PVC, look for the most recent completed pod volume backup for it and get
 	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
 	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
@@ -266,7 +279,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 
 	var snapshotID string
 	if !emptySnapshot {
-		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env)
+		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env, insecureSkipTLSVerify)
 		if err != nil {
 			log.WithError(err).Error("Error getting SnapshotID")
 			return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)

@@ -1,7 +1,7 @@
 FROM openshift/origin-release:golang-1.11 AS builder
 COPY . /go/src/github.com/vmware-tanzu/velero
 RUN cd /go/src/github.com/vmware-tanzu/velero \
-&& CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' ./cmd/velero
+&& CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static" -X github.com/vmware-tanzu/velero/pkg/buildinfo.Version=v1.2.0-konveyor' ./cmd/velero
 
 RUN mkdir /go/src/github.com/restic \
 && cd /go/src/github.com/restic \
