@@ -1,7 +1,10 @@
 package migcluster
 
 import (
+	"context"
 	"fmt"
+	auth "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"net/url"
 	"time"
 
@@ -11,10 +14,11 @@ import (
 
 // Types
 const (
-	InvalidURL         = "InvalidURL"
-	InvalidSaSecretRef = "InvalidSaSecretRef"
-	InvalidSaToken     = "InvalidSaToken"
-	TestConnectFailed  = "TestConnectFailed"
+	InvalidURL          = "InvalidURL"
+	InvalidSaSecretRef  = "InvalidSaSecretRef"
+	InvalidSaToken      = "InvalidSaToken"
+	UnauthorizedSaToken = "UnauthorizedSaToken"
+	TestConnectFailed   = "TestConnectFailed"
 )
 
 // Categories
@@ -29,6 +33,7 @@ const (
 	ConnectFailed = "ConnectFailed"
 	Malformed     = "Malformed"
 	InvalidScheme = "InvalidScheme"
+	Unauthorized  = "Unauthorized"
 )
 
 // Statuses
@@ -39,13 +44,14 @@ const (
 
 // Messages
 const (
-	ReadyMessage              = "The cluster is ready."
-	MissingURLMessage         = "The `url` is required when `isHostCluster` is false."
-	InvalidSaSecretRefMessage = "The `serviceAccountSecretRef` must reference a `secret`."
-	InvalidSaTokenMessage     = "The `saToken` not found in `serviceAccountSecretRef` secret."
-	TestConnectFailedMessage  = "Test connect failed: %s"
-	MalformedURLMessage       = "The `url` is malformed."
-	InvalidURLSchemeMessage   = "The `url` scheme must be 'http' or 'https'."
+	ReadyMessage               = "The cluster is ready."
+	MissingURLMessage          = "The `url` is required when `isHostCluster` is false."
+	InvalidSaSecretRefMessage  = "The `serviceAccountSecretRef` must reference a `secret`."
+	InvalidSaTokenMessage      = "The `saToken` not found in `serviceAccountSecretRef` secret."
+	TestConnectFailedMessage   = "Test connect failed: %s"
+	MalformedURLMessage        = "The `url` is malformed."
+	InvalidURLSchemeMessage    = "The `url` scheme must be 'http' or 'https'."
+	UnauthorizedSaTokenMessage = "The service account token is not authorized to perform migrations."
 )
 
 // Validate the asset collection resource.
@@ -176,6 +182,21 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 		return nil
 	}
 
+	isClusterAdmin, err := r.saIsClusterAdmin(cluster)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !isClusterAdmin {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     UnauthorizedSaToken,
+			Status:   True,
+			Reason:   Unauthorized,
+			Category: Critical,
+			Message:  UnauthorizedSaTokenMessage,
+		})
+	}
+
 	return nil
 }
 
@@ -204,4 +225,38 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	}
 
 	return nil
+}
+
+func (r *ReconcileMigCluster) saIsClusterAdmin(cluster *migapi.MigCluster) (bool, error) {
+	// check for access to all verbs on all resources in all namespaces
+	// in order to determine if the service account has cluster-admin
+	attributes := auth.ResourceAttributes{
+		Group:    "*",
+		Resource: "*",
+		Verb:     "*",
+		Version:  "*",
+	}
+
+	sar := auth.SelfSubjectAccessReview{
+		Spec: auth.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &attributes,
+		},
+	}
+
+	client, err := cluster.GetClient(r.Client)
+	if err != nil {
+		serr, ok := err.(*errors.StatusError)
+		if ok && serr.ErrStatus.Reason == Unauthorized {
+			return false, nil
+		}
+		return false, err
+	}
+	err = client.Create(context.TODO(), &sar)
+	if err != nil {
+		return false, err
+	}
+	if sar.Status.Allowed {
+		return true, nil
+	}
+	return false, nil
 }
