@@ -9,34 +9,34 @@ import (
 )
 
 const (
-	PvsRoot = ClusterRoot + "/persistentvolumes"
-	PvRoot  = PvsRoot + "/:pv"
+	PvcsRoot = NamespaceRoot + "/persistentvolumeclaims"
+	PvcRoot  = PvcsRoot + "/:pvc"
 )
 
 //
-// PV (route) handler.
-type PvHandler struct {
+// PVC (route) handler.
+type PvcHandler struct {
 	// Base
 	ClusterScoped
 }
 
 //
 // Add routes.
-func (h PvHandler) AddRoutes(r *gin.Engine) {
-	r.GET(PvsRoot, h.List)
-	r.GET(PvsRoot+"/", h.List)
-	r.GET(PvRoot, h.Get)
+func (h PvcHandler) AddRoutes(r *gin.Engine) {
+	r.GET(PvcsRoot, h.List)
+	r.GET(PvcsRoot+"/", h.List)
+	r.GET(PvcRoot, h.Get)
 }
 
 //
-// List all of the PVs on a cluster.
-func (h PvHandler) List(ctx *gin.Context) {
+// List all of the PVCs on a cluster.
+func (h PvcHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.PV{
+	list, err := model.PVC{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
@@ -50,12 +50,12 @@ func (h PvHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []PV{}
-	for _, pv := range list {
-		r := PV{
-			Namespace: pv.Namespace,
-			Name:      pv.Name,
-			Object:    pv.DecodeObject(),
+	content := []PVC{}
+	for _, pvc := range list {
+		r := PVC{
+			Namespace: pvc.Namespace,
+			Name:      pvc.Name,
+			Object:    pvc.DecodeObject(),
 		}
 		content = append(content, r)
 	}
@@ -64,20 +64,21 @@ func (h PvHandler) List(ctx *gin.Context) {
 }
 
 //
-// Get a specific PV on a cluster.
-func (h PvHandler) Get(ctx *gin.Context) {
+// Get a specific PVC on a cluster.
+func (h PvcHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	pv := model.PV{
+	pvc := model.PVC{
 		Base: model.Base{
-			Cluster: h.cluster.PK,
-			Name:    ctx.Param("pv"),
+			Cluster:   h.cluster.PK,
+			Namespace: ctx.Param("ns2"),
+			Name:      ctx.Param("pv"),
 		},
 	}
-	err := pv.Get(h.container.Db)
+	err := pvc.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -88,21 +89,21 @@ func (h PvHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := PV{
-		Namespace: pv.Namespace,
-		Name:      pv.Name,
-		Object:    pv.DecodeObject(),
+	content := PVC{
+		Namespace: pvc.Namespace,
+		Name:      pvc.Name,
+		Object:    pvc.DecodeObject(),
 	}
 
 	ctx.JSON(http.StatusOK, content)
 }
 
-// PV REST resource
-type PV struct {
+// PVC REST resource
+type PVC struct {
 	// The k8s namespace.
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
 	// Raw k8s object.
-	Object *v1.PersistentVolume `json:"object,omitempty"`
+	Object *v1.PersistentVolumeClaim `json:"object,omitempty"`
 }

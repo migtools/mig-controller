@@ -49,8 +49,10 @@ func Create() (*sql.DB, error) {
 		&Cluster{},
 		&Plan{},
 		&Namespace{},
+		&Service{},
 		&Pod{},
 		&PV{},
+		&PVC{},
 	}
 	for _, m := range models {
 		ddl, err := Table{}.DDL(m)

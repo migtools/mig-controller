@@ -182,9 +182,9 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 // Cluster REST resource.
 type Cluster struct {
 	// Cluster k8s namespace.
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 	// Cluster k8s name.
 	Name string `json:"name"`
 	// Raw k8s object.
-	Object *migapi.MigCluster `json:"object"`
+	Object *migapi.MigCluster `json:"object,omitempty"`
 }

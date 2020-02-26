@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"io"
@@ -14,7 +13,6 @@ import (
 	capi "k8s.io/client-go/kubernetes/typed/core/v1"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -66,9 +64,13 @@ func (h PodHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	d := Pod{}
-	d.With(&pod, &h.cluster)
-	ctx.JSON(http.StatusOK, d)
+	content := Pod{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+		Object:    pod.DecodeObject(),
+	}
+
+	ctx.JSON(http.StatusOK, content)
 }
 
 //
@@ -96,8 +98,11 @@ func (h PodHandler) List(ctx *gin.Context) {
 	}
 	content := []Pod{}
 	for _, m := range list {
-		d := Pod{}
-		d.With(m, &h.cluster)
+		d := Pod{
+			Namespace: m.Namespace,
+			Name:      m.Name,
+			Object:    m.DecodeObject(),
+		}
 		content = append(content, d)
 	}
 
@@ -284,72 +289,12 @@ func (h *LogHandler) getContainer(ctx *gin.Context) string {
 	return q.Get("container")
 }
 
-//
-// Container REST resource.
-type Container struct {
-	// Pod k8s name.
-	Name string `json:"name"`
-	// The URI used to obtain logs.
-	Log string `json:"log"`
-}
-
-//
-// Pod REST resource.
+// Pod REST resource
 type Pod struct {
-	// Pod k8s namespace.
-	Namespace string `json:"namespace"`
-	// Pod k8s name.
+	// The k8s namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// The k8s name.
 	Name string `json:"name"`
-	// List of containers.
-	Containers []Container `json:"containers"`
-}
-
-//
-// Container filter.
-type ContainerFilter func(*v1.Container) bool
-
-//
-// Update fields using the specified models.
-func (p *Pod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerFilter) {
-	p.Containers = []Container{}
-	p.Namespace = pod.Namespace
-	p.Name = pod.Name
-	path := LogRoot
-	path = strings.Replace(path, ":ns1", cluster.Namespace, 1)
-	path = strings.Replace(path, ":cluster", cluster.Name, 1)
-	path = strings.Replace(path, ":ns2", p.Namespace, 1)
-	path = strings.Replace(path, ":pod", p.Name, 1)
-	for _, container := range p.filterContainers(pod, filters) {
-		lp := fmt.Sprintf("%s?container=%s", path, container.Name)
-		p.Containers = append(
-			p.Containers, Container{
-				Name: container.Name,
-				Log:  lp,
-			})
-	}
-}
-
-//
-// Get a filtered list of containers.
-func (p *Pod) filterContainers(pod *model.Pod, filters []ContainerFilter) []v1.Container {
-	list := []v1.Container{}
-	v1pod := pod.DecodeObject()
-	podContainers := v1pod.Spec.Containers
-	if podContainers == nil {
-		return list
-	}
-	for _, container := range podContainers {
-		excluded := false
-		for _, filter := range filters {
-			if !filter(&container) {
-				excluded = true
-				break
-			}
-		}
-		if !excluded {
-			list = append(list, container)
-		}
-	}
-
-	return list
+	// Raw k8s object.
+	Object *v1.Pod `json:"object,omitempty"`
 }

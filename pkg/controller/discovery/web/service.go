@@ -9,34 +9,34 @@ import (
 )
 
 const (
-	PvsRoot = ClusterRoot + "/persistentvolumes"
-	PvRoot  = PvsRoot + "/:pv"
+	ServicesRoot = NamespaceRoot + "/services"
+	ServiceRoot  = ServicesRoot + "/:service"
 )
 
 //
-// PV (route) handler.
-type PvHandler struct {
+// Service (route) handler.
+type ServiceHandler struct {
 	// Base
 	ClusterScoped
 }
 
 //
 // Add routes.
-func (h PvHandler) AddRoutes(r *gin.Engine) {
-	r.GET(PvsRoot, h.List)
-	r.GET(PvsRoot+"/", h.List)
-	r.GET(PvRoot, h.Get)
+func (h ServiceHandler) AddRoutes(r *gin.Engine) {
+	r.GET(ServicesRoot, h.List)
+	r.GET(ServicesRoot+"/", h.List)
+	r.GET(ServiceRoot, h.Get)
 }
 
 //
-// List all of the PVs on a cluster.
-func (h PvHandler) List(ctx *gin.Context) {
+// List all of the Services on a cluster.
+func (h ServiceHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.PV{
+	list, err := model.Service{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
@@ -50,12 +50,12 @@ func (h PvHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []PV{}
-	for _, pv := range list {
-		r := PV{
-			Namespace: pv.Namespace,
-			Name:      pv.Name,
-			Object:    pv.DecodeObject(),
+	content := []Service{}
+	for _, service := range list {
+		r := Service{
+			Namespace: service.Namespace,
+			Name:      service.Name,
+			Object:    service.DecodeObject(),
 		}
 		content = append(content, r)
 	}
@@ -64,20 +64,21 @@ func (h PvHandler) List(ctx *gin.Context) {
 }
 
 //
-// Get a specific PV on a cluster.
-func (h PvHandler) Get(ctx *gin.Context) {
+// Get a specific Service on a cluster.
+func (h ServiceHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	pv := model.PV{
+	service := model.Service{
 		Base: model.Base{
-			Cluster: h.cluster.PK,
-			Name:    ctx.Param("pv"),
+			Cluster:   h.cluster.PK,
+			Namespace: ctx.Param("ns2"),
+			Name:      ctx.Param("service"),
 		},
 	}
-	err := pv.Get(h.container.Db)
+	err := service.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -88,21 +89,21 @@ func (h PvHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := PV{
-		Namespace: pv.Namespace,
-		Name:      pv.Name,
-		Object:    pv.DecodeObject(),
+	content := Service{
+		Namespace: service.Namespace,
+		Name:      service.Name,
+		Object:    service.DecodeObject(),
 	}
 
 	ctx.JSON(http.StatusOK, content)
 }
 
-// PV REST resource
-type PV struct {
+// Service REST resource
+type Service struct {
 	// The k8s namespace.
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
 	// Raw k8s object.
-	Object *v1.PersistentVolume `json:"object,omitempty"`
+	Object *v1.Service `json:"object,omitempty"`
 }

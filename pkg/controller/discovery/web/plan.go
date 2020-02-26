@@ -2,12 +2,14 @@ package web
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"
+	"strings"
 )
 
 // Plan route root.
@@ -152,41 +154,15 @@ func (h PlanHandler) Pods(ctx *gin.Context) {
 }
 
 //
-// Plan REST resource.
-type Plan struct {
-	// The k8s namespace.
-	Namespace string `json:"namespace"`
-	// The k8s name.
-	Name string `json:"name"`
-	// Raw k8s object.
-	Object *migapi.MigPlan `json:"object"`
-}
-
-//
-// PlanPods REST resource.
-type PlanPods struct {
-	// The k8s namespace.
-	Namespace string `json:"namespace"`
-	// The k8s name.
-	Name string `json:"name"`
-	// List of controller pods.
-	Controller []Pod `json:"controller"`
-	// List of relevant pods on source cluster.
-	Source []Pod `json:"source"`
-	// List of relevant pods on the destination cluster.
-	Destination []Pod `json:"destination"`
-}
-
-//
 // Update the model `with` a PlanHandler
 // Fetch and build the pod lists.
 func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 	var err error
 	p.Namespace = h.plan.Namespace
 	p.Name = h.plan.Name
-	p.Controller = []Pod{}
-	p.Source = []Pod{}
-	p.Destination = []Pod{}
+	p.Controller = []PlanPod{}
+	p.Source = []PlanPod{}
+	p.Destination = []PlanPod{}
 	p.Controller, err = p.buildController(ctx, h)
 	object := h.plan.DecodeObject()
 	if err != nil {
@@ -210,8 +186,8 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 //
 // Build the controller pods list.
 // Finds pods by label.
-func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, error) {
-	pods := []Pod{}
+func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod, error) {
+	pods := []PlanPod{}
 	list, err := model.Pod{
 		Base: model.Base{
 			Namespace: h.plan.Namespace,
@@ -242,7 +218,7 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, err
 			return pods, nil
 		}
 	}
-	pod := Pod{}
+	pod := PlanPod{}
 	filter := func(c *v1.Container) bool { return c.Name == "cam" }
 	pod.With(m, cluster, filter)
 	pods = append(pods, pod)
@@ -253,8 +229,8 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]Pod, err
 //
 // Build list of relevant pods on a cluster.
 // Finds pods by label. Currently includes velero and restic pods.
-func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]Pod, error) {
-	pods := []Pod{}
+func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod, error) {
+	pods := []PlanPod{}
 	cluster := model.Cluster{
 		CR: model.CR{
 			Namespace: ref.Namespace,
@@ -290,11 +266,107 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]Pod, er
 			return nil, err
 		}
 		for _, model := range podModels {
-			pod := Pod{}
+			pod := PlanPod{}
 			pod.With(model, &cluster)
 			pods = append(pods, pod)
 		}
 	}
 
 	return pods, nil
+}
+
+//
+// Plan REST resource.
+type Plan struct {
+	// The k8s namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// The k8s name.
+	Name string `json:"name"`
+	// Raw k8s object.
+	Object *migapi.MigPlan `json:"object,omitempty"`
+}
+
+//
+// PlanPods REST resource.
+type PlanPods struct {
+	// The k8s namespace.
+	Namespace string `json:"namespace"`
+	// The k8s name.
+	Name string `json:"name"`
+	// List of controller pods.
+	Controller []PlanPod `json:"controller"`
+	// List of relevant pods on source cluster.
+	Source []PlanPod `json:"source"`
+	// List of relevant pods on the destination cluster.
+	Destination []PlanPod `json:"destination"`
+}
+
+//
+// Container REST resource.
+type Container struct {
+	// Pod k8s name.
+	Name string `json:"name"`
+	// The URI used to obtain logs.
+	Log string `json:"log"`
+}
+
+//
+// PlanPod REST resource.
+type PlanPod struct {
+	// Pod k8s namespace.
+	Namespace string `json:"namespace"`
+	// Pod k8s name.
+	Name string `json:"name"`
+	// List of containers.
+	Containers []Container `json:"containers"`
+}
+
+//
+// Container filter.
+type ContainerFilter func(*v1.Container) bool
+
+//
+// Update fields using the specified models.
+func (p *PlanPod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerFilter) {
+	p.Containers = []Container{}
+	p.Namespace = pod.Namespace
+	p.Name = pod.Name
+	path := LogRoot
+	path = strings.Replace(path, ":ns1", cluster.Namespace, 1)
+	path = strings.Replace(path, ":cluster", cluster.Name, 1)
+	path = strings.Replace(path, ":ns2", p.Namespace, 1)
+	path = strings.Replace(path, ":pod", p.Name, 1)
+	for _, container := range p.filterContainers(pod, filters) {
+		lp := fmt.Sprintf("%s?container=%s", path, container.Name)
+		p.Containers = append(
+			p.Containers, Container{
+				Name: container.Name,
+				Log:  lp,
+			})
+	}
+}
+
+//
+// Get a filtered list of containers.
+func (p *PlanPod) filterContainers(pod *model.Pod, filters []ContainerFilter) []v1.Container {
+	list := []v1.Container{}
+	v1pod := pod.DecodeObject()
+	podContainers := v1pod.Spec.Containers
+	if podContainers == nil {
+		return list
+	}
+	for _, container := range podContainers {
+		excluded := false
+		for _, filter := range filters {
+			if !filter(&container) {
+				excluded = true
+				break
+			}
+		}
+		if !excluded {
+			list = append(list, container)
+		}
+	}
+
+	return list
 }

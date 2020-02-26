@@ -3,6 +3,7 @@ package web
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	"k8s.io/api/core/v1"
 	"net/http"
 )
 
@@ -49,9 +50,56 @@ func (h NsHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
+	table := model.Table{Db: h.container.Db}
 	content := []Namespace{}
 	for _, m := range list {
-		content = append(content, m.Name)
+		podCount, err := table.Count(
+			&model.Pod{
+				Base: model.Base{
+					Cluster:   h.cluster.PK,
+					Namespace: m.Name,
+				},
+			},
+			model.ListOptions{})
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		pvcCount, err := table.Count(
+			&model.PVC{
+				Base: model.Base{
+					Cluster:   h.cluster.PK,
+					Namespace: m.Name,
+				},
+			},
+			model.ListOptions{})
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		SrvCount, err := table.Count(
+			&model.Service{
+				Base: model.Base{
+					Cluster:   h.cluster.PK,
+					Namespace: m.Name,
+				},
+			},
+			model.ListOptions{})
+		if err != nil {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+		content = append(
+			content,
+			Namespace{
+				Name:         m.Name,
+				ServiceCount: SrvCount,
+				PvcCount:     pvcCount,
+				PodCount:     podCount,
+			})
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -70,4 +118,17 @@ func (h NsHandler) Get(ctx *gin.Context) {
 }
 
 // Namespace REST resource
-type Namespace = string
+type Namespace struct {
+	// Cluster k8s namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// Cluster k8s name.
+	Name string `json:"name"`
+	// Raw k8s object.
+	Object *v1.Namespace `json:"object,omitempty"`
+	// Number of services.
+	ServiceCount int `json:"serviceCount"`
+	// Number of pods.
+	PodCount int `json:"podCount"`
+	// Number of PVCs.
+	PvcCount int `json:"pvcCount"`
+}
