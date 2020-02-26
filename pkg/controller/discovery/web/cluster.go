@@ -139,8 +139,15 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.Cluster{}.List(
-		h.container.Db,
+	db := h.container.Db
+	collection := model.Cluster{}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(
+		db,
 		model.ListOptions{
 			Page: &h.page,
 		})
@@ -148,14 +155,16 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Cluster{}
+	content := ClusterList{
+		Count: count,
+	}
 	for _, m := range list {
-		r := Cluster{
+		d := Cluster{
 			Namespace: m.Namespace,
 			Name:      m.Name,
 			Object:    m.DecodeObject(),
 		}
-		content = append(content, r)
+		content.Items = append(content.Items, d)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -187,4 +196,13 @@ type Cluster struct {
 	Name string `json:"name"`
 	// Raw k8s object.
 	Object *migapi.MigCluster `json:"object,omitempty"`
+}
+
+//
+// Cluster collection REST resource.
+type ClusterList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []Cluster `json:"resources"`
 }

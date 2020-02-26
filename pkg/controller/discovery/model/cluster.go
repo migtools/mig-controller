@@ -37,6 +37,12 @@ func (m *Cluster) DecodeObject() *migapi.MigCluster {
 }
 
 //
+// Count in the DB.
+func (m Cluster) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
 // Fetch the model from the DB.
 func (m Cluster) List(db DB, options ListOptions) ([]*Cluster, error) {
 	list := []*Cluster{}

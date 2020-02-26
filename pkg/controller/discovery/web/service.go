@@ -36,12 +36,19 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.Service{
+	db := h.container.Db
+	collection := model.Service{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
-	}.List(
-		h.container.Db,
+	}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(
+		db,
 		model.ListOptions{
 			Page: &h.page,
 		})
@@ -50,14 +57,16 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Service{}
+	content := ServiceList{
+		Count: count,
+	}
 	for _, service := range list {
 		r := Service{
 			Namespace: service.Namespace,
 			Name:      service.Name,
 			Object:    service.DecodeObject(),
 		}
-		content = append(content, r)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -106,4 +115,13 @@ type Service struct {
 	Name string `json:"name"`
 	// Raw k8s object.
 	Object *v1.Service `json:"object,omitempty"`
+}
+
+//
+// Service collection REST resource.
+type ServiceList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []Service `json:"resources"`
 }
