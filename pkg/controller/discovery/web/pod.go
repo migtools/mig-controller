@@ -81,13 +81,21 @@ func (h PodHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.Pod{
+	db := h.container.Db
+	collection := model.Pod{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
 			Namespace: ctx.Param("ns2"),
 		},
-	}.List(
-		h.container.Db,
+	}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(
+		db,
 		model.ListOptions{
 			Page: &h.page,
 		})
@@ -96,14 +104,16 @@ func (h PodHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Pod{}
+	content := PodList{
+		Count: count,
+	}
 	for _, m := range list {
 		d := Pod{
 			Namespace: m.Namespace,
 			Name:      m.Name,
 			Object:    m.DecodeObject(),
 		}
-		content = append(content, d)
+		content.Items = append(content.Items, d)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -297,4 +307,13 @@ type Pod struct {
 	Name string `json:"name"`
 	// Raw k8s object.
 	Object *v1.Pod `json:"object,omitempty"`
+}
+
+//
+// Pod collection REST resource.
+type PodList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []Pod `json:"resources"`
 }

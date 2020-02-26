@@ -36,12 +36,19 @@ func (h PvHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.PV{
+	db := h.container.Db
+	collection := model.PV{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
-	}.List(
-		h.container.Db,
+	}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(
+		db,
 		model.ListOptions{
 			Page: &h.page,
 		})
@@ -50,14 +57,16 @@ func (h PvHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []PV{}
+	content := PvList{
+		Count: count,
+	}
 	for _, pv := range list {
 		r := PV{
 			Namespace: pv.Namespace,
 			Name:      pv.Name,
 			Object:    pv.DecodeObject(),
 		}
-		content = append(content, r)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -105,4 +114,13 @@ type PV struct {
 	Name string `json:"name"`
 	// Raw k8s object.
 	Object *v1.PersistentVolume `json:"object,omitempty"`
+}
+
+//
+// PV collection REST resource.
+type PvList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []PV `json:"resources"`
 }

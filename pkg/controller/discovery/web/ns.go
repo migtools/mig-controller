@@ -35,12 +35,20 @@ func (h NsHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.Namespace{
+	db := h.container.Db
+	collection := model.Namespace{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
-	}.List(
-		h.container.Db,
+	}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(
+		db,
 		model.ListOptions{
 			Page: &h.page,
 			Sort: []int{5},
@@ -50,7 +58,9 @@ func (h NsHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Namespace{}
+	content := NamespaceList{
+		Count: count,
+	}
 	for _, m := range list {
 		podCount, err := model.Pod{
 			Base: model.Base{
@@ -91,8 +101,8 @@ func (h NsHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		content = append(
-			content,
+		content.Items = append(
+			content.Items,
 			Namespace{
 				Name:         m.Name,
 				ServiceCount: SrvCount,
@@ -130,4 +140,13 @@ type Namespace struct {
 	PodCount int64 `json:"podCount"`
 	// Number of PVCs.
 	PvcCount int64 `json:"pvcCount"`
+}
+
+//
+// NS collection REST resource.
+type NamespaceList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []Namespace `json:"resources"`
 }

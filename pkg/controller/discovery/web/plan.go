@@ -92,20 +92,30 @@ func (h PlanHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	list, err := model.Plan{}.List(h.container.Db, model.ListOptions{})
+	db := h.container.Db
+	collection := model.Plan{}
+	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := []Plan{}
+	list, err := collection.List(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := PlanList{
+		Count: count,
+	}
 	for _, m := range list {
 		d := Plan{
 			Namespace: m.Namespace,
 			Name:      m.Name,
 			Object:    m.DecodeObject(),
 		}
-		content = append(content, d)
+		content.Items = append(content.Items, d)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -284,6 +294,15 @@ type Plan struct {
 	Name string `json:"name"`
 	// Raw k8s object.
 	Object *migapi.MigPlan `json:"object,omitempty"`
+}
+
+//
+// Plan collection REST resource.
+type PlanList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []Plan `json:"resources"`
 }
 
 //
