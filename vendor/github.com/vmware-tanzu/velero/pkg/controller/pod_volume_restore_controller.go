@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -335,6 +336,18 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
+	}
+	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
+		if err != nil {
+			log.WithError(err).Errorf("Error getting BackupStorageLocation %s", req.Spec.BackupStorageLocation)
+			return errors.WithStack(err)
+		}
+		insecureSkipTLSVerify, err := strconv.ParseBool(bsl.Spec.Config["insecureSkipTLSVerify"])
+		if err != nil {
+			insecureSkipTLSVerify = false
+		}
+		resticCmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 	}
 
 	var stdout, stderr string

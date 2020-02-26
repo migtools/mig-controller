@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -244,16 +245,26 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
+	if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
+		return errors.New("timed out waiting for cache to sync")
+	}
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
-		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
-			return errors.New("timed out waiting for cache to sync")
-		}
-
 		env, err := AzureCmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
 		if err != nil {
 			return err
 		}
 		cmd.Env = env
+	}
+	if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
+		bsl, err := rm.backupLocationLister.BackupStorageLocations(rm.namespace).Get(backupLocation)
+		if err != nil {
+			return err
+		}
+		insecureSkipTLSVerify, err := strconv.ParseBool(bsl.Spec.Config["insecureSkipTLSVerify"])
+		if err != nil {
+			insecureSkipTLSVerify = false
+		}
+		cmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 	}
 
 	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())
