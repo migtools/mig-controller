@@ -9,7 +9,7 @@ import (
 
 func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 	// No spec chage this time
-	if plan.HasReconciled() {
+	if plan.HasReconciled() || !clustersReady(plan) {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, err
 }
 
 func reportGVK(plan *migapi.MigPlan, unsupportedMapping map[string][]schema.GroupVersionResource) {
-	plan.Status.UnsupportedNamespaces = []migapi.UnsupportedNamespace{}
+	unsupportedNamespaces := []migapi.UnsupportedNamespace{}
 
 	for namespace, unsupportedGVRs := range unsupportedMapping {
 		unsupportedResources := []string{}
@@ -66,10 +66,10 @@ func reportGVK(plan *migapi.MigPlan, unsupportedMapping map[string][]schema.Grou
 			Name:                 namespace,
 			UnsupportedResources: unsupportedResources,
 		}
-		plan.Status.UnsupportedNamespaces = append(plan.Status.UnsupportedNamespaces, unsupportedNamespace)
+		unsupportedNamespaces = append(unsupportedNamespaces, unsupportedNamespace)
 	}
 
-	if len(plan.Status.UnsupportedNamespaces) > 0 {
+	if len(unsupportedNamespaces) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NotSupported,
 			Status:   True,
@@ -77,4 +77,19 @@ func reportGVK(plan *migapi.MigPlan, unsupportedMapping map[string][]schema.Grou
 			Message:  NsNotSupported,
 		})
 	}
+
+	plan.Status.UnsupportedNamespaces = unsupportedNamespaces
+}
+
+// Check if any blocker condition appeared on the migPlan after cluster validation phase
+func clustersReady(plan *migapi.MigPlan) bool {
+	clustersNotReadyConditions := []string{
+		InvalidDestinationClusterRef,
+		InvalidDestinationCluster,
+		InvalidDestinationClusterRef,
+		InvalidSourceClusterRef,
+		DestinationClusterNotReady,
+		SourceClusterNotReady,
+	}
+	return !plan.Status.HasAnyCondition(clustersNotReadyConditions...)
 }

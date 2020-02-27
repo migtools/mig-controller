@@ -3,15 +3,10 @@ package migplan
 import (
 	"context"
 	"fmt"
-
 	"net"
 	"reflect"
 	"strings"
 
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/health"
-	"github.com/konveyor/mig-controller/pkg/pods"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -20,6 +15,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/health"
+	"github.com/konveyor/mig-controller/pkg/pods"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Types
