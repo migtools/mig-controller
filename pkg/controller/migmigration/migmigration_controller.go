@@ -25,7 +25,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,18 +45,22 @@ func Add(mgr manager.Manager) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager) *ReconcileMigMigration {
 	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileMigMigration) error {
 	// Create a new controller
 	c, err := controller.New("migmigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
+
+	// Find used Kubernetes cluster version
+	kubeVersion, err := migref.GetKubeVersion(mgr.GetConfig())
+	r.KubeVersion = kubeVersion
 
 	// Watch for changes to MigMigration
 	err = c.Watch(
@@ -119,7 +123,8 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
 	client.Client
-	scheme *runtime.Scheme
+	KubeVersion int
+	scheme      *runtime.Scheme
 }
 
 // Reconcile performs Migrations based on the data in MigMigration

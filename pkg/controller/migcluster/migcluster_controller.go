@@ -61,6 +61,10 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
+	// Find used Kubernetes cluster version
+	kubeVersion, err := migref.GetKubeVersion(mgr.GetConfig())
+	r.KubeVersion = kubeVersion
+
 	// Add reference to controller on ReconcileMigCluster object to be used
 	// for adding remote watches at a later time
 	r.Controller = c
@@ -108,8 +112,9 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	k8sclient.Client
-	scheme     *runtime.Scheme
-	Controller controller.Controller
+	scheme      *runtime.Scheme
+	KubeVersion int
+	Controller  controller.Controller
 }
 
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {

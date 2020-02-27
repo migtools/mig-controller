@@ -2,12 +2,17 @@ package migmigration
 
 import (
 	"context"
+
+	"github.com/konveyor/mig-controller/pkg/reference"
 	appsv1 "github.com/openshift/api/apps/v1"
+	k8sappsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+
 	extv1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -91,12 +96,19 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		list := v1beta1.DeploymentList{}
+		var dList runtime.Object
+		if t.KubeVersion >= reference.AppsGap {
+			dList = dList.(*k8sappsv1.DeploymentList)
+		} else {
+			dList = dList.(*v1beta1.DeploymentList)
+		}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
 			options,
-			&list)
+			dList)
+		list := dList.(*k8sappsv1.DeploymentList)
+
 		if err != nil {
 			log.Trace(err)
 			return err

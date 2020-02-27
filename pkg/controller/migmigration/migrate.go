@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 // Backup resources.
@@ -69,6 +70,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	task := Task{
 		Log:             log,
 		Client:          r,
+		KubeVersion:     r.KubeVersion,
 		Owner:           migration,
 		PlanResources:   planResources,
 		Phase:           migration.Status.Phase,

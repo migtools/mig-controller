@@ -18,21 +18,26 @@ package v1alpha1
 
 import (
 	"context"
-	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
 
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	v1 "k8s.io/api/apps/v1"
 	"k8s.io/api/apps/v1beta1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	"github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // SA secret keys.
@@ -169,7 +174,7 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 }
 
 // Delete resources on the cluster by label.
-func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string) error {
+func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string, kubeVersion int) error {
 	client, err := m.GetClient(client)
 	if err != nil {
 		return err
@@ -181,11 +186,19 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 	options := k8sclient.MatchingLabels(labels)
 
 	// Deployment
-	dList := v1beta1.DeploymentList{}
-	err = client.List(context.TODO(), options, &dList)
+	var dListRaw runtime.Object
+	// https://github.com/kubernetes/kubernetes/pull/70672
+	if kubeVersion >= reference.AppsGap {
+		dListRaw = dListRaw.(*v1.DeploymentList)
+	} else {
+		dListRaw = dListRaw.(*v1beta1.DeploymentList)
+	}
+	err = client.List(context.TODO(), options, dListRaw)
 	if err != nil {
 		return err
 	}
+
+	dList := dListRaw.(*v1.DeploymentList)
 	for _, r := range dList.Items {
 		err = client.Delete(context.TODO(), &r)
 		if err != nil && !k8serror.IsNotFound(err) {

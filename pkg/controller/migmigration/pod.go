@@ -8,11 +8,14 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/pods"
+	"github.com/konveyor/mig-controller/pkg/reference"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,7 +69,6 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 	list := corev1.PodList{}
-	ds := v1beta1.DaemonSet{}
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
 	})
@@ -82,13 +84,21 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 
+	var dsRaw runtime.Object
+	if t.KubeVersion >= reference.AppsGap {
+		dsRaw = dsRaw.(*v1.DaemonSet)
+	} else {
+		dsRaw = dsRaw.(*v1beta1.DaemonSet)
+	}
 	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
 			Name:      "restic",
 			Namespace: migapi.VeleroNamespace,
 		},
-		&ds)
+		dsRaw)
+	ds := dsRaw.(*v1.DaemonSet)
+
 	if err != nil {
 		log.Trace(err)
 		return false, err
@@ -102,6 +112,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 			return false, nil
 		}
 	}
+
 	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
 		return false, nil
 	}

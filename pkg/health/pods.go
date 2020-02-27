@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/konveyor/mig-controller/pkg/reference"
+	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -87,13 +89,18 @@ func PodManagersRecreated(client k8sclient.Client, options *k8sclient.ListOption
 }
 
 // DaemonSetsRecreated checks the number of pod replicas managed by DaemonSets
-func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions) (bool, error) {
-	daemonSetList := v1beta1.DaemonSetList{}
-
-	err := client.List(context.TODO(), options, &daemonSetList)
+func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions, kubeVersion int) (bool, error) {
+	var dsList runtime.Object
+	if kubeVersion >= reference.AppsGap {
+		dsList = dsList.(*v1.DaemonSetList)
+	} else {
+		dsList = dsList.(*v1beta1.DaemonSetList)
+	}
+	err := client.List(context.TODO(), options, dsList)
 	if err != nil {
 		return false, err
 	}
+	daemonSetList := dsList.(*v1.DaemonSetList)
 
 	for _, ds := range daemonSetList.Items {
 		if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {

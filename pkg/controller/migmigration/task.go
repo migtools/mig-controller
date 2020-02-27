@@ -4,9 +4,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 // Requeue
@@ -148,6 +149,7 @@ type Task struct {
 	Owner           *migapi.MigMigration
 	PlanResources   *migapi.PlanResources
 	Annotations     map[string]string
+	KubeVersion     int
 	BackupResources []string
 	Phase           string
 	Requeue         time.Duration

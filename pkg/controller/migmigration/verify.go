@@ -78,7 +78,7 @@ func (t *Task) podsRecreated(client k8sclient.Client) (bool, error) {
 	for _, namespace := range targetNamespaces {
 		options := k8sclient.InNamespace(namespace)
 
-		finished, err := health.DaemonSetsRecreated(client, options)
+		finished, err := health.DaemonSetsRecreated(client, options, t.KubeVersion)
 		if err != nil || !finished {
 			return finished, err
 		}

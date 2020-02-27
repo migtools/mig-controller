@@ -18,9 +18,10 @@ package migplan
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
-	"strconv"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
@@ -48,18 +49,22 @@ func Add(mgr manager.Manager) error {
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager) *ReconcileMigPlan {
 	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r *ReconcileMigPlan) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
+
+	// Find used Kubernetes cluster version
+	kubeVersion, err := migref.GetKubeVersion(mgr.GetConfig())
+	r.KubeVersion = kubeVersion
 
 	// Watch for changes to MigPlan
 	err = c.Watch(&source.Kind{
@@ -160,7 +165,8 @@ var _ reconcile.Reconciler = &ReconcileMigPlan{}
 // ReconcileMigPlan reconciles a MigPlan object
 type ReconcileMigPlan struct {
 	client.Client
-	scheme *runtime.Scheme
+	KubeVersion int
+	scheme      *runtime.Scheme
 }
 
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -305,7 +311,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		if !cluster.Status.IsReady() {
 			continue
 		}
-		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
+		err = cluster.DeleteResources(r, plan.GetCorrelationLabels(), r.KubeVersion)
 		if err != nil {
 			log.Trace(err)
 			return err
