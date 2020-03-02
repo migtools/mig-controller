@@ -50,7 +50,8 @@ func (r *RemoteClusterSource) run() {
 			if cluster.Status.HasAnyCondition(
 				InvalidURL,
 				InvalidSaSecretRef,
-				InvalidSaToken) {
+				InvalidSaToken,
+				SaTokenNotPrivileged) {
 				continue
 			}
 
