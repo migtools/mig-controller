@@ -18,10 +18,11 @@ package v1alpha1
 
 import (
 	"context"
+	"time"
+
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"time"
 
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
