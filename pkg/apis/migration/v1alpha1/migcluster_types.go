@@ -29,7 +29,6 @@ import (
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -184,7 +183,7 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 }
 
 // Delete resources on the cluster by label.
-func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string, scheme *runtime.Scheme) error {
+func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string) error {
 	client, err := m.GetClient(client)
 	if err != nil {
 		return err
@@ -195,17 +194,25 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 		return err
 	}
 
-	// Deployment
-	dList := &v1.DeploymentList{}
-	options := k8sclient.MatchingLabels(labels)
 	kubeVersion, err := reference.GetKubeVersion(discovery)
 	if err != nil {
 		return err
 	}
+	options := k8sclient.MatchingLabels(labels)
+
+	// Deployment
 	if kubeVersion >= reference.AppsGap {
+		dList := &v1.DeploymentList{}
 		err = client.List(context.TODO(), options, dList)
 		if err != nil {
 			return err
+		}
+
+		for _, r := range dList.Items {
+			err = client.Delete(context.TODO(), &r)
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
 		}
 	} else {
 		dListOld := &v1beta1.DeploymentList{}
@@ -213,16 +220,12 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 		if err != nil {
 			return err
 		}
-		err = scheme.Convert(dListOld, dList, nil)
-		if err != nil {
-			return err
-		}
-	}
 
-	for _, r := range dList.Items {
-		err = client.Delete(context.TODO(), &r)
-		if err != nil && !k8serror.IsNotFound(err) {
-			return err
+		for _, r := range dListOld.Items {
+			err = client.Delete(context.TODO(), &r)
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
 		}
 	}
 
