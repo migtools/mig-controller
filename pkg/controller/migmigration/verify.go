@@ -3,6 +3,7 @@ package migmigration
 import (
 	"fmt"
 
+	"k8s.io/client-go/discovery"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -21,6 +22,11 @@ func (t *Task) VerificationCompleted() (bool, error) {
 		return false, err
 	}
 
+	discovery, err := t.getDestinationDiscovery()
+	if err != nil {
+		return false, err
+	}
+
 	// Collect and update info about unhealthy pods
 	err = t.updateResourcesHealth(client)
 	if err != nil {
@@ -28,7 +34,7 @@ func (t *Task) VerificationCompleted() (bool, error) {
 	}
 
 	// Check that all pods are recreated
-	finished, err := t.podsRecreated(client)
+	finished, err := t.podsRecreated(client, discovery)
 	if err != nil {
 		return false, err
 	}
@@ -72,13 +78,13 @@ func (t *Task) getAppState(client k8sclient.Client) error {
 	return nil
 }
 
-func (t *Task) podsRecreated(client k8sclient.Client) (bool, error) {
+func (t *Task) podsRecreated(client k8sclient.Client, discovery discovery.DiscoveryInterface) (bool, error) {
 	targetNamespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	// Scan namespaces for resources to wait
 	for _, namespace := range targetNamespaces {
 		options := k8sclient.InNamespace(namespace)
 
-		finished, err := health.DaemonSetsRecreated(client, options, t.KubeVersion)
+		finished, err := health.DaemonSetsRecreated(client, discovery, options, t.scheme)
 		if err != nil || !finished {
 			return finished, err
 		}

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -131,6 +132,15 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
 	return client, nil
 }
 
+// GetDiscoveryClient get a local or remote discovery client using a MigCluster and an existing client
+func (m *MigCluster) GetDiscoveryClient(c k8sclient.Client) (discovery.DiscoveryInterface, error) {
+	restConfig, err := m.BuildRestConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	return discovery.NewDiscoveryClientForConfig(restConfig)
+}
+
 // Test the connection settings by building a client.
 func (m *MigCluster) TestConnection(c k8sclient.Client, timeout time.Duration) error {
 	if m.Spec.IsHostCluster {
@@ -174,31 +184,41 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 }
 
 // Delete resources on the cluster by label.
-func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string, kubeVersion int) error {
+func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string, scheme *runtime.Scheme) error {
 	client, err := m.GetClient(client)
 	if err != nil {
 		return err
 	}
-	if labels == nil {
-		labels = map[string]string{PartOfLabel: Application}
-	}
 
-	options := k8sclient.MatchingLabels(labels)
-
-	// Deployment
-	var dListRaw runtime.Object
-	// https://github.com/kubernetes/kubernetes/pull/70672
-	if kubeVersion >= reference.AppsGap {
-		dListRaw = dListRaw.(*v1.DeploymentList)
-	} else {
-		dListRaw = dListRaw.(*v1beta1.DeploymentList)
-	}
-	err = client.List(context.TODO(), options, dListRaw)
+	discovery, err := m.GetDiscoveryClient(client)
 	if err != nil {
 		return err
 	}
 
-	dList := dListRaw.(*v1.DeploymentList)
+	// Deployment
+	dList := &v1.DeploymentList{}
+	options := k8sclient.MatchingLabels(labels)
+	kubeVersion, err := reference.GetKubeVersion(discovery)
+	if err != nil {
+		return err
+	}
+	if kubeVersion >= reference.AppsGap {
+		err = client.List(context.TODO(), options, dList)
+		if err != nil {
+			return err
+		}
+	} else {
+		dListOld := &v1beta1.DeploymentList{}
+		err = client.List(context.TODO(), options, dListOld)
+		if err != nil {
+			return err
+		}
+		err = scheme.Convert(dListOld, dList, nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, r := range dList.Items {
 		err = client.Delete(context.TODO(), &r)
 		if err != nil && !k8serror.IsNotFound(err) {

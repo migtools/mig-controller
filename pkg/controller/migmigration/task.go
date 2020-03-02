@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"k8s.io/client-go/discovery"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -144,12 +145,12 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
+	*ReconcileMigMigration
+
 	Log             logr.Logger
-	Client          k8sclient.Client
 	Owner           *migapi.MigMigration
 	PlanResources   *migapi.PlanResources
 	Annotations     map[string]string
-	KubeVersion     int
 	BackupResources []string
 	Phase           string
 	Requeue         time.Duration
@@ -608,6 +609,16 @@ func (t *Task) getSourceClient() (k8sclient.Client, error) {
 // Get a client for the destination cluster.
 func (t *Task) getDestinationClient() (k8sclient.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
+}
+
+// Get a discovery client for the source cluster.
+func (t *Task) getSourceDiscovery() (discovery.DiscoveryInterface, error) {
+	return t.PlanResources.SrcMigCluster.GetDiscoveryClient(t.Client)
+}
+
+// Get a discovery client for the destination cluster.
+func (t *Task) getDestinationDiscovery() (discovery.DiscoveryInterface, error) {
+	return t.PlanResources.DestMigCluster.GetDiscoveryClient(t.Client)
 }
 
 // Get the persistent volumes included in the plan.

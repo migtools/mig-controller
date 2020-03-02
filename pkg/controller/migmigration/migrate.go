@@ -68,14 +68,13 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Run
 	task := Task{
-		Log:             log,
-		Client:          r,
-		KubeVersion:     r.KubeVersion,
-		Owner:           migration,
-		PlanResources:   planResources,
-		Phase:           migration.Status.Phase,
-		Annotations:     r.getAnnotations(migration),
-		BackupResources: r.getBackupResources(migration),
+		ReconcileMigMigration: r,
+		Log:                   log,
+		Owner:                 migration,
+		PlanResources:         planResources,
+		Phase:                 migration.Status.Phase,
+		Annotations:           r.getAnnotations(migration),
+		BackupResources:       r.getBackupResources(migration),
 	}
 	err = task.Run()
 	if err != nil {

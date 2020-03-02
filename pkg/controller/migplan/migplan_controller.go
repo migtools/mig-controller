@@ -50,7 +50,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigPlan {
-	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigPlan{Client: mgr.GetClient(), Scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -61,10 +61,6 @@ func add(mgr manager.Manager, r *ReconcileMigPlan) error {
 		log.Trace(err)
 		return err
 	}
-
-	// Find used Kubernetes cluster version
-	kubeVersion, err := migref.GetKubeVersion(mgr.GetConfig())
-	r.KubeVersion = kubeVersion
 
 	// Watch for changes to MigPlan
 	err = c.Watch(&source.Kind{
@@ -165,8 +161,7 @@ var _ reconcile.Reconciler = &ReconcileMigPlan{}
 // ReconcileMigPlan reconciles a MigPlan object
 type ReconcileMigPlan struct {
 	client.Client
-	KubeVersion int
-	scheme      *runtime.Scheme
+	Scheme *runtime.Scheme
 }
 
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -311,7 +306,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		if !cluster.Status.IsReady() {
 			continue
 		}
-		err = cluster.DeleteResources(r, plan.GetCorrelationLabels(), r.KubeVersion)
+		err = cluster.DeleteResources(r, plan.GetCorrelationLabels(), r.Scheme)
 		if err != nil {
 			log.Trace(err)
 			return err

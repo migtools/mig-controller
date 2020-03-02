@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -89,20 +90,34 @@ func PodManagersRecreated(client k8sclient.Client, options *k8sclient.ListOption
 }
 
 // DaemonSetsRecreated checks the number of pod replicas managed by DaemonSets
-func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions, kubeVersion int) (bool, error) {
-	var dsList runtime.Object
-	if kubeVersion >= reference.AppsGap {
-		dsList = dsList.(*v1.DaemonSetList)
-	} else {
-		dsList = dsList.(*v1beta1.DaemonSetList)
-	}
-	err := client.List(context.TODO(), options, dsList)
+func DaemonSetsRecreated(
+	client k8sclient.Client,
+	discovery discovery.DiscoveryInterface,
+	options *k8sclient.ListOptions,
+	scheme *runtime.Scheme) (bool, error) {
+	dsList := &v1.DaemonSetList{}
+	kubeVersion, err := reference.GetKubeVersion(discovery)
 	if err != nil {
 		return false, err
 	}
-	daemonSetList := dsList.(*v1.DaemonSetList)
+	if kubeVersion >= reference.AppsGap {
+		err := client.List(context.TODO(), options, dsList)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		dsListOld := &v1beta1.DaemonSetList{}
+		err := client.List(context.TODO(), options, dsListOld)
+		if err != nil {
+			return false, err
+		}
+		err = scheme.Convert(dsListOld, dsList, nil)
+		if err != nil {
+			return false, err
+		}
+	}
 
-	for _, ds := range daemonSetList.Items {
+	for _, ds := range dsList.Items {
 		if ds.Status.DesiredNumberScheduled != ds.Status.NumberReady {
 			return false, nil
 		}

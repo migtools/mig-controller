@@ -58,10 +58,6 @@ func add(mgr manager.Manager, r *ReconcileMigMigration) error {
 		return err
 	}
 
-	// Find used Kubernetes cluster version
-	kubeVersion, err := migref.GetKubeVersion(mgr.GetConfig())
-	r.KubeVersion = kubeVersion
-
 	// Watch for changes to MigMigration
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigMigration{}},
@@ -123,8 +119,7 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
 	client.Client
-	KubeVersion int
-	scheme      *runtime.Scheme
+	scheme *runtime.Scheme
 }
 
 // Reconcile performs Migrations based on the data in MigMigration

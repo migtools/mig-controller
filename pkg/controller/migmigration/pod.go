@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +67,13 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		log.Trace(err)
 		return false, err
 	}
+
+	discovery, err := t.getSourceDiscovery()
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
 	list := corev1.PodList{}
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
@@ -84,20 +90,35 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 
-	var dsRaw runtime.Object
-	if t.KubeVersion >= reference.AppsGap {
-		dsRaw = dsRaw.(*v1.DaemonSet)
-	} else {
-		dsRaw = dsRaw.(*v1beta1.DaemonSet)
+	ds := &v1.DaemonSet{}
+	kubeVersion, err := reference.GetKubeVersion(discovery)
+	if err != nil {
+		log.Trace(err)
+		return false, err
 	}
-	err = client.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Name:      "restic",
-			Namespace: migapi.VeleroNamespace,
-		},
-		dsRaw)
-	ds := dsRaw.(*v1.DaemonSet)
+	if kubeVersion >= reference.AppsGap {
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      "restic",
+				Namespace: migapi.VeleroNamespace,
+			},
+			ds)
+	} else {
+		dsOld := &v1beta1.DaemonSet{}
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      "restic",
+				Namespace: migapi.VeleroNamespace,
+			},
+			dsOld)
+		err = t.scheme.Convert(dsOld, ds, nil)
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+	}
 
 	if err != nil {
 		log.Trace(err)

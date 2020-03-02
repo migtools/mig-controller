@@ -12,7 +12,6 @@ import (
 
 	extv1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -20,6 +19,16 @@ import (
 // All quiesce functionality should be put here
 func (t *Task) quiesceApplications() error {
 	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	discovery, err := t.getSourceDiscovery()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	kubeVersion, err := reference.GetKubeVersion(discovery)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -34,7 +43,7 @@ func (t *Task) quiesceApplications() error {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDeployments(client)
+	err = t.scaleDownDeployments(client, kubeVersion)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -44,12 +53,12 @@ func (t *Task) quiesceApplications() error {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownReplicaSets(client)
+	err = t.scaleDownReplicaSets(client, kubeVersion)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDaemonSets(client)
+	err = t.scaleDownDaemonSets(client, kubeVersion)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -93,32 +102,44 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 }
 
 // Scales down all Deployments
-func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
+func (t *Task) scaleDownDeployments(client k8sclient.Client, kubeVersion int) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		var dList runtime.Object
-		if t.KubeVersion >= reference.AppsGap {
-			dList = dList.(*k8sappsv1.DeploymentList)
-		} else {
-			dList = dList.(*v1beta1.DeploymentList)
-		}
+		dList := &k8sappsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(
-			context.TODO(),
-			options,
-			dList)
-		list := dList.(*k8sappsv1.DeploymentList)
+		if kubeVersion >= reference.AppsGap {
+			err := client.List(
+				context.TODO(),
+				options,
+				dList)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		} else {
+			dListOld := &v1beta1.DeploymentList{}
+			err := client.List(
+				context.TODO(),
+				options,
+				dListOld)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 
-		if err != nil {
-			log.Trace(err)
-			return err
+			err = t.scheme.Convert(dListOld, dList, nil)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
-		for _, deployment := range list.Items {
+
+		for _, deployment := range dList.Items {
 			if deployment.Spec.Replicas == &zero {
 				continue
 			}
 			deployment.Spec.Replicas = &zero
-			err = client.Update(context.TODO(), &deployment)
+			err := client.Update(context.TODO(), &deployment)
 			if err != nil {
 				log.Trace(err)
 				return err
@@ -159,25 +180,37 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 }
 
 // Scales down all ReplicaSets.
-func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
+func (t *Task) scaleDownReplicaSets(client k8sclient.Client, kubeVersion int) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		list := extv1b1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(
-			context.TODO(),
-			options,
-			&list)
-		if err != nil {
-			log.Trace(err)
-			return err
+		rsList := &k8sappsv1.ReplicaSetList{}
+		if kubeVersion >= reference.AppsGap {
+			err := client.List(context.TODO(), options, rsList)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		} else {
+			rsListOld := &extv1b1.ReplicaSetList{}
+			err := client.List(context.TODO(), options, rsListOld)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			err = t.scheme.Convert(rsListOld, rsList, nil)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
-		for _, set := range list.Items {
+
+		for _, set := range rsList.Items {
 			if set.Spec.Replicas == &zero {
 				continue
 			}
 			set.Spec.Replicas = &zero
-			err = client.Update(context.TODO(), &set)
+			err := client.Update(context.TODO(), &set)
 			if err != nil {
 				log.Trace(err)
 				return err
@@ -194,26 +227,44 @@ const (
 )
 
 // Scales down all DaemonSets.
-func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
+func (t *Task) scaleDownDaemonSets(client k8sclient.Client, kubeVersion int) error {
 	for _, ns := range t.sourceNamespaces() {
-		list := extv1b1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(
-			context.TODO(),
-			options,
-			&list)
-		if err != nil {
-			log.Trace(err)
-			return err
+		rsList := &k8sappsv1.DaemonSetList{}
+		if kubeVersion >= reference.AppsGap {
+			err := client.List(
+				context.TODO(),
+				options,
+				rsList)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		} else {
+			rsListOld := &extv1b1.DaemonSetList{}
+			err := client.List(
+				context.TODO(),
+				options,
+				rsListOld)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			err = t.scheme.Convert(rsListOld, rsList, nil)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
 		}
-		for _, set := range list.Items {
+
+		for _, set := range rsList.Items {
 			if set.Spec.Template.Spec.NodeSelector == nil {
 				set.Spec.Template.Spec.NodeSelector = make(map[string]string)
 			} else if set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] == quiesceNodeSelectorVal {
 				continue
 			}
 			set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] = quiesceNodeSelectorVal
-			err = client.Update(context.TODO(), &set)
+			err := client.Update(context.TODO(), &set)
 			if err != nil {
 				log.Trace(err)
 				return err
