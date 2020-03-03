@@ -31,6 +31,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+
+	_ "k8s.io/code-generator/cmd/client-gen/args"
+	_ "k8s.io/code-generator/cmd/client-gen/generators/fake"
+	_ "k8s.io/code-generator/cmd/client-gen/generators/scheme"
+	_ "k8s.io/code-generator/cmd/client-gen/generators/util"
+	_ "k8s.io/code-generator/cmd/client-gen/path"
+	_ "k8s.io/code-generator/cmd/client-gen/types"
+	_ "k8s.io/code-generator/cmd/deepcopy-gen/args"
+	_ "k8s.io/code-generator/pkg/namer"
+	_ "k8s.io/code-generator/pkg/util"
+
+	_ "sigs.k8s.io/controller-tools/pkg/crd/generator"
+	_ "sigs.k8s.io/controller-tools/pkg/rbac"
+	_ "sigs.k8s.io/controller-tools/pkg/util"
+	_ "sigs.k8s.io/controller-tools/pkg/webhook"
 )
 
 func main() {

@@ -5,7 +5,7 @@ install: true
 matrix:
   include:
     - os: linux
-      go: "1.10.3"
+      go: "1.14"
       sudo: true
       cache:
         directories:
@@ -13,7 +13,7 @@ matrix:
           - $HOME/gopath/pkg/mod
 
     - os: osx
-      go: "1.10.3"
+      go: "1.14"
       cache:
         directories:
           - $HOME/Library/Caches/go-build
@@ -24,4 +24,4 @@ script:
   - curl -sL https://go.kubebuilder.io/dl/2.0.0-beta.0/${os}/${arch} | tar -xz -C /tmp/
   - sudo mv /tmp/kubebuilder_2.0.0-beta.0_${os}_${arch} /usr/local/kubebuilder
   - export PATH=$PATH:/usr/local/kubebuilder/bin
-  - env GO111MODULE=on make ci
+  - make ci
