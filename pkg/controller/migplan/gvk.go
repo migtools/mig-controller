@@ -133,7 +133,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	resourcesDiff := compareResources(srcResourceList, dstResourceList)
-	unsupportedGVRs, err := r.unsupportedResources(resourcesDiff)
+	unsupportedGVRs, err := unsupportedResources(resourcesDiff)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to get unsupported resources for srcCluster")
 	}
@@ -266,7 +266,7 @@ func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 	return resources, nil
 }
 
-func (r *Compare) unsupportedResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
+func unsupportedResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	unsupportedGVRs := []schema.GroupVersionResource{}
 	for _, resourceList := range resourceDiff {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
