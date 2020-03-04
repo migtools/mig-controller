@@ -58,8 +58,8 @@ type MigPlanSpec struct {
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
 	Conditions
-	UnsupportedNamespaces []UnsupportedNamespace `json:"unsupportedNamespaces,omitempty"`
-	ObservedGeneration    int64                  `json:"observedGeneration"`
+	Incompatible
+	ObservedGeneration int64 `json:"observedGeneration"`
 }
 
 // +genclient

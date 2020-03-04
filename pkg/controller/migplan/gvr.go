@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,13 +38,13 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 		return err
 	}
 
-	unsupportedMapping, err := gvkCompare.Compare()
+	incompatibleMapping, err := gvkCompare.Compare()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	reportGVK(plan, unsupportedMapping)
+	reportGVK(plan, incompatibleMapping)
 
 	return nil
 }
@@ -57,48 +56,53 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*Compare, error) 
 
 	err := gvkCompare.NewSourceDiscovery(r)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
 
 	err = gvkCompare.NewDestinationDiscovery(r)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
 
 	err = gvkCompare.NewSourceClient(r)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
 
 	return gvkCompare, nil
 }
 
-func reportGVK(plan *migapi.MigPlan, unsupportedMapping map[string][]schema.GroupVersionResource) {
-	unsupportedNamespaces := []migapi.UnsupportedNamespace{}
+func reportGVK(plan *migapi.MigPlan, incompatibleMapping map[string][]schema.GroupVersionResource) {
+	incompatibleNamespaces := []migapi.IncompatibleNamespace{}
 
-	for namespace, unsupportedGVRs := range unsupportedMapping {
-		unsupportedResources := []string{}
-		for _, res := range unsupportedGVRs {
-			unsupportedResources = append(unsupportedResources, res.String())
+	for namespace, incompatibleGVRs := range incompatibleMapping {
+		incompatibleResources := []migapi.IncompatibleGVR{}
+		for _, res := range incompatibleGVRs {
+			incompatibleResources = append(incompatibleResources, migapi.FromGVR(res))
 		}
 
-		unsupportedNamespace := migapi.UnsupportedNamespace{
-			Name:                 namespace,
-			UnsupportedResources: unsupportedResources,
+		incompatibleNamespace := migapi.IncompatibleNamespace{
+			Name: namespace,
+			GVRs: incompatibleResources,
 		}
-		unsupportedNamespaces = append(unsupportedNamespaces, unsupportedNamespace)
+		incompatibleNamespaces = append(incompatibleNamespaces, incompatibleNamespace)
 	}
 
-	if len(unsupportedNamespaces) > 0 {
+	if len(incompatibleNamespaces) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     NotSupported,
+			Type:     GVRsIncompatible,
 			Status:   True,
 			Category: Warn,
-			Message:  NsNotSupported,
+			Message:  NsGVRsIncompatible,
 		})
 	}
 
-	plan.Status.UnsupportedNamespaces = unsupportedNamespaces
+	plan.Status.Incompatible = migapi.Incompatible{
+		Namespaces: incompatibleNamespaces,
+	}
 }
 
 // Check if any blocker condition appeared on the migPlan after cluster validation phase
@@ -114,43 +118,47 @@ func clustersReady(plan *migapi.MigPlan) bool {
 	return !plan.Status.HasAnyCondition(clustersNotReadyConditions...)
 }
 
-// Compare GVKs on both clusters, find unsupported GVRs
-// and check each plan source namespace for existence of unsupported GVRs
+// Compare GVKs on both clusters, find incompatible GVRs
+// and check each plan source namespace for existence of incompatible GVRs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	srcResourceList, err := collectResources(r.SrcDiscovery)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server resources for a srcCluster")
+		log.Trace(err)
+		return nil, err
 	}
 
 	dstResourceList, err := collectResources(r.DstDiscovery)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server resources for a dstCluster")
+		log.Trace(err)
+		return nil, err
 	}
 
 	err = r.excludeCRDs(srcResourceList)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to exclude CRs from the unsupported resources")
+		log.Trace(err)
+		return nil, err
 	}
 
 	resourcesDiff := compareResources(srcResourceList, dstResourceList)
-	unsupportedGVRs, err := unsupportedResources(resourcesDiff)
+	incompatibleGVRs, err := incompatibleResources(resourcesDiff)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get unsupported resources for srcCluster")
+		log.Trace(err)
+		return nil, err
 	}
 
-	return r.collectUnsupportedMapping(unsupportedGVRs)
+	return r.collectIncompatibleMapping(incompatibleGVRs)
 }
 
 // NewSourceDiscovery initializes source discovery client for a source cluster
 func (r *Compare) NewSourceDiscovery(c client.Client) error {
 	srcCluster, err := r.Plan.GetSourceCluster(c)
 	if err != nil {
-		return errors.Wrap(err, "Error reading srcMigCluster")
+		return err
 	}
 
 	discovery, err := r.getDiscovery(c, srcCluster)
 	if err != nil {
-		return errors.Wrap(err, "Can't compile discovery client for srcCluster")
+		return err
 	}
 
 	r.SrcDiscovery = discovery
@@ -162,12 +170,12 @@ func (r *Compare) NewSourceDiscovery(c client.Client) error {
 func (r *Compare) NewDestinationDiscovery(c client.Client) error {
 	dstCluster, err := r.Plan.GetDestinationCluster(c)
 	if err != nil {
-		return errors.Wrap(err, "Error reading dstMigCluster")
+		return err
 	}
 
 	discovery, err := r.getDiscovery(c, dstCluster)
 	if err != nil {
-		return errors.Wrap(err, "Can't compile discovery client for dstCluster")
+		return err
 	}
 
 	r.DstDiscovery = discovery
@@ -179,12 +187,12 @@ func (r *Compare) NewDestinationDiscovery(c client.Client) error {
 func (r *Compare) NewSourceClient(c client.Client) error {
 	srcCluster, err := r.Plan.GetSourceCluster(c)
 	if err != nil {
-		return errors.Wrap(err, "Error reading srcMigCluster")
+		return err
 	}
 
 	client, err := r.getClient(c, srcCluster)
 	if err != nil {
-		return errors.Wrap(err, "Can't compile dynamic client for srcCluster")
+		return err
 	}
 
 	r.SrcClient = client
@@ -195,7 +203,7 @@ func (r *Compare) NewSourceClient(c client.Client) error {
 func (r *Compare) getDiscovery(c client.Client, cluster *migapi.MigCluster) (*discovery.DiscoveryClient, error) {
 	config, err := cluster.BuildRestConfig(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "Can't get REST config from a cluster")
+		return nil, err
 	}
 
 	return discovery.NewDiscoveryClientForConfig(config)
@@ -204,56 +212,56 @@ func (r *Compare) getDiscovery(c client.Client, cluster *migapi.MigCluster) (*di
 func (r *Compare) getClient(c client.Client, cluster *migapi.MigCluster) (dynamic.Interface, error) {
 	config, err := cluster.BuildRestConfig(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "Can't get REST config from a cluster")
+		return nil, err
 	}
 
 	return dynamic.NewForConfig(config)
 }
 
-func (r *Compare) collectUnsupportedMapping(unsupportedResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
-	unsupportedNamespaces := map[string][]schema.GroupVersionResource{}
-	for _, gvr := range unsupportedResources {
+func (r *Compare) collectIncompatibleMapping(incompatibleResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
+	incompatibleNamespaces := map[string][]schema.GroupVersionResource{}
+	for _, gvr := range incompatibleResources {
 		namespaceOccurence, err := r.occurIn(gvr)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Unable to collect namespace occurences for GVR: %s", gvr)
+			return nil, err
 		}
 
 		for _, namespace := range namespaceOccurence {
 			if inNamespaces(namespace, r.Plan.GetSourceNamespaces()) {
-				_, exist := unsupportedNamespaces[namespace]
+				_, exist := incompatibleNamespaces[namespace]
 				if exist {
-					unsupportedNamespaces[namespace] = append(unsupportedNamespaces[namespace], gvr)
+					incompatibleNamespaces[namespace] = append(incompatibleNamespaces[namespace], gvr)
 				} else {
-					unsupportedNamespaces[namespace] = []schema.GroupVersionResource{gvr}
+					incompatibleNamespaces[namespace] = []schema.GroupVersionResource{gvr}
 				}
 			}
 		}
 	}
 
-	return unsupportedNamespaces, nil
+	return incompatibleNamespaces, nil
 }
 
 func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
-	namespacesOccured := []string{}
+	namespacesOccurred := []string{}
 	options := metav1.ListOptions{}
 	resourceList, err := r.SrcClient.Resource(gvr).List(options)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error while listing: %s", gvr)
+		return nil, err
 	}
 
 	for _, res := range resourceList.Items {
-		if !inNamespaces(res.GetNamespace(), namespacesOccured) {
-			namespacesOccured = append(namespacesOccured, res.GetNamespace())
+		if !inNamespaces(res.GetNamespace(), namespacesOccurred) {
+			namespacesOccurred = append(namespacesOccurred, res.GetNamespace())
 		}
 	}
 
-	return namespacesOccured, nil
+	return namespacesOccurred, nil
 }
 
 func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	resources, err := discovery.ServerResources()
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get a list of resources for a GroupVersion on srcCluster")
+		return nil, err
 	}
 
 	for _, res := range resources {
@@ -266,39 +274,36 @@ func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 	return resources, nil
 }
 
-func unsupportedResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
-	unsupportedGVRs := []schema.GroupVersionResource{}
+func incompatibleResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
+	incompatibleGVRs := []schema.GroupVersionResource{}
 	for _, resourceList := range resourceDiff {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error parsing GroupVersion %s", resourceList.GroupVersion)
+			return nil, err
 		}
 
 		for _, resource := range resourceList.APIResources {
 			gvr := gv.WithResource(resource.Name)
-			unsupportedGVRs = append(unsupportedGVRs, gvr)
+			incompatibleGVRs = append(incompatibleGVRs, gvr)
 		}
 	}
 
-	return unsupportedGVRs, nil
+	return incompatibleGVRs, nil
 }
 
 func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) error {
 	options := metav1.ListOptions{}
 	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
 	if err != nil {
-		return errors.Wrap(err, "Error while listing CRDs")
+		return err
 	}
 
 	crdGroups := []string{}
 	groupPath := []string{"spec", "group"}
 	for _, crd := range crdList.Items {
-		group, found, err := unstructured.NestedString(crd.Object, groupPath...)
-		if !found {
-			return errors.Wrap(err, "Error while extracting CRD group: does not exist")
-		}
+		group, _, err := unstructured.NestedString(crd.Object, groupPath...)
 		if err != nil {
-			return errors.Wrap(err, "Error while extracting CRD group")
+			return err
 		}
 		crdGroups = append(crdGroups, group)
 	}
