@@ -2,12 +2,10 @@ package web
 
 import (
 	"database/sql"
-
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	"net/http"
 )
 
 const (

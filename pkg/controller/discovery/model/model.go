@@ -4,15 +4,13 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"fmt"
-
+	"github.com/konveyor/mig-controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/settings"
+	_ "github.com/mattn/go-sqlite3"
 	pathlib "path"
 	"reflect"
 	"strconv"
 	"sync"
-
-	"github.com/konveyor/mig-controller/pkg/logging"
-	"github.com/konveyor/mig-controller/pkg/settings"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // Shared logger.

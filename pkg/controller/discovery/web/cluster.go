@@ -1,14 +1,12 @@
 package web
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/gin-gonic/gin"
-	auth "k8s.io/api/authorization/v1"
-
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	auth "k8s.io/api/authorization/v1"
+	"net/http"
+	"time"
 )
 
 // Cluster-scoped route roots.

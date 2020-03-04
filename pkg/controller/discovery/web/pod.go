@@ -4,17 +4,15 @@ import (
 	"bufio"
 	"database/sql"
 	"encoding/json"
-	"io"
-	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
-	v1 "k8s.io/api/core/v1"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	"io"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	capi "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	"net/http"
+	"strconv"
 )
 
 const (

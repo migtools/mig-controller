@@ -1,12 +1,11 @@
 package model
 
 import (
+	"github.com/konveyor/mig-controller/pkg/logging"
+	"github.com/onsi/gomega"
 	"os"
 	pathlib "path"
 	"testing"
-
-	"github.com/konveyor/mig-controller/pkg/logging"
-	"github.com/onsi/gomega"
 )
 
 var uid = 0

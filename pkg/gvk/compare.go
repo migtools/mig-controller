@@ -1,7 +1,6 @@
 package gvk
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -17,7 +16,7 @@ import (
 
 var crdGVR = schema.GroupVersionResource{
 	Group:    "apiextensions.k8s.io",
-	Version:  "v1beta1",
+	Version:  "v1beta1", // Should become v1 after 1.17, needs downscaling
 	Resource: "customresourcedefinitions",
 }
 
@@ -32,25 +31,25 @@ type Compare struct {
 // Compare GVKs on both clusters, find unsupported GVRs
 // and check each plan source namespace for existence of unsupported GVRs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
-	srcGroupList, err := r.SrcDiscovery.ServerGroups()
+	srcResourceList, err := collectResources(r.SrcDiscovery)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server groups for a srcCluster")
+		return nil, errors.Wrap(err, "Unable to fetch server resources for a srcCluster")
 	}
 
-	dstGroupList, err := r.DstDiscovery.ServerGroups()
+	dstResourceList, err := collectResources(r.DstDiscovery)
 	if err != nil {
-		return nil, errors.Wrap(err, "Unable to fetch server groups for a dstCluster")
+		return nil, errors.Wrap(err, "Unable to fetch server resources for a dstCluster")
 	}
 
-	gvDiff := compareGroupVersions(srcGroupList, dstGroupList)
-	unsupportedGVRs, err := r.unsupportedResources(gvDiff)
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to get unsupported resources for scrCluster")
-	}
-
-	err = r.excludeCRDs(&unsupportedGVRs)
+	err = r.excludeCRDs(srcResourceList)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to exclude CRs from the unsupported resources")
+	}
+
+	resourcesDiff := compareResources(srcResourceList, dstResourceList)
+	unsupportedGVRs, err := r.unsupportedResources(resourcesDiff)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to get unsupported resources for srcCluster")
 	}
 
 	return r.collectUnsupportedMapping(unsupportedGVRs)
@@ -125,18 +124,10 @@ func (r *Compare) getClient(c client.Client, cluster *migapi.MigCluster) (dynami
 	return dynamic.NewForConfig(config)
 }
 
-func compareGroupVersions(src *metav1.APIGroupList, dst *metav1.APIGroupList) []metav1.APIGroup {
-	missingGroups := missingGroups(src.Groups, dst.Groups)
-	matchGroups(src, dst, missingGroups)
-	missingVersions := missingVersions(src.Groups, dst.Groups)
-
-	return append(missingGroups, missingVersions...)
-}
-
 func (r *Compare) collectUnsupportedMapping(unsupportedResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
 	unsupportedNamespaces := map[string][]schema.GroupVersionResource{}
 	for _, gvr := range unsupportedResources {
-		namespaceOccurence, err := r.occureIn(gvr)
+		namespaceOccurence, err := r.occurIn(gvr)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Unable to collect namespace occurences for GVR: %s", gvr)
 		}
@@ -156,7 +147,7 @@ func (r *Compare) collectUnsupportedMapping(unsupportedResources []schema.GroupV
 	return unsupportedNamespaces, nil
 }
 
-func (r *Compare) occureIn(gvr schema.GroupVersionResource) ([]string, error) {
+func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
 	namespacesOccured := []string{}
 	options := metav1.ListOptions{}
 	resourceList, err := r.SrcClient.Resource(gvr).List(options)
@@ -173,34 +164,40 @@ func (r *Compare) occureIn(gvr schema.GroupVersionResource) ([]string, error) {
 	return namespacesOccured, nil
 }
 
-func (r *Compare) unsupportedResources(gvDiff []metav1.APIGroup) ([]schema.GroupVersionResource, error) {
+func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+	resources, err := discovery.ServerResources()
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to get a list of resources for a GroupVersion on srcCluster")
+	}
+
+	for _, res := range resources {
+		res.APIResources = namespaced(res.APIResources)
+		res.APIResources = excludeSubresources(res.APIResources)
+		// Some resources appear not to have permissions to list, need to exclude those.
+		res.APIResources = listAllowed(res.APIResources)
+	}
+
+	return resources, nil
+}
+
+func (r *Compare) unsupportedResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	unsupportedGVRs := []schema.GroupVersionResource{}
-	for _, gr := range gvDiff {
-		for _, version := range gr.Versions {
-			r, err := r.SrcDiscovery.ServerResourcesForGroupVersion(version.GroupVersion)
-			if err != nil {
-				return nil, errors.Wrap(err, "Unable to get a list of resources for a GroupVersion on srcCluster")
-			}
+	for _, resourceList := range resourceDiff {
+		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error parsing GroupVersion %s", resourceList.GroupVersion)
+		}
 
-			r.APIResources = namespaced(r.APIResources)
-			r.APIResources = excludeSubresources(r.APIResources)
-
-			gv, err := schema.ParseGroupVersion(version.GroupVersion)
-			if err != nil {
-				return nil, errors.Wrapf(err, "error parsing GroupVersion %s", gr)
-			}
-
-			for _, resource := range r.APIResources {
-				gvr := gv.WithResource(resource.Name)
-				unsupportedGVRs = append(unsupportedGVRs, gvr)
-			}
+		for _, resource := range resourceList.APIResources {
+			gvr := gv.WithResource(resource.Name)
+			unsupportedGVRs = append(unsupportedGVRs, gvr)
 		}
 	}
 
 	return unsupportedGVRs, nil
 }
 
-func (r *Compare) excludeCRDs(unsupportedGVRs *[]schema.GroupVersionResource) error {
+func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) error {
 	options := metav1.ListOptions{}
 	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
 	if err != nil {
@@ -212,7 +209,7 @@ func (r *Compare) excludeCRDs(unsupportedGVRs *[]schema.GroupVersionResource) er
 	for _, crd := range crdList.Items {
 		group, found, err := unstructured.NestedString(crd.Object, groupPath...)
 		if !found {
-			return errors.Wrap(err, "Error while extracting CRD group: not exist")
+			return errors.Wrap(err, "Error while extracting CRD group: does not exist")
 		}
 		if err != nil {
 			return errors.Wrap(err, "Error while extracting CRD group")
@@ -220,14 +217,14 @@ func (r *Compare) excludeCRDs(unsupportedGVRs *[]schema.GroupVersionResource) er
 		crdGroups = append(crdGroups, group)
 	}
 
-	updatedGVRs := []schema.GroupVersionResource{}
-	for _, gvr := range *unsupportedGVRs {
-		if !isCRDGroup(gvr.Group, crdGroups) {
-			updatedGVRs = append(updatedGVRs, gvr)
+	updatedLists := []*metav1.APIResourceList{}
+	for _, resourceList := range resources {
+		if !isCRDGroup(resourceList.GroupVersion, crdGroups) {
+			updatedLists = append(updatedLists, resourceList)
 		}
 	}
 
-	*unsupportedGVRs = updatedGVRs
+	resources = updatedLists
 
 	return nil
 }
@@ -254,79 +251,60 @@ func namespaced(resources []metav1.APIResource) []metav1.APIResource {
 	return filteredList
 }
 
-func missingGroups(srcList []metav1.APIGroup, dstList []metav1.APIGroup) []metav1.APIGroup {
-	missing := []metav1.APIGroup{}
-	for _, group := range srcList {
-		if !groupExist(group, dstList) {
-			missing = append(missing, group)
-		}
-	}
-
-	return missing
-}
-
-func groupExist(group metav1.APIGroup, groupList []metav1.APIGroup) bool {
-	for _, selectedGroup := range groupList {
-		if selectedGroup.Name == group.Name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func versionExist(preferredVersion metav1.GroupVersionForDiscovery, versions []metav1.GroupVersionForDiscovery) bool {
-	for _, version := range versions {
-		if preferredVersion.GroupVersion == version.GroupVersion {
-			return true
-		}
-	}
-
-	return false
-}
-
-func missingVersions(src []metav1.APIGroup, dst []metav1.APIGroup) []metav1.APIGroup {
-	missingVersion := []metav1.APIGroup{}
-	for i, srcGroup := range src {
-		missingVersions := []metav1.GroupVersionForDiscovery{}
-		for _, version := range srcGroup.Versions {
-			if !versionExist(version, dst[i].Versions) {
-				missingVersions = append(missingVersions, version)
+func listAllowed(resources []metav1.APIResource) []metav1.APIResource {
+	filteredList := []metav1.APIResource{}
+	for _, res := range resources {
+		for _, verb := range res.Verbs {
+			if verb == "list" {
+				filteredList = append(filteredList, res)
+				break
 			}
 		}
-		if len(missingVersions) > 0 {
-			srcGroup.Versions = missingVersions
-			missingVersion = append(missingVersion, srcGroup)
-		}
 	}
 
-	return missingVersion
+	return filteredList
 }
 
-func matchGroups(src *metav1.APIGroupList, dst *metav1.APIGroupList, missing []metav1.APIGroup) {
-	reducedSrc := []metav1.APIGroup{}
-	for _, group := range src.Groups {
-		if !groupExist(group, missing) {
-			reducedSrc = append(reducedSrc, group)
+func resourceExist(resource metav1.APIResource, resources []metav1.APIResource) bool {
+	for _, resourceItem := range resources {
+		if resource.Name == resourceItem.Name {
+			return true
 		}
 	}
 
-	reducedDst := []metav1.APIGroup{}
-	for _, group := range dst.Groups {
-		if groupExist(group, reducedSrc) {
-			reducedDst = append(reducedDst, group)
+	return false
+}
+
+func compareResources(src []*metav1.APIResourceList, dst []*metav1.APIResourceList) []*metav1.APIResourceList {
+	missingResources := []*metav1.APIResourceList{}
+	for _, srcList := range src {
+		missing := []metav1.APIResource{}
+		for _, resource := range srcList.APIResources {
+			if !resourceExist(resource, fingResourceList(srcList.GroupVersion, dst)) {
+				missing = append(missing, resource)
+			}
+		}
+
+		if len(missing) > 0 {
+			missingList := &metav1.APIResourceList{
+				GroupVersion: srcList.GroupVersion,
+				APIResources: missing,
+			}
+			missingResources = append(missingResources, missingList)
 		}
 	}
 
-	sort.Slice(reducedSrc, func(i int, j int) bool {
-		return reducedSrc[i].Name < reducedSrc[j].Name
-	})
-	sort.Slice(reducedDst, func(i int, j int) bool {
-		return reducedDst[i].Name < reducedDst[j].Name
-	})
+	return missingResources
+}
 
-	src.Groups = reducedSrc
-	dst.Groups = reducedDst
+func fingResourceList(groupVersion string, list []*metav1.APIResourceList) []metav1.APIResource {
+	for _, l := range list {
+		if l.GroupVersion == groupVersion {
+			return l.APIResources
+		}
+	}
+
+	return nil
 }
 
 func inNamespaces(item string, namespaces []string) bool {
@@ -341,7 +319,7 @@ func inNamespaces(item string, namespaces []string) bool {
 
 func isCRDGroup(group string, crdGroups []string) bool {
 	for _, crdGroup := range crdGroups {
-		if crdGroup == group {
+		if strings.HasPrefix(group, crdGroup) {
 			return true
 		}
 	}

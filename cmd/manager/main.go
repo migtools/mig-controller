@@ -20,6 +20,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/konveyor/mig-controller/pkg/apis"
+	"github.com/konveyor/mig-controller/pkg/controller"
+	"github.com/konveyor/mig-controller/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -28,10 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
-
-	"github.com/konveyor/mig-controller/pkg/apis"
-	"github.com/konveyor/mig-controller/pkg/controller"
-	"github.com/konveyor/mig-controller/pkg/webhook"
 )
 
 func main() {

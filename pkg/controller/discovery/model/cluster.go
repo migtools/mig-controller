@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 

@@ -1,13 +1,6 @@
 package web
 
 import (
-	"net/http"
-	"regexp"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/container"
@@ -17,8 +10,14 @@ import (
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
+	"net/http"
+	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Application settings.
