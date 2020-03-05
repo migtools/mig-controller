@@ -3,10 +3,10 @@ package migplan
 import (
 	"context"
 	"fmt"
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/health"
-	"github.com/konveyor/mig-controller/pkg/pods"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"net"
+	"reflect"
+	"strings"
+
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -14,10 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
-	"net"
-	"reflect"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/health"
+	"github.com/konveyor/mig-controller/pkg/pods"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Types
@@ -54,6 +56,7 @@ const (
 	PvsDiscovered                  = "PvsDiscovered"
 	Closed                         = "Closed"
 	SourcePodsNotHealthy           = "SourcePodsNotHealthy"
+	GVRsIncompatible               = "GVRsIncompatible"
 )
 
 // Categories
@@ -94,6 +97,7 @@ const (
 	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
 	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
+	NsGVRsIncompatible                    = "Some namespaces contain GVRs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
 	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
@@ -175,6 +179,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Pods
 	err = r.validatePods(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// GVK
+	err = r.compareGVK(plan)
 	if err != nil {
 		log.Trace(err)
 		return err

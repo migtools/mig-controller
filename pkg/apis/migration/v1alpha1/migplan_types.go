@@ -26,8 +26,6 @@ import (
 	"sort"
 	"strings"
 
-	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -36,6 +34,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Cache Indexes.
@@ -57,6 +58,7 @@ type MigPlanSpec struct {
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
 	Conditions
+	Incompatible       `json:",inline"`
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
@@ -207,7 +209,7 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 // Registry
 //
 
-// Registry label for controller-created migration registry resoruces
+// Registry label for controller-created migration registry resources
 const (
 	MigrationRegistryLabel        = "migration-registry"
 	MigrationRegistryDefaultImage = "registry:2"
