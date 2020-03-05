@@ -93,25 +93,34 @@ spec:
           type: object
         status:
           properties:
+            incompatibleNamespaces:
+              items:
+                properties:
+                  gvrs:
+                    items:
+                      properties:
+                        group:
+                          type: string
+                        resoruce:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - group
+                      - version
+                      - resoruce
+                      type: object
+                    type: array
+                  name:
+                    type: string
+                required:
+                - name
+                - gvrs
+                type: object
+              type: array
             observedGeneration:
               format: int64
               type: integer
-            unsupportedNamespaces:
-              items:
-                properties:
-                  name:
-                    type: string
-                  unsupportedResources:
-                    items:
-                      type: string
-                    type: array
-                required:
-                - name
-                - unsupportedResources
-                type: object
-              type: array
-          required:
-          - observedGeneration
           type: object
   version: v1alpha1
 status:
