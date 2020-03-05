@@ -218,6 +218,9 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 }
 
 func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigCluster) error {
+	if cluster.Spec.IsHostCluster {
+		return nil
+	}
 	if cluster.Status.HasCriticalCondition() {
 		return nil
 	}
