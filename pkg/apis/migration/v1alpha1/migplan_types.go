@@ -209,7 +209,7 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 // Registry
 //
 
-// Registry label for controller-created migration registry resoruces
+// Registry label for controller-created migration registry resources
 const (
 	MigrationRegistryLabel        = "migration-registry"
 	MigrationRegistryDefaultImage = "registry:2"

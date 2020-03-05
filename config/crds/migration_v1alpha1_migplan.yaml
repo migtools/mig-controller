@@ -101,14 +101,14 @@ spec:
                       properties:
                         group:
                           type: string
-                        resoruce:
+                        resource:
                           type: string
                         version:
                           type: string
                       required:
                       - group
                       - version
-                      - resoruce
+                      - resource
                       type: object
                     type: array
                   name:

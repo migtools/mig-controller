@@ -19,7 +19,7 @@ type IncompatibleNamespace struct {
 type IncompatibleGVR struct {
 	Group    string `json:"group"`
 	Version  string `json:"version"`
-	Resource string `json:"resoruce"`
+	Resource string `json:"resource"`
 }
 
 // FromGVR - allows to convert the scheme.GVR into lowercase IncompatibleGVR
