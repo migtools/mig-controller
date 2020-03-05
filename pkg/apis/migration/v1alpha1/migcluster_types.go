@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
@@ -26,7 +27,7 @@ import (
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"k8s.io/api/apps/v1beta1"
+	appv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -103,22 +104,11 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
-	if m.Spec.IsHostCluster {
-		return c, nil
-	}
-	/*
-		TODO: re-enable cache after issue with caching secrets is resolved
-		remoteWatchMap := remote.GetWatchMap()
-		remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
-		if remoteWatchCluster != nil {
-			return remoteWatchCluster.RemoteManager.GetClient(), nil
-		}
-	*/
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
-	client, err := k8sclient.New(restConfig, k8sclient.Options{Scheme: scheme.Scheme})
+	client, err := compat.NewClient(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +171,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 	options := k8sclient.MatchingLabels(labels)
 
 	// Deployment
-	dList := v1beta1.DeploymentList{}
+	dList := appv1.DeploymentList{}
 	err = client.List(context.TODO(), options, &dList)
 	if err != nil {
 		return err
