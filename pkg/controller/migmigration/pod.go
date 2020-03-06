@@ -2,20 +2,19 @@ package migmigration
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/pods"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
+	"strings"
 )
 
 // Delete the running restic pods.
@@ -66,7 +65,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 	list := corev1.PodList{}
-	ds := v1beta1.DaemonSet{}
+	ds := appsv1.DaemonSet{}
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
 	})
