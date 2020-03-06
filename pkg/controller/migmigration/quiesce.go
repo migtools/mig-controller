@@ -2,11 +2,10 @@ package migmigration
 
 import (
 	"context"
-	appsv1 "github.com/openshift/api/apps/v1"
-	"k8s.io/api/apps/v1beta1"
+	ocappsv1 "github.com/openshift/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	extv1b1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +60,7 @@ func (t *Task) quiesceApplications() error {
 // Scales down DeploymentConfig on source cluster
 func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 	for _, ns := range t.sourceNamespaces() {
-		list := appsv1.DeploymentConfigList{}
+		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -91,7 +90,7 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		list := v1beta1.DeploymentList{}
+		list := appsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -121,7 +120,7 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		list := v1beta1.StatefulSetList{}
+		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -150,7 +149,7 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
-		list := extv1b1.ReplicaSetList{}
+		list := appsv1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
@@ -184,7 +183,7 @@ const (
 // Scales down all DaemonSets.
 func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 	for _, ns := range t.sourceNamespaces() {
-		list := extv1b1.DaemonSetList{}
+		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
