@@ -2,8 +2,8 @@ package compat
 
 import (
 	"context"
-	appv1 "k8s.io/api/apps/v1"
-	appv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	dapi "k8s.io/client-go/discovery"
@@ -67,17 +67,33 @@ func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
 // Down convert a resource as needed based on cluster version.
 func (c Client) downConvert(obj runtime.Object) runtime.Object {
 	if c.Minor < 16 {
-		if _, cast := obj.(*appv1.Deployment); cast {
-			return &appv1beta1.Deployment{}
+		// Deployment
+		if _, cast := obj.(*appsv1.Deployment); cast {
+			return &appsv1beta1.Deployment{}
 		}
-		if _, cast := obj.(*appv1.DeploymentList); cast {
-			return &appv1beta1.DeploymentList{}
+		if _, cast := obj.(*appsv1.DeploymentList); cast {
+			return &appsv1beta1.DeploymentList{}
 		}
-		if _, cast := obj.(*appv1.DaemonSet); cast {
+		// DaemonSet
+		if _, cast := obj.(*appsv1.DaemonSet); cast {
 			return &extv1beta1.DaemonSet{}
 		}
-		if _, cast := obj.(*appv1.DaemonSetList); cast {
+		if _, cast := obj.(*appsv1.DaemonSetList); cast {
 			return &extv1beta1.DaemonSetList{}
+		}
+		// ReplicaSet
+		if _, cast := obj.(*appsv1.ReplicaSet); cast {
+			return &extv1beta1.ReplicaSet{}
+		}
+		if _, cast := obj.(*appsv1.ReplicaSetList); cast {
+			return &extv1beta1.ReplicaSetList{}
+		}
+		// StatefulSet
+		if _, cast := obj.(*appsv1.StatefulSet); cast {
+			return &appsv1beta1.StatefulSet{}
+		}
+		if _, cast := obj.(*appsv1.StatefulSetList); cast {
+			return &appsv1beta1.StatefulSetList{}
 		}
 	}
 

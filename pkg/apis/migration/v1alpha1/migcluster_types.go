@@ -18,8 +18,8 @@ package v1alpha1
 
 import (
 	"context"
-	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
-	"github.com/konveyor/mig-controller/pkg/compat"
+	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
+	"github.com/fusor/mig-controller/pkg/compat"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
