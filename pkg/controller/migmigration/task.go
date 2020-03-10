@@ -20,6 +20,10 @@ const (
 	Started                       = "Started"
 	Prepare                       = "Prepare"
 	EnsureCloudSecretPropagated   = "EnsureCloudSecretPropagated"
+	PreBackupHooks                = "PreBackupHooks"
+	PostBackupHooks               = "PostBackupHooks"
+	PreRestoreHooks               = "PreRestoreHooks"
+	PostRestoreHooks              = "PostRestoreHooks"
 	EnsureInitialBackup           = "EnsureInitialBackup"
 	InitialBackupCreated          = "InitialBackupCreated"
 	InitialBackupFailed           = "InitialBackupFailed"
@@ -103,6 +107,7 @@ var FinalItinerary = Itinerary{
 		{phase: Started},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
+		{phase: PreBackupHooks},
 		{phase: EnsureInitialBackup},
 		{phase: InitialBackupCreated},
 		{phase: AnnotateResources, all: HasPVs},
@@ -121,9 +126,12 @@ var FinalItinerary = Itinerary{
 		{phase: EnsureStagePodsTerminated, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, all: HasPVs},
 		{phase: EnsureInitialBackupReplicated},
+		{phase: PostBackupHooks},
+		{phase: PreRestoreHooks},
 		{phase: EnsureFinalRestore},
 		{phase: FinalRestoreCreated},
 		{phase: EnsureLabelsDeleted},
+		{phase: PostRestoreHooks},
 		{phase: Verification, all: HasVerify},
 		{phase: Completed},
 	},
@@ -252,6 +260,17 @@ func (t *Task) Run() error {
 			t.next()
 		} else {
 			t.Requeue = PollReQ
+		}
+	case PreBackupHooks:
+		status, err := t.runHooks()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if status {
+			t.next()
+		} else {
+			t.Requeue = NoReQ
 		}
 	case EnsureInitialBackup:
 		_, err := t.ensureInitialBackup()
@@ -403,6 +422,28 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
+	case PostBackupHooks:
+		status, err := t.runHooks()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if status {
+			t.next()
+		} else {
+			t.Requeue = NoReQ
+		}
+	case PreRestoreHooks:
+		status, err := t.runHooks()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if status {
+			t.next()
+		} else {
+			t.Requeue = NoReQ
+		}
 	case EnsureStageRestore:
 		backup, err := t.getStageBackup()
 		if err != nil {
@@ -534,6 +575,17 @@ func (t *Task) Run() error {
 			} else {
 				t.next()
 			}
+		} else {
+			t.Requeue = NoReQ
+		}
+	case PostRestoreHooks:
+		status, err := t.runHooks()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if status {
+			t.next()
 		} else {
 			t.Requeue = NoReQ
 		}

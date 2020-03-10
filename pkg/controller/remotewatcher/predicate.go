@@ -3,6 +3,7 @@ package remotewatcher
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -206,6 +207,38 @@ func (r PodPredicate) Delete(e event.DeleteEvent) bool {
 	pod, cast := e.Object.(*kapi.Pod)
 	if cast {
 		return pod.Spec.Volumes != nil
+	}
+	return false
+}
+
+// Job
+type JobPredicate struct {
+	predicate.Funcs
+}
+
+// Watched resource has been created.
+func (r JobPredicate) Create(e event.CreateEvent) bool {
+	job, cast := e.Object.(*batchv1.Job)
+	if cast {
+		return hasCorrelationLabel(job.Labels)
+	}
+	return false
+}
+
+// Watched resource has been updated.
+func (r JobPredicate) Update(e event.UpdateEvent) bool {
+	job, cast := e.ObjectOld.(*batchv1.Job)
+	if cast {
+		return hasCorrelationLabel(job.Labels)
+	}
+	return false
+}
+
+// Watched resource has been deleted.
+func (r JobPredicate) Delete(e event.DeleteEvent) bool {
+	job, cast := e.Object.(*batchv1.Job)
+	if cast {
+		return hasCorrelationLabel(job.Labels)
 	}
 	return false
 }

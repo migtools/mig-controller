@@ -7,21 +7,22 @@ import (
 	"reflect"
 	"strings"
 
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/health"
+	"github.com/konveyor/mig-controller/pkg/pods"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/health"
-	"github.com/konveyor/mig-controller/pkg/pods"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"github.com/konveyor/mig-controller/pkg/settings"
+	k8sconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Types
@@ -61,6 +62,16 @@ const (
 	Closed                                     = "Closed"
 	SourcePodsNotHealthy                       = "SourcePodsNotHealthy"
 	GVKsIncompatible                           = "GVKsIncompatible"
+	InvalidHookRef                             = "InvalidHookRef"
+	HookNotReady                               = "HookNotReady"
+	InvalidHookNSName                          = "InvalidHookNSName"
+	InvalidHookSAName                          = "InvalidHookSAName"
+	PreBackupPhase                             = "PreBackup"
+	PostBackupPhase                            = "PostBackup"
+	PreRestorePhase                            = "PreRestore"
+	PostRestorePhase                           = "PostRestore"
+	HookPhaseUnknown                           = "HookPhaseUnknown"
+	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 )
 
 // Categories
@@ -128,6 +139,12 @@ const (
 	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                                     = "The migration plan is closed."
 	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
+	InvalidHookRefMessage                             = "One or more referenced hooks do not exist."
+	HookNotReadyMessage                               = "One or more referenced hooks are not ready."
+	InvalidHookNSNameMessage                          = "The executionNamespace specified is invalid, DNS-1123 label regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'."
+	InvalidHookSANameMessage                          = "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'"
+	HookPhaseUnknownMessage                           = "The hook phase must be one of: PreRestore, PostRestore, PreBackup, PostBackup"
+	HookPhaseDuplicateMessage                         = "Only one hook may be specified per phase"
 )
 
 // Valid AccessMode values
@@ -193,6 +210,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Pods
 	err = r.validatePods(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Hooks
+	err = r.validateHooks(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -993,6 +1017,111 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			Category: Warn,
 			Message:  SourcePodsNotHealthyMessage,
 		})
+	}
+
+	return nil
+}
+
+func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
+
+	client, err := k8sclient.New(k8sconfig.GetConfigOrDie(), k8sclient.Options{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	var preBackupCount, postBackupCount, preRestoreCount, postRestoreCount int = 0, 0, 0, 0
+
+	for _, hook := range plan.Spec.Hooks {
+
+		migHook := migapi.MigHook{}
+		err := client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      hook.Reference.Name,
+				Namespace: hook.Reference.Namespace,
+			},
+			&migHook)
+
+		// NotFound
+		if k8serror.IsNotFound(err) {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     InvalidHookRef,
+				Status:   True,
+				Reason:   NotFound,
+				Category: Critical,
+				Message:  InvalidHookRefMessage,
+			})
+			return nil
+		} else if err != nil {
+			log.Trace(err)
+			return err
+		}
+
+		// InvalidHookSA
+		if errs := validation.IsDNS1123Subdomain(hook.ServiceAccount); len(errs) != 0 {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     InvalidHookSAName,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  InvalidHookSANameMessage,
+			})
+		}
+
+		// InvalidHookNS
+		if errs := validation.IsDNS1123Label(hook.ExecutionNamespace); len(errs) != 0 {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     InvalidHookNSName,
+				Status:   True,
+				Reason:   NotSet,
+				Category: Critical,
+				Message:  InvalidHookNSNameMessage,
+			})
+		}
+
+		// NotReady
+		if !migHook.Status.IsReady() {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     HookNotReady,
+				Status:   True,
+				Category: Critical,
+				Message:  HookNotReadyMessage,
+			})
+			return nil
+		}
+
+		switch hook.Phase {
+		case PreRestorePhase:
+			preRestoreCount++
+		case PostRestorePhase:
+			postRestoreCount++
+		case PreBackupPhase:
+			preBackupCount++
+		case PostBackupPhase:
+			postBackupCount++
+		default:
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     HookPhaseUnknown,
+				Status:   True,
+				Category: Critical,
+				Message:  HookPhaseUnknown,
+			})
+			return nil
+		}
+	}
+
+	if preRestoreCount > 1 ||
+		postRestoreCount > 1 ||
+		preBackupCount > 1 ||
+		postBackupCount > 1 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     HookPhaseDuplicateMessage,
+			Status:   True,
+			Category: Critical,
+			Message:  HookPhaseDuplicateMessage,
+		})
+		return nil
 	}
 
 	return nil

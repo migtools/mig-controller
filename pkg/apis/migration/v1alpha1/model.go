@@ -126,6 +126,18 @@ func ListStorage(client k8sclient.Client) ([]MigStorage, error) {
 	return list.Items, err
 }
 
+// List MigHook
+// Returns and empty list when none found.
+func ListHook(client k8sclient.Client) ([]MigHook, error) {
+	list := MigHookList{}
+	err := client.List(context.TODO(), nil, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
+}
+
 // List MigMigrations
 // Returns and empty list when none found.
 func ListMigrations(client k8sclient.Client) ([]MigMigration, error) {

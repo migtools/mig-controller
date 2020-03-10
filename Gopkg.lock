@@ -1334,6 +1334,7 @@
     "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/intstr",
+    "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apiserver/pkg/storage/names",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/dynamic",
