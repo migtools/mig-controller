@@ -133,7 +133,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
-	err = r.excludeCRDs(srcResourceList)
+	srcResourceList, err = r.excludeCRDs(srcResourceList)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
@@ -291,11 +291,11 @@ func incompatibleResources(resourceDiff []*metav1.APIResourceList) ([]schema.Gro
 	return incompatibleGVRs, nil
 }
 
-func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) error {
+func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.APIResourceList, error) {
 	options := metav1.ListOptions{}
 	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	crdGroups := []string{}
@@ -303,7 +303,7 @@ func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) error {
 	for _, crd := range crdList.Items {
 		group, _, err := unstructured.NestedString(crd.Object, groupPath...)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		crdGroups = append(crdGroups, group)
 	}
@@ -315,9 +315,7 @@ func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) error {
 		}
 	}
 
-	resources = updatedLists
-
-	return nil
+	return updatedLists, nil
 }
 
 func excludeSubresources(resources []metav1.APIResource) []metav1.APIResource {
