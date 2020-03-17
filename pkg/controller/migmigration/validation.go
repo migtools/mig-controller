@@ -49,7 +49,7 @@ const (
 	HasFinalMigrationMessage   = "The associated MigPlan already has a final migration."
 	PostponedMessage           = "Postponed %d seconds to ensure migrations run serially and in order."
 	CancelledMessage           = "The migration is cancelled"
-	CancelInProgressMessage    = "The migration cancel is progress"
+	CancelInProgressMessage    = "The migration cancel is in progress"
 	RunningMessage             = "Step: %d/%d"
 	FailedMessage              = "The migration has failed.  See: Errors."
 	SucceededMessage           = "The migration has completed successfully."
