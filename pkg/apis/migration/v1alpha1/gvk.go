@@ -12,21 +12,21 @@ type Incompatible struct {
 // to contain resources incompatible by the migration
 type IncompatibleNamespace struct {
 	Name string            `json:"name"`
-	GVRs []IncompatibleGVR `json:"gvrs"`
+	GVKs []IncompatibleGVK `json:"gvks"`
 }
 
-// IncompatibleGVR - custom sructure for printing GVRs lowercase
-type IncompatibleGVR struct {
-	Group    string `json:"group"`
-	Version  string `json:"version"`
-	Resource string `json:"resource"`
+// IncompatibleGVK - custom structure for printing GVKs lowercase
+type IncompatibleGVK struct {
+	Group   string `json:"group"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
 }
 
-// FromGVR - allows to convert the scheme.GVR into lowercase IncompatibleGVR
-func FromGVR(gvr schema.GroupVersionResource) IncompatibleGVR {
-	return IncompatibleGVR{
-		Group:    gvr.Group,
-		Version:  gvr.Version,
-		Resource: gvr.Resource,
+// FromGVR - allows to convert the scheme.GVR into lowercase IncompatibleGVK
+func FromGVR(gvr schema.GroupVersionResource) IncompatibleGVK {
+	return IncompatibleGVK{
+		Group:   gvr.Group,
+		Version: gvr.Version,
+		Kind:    gvr.Resource,
 	}
 }

@@ -78,25 +78,25 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*Compare, error) 
 func reportGVK(plan *migapi.MigPlan, incompatibleMapping map[string][]schema.GroupVersionResource) {
 	incompatibleNamespaces := []migapi.IncompatibleNamespace{}
 
-	for namespace, incompatibleGVRs := range incompatibleMapping {
-		incompatibleResources := []migapi.IncompatibleGVR{}
-		for _, res := range incompatibleGVRs {
+	for namespace, incompatibleGVKs := range incompatibleMapping {
+		incompatibleResources := []migapi.IncompatibleGVK{}
+		for _, res := range incompatibleGVKs {
 			incompatibleResources = append(incompatibleResources, migapi.FromGVR(res))
 		}
 
 		incompatibleNamespace := migapi.IncompatibleNamespace{
 			Name: namespace,
-			GVRs: incompatibleResources,
+			GVKs: incompatibleResources,
 		}
 		incompatibleNamespaces = append(incompatibleNamespaces, incompatibleNamespace)
 	}
 
 	if len(incompatibleNamespaces) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     GVRsIncompatible,
+			Type:     GVKsIncompatible,
 			Status:   True,
 			Category: Warn,
-			Message:  NsGVRsIncompatible,
+			Message:  NsGVKsIncompatible,
 		})
 	}
 
@@ -118,8 +118,8 @@ func clustersReady(plan *migapi.MigPlan) bool {
 	return !plan.Status.HasAnyCondition(clustersNotReadyConditions...)
 }
 
-// Compare GVKs on both clusters, find incompatible GVRs
-// and check each plan source namespace for existence of incompatible GVRs
+// Compare GVKs on both clusters, find incompatible GVKs
+// and check each plan source namespace for existence of incompatible GVKs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	srcResourceList, err := collectResources(r.SrcDiscovery)
 	if err != nil {
@@ -140,13 +140,13 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	resourcesDiff := compareResources(srcResourceList, dstResourceList)
-	incompatibleGVRs, err := incompatibleResources(resourcesDiff)
+	incompatibleGVKs, err := incompatibleResources(resourcesDiff)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 
-	return r.collectIncompatibleMapping(incompatibleGVRs)
+	return r.collectIncompatibleMapping(incompatibleGVKs)
 }
 
 // NewSourceDiscovery initializes source discovery client for a source cluster
@@ -220,8 +220,8 @@ func (r *Compare) getClient(c client.Client, cluster *migapi.MigCluster) (dynami
 
 func (r *Compare) collectIncompatibleMapping(incompatibleResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
 	incompatibleNamespaces := map[string][]schema.GroupVersionResource{}
-	for _, gvr := range incompatibleResources {
-		namespaceOccurence, err := r.occurIn(gvr)
+	for _, gvk := range incompatibleResources {
+		namespaceOccurence, err := r.occurIn(gvk)
 		if err != nil {
 			return nil, err
 		}
@@ -230,9 +230,9 @@ func (r *Compare) collectIncompatibleMapping(incompatibleResources []schema.Grou
 			if inNamespaces(namespace, r.Plan.GetSourceNamespaces()) {
 				_, exist := incompatibleNamespaces[namespace]
 				if exist {
-					incompatibleNamespaces[namespace] = append(incompatibleNamespaces[namespace], gvr)
+					incompatibleNamespaces[namespace] = append(incompatibleNamespaces[namespace], gvk)
 				} else {
-					incompatibleNamespaces[namespace] = []schema.GroupVersionResource{gvr}
+					incompatibleNamespaces[namespace] = []schema.GroupVersionResource{gvk}
 				}
 			}
 		}
@@ -275,7 +275,7 @@ func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 }
 
 func incompatibleResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
-	incompatibleGVRs := []schema.GroupVersionResource{}
+	incompatibleGVKs := []schema.GroupVersionResource{}
 	for _, resourceList := range resourceDiff {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
@@ -283,12 +283,12 @@ func incompatibleResources(resourceDiff []*metav1.APIResourceList) ([]schema.Gro
 		}
 
 		for _, resource := range resourceList.APIResources {
-			gvr := gv.WithResource(resource.Name)
-			incompatibleGVRs = append(incompatibleGVRs, gvr)
+			gvk := gv.WithResource(resource.Name)
+			incompatibleGVKs = append(incompatibleGVKs, gvk)
 		}
 	}
 
-	return incompatibleGVRs, nil
+	return incompatibleGVKs, nil
 }
 
 func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.APIResourceList, error) {
