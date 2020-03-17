@@ -295,9 +295,49 @@ func (t *Task) ensureStagePodsDeleted() error {
 		}
 	}
 
-	t.Owner.Status.DeleteCondition(StagePodsCreated)
-
 	return nil
+}
+
+// Ensure the deleted stage pods have finished terminating
+func (t *Task) ensureStagePodsTerminated() (bool, error) {
+	clients, namespaceList, err := t.getBothClientsWithNamespaces()
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	terminatedPhases := map[corev1.PodPhase]bool{
+		corev1.PodSucceeded: true,
+		corev1.PodFailed:    true,
+		corev1.PodUnknown:   true,
+	}
+	cLabel, _ := t.Owner.GetCorrelationLabel()
+	for i, client := range clients {
+		podList := corev1.PodList{}
+		for _, ns := range namespaceList[i] {
+			options := k8sclient.InNamespace(ns)
+			err := client.List(context.TODO(), options, &podList)
+			if err != nil {
+				return false, err
+			}
+			for _, pod := range podList.Items {
+				if pod.Labels == nil {
+					continue
+				}
+				// doesn't belong to us
+				if _, found := pod.Labels[cLabel]; !found {
+					continue
+				}
+				// looks like it's terminated
+				if terminatedPhases[pod.Status.Phase] {
+					continue
+				}
+				return false, nil
+			}
+		}
+	}
+	t.Owner.Status.DeleteCondition(StagePodsCreated)
+	return true, nil
 }
 
 // Find all velero pods on the specified cluster.

@@ -43,6 +43,7 @@ const (
 	FinalRestoreFailed            = "FinalRestoreFailed"
 	Verification                  = "Verification"
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
+	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
 	Completed                     = "Completed"
 )
@@ -75,6 +76,7 @@ var StageItinerary = Itinerary{
 	{phase: EnsureStageRestore, flags: HasPVs},
 	{phase: StageRestoreCreated, flags: HasPVs},
 	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
+	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
 	{phase: Completed},
 }
@@ -99,6 +101,7 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureStageRestore, flags: HasPVs},
 	{phase: StageRestoreCreated, flags: HasPVs},
 	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
+	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
@@ -390,6 +393,17 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
+	case EnsureStagePodsTerminated:
+		terminated, err := t.ensureStagePodsTerminated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if terminated {
+			t.next()
+		} else {
+			t.Requeue = PollReQ
+		}
 	case EnsureAnnotationsDeleted:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
