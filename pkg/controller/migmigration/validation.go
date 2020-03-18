@@ -11,8 +11,10 @@ const (
 	InvalidPlanRef      = "InvalidPlanRef"
 	PlanNotReady        = "PlanNotReady"
 	PlanClosed          = "PlanClosed"
+	Cancelling          = "Cancelling"
 	HasFinalMigration   = "HasFinalMigration"
 	Postponed           = "Postponed"
+	Canceled            = "Canceled"
 	Running             = "Running"
 	Succeeded           = "Succeeded"
 	Failed              = "Failed"
@@ -28,6 +30,7 @@ const (
 const (
 	NotSet         = "NotSet"
 	NotFound       = "NotFound"
+	Cancel         = "Cancel"
 	ErrorsDetected = "ErrorsDetected"
 )
 
@@ -45,6 +48,8 @@ const (
 	PlanClosedMessage          = "The associated migration plan is closed."
 	HasFinalMigrationMessage   = "The associated MigPlan already has a final migration."
 	PostponedMessage           = "Postponed %d seconds to ensure migrations run serially and in order."
+	CancelledMessage           = "The migration has been cancelled."
+	CancelInProgressMessage    = "The migration is being canceled."
 	RunningMessage             = "Step: %d/%d"
 	FailedMessage              = "The migration has failed.  See: Errors."
 	SucceededMessage           = "The migration has completed successfully."

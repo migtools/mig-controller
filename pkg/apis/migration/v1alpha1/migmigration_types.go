@@ -34,6 +34,7 @@ type MigMigrationSpec struct {
 	QuiescePods     bool                  `json:"quiescePods,omitempty"`
 	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
 	Verify          bool                  `json:"verify,omitempty"`
+	Canceled        bool                  `json:"canceled,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration

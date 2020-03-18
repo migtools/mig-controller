@@ -45,6 +45,8 @@ const (
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
+	Canceling                     = "Canceling"
+	Cancelled                     = "Cancelled"
 	Completed                     = "Completed"
 )
 
@@ -107,6 +109,14 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
 	{phase: Verification, flags: HasVerify},
+	{phase: Completed},
+}
+
+var CancelItinerary = Itinerary{
+	{phase: Canceling},
+	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: Cancelled},
 	{phase: Completed},
 }
 
@@ -482,6 +492,27 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
+	case Canceling:
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     Canceling,
+			Status:   True,
+			Reason:   Cancel,
+			Category: Advisory,
+			Message:  CancelInProgressMessage,
+			Durable:  true,
+		})
+		t.next()
+	case Cancelled:
+		t.Owner.Status.DeleteCondition(Canceling)
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     Canceled,
+			Status:   True,
+			Reason:   Cancel,
+			Category: Advisory,
+			Message:  CancelledMessage,
+			Durable:  true,
+		})
+		t.next()
 	case StageBackupFailed, StageRestoreFailed:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -513,7 +544,9 @@ func (t *Task) Run() error {
 // Initialize.
 func (t *Task) init() {
 	t.Requeue = FastReQ
-	if t.stage() {
+	if t.canceled() {
+		t.Itinerary = CancelItinerary
+	} else if t.stage() {
 		t.Itinerary = StageItinerary
 	} else {
 		t.Itinerary = FinalItinerary
@@ -531,7 +564,11 @@ func (t *Task) next() {
 		break
 	}
 	if current == -1 {
-		t.Phase = Completed
+		if t.canceled() {
+			t.Phase = CancelItinerary[0].phase
+		} else {
+			t.Phase = Completed
+		}
 		return
 	}
 	for n := current + 1; n < len(t.Itinerary); n++ {
@@ -551,7 +588,6 @@ func (t *Task) next() {
 		t.Phase = next.phase
 		return
 	}
-
 	t.Phase = Completed
 }
 
@@ -580,6 +616,11 @@ func (t *Task) addErrors(errors []string) {
 // Migration UID.
 func (t *Task) UID() string {
 	return string(t.Owner.UID)
+}
+
+// Get whether the migration is cancelled.
+func (t *Task) canceled() bool {
+	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Cancelling)
 }
 
 // Get whether the migration is stage.
