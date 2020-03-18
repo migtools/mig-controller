@@ -900,7 +900,7 @@ func (r *NfsValidation) init(client k8sclient.Client) error {
 			log.Trace(err)
 			return err
 		}
-		r.restCfg, err = r.cluster.BuildRestConfig(r.client)
+		r.restCfg, err = r.cluster.BuildRestConfig(client)
 		if err != nil {
 			log.Trace(err)
 			return err
