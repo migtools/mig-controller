@@ -56,7 +56,7 @@ const (
 	PvsDiscovered                  = "PvsDiscovered"
 	Closed                         = "Closed"
 	SourcePodsNotHealthy           = "SourcePodsNotHealthy"
-	GVRsIncompatible               = "GVRsIncompatible"
+	GVKsIncompatible               = "GVKsIncompatible"
 )
 
 // Categories
@@ -97,7 +97,7 @@ const (
 	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
 	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
 	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	NsGVRsIncompatible                    = "Some namespaces contain GVRs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
+	NsGVKsIncompatible                    = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
 	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
 	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
