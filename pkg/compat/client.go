@@ -2,16 +2,19 @@ package compat
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv1beta "k8s.io/api/batch/v1beta1"
+	batchv2alpha "k8s.io/api/batch/v2alpha1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	dapi "k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 )
 
 //
@@ -64,7 +67,7 @@ func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
 }
 
 //
-// Down convert a resource as needed based on cluster version.
+// Down convert a resource as needed based on cluster version
 func (c Client) downConvert(obj runtime.Object) runtime.Object {
 	if c.Minor < 16 {
 		// Deployment
@@ -97,6 +100,16 @@ func (c Client) downConvert(obj runtime.Object) runtime.Object {
 		}
 	}
 
+	if c.Minor < 8 {
+		// CronJob
+		if _, cast := obj.(*batchv1beta.CronJobList); cast {
+			return &batchv2alpha.CronJobList{}
+		}
+		if _, cast := obj.(*batchv1beta.CronJob); cast {
+			return &batchv2alpha.CronJob{}
+		}
+	}
+
 	return obj
 }
 
@@ -109,11 +122,9 @@ func (c Client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 	if err != nil {
 		return err
 	}
-	if in != obj {
-		err := scheme.Scheme.Convert(obj, in, ctx)
-		if err != nil {
-			return err
-		}
+	err = scheme.Scheme.Convert(obj, in, ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -128,11 +139,9 @@ func (c Client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 	if err != nil {
 		return err
 	}
-	if in != obj {
-		err := scheme.Scheme.Convert(obj, in, ctx)
-		if err != nil {
-			return err
-		}
+	err = scheme.Scheme.Convert(obj, in, ctx)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -143,6 +152,10 @@ func (c Client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 // The resource will be converted to a compatible version as needed.
 func (c Client) Create(ctx context.Context, in runtime.Object) error {
 	obj := c.downConvert(in)
+	err := scheme.Scheme.Convert(in, obj, ctx)
+	if err != nil {
+		return err
+	}
 	return c.Client.Create(ctx, obj)
 }
 
@@ -151,6 +164,10 @@ func (c Client) Create(ctx context.Context, in runtime.Object) error {
 // The resource will be converted to a compatible version as needed.
 func (c Client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.DeleteOptionFunc) error {
 	obj := c.downConvert(in)
+	err := scheme.Scheme.Convert(in, obj, ctx)
+	if err != nil {
+		return err
+	}
 	return c.Client.Delete(ctx, obj, opt...)
 }
 
@@ -159,9 +176,9 @@ func (c Client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 // The resource will be converted to a compatible version as needed.
 func (c Client) Update(ctx context.Context, in runtime.Object) error {
 	obj := c.downConvert(in)
+	err := scheme.Scheme.Convert(in, obj, ctx)
+	if err != nil {
+		return err
+	}
 	return c.Client.Update(ctx, obj)
-}
-
-func (c Client) Status() k8sclient.StatusWriter {
-	return c.Client.Status()
 }

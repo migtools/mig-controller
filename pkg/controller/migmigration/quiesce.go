@@ -2,12 +2,13 @@ package migmigration
 
 import (
 	"context"
+
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	batchv1beta "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -214,29 +215,19 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 // Using unstructured because OCP 3.7 supports batch/v2alpha1 which is
 // not supported in newer versions such as OCP 3.11.
 func (t *Task) suspendCronJobs(client k8sclient.Client) error {
-	fields := []string{"spec", "suspend"}
 	for _, ns := range t.sourceNamespaces() {
+		list := batchv1beta.CronJobList{}
 		options := k8sclient.InNamespace(ns)
-		list := unstructured.UnstructuredList{}
-		list.SetGroupVersionKind(schema.GroupVersionKind{
-			Group: "batch",
-			Kind:  "cronjob",
-		})
 		err := client.List(context.TODO(), options, &list)
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
 		for _, r := range list.Items {
-			suspend, found, err := unstructured.NestedBool(r.Object, fields...)
-			if err != nil {
-				log.Trace(err)
-				return err
-			}
-			if found && suspend {
+			if r.Spec.Suspend != nil && *r.Spec.Suspend {
 				continue
 			}
-			unstructured.SetNestedField(r.Object, true, fields...)
+			r.Spec.Suspend = pointer.BoolPtr(true)
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
 				log.Trace(err)
