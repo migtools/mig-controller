@@ -226,11 +226,23 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 	}
 
 	// check for access to all verbs on all resources in all namespaces
-	// in order to determine if the service account has cluster-admin
-	sar := auth.SelfSubjectAccessReview{
+	// in the migration.openshift.io and velero.io groups in order to
+	// determine if the service account has sufficient permissions
+	migrationSar := auth.SelfSubjectAccessReview{
 		Spec: auth.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &auth.ResourceAttributes{
-				Group:    "*",
+				Group:    "migration.openshift.io",
+				Resource: "*",
+				Verb:     "*",
+				Version:  "*",
+			},
+		},
+	}
+
+	veleroSar := auth.SelfSubjectAccessReview{
+		Spec: auth.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &auth.ResourceAttributes{
+				Group:    "velero.io",
 				Resource: "*",
 				Verb:     "*",
 				Version:  "*",
@@ -243,12 +255,17 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 		log.Trace(err)
 		return err
 	}
-	err = client.Create(context.TODO(), &sar)
+	err = client.Create(context.TODO(), &migrationSar)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	if !sar.Status.Allowed {
+	err = client.Create(context.TODO(), &veleroSar)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !migrationSar.Status.Allowed || !veleroSar.Status.Allowed {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     SaTokenNotPrivileged,
 			Status:   True,
