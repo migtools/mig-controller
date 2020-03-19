@@ -20,6 +20,7 @@ import (
 	"context"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"time"
@@ -142,6 +143,9 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	secret, err := GetSecret(c, m.Spec.ServiceAccountSecretRef)
 	if err != nil {
 		return nil, err
+	}
+	if secret == nil {
+		return nil, errors.Errorf("Service Account Secret not found for %v", m.Name)
 	}
 	var tlsClientConfig rest.TLSClientConfig
 	if m.Spec.Insecure {
