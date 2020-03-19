@@ -2,6 +2,8 @@ package migmigration
 
 import (
 	"context"
+	"encoding/json"
+	"strconv"
 
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -12,6 +14,14 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// ReplicasAnnotation - annotation to set during quisce phase, which will allow to recreate the app back to it's initial state
+// in case of a migration failure or user's intent
+const (
+	SuspendAnnotation      = "migration.openshift.io/preQuiesceSuspend"
+	ReplicasAnnotation     = "migration.openshift.io/preQuiesceReplicas"
+	NodeSelectorAnnotation = "migration.openshift.io/preQuiesceNodeSelector"
+)
+
 // All quiesce functionality should be put here
 func (t *Task) quiesceApplications() error {
 	client, err := t.getSourceClient()
@@ -19,37 +29,83 @@ func (t *Task) quiesceApplications() error {
 		log.Trace(err)
 		return err
 	}
-	err = t.suspendCronJobs(client)
+	err = t.quiesceCronJobs(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDeploymentConfigs(client)
+	err = t.quiesceDeploymentConfigs(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDeployments(client)
+	err = t.quiesceDeployments(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownStatefulSets(client)
+	err = t.quiesceStatefulSets(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownReplicaSets(client)
+	err = t.quiesceReplicaSets(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownDaemonSets(client)
+	err = t.quiesceDaemonSets(client, true)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	err = t.scaleDownJobs(client)
+	err = t.quiesceJobs(client, true)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+// All quiesce undo functionality should be put here
+func (t *Task) reactivateApplications() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceCronJobs(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceDeploymentConfigs(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceDeployments(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceStatefulSets(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceReplicaSets(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceDaemonSets(client, false)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = t.quiesceJobs(client, false)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -59,7 +115,7 @@ func (t *Task) quiesceApplications() error {
 }
 
 // Scales down DeploymentConfig on source cluster
-func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
+func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, suspend bool) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
@@ -72,10 +128,26 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 			return err
 		}
 		for _, dc := range list.Items {
-			if dc.Spec.Replicas == 0 {
-				continue
+			if suspend {
+				if dc.Spec.Replicas == 0 {
+					continue
+				}
+				dc.Annotations[ReplicasAnnotation] = string(dc.Spec.Replicas)
+				dc.Spec.Replicas = 0
+			} else {
+				replicas, exist := dc.Annotations[ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				dc.Annotations = removeAnnotation(dc.Annotations, ReplicasAnnotation)
+				dc.Spec.Replicas = int32(number)
 			}
-			dc.Spec.Replicas = 0
+
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				log.Trace(err)
@@ -88,7 +160,7 @@ func (t *Task) scaleDownDeploymentConfigs(client k8sclient.Client) error {
 }
 
 // Scales down all Deployments
-func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
+func (t *Task) quiesceDeployments(client k8sclient.Client, suspend bool) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
 		list := appsv1.DeploymentList{}
@@ -102,10 +174,26 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 			return err
 		}
 		for _, deployment := range list.Items {
-			if deployment.Spec.Replicas == &zero {
-				continue
+			if suspend {
+				if *deployment.Spec.Replicas == zero {
+					continue
+				}
+				deployment.Annotations[ReplicasAnnotation] = string(*deployment.Spec.Replicas)
+				deployment.Spec.Replicas = &zero
+			} else {
+				replicas, exist := deployment.Annotations[ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				deployment.Annotations = removeAnnotation(deployment.Annotations, ReplicasAnnotation)
+				restoredReplicas := int32(number)
+				deployment.Spec.Replicas = &restoredReplicas
 			}
-			deployment.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
 				log.Trace(err)
@@ -118,7 +206,7 @@ func (t *Task) scaleDownDeployments(client k8sclient.Client) error {
 }
 
 // Scales down all StatefulSets.
-func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
+func (t *Task) quiesceStatefulSets(client k8sclient.Client, suspend bool) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
 		list := appsv1.StatefulSetList{}
@@ -132,10 +220,26 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 			return err
 		}
 		for _, set := range list.Items {
-			if set.Spec.Replicas == &zero {
-				continue
+			if suspend {
+				if *set.Spec.Replicas == zero {
+					continue
+				}
+				set.Annotations[ReplicasAnnotation] = string(*set.Spec.Replicas)
+				set.Spec.Replicas = &zero
+			} else {
+				replicas, exist := set.Annotations[ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				set.Annotations = removeAnnotation(set.Annotations, ReplicasAnnotation)
+				restoredReplicas := int32(number)
+				set.Spec.Replicas = &restoredReplicas
 			}
-			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				log.Trace(err)
@@ -147,7 +251,7 @@ func (t *Task) scaleDownStatefulSets(client k8sclient.Client) error {
 }
 
 // Scales down all ReplicaSets.
-func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
+func (t *Task) quiesceReplicaSets(client k8sclient.Client, suspend bool) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
 		list := appsv1.ReplicaSetList{}
@@ -161,10 +265,26 @@ func (t *Task) scaleDownReplicaSets(client k8sclient.Client) error {
 			return err
 		}
 		for _, set := range list.Items {
-			if set.Spec.Replicas == &zero {
-				continue
+			if suspend {
+				if *set.Spec.Replicas == zero {
+					continue
+				}
+				set.Annotations[ReplicasAnnotation] = string(*set.Spec.Replicas)
+				set.Spec.Replicas = &zero
+			} else {
+				replicas, exist := set.Annotations[ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				set.Annotations = removeAnnotation(set.Annotations, ReplicasAnnotation)
+				restoredReplicas := int32(number)
+				set.Spec.Replicas = &restoredReplicas
 			}
-			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				log.Trace(err)
@@ -182,7 +302,7 @@ const (
 )
 
 // Scales down all DaemonSets.
-func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
+func (t *Task) quiesceDaemonSets(client k8sclient.Client, suspend bool) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
@@ -195,12 +315,33 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 			return err
 		}
 		for _, set := range list.Items {
-			if set.Spec.Template.Spec.NodeSelector == nil {
-				set.Spec.Template.Spec.NodeSelector = make(map[string]string)
-			} else if set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] == quiesceNodeSelectorVal {
-				continue
+			if suspend {
+				if set.Spec.Template.Spec.NodeSelector == nil {
+					set.Spec.Template.Spec.NodeSelector = map[string]string{}
+				} else if set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] == quiesceNodeSelectorVal {
+					continue
+				}
+				selector, err := json.Marshal(set.Spec.Template.Spec.NodeSelector)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				set.Annotations[NodeSelectorAnnotation] = string(selector)
+				set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] = quiesceNodeSelectorVal
+			} else {
+				selector, exist := set.Annotations[NodeSelectorAnnotation]
+				if !exist {
+					continue
+				}
+				nodeSelector := map[string]string{}
+				err := json.Unmarshal([]byte(selector), &nodeSelector)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				set.Annotations = removeAnnotation(set.Annotations, NodeSelectorAnnotation)
+				set.Spec.Template.Spec.NodeSelector = nodeSelector
 			}
-			set.Spec.Template.Spec.NodeSelector[quiesceNodeSelector] = quiesceNodeSelectorVal
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				log.Trace(err)
@@ -212,8 +353,6 @@ func (t *Task) scaleDownDaemonSets(client k8sclient.Client) error {
 }
 
 // Suspends all CronJobs
-// Using unstructured because OCP 3.7 supports batch/v2alpha1 which is
-// not supported in newer versions such as OCP 3.11.
 func (t *Task) suspendCronJobs(client k8sclient.Client) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := batchv1beta.CronJobList{}
@@ -240,7 +379,7 @@ func (t *Task) suspendCronJobs(client k8sclient.Client) error {
 }
 
 // Scales down all Jobs
-func (t *Task) scaleDownJobs(client k8sclient.Client) error {
+func (t *Task) quiesceJobs(client k8sclient.Client, suspend bool) error {
 	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
 		list := batchv1.JobList{}
@@ -254,10 +393,26 @@ func (t *Task) scaleDownJobs(client k8sclient.Client) error {
 			return err
 		}
 		for _, job := range list.Items {
-			if job.Spec.Parallelism == &zero {
-				continue
+			if suspend {
+				if job.Spec.Parallelism == &zero {
+					continue
+				}
+				job.Annotations[ReplicasAnnotation] = string(*job.Spec.Parallelism)
+				job.Spec.Parallelism = &zero
+			} else {
+				replicas, exist := job.Annotations[ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
+				job.Annotations = removeAnnotation(job.Annotations, ReplicasAnnotation)
+				parallelReplicas := int32(number)
+				job.Spec.Parallelism = &parallelReplicas
 			}
-			job.Spec.Parallelism = &zero
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
 				log.Trace(err)
@@ -313,4 +468,15 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func removeAnnotation(annotations map[string]string, toRemove string) map[string]string {
+	updatedAnnotations := make(map[string]string)
+	for key, value := range updatedAnnotations {
+		if key != toRemove {
+			updatedAnnotations[key] = value
+		}
+	}
+
+	return updatedAnnotations
 }

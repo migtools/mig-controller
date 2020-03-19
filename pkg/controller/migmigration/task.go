@@ -30,6 +30,7 @@ const (
 	ResticRestarted               = "ResticRestarted"
 	QuiesceApplications           = "QuiesceApplications"
 	EnsureQuiesced                = "EnsureQuiesced"
+	ReactivateApplications        = "ReactivateApplications"
 	EnsureStageBackup             = "EnsureStageBackup"
 	StageBackupCreated            = "StageBackupCreated"
 	StageBackupFailed             = "StageBackupFailed"
@@ -118,9 +119,17 @@ var CancelItinerary = Itinerary{
 	{phase: Canceling},
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
+	{phase: ReactivateApplications, all: Quiesce},
 	{phase: DeleteBackups},
 	{phase: DeleteRestores},
 	{phase: Canceled},
+	{phase: Completed},
+}
+
+var FailedItinerary = Itinerary{
+	{phase: EnsureStagePodsDeleted, all: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, all: HasPVs},
+	{phase: ReactivateApplications, all: Quiesce},
 	{phase: Completed},
 }
 
@@ -313,6 +322,13 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
+	case ReactivateApplications:
+		err := t.reactivateApplications()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.next()
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
@@ -532,22 +548,9 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next()
-	case StageBackupFailed, StageRestoreFailed:
-		err := t.ensureStagePodsDeleted()
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-		if !t.keepAnnotations() {
-			err = t.deleteAnnotations()
-			if err != nil {
-				log.Trace(err)
-				return err
-			}
-		}
+	// Out of tree states - needs to be triggered manually with t.fail(...)
+	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
 		t.Requeue = NoReQ
-		t.next()
-	case InitialBackupFailed, FinalRestoreFailed:
 		t.next()
 	case Completed:
 	}
