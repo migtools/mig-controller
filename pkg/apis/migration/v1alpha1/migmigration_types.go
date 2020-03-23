@@ -92,3 +92,8 @@ func (r *MigMigration) AddErrors(errors []string) {
 		}
 	}
 }
+
+// HasErrors will notify about error presence on the MigMigration resource
+func (r *MigMigration) HasErrors() bool {
+	return len(r.Status.Errors) > 0
+}

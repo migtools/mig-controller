@@ -253,7 +253,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.failed(InitialBackupFailed, reasons)
+				t.fail(InitialBackupFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -353,7 +353,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.failed(StageBackupFailed, reasons)
+				t.fail(StageBackupFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -412,7 +412,7 @@ func (t *Task) Run() error {
 		if completed {
 			t.setResticConditions(restore)
 			if len(reasons) > 0 {
-				t.failed(StageRestoreFailed, reasons)
+				t.fail(StageRestoreFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -497,7 +497,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.failed(FinalRestoreFailed, reasons)
+				t.fail(FinalRestoreFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -566,7 +566,9 @@ func (t *Task) Run() error {
 // Initialize.
 func (t *Task) init() {
 	t.Requeue = FastReQ
-	if t.canceled() {
+	if t.failed() {
+		t.Itinerary = FailedItinerary
+	} else if t.canceled() {
 		t.Itinerary = CancelItinerary
 	} else if t.stage() {
 		t.Itinerary = StageItinerary
@@ -586,7 +588,9 @@ func (t *Task) next() {
 		break
 	}
 	if current == -1 {
-		if t.canceled() {
+		if t.failed() {
+			t.Phase = FailedItinerary[0].phase
+		} else if t.canceled() {
 			t.Phase = CancelItinerary[0].phase
 		} else {
 			t.Phase = Completed
@@ -643,8 +647,8 @@ func (t *Task) anyFlags(step Step) bool {
 	return step.any == uint8(0)
 }
 
-// Phase failed.
-func (t *Task) failed(nextPhase string, reasons []string) {
+// Phase fail.
+func (t *Task) fail(nextPhase string, reasons []string) {
 	t.addErrors(reasons)
 	t.Phase = nextPhase
 	t.Owner.AddErrors(t.Errors)
@@ -670,7 +674,12 @@ func (t *Task) UID() string {
 	return string(t.Owner.UID)
 }
 
-// Get whether the migration is canceled.
+// Get whether the migration has failed
+func (t *Task) failed() bool {
+	return t.Owner.HasErrors()
+}
+
+// Get whether the migration is cancelled.
 func (t *Task) canceled() bool {
 	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Canceling)
 }
