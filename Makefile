@@ -51,7 +51,7 @@ generate: conversion-gen
 
 # Generate conversion functions
 conversion-gen:
-	./hack/conversion-gen-${GOOS} --go-header-file ./hack/boilerplate.go.txt -i ./pkg/compat/conversion/...
+	./hack/conversion-gen-${GOOS} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i ./pkg/compat/conversion/...
 
 # Build the docker image
 #docker-build: test
