@@ -1,8 +1,8 @@
 package conversion
 
 import (
-	"github.com/konveyor/mig-controller/pkg/compat/conversion/appsv1"
-	"github.com/konveyor/mig-controller/pkg/compat/conversion/batchv1beta"
+	"github.com/fusor/mig-controller/pkg/compat/conversion/appsv1"
+	"github.com/fusor/mig-controller/pkg/compat/conversion/batchv1beta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
