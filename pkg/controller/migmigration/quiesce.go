@@ -128,11 +128,14 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, suspend bool) e
 			return err
 		}
 		for _, dc := range list.Items {
+			if dc.Annotations == nil {
+				dc.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if dc.Spec.Replicas == 0 {
 					continue
 				}
-				dc.Annotations[ReplicasAnnotation] = string(dc.Spec.Replicas)
+				dc.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
 				dc.Spec.Replicas = 0
 			} else {
 				replicas, exist := dc.Annotations[ReplicasAnnotation]
@@ -147,7 +150,6 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, suspend bool) e
 				dc.Annotations = removeAnnotation(dc.Annotations, ReplicasAnnotation)
 				dc.Spec.Replicas = int32(number)
 			}
-
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				log.Trace(err)
@@ -174,11 +176,14 @@ func (t *Task) quiesceDeployments(client k8sclient.Client, suspend bool) error {
 			return err
 		}
 		for _, deployment := range list.Items {
+			if deployment.Annotations == nil {
+				deployment.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if *deployment.Spec.Replicas == zero {
 					continue
 				}
-				deployment.Annotations[ReplicasAnnotation] = string(*deployment.Spec.Replicas)
+				deployment.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
 				deployment.Spec.Replicas = &zero
 			} else {
 				replicas, exist := deployment.Annotations[ReplicasAnnotation]
@@ -220,11 +225,14 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client, suspend bool) error 
 			return err
 		}
 		for _, set := range list.Items {
+			if set.Annotations == nil {
+				set.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if *set.Spec.Replicas == zero {
 					continue
 				}
-				set.Annotations[ReplicasAnnotation] = string(*set.Spec.Replicas)
+				set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
 				set.Spec.Replicas = &zero
 			} else {
 				replicas, exist := set.Annotations[ReplicasAnnotation]
@@ -265,11 +273,14 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client, suspend bool) error {
 			return err
 		}
 		for _, set := range list.Items {
+			if set.Annotations == nil {
+				set.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if *set.Spec.Replicas == zero {
 					continue
 				}
-				set.Annotations[ReplicasAnnotation] = string(*set.Spec.Replicas)
+				set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
 				set.Spec.Replicas = &zero
 			} else {
 				replicas, exist := set.Annotations[ReplicasAnnotation]
@@ -315,6 +326,9 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, suspend bool) error {
 			return err
 		}
 		for _, set := range list.Items {
+			if set.Annotations == nil {
+				set.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if set.Spec.Template.Spec.NodeSelector == nil {
 					set.Spec.Template.Spec.NodeSelector = map[string]string{}
@@ -353,7 +367,7 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, suspend bool) error {
 }
 
 // Suspends all CronJobs
-func (t *Task) suspendCronJobs(client k8sclient.Client) error {
+func (t *Task) quiesceCronJobs(client k8sclient.Client, suspend bool) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := batchv1beta.CronJobList{}
 		options := k8sclient.InNamespace(ns)
@@ -363,10 +377,23 @@ func (t *Task) suspendCronJobs(client k8sclient.Client) error {
 			return err
 		}
 		for _, r := range list.Items {
-			if r.Spec.Suspend != nil && *r.Spec.Suspend {
-				continue
+			if r.Annotations == nil {
+				r.Annotations = make(map[string]string)
 			}
-			r.Spec.Suspend = pointer.BoolPtr(true)
+			if suspend {
+				if r.Spec.Suspend == pointer.BoolPtr(true) {
+					continue
+				}
+				r.Annotations[SuspendAnnotation] = "true"
+				r.Spec.Suspend = pointer.BoolPtr(true)
+			} else {
+				_, exist := r.Annotations[SuspendAnnotation]
+				if !exist {
+					continue
+				}
+				r.Annotations = removeAnnotation(r.Annotations, SuspendAnnotation)
+				r.Spec.Suspend = pointer.BoolPtr(false)
+			}
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
 				log.Trace(err)
@@ -393,11 +420,14 @@ func (t *Task) quiesceJobs(client k8sclient.Client, suspend bool) error {
 			return err
 		}
 		for _, job := range list.Items {
+			if job.Annotations == nil {
+				job.Annotations = make(map[string]string)
+			}
 			if suspend {
 				if job.Spec.Parallelism == &zero {
 					continue
 				}
-				job.Annotations[ReplicasAnnotation] = string(*job.Spec.Parallelism)
+				job.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
 				job.Spec.Parallelism = &zero
 			} else {
 				replicas, exist := job.Annotations[ReplicasAnnotation]
@@ -456,6 +486,9 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			return false, err
 		}
 		for _, pod := range list.Items {
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
 			if _, found := skippedPhases[pod.Status.Phase]; found {
 				continue
 			}
