@@ -1,6 +1,7 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/ocpmigrate/mig-controller:latest
+GOOS ?= `go env GOOS`
 
 ci: all
 
@@ -46,8 +47,12 @@ vet:
 	go vet ./pkg/... ./cmd/...
 
 # Generate code
-generate:
+generate: conversion-gen
 	go generate ./pkg/... ./cmd/...
+
+# Generate conversion functions
+conversion-gen:
+	./hack/conversion-gen-${GOOS} -i ./pkg/compat/conversion/...
 
 # Build the docker image
 #docker-build: test
