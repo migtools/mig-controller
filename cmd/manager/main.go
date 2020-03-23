@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/konveyor/mig-controller/pkg/apis"
+	"github.com/konveyor/mig-controller/pkg/compat/conversion"
 	"github.com/konveyor/mig-controller/pkg/controller"
 	"github.com/konveyor/mig-controller/pkg/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -72,6 +73,10 @@ func main() {
 	}
 	if err := clusterregv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable add Cluster Registry APIs to scheme")
+		os.Exit(1)
+	}
+	if err := conversion.RegisterConversions(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to register nessesary conversions")
 		os.Exit(1)
 	}
 
