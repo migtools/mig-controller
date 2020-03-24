@@ -24,4 +24,4 @@ script:
   - curl -sL https://go.kubebuilder.io/dl/2.0.0-beta.0/${os}/${arch} | tar -xz -C /tmp/
   - sudo mv /tmp/kubebuilder_2.0.0-beta.0_${os}_${arch} /usr/local/kubebuilder
   - export PATH=$PATH:/usr/local/kubebuilder/bin
-  - env GO111MODULE=on make ci
+  - env GO111MODULE=on KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s make ci
