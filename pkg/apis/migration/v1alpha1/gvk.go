@@ -30,3 +30,17 @@ func FromGVR(gvr schema.GroupVersionResource) IncompatibleGVK {
 		Kind:    gvr.Resource,
 	}
 }
+
+// ResourceList returns a list of collected resources, which are not supported by an apiServer on a destination cluster
+func (i *Incompatible) ResourceList() (incompatible []string) {
+	for _, ns := range i.Namespaces {
+		for _, gvk := range ns.GVKs {
+			resource := schema.GroupResource{
+				Group:    gvk.Group,
+				Resource: gvk.Kind,
+			}
+			incompatible = append(incompatible, resource.String())
+		}
+	}
+	return
+}
