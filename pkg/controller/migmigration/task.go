@@ -45,6 +45,7 @@ const (
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
+	BackupDeletionRequested       = "RequestBackupDeletion"
 	Canceling                     = "Canceling"
 	Cancelled                     = "Cancelled"
 	Completed                     = "Completed"
@@ -116,6 +117,7 @@ var CancelItinerary = Itinerary{
 	{phase: Canceling},
 	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: BackupDeletionRequested},
 	{phase: Cancelled},
 	{phase: Completed},
 }
@@ -501,6 +503,16 @@ func (t *Task) Run() error {
 			Message:  CancelInProgressMessage,
 			Durable:  true,
 		})
+		t.next()
+	case BackupDeletionRequested:
+		if err := t.cleanBackups(); err != nil {
+			log.Trace(err)
+			return err
+		}
+		if err := t.cleanRestores(); err != nil {
+			log.Trace(err)
+			return err
+		}
 		t.next()
 	case Cancelled:
 		t.Owner.Status.DeleteCondition(Canceling)
