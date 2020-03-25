@@ -30,7 +30,7 @@ const (
 	ResticRestarted               = "ResticRestarted"
 	QuiesceApplications           = "QuiesceApplications"
 	EnsureQuiesced                = "EnsureQuiesced"
-	ReactivateApplications        = "ReactivateApplications"
+	UnQuiesceApplications         = "UnQuiesceApplications"
 	EnsureStageBackup             = "EnsureStageBackup"
 	StageBackupCreated            = "StageBackupCreated"
 	StageBackupFailed             = "StageBackupFailed"
@@ -119,7 +119,7 @@ var CancelItinerary = Itinerary{
 	{phase: Canceling},
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: ReactivateApplications, all: Quiesce},
+	{phase: UnQuiesceApplications, all: Quiesce},
 	{phase: DeleteBackups},
 	{phase: DeleteRestores},
 	{phase: Canceled},
@@ -129,7 +129,7 @@ var CancelItinerary = Itinerary{
 var FailedItinerary = Itinerary{
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: ReactivateApplications, all: Quiesce},
+	{phase: UnQuiesceApplications, all: Quiesce},
 	{phase: Completed},
 }
 
@@ -322,7 +322,7 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case ReactivateApplications:
+	case UnQuiesceApplications:
 		err := t.unQuiesceApplications()
 		if err != nil {
 			log.Trace(err)

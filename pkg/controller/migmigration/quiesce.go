@@ -154,7 +154,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client) error {
 		}
 		for _, dc := range list.Items {
 			if dc.Annotations == nil {
-				dc.Annotations = make(map[string]string)
+				continue
 			}
 			replicas, exist := dc.Annotations[ReplicasAnnotation]
 			if !exist {
@@ -165,7 +165,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			dc.Annotations = removeAnnotation(dc.Annotations, ReplicasAnnotation)
+			delete(dc.Annotations, ReplicasAnnotation)
 			dc.Spec.Replicas = int32(number)
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
@@ -238,7 +238,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			deployment.Annotations = removeAnnotation(deployment.Annotations, ReplicasAnnotation)
+			delete(deployment.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			deployment.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &deployment)
@@ -300,7 +300,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client) error {
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+				continue
 			}
 			replicas, exist := set.Annotations[ReplicasAnnotation]
 			if !exist {
@@ -311,7 +311,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			set.Annotations = removeAnnotation(set.Annotations, ReplicasAnnotation)
+			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			set.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &set)
@@ -372,7 +372,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+				continue
 			}
 			replicas, exist := set.Annotations[ReplicasAnnotation]
 			if !exist {
@@ -383,7 +383,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			set.Annotations = removeAnnotation(set.Annotations, ReplicasAnnotation)
+			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			set.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &set)
@@ -450,7 +450,7 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client) error {
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+				continue
 			}
 			selector, exist := set.Annotations[NodeSelectorAnnotation]
 			if !exist {
@@ -462,7 +462,7 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			set.Annotations = removeAnnotation(set.Annotations, NodeSelectorAnnotation)
+			delete(set.Annotations, NodeSelectorAnnotation)
 			set.Spec.Template.Spec.NodeSelector = nodeSelector
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -516,13 +516,12 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client) error {
 		}
 		for _, r := range list.Items {
 			if r.Annotations == nil {
-				r.Annotations = make(map[string]string)
-			}
-			_, exist := r.Annotations[SuspendAnnotation]
-			if !exist {
 				continue
 			}
-			r.Annotations = removeAnnotation(r.Annotations, SuspendAnnotation)
+			if _, exist := r.Annotations[SuspendAnnotation]; !exist {
+				continue
+			}
+			delete(r.Annotations, SuspendAnnotation)
 			r.Spec.Suspend = pointer.BoolPtr(false)
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
@@ -584,7 +583,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client) error {
 		}
 		for _, job := range list.Items {
 			if job.Annotations == nil {
-				job.Annotations = make(map[string]string)
+				continue
 			}
 			replicas, exist := job.Annotations[ReplicasAnnotation]
 			if !exist {
@@ -595,7 +594,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client) error {
 				log.Trace(err)
 				return err
 			}
-			job.Annotations = removeAnnotation(job.Annotations, ReplicasAnnotation)
+			delete(job.Annotations, ReplicasAnnotation)
 			parallelReplicas := int32(number)
 			job.Spec.Parallelism = &parallelReplicas
 			err = client.Update(context.TODO(), &job)
@@ -656,15 +655,4 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 	}
 
 	return true, nil
-}
-
-func removeAnnotation(annotations map[string]string, toRemove string) map[string]string {
-	updatedAnnotations := make(map[string]string)
-	for key, value := range updatedAnnotations {
-		if key != toRemove {
-			updatedAnnotations[key] = value
-		}
-	}
-
-	return updatedAnnotations
 }
