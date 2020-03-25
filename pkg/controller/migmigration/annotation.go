@@ -18,6 +18,10 @@ const (
 	PvStorageClassAnnotation = "openshift.io/target-storage-class" // storageClassName
 	PvAccessModeAnnotation   = "openshift.io/target-access-mode"   // accessMode
 	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods" // (true|false)
+	QuiesceNodeSelector      = "migration.openshift.io/quiesceDaemonSet"
+	SuspendAnnotation        = "migration.openshift.io/preQuiesceSuspend"
+	ReplicasAnnotation       = "migration.openshift.io/preQuiesceReplicas"
+	NodeSelectorAnnotation   = "migration.openshift.io/preQuiesceNodeSelector"
 )
 
 // Restic Annotations

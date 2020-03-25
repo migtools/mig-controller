@@ -323,7 +323,7 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case ReactivateApplications:
-		err := t.reactivateApplications()
+		err := t.unQuiesceApplications()
 		if err != nil {
 			log.Trace(err)
 			return err
