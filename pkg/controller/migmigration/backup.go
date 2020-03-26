@@ -376,3 +376,12 @@ func findPVCopyMethod(pvList migapi.PersistentVolumes, pvName string) string {
 	}
 	return ""
 }
+
+func findPVVerify(pvList migapi.PersistentVolumes, pvName string) bool {
+	for _, pv := range pvList.List {
+		if pv.Name == pvName {
+			return pv.Selection.Verify
+		}
+	}
+	return false
+}
