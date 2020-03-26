@@ -1,11 +1,11 @@
 
 # Velero plugin system
 
-Velero has a plugin system which allows integration with a variety of providers for backup storage and volume snapshot operations. 
+Velero uses storage provider plugins to integrate with a variety of storage systems to support backup and snapshot operations.
 
-During install, Velero requires that at least one plugin is added (with the `--plugins` flag). The plugin will be either of the type object store or volume snapshotter, or a plugin that contains both. An exception to this is that when the user is not configuring a backup storage location or a snapshot storage location at the time of install, this flag is optional.
+For server installation, Velero requires that at least one plugin is added (with the `--plugins` flag). The plugin will be either of the type object store or volume snapshotter, or a plugin that contains both. An exception to this is that when the user is not configuring a backup storage location or a snapshot storage location at the time of install, this flag is optional.
 
-Any plugin can be added after Velero has been installed by using the command `velero plugin add <registry/image:version>`. 
+Any plugin can be added after Velero has been installed by using the command `velero plugin add <registry/image:version>`.
 
 Example with a dockerhub image: `velero plugin add velero/velero-plugin-for-aws:v1.0.0`.
 
@@ -19,6 +19,9 @@ Anyone can add integrations for any platform to provide additional backup and vo
 
 After you publish your plugin on your own repository, open a PR that adds a link to it under the appropriate list of [supported providers][3] page in our documentation.
 
+You can also add the [`velero-plugin` GitHub Topic][4] to your repo, and it will be shown under the aggregated list of repositories automatically.
+
 [1]: https://github.com/vmware-tanzu/velero-plugin-example/
 [2]: custom-plugins.md
 [3]: supported-providers.md
+[4]: https://github.com/topics/velero-plugin

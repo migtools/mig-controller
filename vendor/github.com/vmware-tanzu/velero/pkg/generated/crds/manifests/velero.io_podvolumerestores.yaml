@@ -14,19 +14,20 @@ spec:
     listKind: PodVolumeRestoreList
     plural: podvolumerestores
     singular: podvolumerestore
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -58,7 +59,7 @@ spec:
                     in the future.'
                   type: string
                 kind:
-                  description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+                  description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
                   type: string
                 name:
                   description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
@@ -68,7 +69,7 @@ spec:
                   type: string
                 resourceVersion:
                   description: 'Specific resourceVersion to which this reference is
-                    made, if any. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency'
+                    made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
                   type: string
                 uid:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
@@ -100,6 +101,11 @@ spec:
               format: date-time
               nullable: true
               type: string
+            errors:
+              description: Errors is a count of all error messages that were generated
+                during execution of the pod volume restore. The actual errors are
+                in the restic log
+              type: integer
             message:
               description: Message is a message about the pod volume restore's status.
               type: string
@@ -123,12 +129,22 @@ spec:
                   format: int64
                   type: integer
               type: object
+            resticPod:
+              description: ResticPod is the name of the restic pod which processed
+                the restore. Any errors referenced in Errors or VerifyErrors will
+                be logged in this pod's log.
+              type: string
             startTimestamp:
               description: StartTimestamp records the time a restore was started.
                 The server's time is used for StartTimestamps
               format: date-time
               nullable: true
               type: string
+            verifyErrors:
+              description: VerifyErrors is a count of all verification-related error
+                messages that were generated during execution of the pod volume restore.
+                The actual errors are in the restic log
+              type: integer
           type: object
       type: object
   version: v1

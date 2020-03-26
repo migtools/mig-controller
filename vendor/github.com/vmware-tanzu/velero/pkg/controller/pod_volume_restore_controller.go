@@ -295,7 +295,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// execute the restore process
-	if err := c.restorePodVolume(req, credsFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, credsFile, volumeDir, log, restic.GetVolumesToVerifyIncludes(pod, req.Spec.Volume)); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -314,7 +314,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger, verify bool) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -327,15 +327,35 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 		credsFile,
 		req.Spec.SnapshotID,
 		volumePath,
+		verify,
 	)
 
-	// if this is azure, set resticCmd.Env appropriately
+	// Running restic command might need additional provider specific environment variables. Based on the provider, we
+	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
 		env, err := restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
 		if err != nil {
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
+	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		env, err := restic.S3CmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+		if err != nil {
+			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
+		}
+		resticCmd.Env = env
+	}
+	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
+		if err != nil {
+			log.WithError(err).Errorf("Error getting BackupStorageLocation %s", req.Spec.BackupStorageLocation)
+			return errors.WithStack(err)
+		}
+		insecureSkipTLSVerify, err := strconv.ParseBool(bsl.Spec.Config["insecureSkipTLSVerify"])
+		if err != nil {
+			insecureSkipTLSVerify = false
+		}
+		resticCmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 	}
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
 		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
@@ -355,7 +375,11 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 	if stdout, stderr, err = restic.RunRestore(resticCmd, log, c.updateRestoreProgressFunc(req, log)); err != nil {
 		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+	log.Infof("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+	err = c.processRestoreErrors(req, stdout, stderr, verify)
+	if err != nil {
+		log.WithError(err).Error("error updating PodVolumeRestore errors")
+	}
 
 	// Remove the .velero directory from the restored volume (it may contain done files from previous restores
 	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
@@ -389,6 +413,32 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 	return nil
 }
 
+func (c *podVolumeRestoreController) processRestoreErrors(req *velerov1api.PodVolumeRestore, stdout, stderr string, verify bool) error {
+	nErrors := 0
+	nVerifyErrors := 0
+	for _, str := range strings.Split(stdout, "\n") {
+		var i int
+		_, err := fmt.Sscanf(str, "There were %d errors", &i)
+		if err == nil {
+			nErrors = i
+		}
+	}
+	if verify {
+		for _, str := range strings.Split(stderr, "\n") {
+			if strings.Contains(str, "Unexpected contents starting at offset") || strings.Contains(str, "Invalid file size: expected") {
+				nVerifyErrors++
+			}
+		}
+	}
+	if _, err := c.patchPodVolumeRestore(req, func(r *velerov1api.PodVolumeRestore) {
+		r.Status.Errors = nErrors
+		r.Status.VerifyErrors = nVerifyErrors
+		r.Status.ResticPod = os.Getenv("POD_NAME")
+	}); err != nil {
+		return err
+	}
+	return nil
+}
 func (c *podVolumeRestoreController) patchPodVolumeRestore(req *velerov1api.PodVolumeRestore, mutate func(*velerov1api.PodVolumeRestore)) (*velerov1api.PodVolumeRestore, error) {
 	// Record original json
 	oldData, err := json.Marshal(req)

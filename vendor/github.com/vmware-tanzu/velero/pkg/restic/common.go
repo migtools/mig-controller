@@ -49,12 +49,18 @@ const (
 	// pod volume backups when they're for a PVC.
 	PVCNameAnnotation = "velero.io/pvc-name"
 
+	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
+	// need to be backed up using restic.
+	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
+	// VolumesToVerifyAnnotation is the annotation on a pod whose mounted volumes
+	// need to be verified after backing up with restic.
+	VolumesToVerifyAnnotation = "backup.velero.io/verify-volumes"
+
 	// Deprecated.
 	//
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
-
-	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 )
 
 // getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
@@ -115,12 +121,33 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue := annotations[volumesToBackupAnnotation]
+	backupsValue := annotations[VolumesToBackupAnnotation]
 	if backupsValue == "" {
 		return nil
 	}
 
 	return strings.Split(backupsValue, ",")
+}
+
+// GetVolumesToVerifyIncludes returns true if the passed-in
+// volume name is included in the VolumesToVerifyAnnotation
+func GetVolumesToVerifyIncludes(obj metav1.Object, volName string) bool {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return false
+	}
+
+	volumesValue := annotations[VolumesToVerifyAnnotation]
+	if volumesValue == "" {
+		return false
+	}
+
+	for _, vol := range strings.Split(volumesValue, ",") {
+		if vol == volName {
+			return true
+		}
+	}
+	return false
 }
 
 // SnapshotIdentifier uniquely identifies a restic snapshot
@@ -228,13 +255,36 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := getResticEnvVars(loc.Spec.Config)
+	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}
 
 	env := os.Environ()
 	for k, v := range azureVars {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return env, nil
+}
+
+// S3CmdEnv returns a list of environment variables (in the format var=val) that
+// should be used when running a restic command for an S3 backend. This list is
+// the current environment, plus the AWS-specific variables restic needs, namely
+// a credential profile.
+func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
+	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting aws restic env vars")
+	}
+
+	env := os.Environ()
+	for k, v := range awsVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 

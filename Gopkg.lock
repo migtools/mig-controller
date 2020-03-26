@@ -607,11 +607,11 @@
 
 [[projects]]
   branch = "konveyor-dev"
-  digest = "1:7ee1d20ebea6a6f2472452e10aafc34a530e688287517c5785e95e533d331c72"
+  digest = "1:60f9595616a7fe035a916b04e16bf41f46e611ffd5c976f6854b5353ffa78734"
   name = "github.com/vmware-tanzu/velero"
   packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
-  revision = "53b3e5029c9d0ce8c6bbca305f991af0031dbd51"
+  revision = "342f398f168a0bd3714c7eb5d242724c05bb3e83"
   source = "github.com/konveyor/velero.git"
 
 [[projects]]

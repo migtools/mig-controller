@@ -54,29 +54,64 @@ The restic containers should be running in a `privileged` mode to be able to mou
 
 1. Add the `velero` ServiceAccount to the `privileged` SCC:
 
-```
-$ oc adm policy add-scc-to-user privileged -z velero -n velero
-```
+    ```
+    $ oc adm policy add-scc-to-user privileged -z velero -n velero
+    ```
 
-2. Modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes.
+2. For OpenShift version  >= `4.1`, Modify the DaemonSet yaml to request a privileged mode:
 
-```diff
-@@ -35,7 +35,7 @@ spec:
-             secretName: cloud-credentials
-         - name: host-pods
-           hostPath:
--            path: /var/lib/kubelet/pods
-+            path: /var/lib/origin/openshift.local.volumes/pods
-         - name: scratch
-           emptyDir: {}
-       containers:
-@@ -67,3 +67,5 @@ spec:
-               value: /credentials/cloud
-             - name: VELERO_SCRATCH_DIR
-               value: /scratch
-+          securityContext:
-+            privileged: true
-```
+    ```diff
+    @@ -67,3 +67,5 @@ spec:
+                  value: /credentials/cloud
+                - name: VELERO_SCRATCH_DIR
+                  value: /scratch
+    +          securityContext:
+    +            privileged: true
+    ```
+
+    or
+
+    ```shell
+    oc patch ds/restic \
+      --namespace velero \
+      --type json \
+      -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+    ```
+
+3. For OpenShift version  < `4.1`, Modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes.
+
+    ```diff
+    @@ -35,7 +35,7 @@ spec:
+                secretName: cloud-credentials
+            - name: host-pods
+              hostPath:
+    -            path: /var/lib/kubelet/pods
+    +            path: /var/lib/origin/openshift.local.volumes/pods
+            - name: scratch
+              emptyDir: {}
+          containers:
+    @@ -67,3 +67,5 @@ spec:
+                  value: /credentials/cloud
+                - name: VELERO_SCRATCH_DIR
+                  value: /scratch
+    +          securityContext:
+    +            privileged: true
+    ```
+
+    or 
+
+    ```shell
+    oc patch ds/restic \
+      --namespace velero \
+      --type json \
+      -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+
+    oc patch ds/restic \
+      --namespace velero \
+      --type json \
+      -p '[{"op":"replace","path":"/spec/template/spec/volumes/0/hostPath","value": { "path": "/var/lib/origin/openshift.local.volumes/pods"}}]'
+    ```
+
 
 If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
 
@@ -107,6 +142,18 @@ The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/k
 ```yaml
 hostPath:
   path: /var/vcap/data/kubelet/pods
+```
+
+**Microsoft Azure**
+
+If you are using [Azure Files][8], you need to add `nouser_xattr` to your storage class's `mountOptions`. See [this restic issue][9] for more details.
+
+You can use the following command to patch the storage class:
+
+```bash
+kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
+  --type json \
+  --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
 ```
 
 You're now ready to use Velero with restic.
@@ -372,9 +419,11 @@ Velero does not currently provide a mechanism to detect persistent volume claims
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
 [1]: https://github.com/restic/restic
-[2]: install-overview.md
+[2]: customize-installation.md#enable-restic-integration
 [3]: https://github.com/vmware-tanzu/velero/releases/
 [4]: https://kubernetes.io/docs/concepts/storage/volumes/#local
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
 [6]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
 [7]: https://github.com/bitsbeats/velero-pvc-watcher
+[8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
+[9]: https://github.com/restic/restic/issues/1800

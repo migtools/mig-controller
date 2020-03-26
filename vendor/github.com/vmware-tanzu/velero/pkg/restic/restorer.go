@@ -138,6 +138,20 @@ ForEachVolume:
 			if res.Status.Phase == velerov1api.PodVolumeRestorePhaseFailed {
 				errs = append(errs, errors.Errorf("pod volume restore failed: %s", res.Status.Message))
 			}
+			if res.Status.Errors > 0 {
+				data.Restore.Status.PodVolumeRestoreErrors = append(data.Restore.Status.PodVolumeRestoreErrors, corev1api.ObjectReference{
+					Kind:      "PodVolumeRestore",
+					Name:      res.Name,
+					Namespace: res.Namespace,
+				})
+			}
+			if res.Status.VerifyErrors > 0 {
+				data.Restore.Status.PodVolumeRestoreVerifyErrors = append(data.Restore.Status.PodVolumeRestoreVerifyErrors, corev1api.ObjectReference{
+					Kind:      "PodVolumeRestore",
+					Name:      res.Name,
+					Namespace: res.Namespace,
+				})
+			}
 		}
 	}
 

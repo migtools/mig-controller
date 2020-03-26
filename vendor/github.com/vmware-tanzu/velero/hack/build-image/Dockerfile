@@ -1,4 +1,4 @@
-# Copyright 2018, 2019 the Velero contributors.
+# Copyright 2018, 2019, 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ FROM golang:1.12
 RUN mkdir -p /go/src/k8s.io
 WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
-RUN git clone -b kubernetes-1.15.3 https://github.com/kubernetes/code-generator
-RUN git clone -b kubernetes-1.15.3 https://github.com/kubernetes/apimachinery 
+RUN git clone -b kubernetes-1.17.0 https://github.com/kubernetes/code-generator
+RUN git clone -b kubernetes-1.17.0 https://github.com/kubernetes/apimachinery 
 # Use a proxy for go modules to reduce the likelihood of various hosts being down and breaking the build
 ENV GOPROXY=https://proxy.golang.org
 # vendor code-generator go modules to be compatible with pre-1.15
@@ -27,7 +27,7 @@ WORKDIR  /go/src/k8s.io/code-generator
 RUN GO111MODULE=on go mod vendor
 RUN mkdir -p /go/src/sigs.k8s.io
 WORKDIR /go/src/sigs.k8s.io
-RUN git clone -b v0.2.2 https://github.com/kubernetes-sigs/controller-tools
+RUN git clone -b v0.2.4 https://github.com/kubernetes-sigs/controller-tools
 WORKDIR /go/src/sigs.k8s.io/controller-tools
 RUN GO111MODULE=on go mod vendor
 RUN go get golang.org/x/tools/cmd/goimports
