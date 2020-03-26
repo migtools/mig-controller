@@ -1,0 +1,29 @@
+settings = {}
+
+# global settings
+settings.update(read_json(
+    "tilt-settings.json",
+    default={},
+))
+
+allow_k8s_contexts(k8s_context())
+
+docker_build(
+    ref=settings.get("image"),
+    context='../..',
+    only=['pkg', 'vendor', 'cmd'],
+    live_update=[
+        restart_container(),
+    ]
+)
+
+file = read_yaml(settings.get('migration_controller'))
+file['spec']['mig_controller_image_fqin'] = settings.get("image")
+
+k8s_kind('MigrationController',
+         image_json_path='{.spec.mig_controller_image_fqin}')
+k8s_resource("migration-controller",  extra_pod_selectors={
+    "app": "migration",
+    "control-plane": "controller-manager"
+})
+k8s_yaml(encode_yaml(file))
