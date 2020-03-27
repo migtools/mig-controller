@@ -282,33 +282,27 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	return nil
 }
 
-func (t *Task) cleanBackups() error {
+func (t *Task) deleteBackups() error {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	initialBackup, err := t.getInitialBackup()
+	labels := t.Owner.GetCorrelationLabels()
+	labels["migmigration"] = string(t.Owner.GetUID())
+	list := velero.BackupList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
 	if err != nil {
 		log.Trace(err)
 		return err
-	}
-	if initialBackup != nil {
-		request := buildDeleteBackupRequest(initialBackup.Name, initialBackup.UID)
-		if err := client.Create(context.TODO(), request); err != nil {
-			log.Trace(err)
-			return err
-		}
 	}
 
-	stageBackup, err := t.getStageBackup()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	if stageBackup != nil {
-		request := buildDeleteBackupRequest(stageBackup.Name, stageBackup.UID)
+	for _, backup := range list.Items {
+		request := buildDeleteBackupRequest(backup.Name, backup.UID)
 		if err := client.Create(context.TODO(), request); err != nil {
 			log.Trace(err)
 			return err

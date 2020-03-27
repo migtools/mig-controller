@@ -233,32 +233,26 @@ func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	t.updateNamespaceMapping(restore)
 }
 
-func (t *Task) cleanRestores() error {
+func (t *Task) deleteRestores() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	stageRestore, err := t.getStageRestore()
-	if err != nil && !k8serror.IsNotFound(err) {
-		log.Trace(err)
-		return err
-	}
-	if stageRestore != nil {
-		err = client.Delete(context.TODO(), stageRestore)
-		if err != nil && !k8serror.IsNotFound(err) {
-			log.Trace(err)
-			return err
-		}
-	}
 
-	initialRestore, err := t.getFinalRestore()
-	if err != nil && !k8serror.IsNotFound(err) {
+	labels := t.Owner.GetCorrelationLabels()
+	labels["migmigration"] = string(t.Owner.GetUID())
+	list := velero.RestoreList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
 		log.Trace(err)
 		return err
 	}
-	if initialRestore != nil {
-		err = client.Delete(context.TODO(), initialRestore)
+	for _, restore := range list.Items {
+		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			log.Trace(err)
 			return err

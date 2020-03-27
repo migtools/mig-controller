@@ -45,7 +45,8 @@ const (
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
-	BackupDeletionRequested       = "RequestBackupDeletion"
+	DeleteBackups                 = "DeleteBackups"
+	DeleteRestores                = "DeleteRestores"
 	Canceling                     = "Canceling"
 	Cancelled                     = "Cancelled"
 	Completed                     = "Completed"
@@ -117,7 +118,8 @@ var CancelItinerary = Itinerary{
 	{phase: Canceling},
 	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
-	{phase: BackupDeletionRequested},
+	{phase: DeleteBackups},
+	{phase: DeleteRestores},
 	{phase: Cancelled},
 	{phase: Completed},
 }
@@ -504,12 +506,14 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next()
-	case BackupDeletionRequested:
-		if err := t.cleanBackups(); err != nil {
+	case DeleteBackups:
+		if err := t.deleteBackups(); err != nil {
 			log.Trace(err)
 			return err
 		}
-		if err := t.cleanRestores(); err != nil {
+		t.next()
+	case DeleteRestores:
+		if err := t.deleteRestores(); err != nil {
 			log.Trace(err)
 			return err
 		}
