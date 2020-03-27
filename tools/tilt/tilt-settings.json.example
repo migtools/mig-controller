@@ -1,0 +1,4 @@
+{
+	"image": "<YOUR_IMAGE>",
+	"migration_controller": "<PATH TO MIGRATION CONTROLLER TEMPLATE (kind: MigrationController)>"
+}

@@ -19,7 +19,7 @@ run: generate fmt vet
 	go run ./cmd/manager/main.go
 
 tilt:
-	tilt up --hud=false --no-browser --file hack/tilt/Tiltfile
+	 IMG=${IMG} TEMPLATE=${TEMPLATE} tilt up --hud=false --no-browser --file tools/tilt/Tiltfile
 
 # Install CRDs into a cluster
 install: manifests

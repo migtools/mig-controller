@@ -1,4 +1,0 @@
-{
-	"image": "quay.io/dgrigore/mig-controller",
-	"migration_controller": "/home/dgrigore/Documents/work/openshift/mig-operator/deploy/non-olm/latest/controller-4.yml"
-}
