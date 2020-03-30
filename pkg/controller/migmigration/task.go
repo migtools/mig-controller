@@ -193,11 +193,12 @@ func (t *Task) Run() error {
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
 	t.init()
+	step := t.setStep()
 
 	// Run the current phase.
 	switch t.Phase {
 	case Created, Started:
-		t.next()
+		t.next(step)
 	case Prepare:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -209,7 +210,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -225,7 +226,7 @@ func (t *Task) Run() error {
 			}
 		}
 		if count == 2 {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -236,7 +237,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next()
+		t.next(step)
 	case InitialBackupCreated:
 		backup, err := t.ensureInitialBackup()
 		if err != nil {
@@ -255,7 +256,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(InitialBackupFailed, reasons)
 			} else {
-				t.next()
+				t.next(step)
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -266,14 +267,14 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case EnsureStagePods:
 		_, err := t.ensureStagePodsCreated()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case StagePodsCreated:
 		started, err := t.ensureStagePodsStarted()
 		if err != nil {
@@ -281,7 +282,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -292,7 +293,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = PollReQ
-		t.next()
+		t.next(step)
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
@@ -300,7 +301,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -310,7 +311,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
@@ -318,7 +319,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if quiesced {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -328,7 +329,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
@@ -336,7 +337,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = 0
-		t.next()
+		t.next(step)
 	case StageBackupCreated:
 		backup, err := t.ensureStageBackup()
 		if err != nil {
@@ -355,7 +356,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageBackupFailed, reasons)
 			} else {
-				t.next()
+				t.next(step)
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -375,7 +376,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -394,7 +395,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next()
+		t.next(step)
 	case StageRestoreCreated:
 		restore, err := t.ensureStageRestore()
 		if err != nil {
@@ -414,7 +415,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageRestoreFailed, reasons)
 			} else {
-				t.next()
+				t.next(step)
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -425,7 +426,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case EnsureStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
@@ -433,7 +434,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if terminated {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -445,7 +446,7 @@ func (t *Task) Run() error {
 				return err
 			}
 		}
-		t.next()
+		t.next(step)
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -461,7 +462,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -480,7 +481,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next()
+		t.next(step)
 	case FinalRestoreCreated:
 		restore, err := t.ensureFinalRestore()
 		if err != nil {
@@ -499,7 +500,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(FinalRestoreFailed, reasons)
 			} else {
-				t.next()
+				t.next(step)
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -511,7 +512,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if completed {
-			t.next()
+			t.next(step)
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -524,19 +525,19 @@ func (t *Task) Run() error {
 			Message:  CancelInProgressMessage,
 			Durable:  true,
 		})
-		t.next()
+		t.next(step)
 	case DeleteBackups:
 		if err := t.deleteBackups(); err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case DeleteRestores:
 		if err := t.deleteRestores(); err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next()
+		t.next(step)
 	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
@@ -547,11 +548,11 @@ func (t *Task) Run() error {
 			Message:  CanceledMessage,
 			Durable:  true,
 		})
-		t.next()
+		t.next(step)
 	// Out of tree states - needs to be triggered manually with t.fail(...)
 	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
 		t.Requeue = NoReQ
-		t.next()
+		t.next(step)
 	case Completed:
 	}
 
@@ -577,8 +578,8 @@ func (t *Task) init() {
 	}
 }
 
-// Advance the task to the next phase.
-func (t *Task) next() {
+// Set the step which will be executed.
+func (t *Task) setStep() int {
 	current := -1
 	for i, step := range t.Itinerary {
 		if step.phase != t.Phase {
@@ -588,16 +589,20 @@ func (t *Task) next() {
 		break
 	}
 	if current == -1 {
-		if t.failed() {
-			t.Phase = FailedItinerary[0].phase
-		} else if t.canceled() {
-			t.Phase = CancelItinerary[0].phase
+		if t.failed() || t.canceled() {
+			current = 0
 		} else {
-			t.Phase = Completed
+			current = len(t.Itinerary) - 1
 		}
-		return
+		t.Phase = t.Itinerary[current].phase
 	}
-	for n := current + 1; n < len(t.Itinerary); n++ {
+
+	return current
+}
+
+// Advance the task to the next phase.
+func (t *Task) next(currentPhaseIndex int) {
+	for n := currentPhaseIndex + 1; n < len(t.Itinerary); n++ {
 		next := t.Itinerary[n]
 		if !t.allFlags(next) {
 			continue
