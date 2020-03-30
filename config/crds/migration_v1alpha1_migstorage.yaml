@@ -59,8 +59,6 @@ spec:
                 s3CustomCABundle:
                   format: byte
                   type: string
-              required:
-              - insecure
               type: object
             backupStorageProvider:
               type: string

@@ -93,7 +93,7 @@ type BackupStorageConfig struct {
 	AzureStorageContainer string                `json:"azureStorageContainer,omitempty"`
 	AzureResourceGroup    string                `json:"azureResourceGroup,omitempty"`
 	GcpBucket             string                `json:"gcpBucket,omitempty"`
-	Insecure              bool                  `json:"insecure"`
+	Insecure              bool                  `json:"insecure,omitempty"`
 }
 
 func init() {
