@@ -609,10 +609,7 @@
   branch = "konveyor-dev"
   digest = "1:7ee1d20ebea6a6f2472452e10aafc34a530e688287517c5785e95e533d331c72"
   name = "github.com/vmware-tanzu/velero"
-  packages = [
-    "pkg/apis/velero/v1",
-    "pkg/label",
-  ]
+  packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
   revision = "53b3e5029c9d0ce8c6bbca305f991af0031dbd51"
   source = "github.com/konveyor/velero.git"
@@ -1312,7 +1309,6 @@
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/vmware-tanzu/velero/pkg/apis/velero/v1",
-    "github.com/vmware-tanzu/velero/pkg/label",
     "golang.org/x/net/context",
     "google.golang.org/api/option",
     "k8s.io/api/apps/v1",

@@ -9,7 +9,6 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/label"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -289,12 +288,10 @@ func (t *Task) deleteBackups() error {
 		return err
 	}
 
-	labels := t.Owner.GetCorrelationLabels()
-	labels["migmigration"] = string(t.Owner.GetUID())
 	list := velero.BackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		log.Trace(err)
@@ -302,7 +299,15 @@ func (t *Task) deleteBackups() error {
 	}
 
 	for _, backup := range list.Items {
-		request := buildDeleteBackupRequest(backup.Name, backup.UID)
+		request := &velero.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    migapi.VeleroNamespace,
+				GenerateName: backup.Name + "-",
+			},
+			Spec: velero.DeleteBackupRequestSpec{
+				BackupName: backup.Name,
+			},
+		}
 		if err := client.Create(context.TODO(), request); err != nil {
 			log.Trace(err)
 			return err
@@ -310,22 +315,6 @@ func (t *Task) deleteBackups() error {
 	}
 
 	return nil
-}
-
-func buildDeleteBackupRequest(name string, uid types.UID) *velero.DeleteBackupRequest {
-	return &velero.DeleteBackupRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    migapi.VeleroNamespace,
-			GenerateName: name + "-",
-			Labels: map[string]string{
-				velero.BackupNameLabel: label.GetValidName(name),
-				velero.BackupUIDLabel:  string(uid),
-			},
-		},
-		Spec: velero.DeleteBackupRequestSpec{
-			BackupName: name,
-		},
-	}
 }
 
 // Determine whether backups are replicated by velero on the destination cluster.

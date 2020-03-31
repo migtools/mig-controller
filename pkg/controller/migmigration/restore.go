@@ -240,12 +240,10 @@ func (t *Task) deleteRestores() error {
 		return err
 	}
 
-	labels := t.Owner.GetCorrelationLabels()
-	labels["migmigration"] = string(t.Owner.GetUID())
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		log.Trace(err)
