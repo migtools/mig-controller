@@ -21,7 +21,11 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+
+	"github.com/konveyor/mig-controller/pkg/settings"
 )
+
+var Settings = &settings.Settings
 
 // Credentials Secret.
 const (
@@ -364,6 +368,16 @@ func (r *S3Test) newSession() (*session.Session, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: r.insecure},
 	}
+
+	var hasHttpProxy, hasHttpsProxy, hasNoProxy bool
+	hasHttpProxy, _ = Settings.HasProxyVar(settings.HttpProxy)
+	hasHttpsProxy, _ = Settings.HasProxyVar(settings.HttpsProxy)
+	hasNoProxy, _ = Settings.HasProxyVar(settings.NoProxy)
+
+	if hasHttpProxy || hasHttpsProxy || hasNoProxy {
+		transport.Proxy = http.ProxyFromEnvironment
+	}
+
 	client := &http.Client{Transport: transport}
 	sessionOptions := session.Options{
 		Config: aws.Config{
