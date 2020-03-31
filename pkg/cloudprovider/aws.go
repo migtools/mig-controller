@@ -137,7 +137,11 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	if envVars == nil {
+		envVars = []kapi.EnvVar{}
+	}
+	s3EnvVars := []kapi.EnvVar{
 		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "s3",
@@ -180,6 +184,26 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Name:  "REGISTRY_STORAGE_S3_SKIPVERIFY",
 			Value: strconv.FormatBool(p.Insecure),
 		},
+	}
+	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
+
+	if len(p.CustomCABundle) > 0 {
+		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
+			kapi.VolumeMount{
+				Name:      "registry-secret",
+				ReadOnly:  true,
+				MountPath: "/etc/ssl/certs/ca_bundle.pem",
+				SubPath:   "ca_bundle.pem",
+			})
+		dc.Spec.Template.Spec.Volumes = append(dc.Spec.Template.Spec.Volumes, kapi.Volume{
+			Name: "registry-secret",
+			VolumeSource: kapi.VolumeSource{
+				Secret: &kapi.SecretVolumeSource{
+					SecretName: name,
+				},
+			},
+		})
 	}
 }
 
