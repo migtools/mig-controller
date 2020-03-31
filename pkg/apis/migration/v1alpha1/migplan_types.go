@@ -61,8 +61,8 @@ type MigPlanSpec struct {
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
 	Conditions
-	Incompatible       `json:",inline"`
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	Incompatible   `json:",inline"`
+	ObservedDigest string `json:"observedDigest,omitempty"`
 }
 
 // +genclient

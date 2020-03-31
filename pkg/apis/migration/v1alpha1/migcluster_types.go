@@ -56,7 +56,7 @@ type MigClusterSpec struct {
 // MigClusterStatus defines the observed state of MigCluster
 type MigClusterStatus struct {
 	Conditions
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ObservedDigest string `json:"observedDigest,omitempty"`
 }
 
 // +genclient

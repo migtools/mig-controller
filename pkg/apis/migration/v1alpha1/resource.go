@@ -1,5 +1,11 @@
 package v1alpha1
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+)
+
 const (
 	VeleroNamespace = "openshift-migration"
 )
@@ -42,11 +48,11 @@ func (r *MigPlan) GetName() string {
 }
 
 func (r *MigPlan) MarkReconciled() {
-	r.Status.ObservedGeneration = r.Generation + 1
+	r.Status.ObservedDigest = digest(r.Spec)
 }
 
 func (r *MigPlan) HasReconciled() bool {
-	return r.Status.ObservedGeneration == r.Generation
+	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
 // Storage
@@ -71,11 +77,11 @@ func (r *MigStorage) GetName() string {
 }
 
 func (r *MigStorage) MarkReconciled() {
-	r.Status.ObservedGeneration = r.Generation + 1
+	r.Status.ObservedDigest = digest(r.Spec)
 }
 
 func (r *MigStorage) HasReconciled() bool {
-	return r.Status.ObservedGeneration == r.Generation
+	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
 // Cluster
@@ -100,11 +106,11 @@ func (r *MigCluster) GetName() string {
 }
 
 func (r *MigCluster) MarkReconciled() {
-	r.Status.ObservedGeneration = r.Generation + 1
+	r.Status.ObservedDigest = digest(r.Spec)
 }
 
 func (r *MigCluster) HasReconciled() bool {
-	return r.Status.ObservedGeneration == r.Generation
+	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
 // Migration
@@ -129,9 +135,19 @@ func (r *MigMigration) GetName() string {
 }
 
 func (r *MigMigration) MarkReconciled() {
-	r.Status.ObservedGeneration = r.Generation + 1
+	r.Status.ObservedDigest = digest(r.Spec)
 }
 
 func (r *MigMigration) HasReconciled() bool {
-	return r.Status.ObservedGeneration == r.Generation
+	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
+//
+// Generate a sha256 hex-digest for an object.
+func digest(object interface{}) string {
+	j, _ := json.Marshal(object)
+	hash := sha256.New()
+	hash.Write(j)
+	digest := hex.EncodeToString(hash.Sum(nil))
+	return digest
 }

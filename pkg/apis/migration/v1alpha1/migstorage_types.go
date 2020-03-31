@@ -44,7 +44,7 @@ type MigStorageSpec struct {
 // MigStorageStatus defines the observed state of MigStorage
 type MigStorageStatus struct {
 	Conditions
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ObservedDigest string `json:"observedDigest,omitempty"`
 }
 
 // +genclient
