@@ -139,7 +139,11 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	if envVars == nil {
+		envVars = []kapi.EnvVar{}
+	}
+	s3EnvVars := []kapi.EnvVar{
 		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "s3",
@@ -183,6 +187,8 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Value: strconv.FormatBool(p.Insecure),
 		},
 	}
+	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
+
 	if len(p.CustomCABundle) > 0 {
 		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			dc.Spec.Template.Spec.Containers[0].VolumeMounts,

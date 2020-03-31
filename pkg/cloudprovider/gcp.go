@@ -69,7 +69,11 @@ func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 }
 
 func (p *GCPProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
-	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	if envVars == nil {
+		envVars = []kapi.EnvVar{}
+	}
+	gcpEnvVars := []kapi.EnvVar{
 		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "gcs",
@@ -87,6 +91,7 @@ func (p *GCPProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Value: "/credentials/cloud",
 		},
 	}
+	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, gcpEnvVars...)
 	dc.Spec.Template.Spec.Containers[0].VolumeMounts = []kapi.VolumeMount{
 		{
 			Name:      "cloud-credentials",
