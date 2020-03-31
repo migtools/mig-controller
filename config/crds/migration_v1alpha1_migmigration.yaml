@@ -49,9 +49,8 @@ spec:
               items:
                 type: string
               type: array
-            observedGeneration:
-              format: int64
-              type: integer
+            observedDigest:
+              type: string
             phase:
               type: string
             startTimestamp:

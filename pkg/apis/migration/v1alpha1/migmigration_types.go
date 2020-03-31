@@ -41,10 +41,10 @@ type MigMigrationSpec struct {
 type MigMigrationStatus struct {
 	Conditions
 	UnhealthyResources
-	ObservedGeneration int64        `json:"observedGeneration,omitempty"`
-	StartTimestamp     *metav1.Time `json:"startTimestamp,omitempty"`
-	Phase              string       `json:"phase,omitempty"`
-	Errors             []string     `json:"errors,omitempty"`
+	ObservedDigest string       `json:"observedDigest,omitempty"`
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+	Phase          string       `json:"phase,omitempty"`
+	Errors         []string     `json:"errors,omitempty"`
 }
 
 // +genclient
