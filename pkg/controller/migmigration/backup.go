@@ -281,6 +281,42 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	return nil
 }
 
+func (t *Task) deleteBackups() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	list := velero.BackupList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
+		&list)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	for _, backup := range list.Items {
+		request := &velero.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    migapi.VeleroNamespace,
+				GenerateName: backup.Name + "-",
+			},
+			Spec: velero.DeleteBackupRequestSpec{
+				BackupName: backup.Name,
+			},
+		}
+		if err := client.Create(context.TODO(), request); err != nil {
+			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Determine whether backups are replicated by velero on the destination cluster.
 func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 	client, err := t.getDestinationClient()

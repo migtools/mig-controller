@@ -8,6 +8,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -230,6 +231,33 @@ func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	}
 
 	t.updateNamespaceMapping(restore)
+}
+
+func (t *Task) deleteRestores() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	list := velero.RestoreList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
+		&list)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	for _, restore := range list.Items {
+		err = client.Delete(context.TODO(), &restore)
+		if err != nil && !k8serror.IsNotFound(err) {
+			log.Trace(err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Update namespace mapping for restore
