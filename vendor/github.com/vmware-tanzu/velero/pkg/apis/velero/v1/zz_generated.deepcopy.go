@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -1104,6 +1105,16 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 	if in.ValidationErrors != nil {
 		in, out := &in.ValidationErrors, &out.ValidationErrors
 		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.PodVolumeRestoreErrors != nil {
+		in, out := &in.PodVolumeRestoreErrors, &out.PodVolumeRestoreErrors
+		*out = make([]corev1.ObjectReference, len(*in))
+		copy(*out, *in)
+	}
+	if in.PodVolumeRestoreVerifyErrors != nil {
+		in, out := &in.PodVolumeRestoreVerifyErrors, &out.PodVolumeRestoreVerifyErrors
+		*out = make([]corev1.ObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	return

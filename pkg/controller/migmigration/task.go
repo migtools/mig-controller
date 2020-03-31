@@ -392,6 +392,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if completed {
+			t.setResticConditions(restore)
 			if len(reasons) > 0 {
 				t.failed(StageRestoreFailed, reasons)
 			} else {

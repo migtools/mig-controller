@@ -22,7 +22,8 @@ const (
 
 // Restic Annotations
 const (
-	ResticPvBackupAnnotation = "backup.velero.io/backup-volumes" // (true|false)
+	ResticPvBackupAnnotation = "backup.velero.io/backup-volumes" // comma-separated list of volume names
+	ResticPvVerifyAnnotation = "backup.velero.io/verify-volumes" // comma-separated list of volume names
 )
 
 // Labels.
@@ -56,6 +57,7 @@ type ServiceAccounts map[string]map[string]bool
 // The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
+// The ResticPvVerifyAnnotation is added to Pods as needed by Restic.
 // The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
 // by the velero.Backup label selector.
 // The IncludedInStageBackupLabel label is added to Namespaces to prevent the
@@ -100,8 +102,9 @@ func (t *Task) annotateStageResources() error {
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 // The IncludedInStageBackupLabel label is added to PVCs and is referenced
 // by the velero.Backup label selector.
-func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, error) {
+func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, []string, error) {
 	volumes := []string{}
+	verifyVolumes := []string{}
 	pvs := t.getPVs()
 	for _, pv := range pod.Spec.Volumes {
 		claim := pv.VolumeSource.PersistentVolumeClaim
@@ -131,6 +134,9 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 			// Add to Restic volume list if copyMethod is "filesystem"
 			if findPVCopyMethod(pvs, pvc.Spec.VolumeName) == migapi.PvFilesystemCopyMethod {
 				volumes = append(volumes, pv.Name)
+				if findPVVerify(pvs, pvc.Spec.VolumeName) {
+					verifyVolumes = append(verifyVolumes, pv.Name)
+				}
 			}
 			// PV storageClass annotation needed by the velero plugin.
 			storageClass := findPVStorageClass(pvs, pvc.Spec.VolumeName)
@@ -145,7 +151,7 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 		err = client.Update(context.TODO(), &pvc)
 		if err != nil {
 			log.Trace(err)
-			return nil, err
+			return nil, nil, err
 		}
 		log.Info(
 			"PVC annotations/labels added.",
@@ -155,7 +161,7 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 			pvc.Name)
 	}
 
-	return volumes, nil
+	return volumes, verifyVolumes, nil
 }
 
 // Add label to namespaces
@@ -191,6 +197,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 
 // Add annotations and labels to Pods.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
+// The ResticPvVerifyAnnotation is added to Pods as needed by Restic.
 // The IncludedInStageBackupLabel label is added to Pods and is referenced
 // by the velero.Backup label selector.
 // Returns a set of referenced service accounts.
@@ -218,7 +225,7 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 				continue
 			}
 			// Annotate PVCs.
-			volumes, err := t.annotatePVCs(client, pod)
+			volumes, verifyVolumes, err := t.annotatePVCs(client, pod)
 			if err != nil {
 				log.Trace(err)
 				return nil, err
@@ -231,6 +238,7 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 				pod.Annotations = make(map[string]string)
 			}
 			pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
+			pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
 			// Add label used by stage backup label selector.
 			if pod.Labels == nil {
 				pod.Labels = make(map[string]string)
@@ -403,6 +411,10 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 			if pod.Annotations != nil {
 				if _, found := pod.Annotations[ResticPvBackupAnnotation]; found {
 					delete(pod.Annotations, ResticPvBackupAnnotation)
+					needsUpdate = true
+				}
+				if _, found := pod.Annotations[ResticPvVerifyAnnotation]; found {
+					delete(pod.Annotations, ResticPvVerifyAnnotation)
 					needsUpdate = true
 				}
 			}

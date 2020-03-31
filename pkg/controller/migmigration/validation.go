@@ -18,6 +18,8 @@ const (
 	Running             = "Running"
 	Succeeded           = "Succeeded"
 	Failed              = "Failed"
+	ResticErrors        = "ResticErrors"
+	ResticVerifyErrors  = "ResticVerifyErrors"
 )
 
 // Categories
@@ -54,6 +56,8 @@ const (
 	FailedMessage              = "The migration has failed.  See: Errors."
 	SucceededMessage           = "The migration has completed successfully."
 	UnhealthyNamespacesMessage = "'%s' cluster has unhealthy namespaces. See status.namespaces for details."
+	ResticErrorsMessage        = "There were errors found in %d Restic volume restores. See restore `%s` for details"
+	ResticVerifyErrorsMessage  = "There were verify errors found in %d Restic volume restores. See restore `%s` for details"
 )
 
 // Validate the plan resource.

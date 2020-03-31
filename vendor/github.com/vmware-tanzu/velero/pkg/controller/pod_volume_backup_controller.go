@@ -228,10 +228,16 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		req.Spec.Tags,
 	)
 
-	// if this is azure, set resticCmd.Env appropriately
+	// Running restic command might need additional provider specific environment variables. Based on the provider, we
+	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	var env []string
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
 		if env, err = restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
+			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
+		}
+		resticCmd.Env = env
+	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		if env, err = restic.S3CmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
@@ -255,7 +261,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// changed since the PVC's last backup, restic will not be able to identify a suitable
 	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
 	if pvcUID, ok := req.Labels[velerov1api.PVCUIDLabel]; ok {
-		parentSnapshotID := getParentSnapshot(log, pvcUID, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
+		parentSnapshotID := getParentSnapshot(log, pvcUID, req.Spec.BackupStorageLocation, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
 		if parentSnapshotID == "" {
 			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
 		} else {
@@ -309,7 +315,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 // getParentSnapshot finds the most recent completed pod volume backup for the specified PVC and returns its
 // restic snapshot ID. Any errors encountered are logged but not returned since they do not prevent a backup
 // from proceeding.
-func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
+func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
 	log = log.WithField("pvcUID", pvcUID)
 	log.Infof("Looking for most recent completed pod volume backup for this PVC")
 
@@ -324,6 +330,14 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLis
 	var mostRecentBackup *velerov1api.PodVolumeBackup
 	for _, backup := range pvcBackups {
 		if backup.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
+			continue
+		}
+
+		if backupStorageLocation != backup.Spec.BackupStorageLocation {
+			// Check the backup storage location is the same as spec in order to support backup to multiple backup-locations.
+			// Otherwise, there exists a case that backup volume snapshot to the second location would failed, since the founded
+			// parent ID is only valid for the first backup location, not the second backup location.
+			// Also, the second backup should not use the first backup parent ID since its for the first backup location only.
 			continue
 		}
 

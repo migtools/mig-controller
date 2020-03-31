@@ -125,6 +125,7 @@ func (t *Task) buildStagePod(pod *corev1.Pod) *corev1.Pod {
 			Name:      pod.Name + "-" + "stage",
 			Annotations: map[string]string{
 				ResticPvBackupAnnotation: pod.Annotations[ResticPvBackupAnnotation],
+				ResticPvVerifyAnnotation: pod.Annotations[ResticPvVerifyAnnotation],
 			},
 			Labels: labels,
 		},
@@ -204,6 +205,7 @@ func (t *Task) ensureStagePodsCreated() (int, error) {
 				"name",
 				newPod.Name)
 			delete(pod.Annotations, ResticPvBackupAnnotation)
+			delete(pod.Annotations, ResticPvVerifyAnnotation)
 			err = client.Update(context.TODO(), &pod)
 			if err != nil {
 				log.Trace(err)

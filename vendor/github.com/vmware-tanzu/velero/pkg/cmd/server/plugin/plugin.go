@@ -38,6 +38,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
+				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
@@ -48,6 +49,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
 				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
+				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
 				Serve()
 		},
 	}
@@ -90,6 +92,10 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
+func newRemapCRDVersionAction(logger logrus.FieldLogger) (interface{}, error) {
+	return backup.NewRemapCRDVersionAction(logger), nil
+}
+
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewJobAction(logger), nil
 }
@@ -128,6 +134,10 @@ func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, 
 
 func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewAddPVFromPVCAction(logger), nil
+}
+
+func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewCRDV1PreserveUnknownFieldsAction(logger), nil
 }
 
 func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {

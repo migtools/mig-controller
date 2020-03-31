@@ -199,6 +199,30 @@ func (t Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	return completed, reasons
 }
 
+// Set warning conditions on migmigration if there were restic errors
+func (t *Task) setResticConditions(restore *velero.Restore) {
+	if len(restore.Status.PodVolumeRestoreErrors) > 0 {
+		message := fmt.Sprintf(ResticErrorsMessage, len(restore.Status.PodVolumeRestoreErrors), restore.Name)
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     ResticErrors,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
+	}
+	if len(restore.Status.PodVolumeRestoreVerifyErrors) > 0 {
+		message := fmt.Sprintf(ResticVerifyErrorsMessage, len(restore.Status.PodVolumeRestoreVerifyErrors), restore.Name)
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     ResticVerifyErrors,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
+	}
+}
+
 // Build a Restore as desired for the destination cluster.
 func (t *Task) buildRestore(backupName string) (*velero.Restore, error) {
 	client, err := t.getDestinationClient()

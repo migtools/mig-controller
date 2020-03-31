@@ -63,6 +63,7 @@ These instructions start the Velero server and a Minio instance that is accessib
     ```
     velero install \
         --provider aws \
+        --plugins velero/velero-plugin-for-aws:v1.0.0 \
         --bucket velero \
         --secret-file ./credentials-velero \
         --use-volume-snapshots=false \
@@ -259,7 +260,7 @@ In this case:
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_AND_PORT_OF_INGRESS>` as a field under `spec.config`.
 
 [1]: #expose-minio-with-service-of-type-nodeport
-[3]: ../install-overview.md
+[3]: ../customize-installation.md
 [17]: ../restic.md
 [18]: ../debugging-restores.md
 [26]: https://github.com/vmware-tanzu/velero/releases

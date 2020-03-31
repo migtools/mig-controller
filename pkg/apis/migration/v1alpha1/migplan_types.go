@@ -696,11 +696,13 @@ type Supported struct {
 // StorageClass - The PV storage class name to use in the destination cluster.
 // AccessMode   - The PV access mode to use in the destination cluster, if different from src PVC AccessMode
 // CopyMethod   - The PV copy method to use ('filesystem' for restic copy, or 'snapshot' for velero snapshot plugin)
+// Verify       - Whether or not to verify copied volume data if CopyMethod is 'filesystem'
 type Selection struct {
 	Action       string                          `json:"action,omitempty"`
 	StorageClass string                          `json:"storageClass,omitempty"`
 	AccessMode   kapi.PersistentVolumeAccessMode `json:"accessMode,omitempty" protobuf:"bytes,1,rep,name=accessMode,casttype=PersistentVolumeAccessMode"`
 	CopyMethod   string                          `json:"copyMethod,omitempty"`
+	Verify       bool                            `json:"verify,omitempty"`
 }
 
 // Update the PV with another.
