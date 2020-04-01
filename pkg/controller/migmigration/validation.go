@@ -152,10 +152,8 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 	}
 	hasCondition := false
 	for _, m := range migrations {
-		if m.UID == migration.UID {
-			continue
-		}
-		if !!m.Spec.Stage {
+		// ignore cancelled
+		if m.Spec.Stage || m.Spec.Canceled || m.UID == migration.UID {
 			continue
 		}
 		// Stage
