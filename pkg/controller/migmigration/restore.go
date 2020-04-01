@@ -10,6 +10,7 @@ import (
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -248,10 +249,10 @@ func (t *Task) buildRestore(backupName string) (*velero.Restore, error) {
 
 // Update a Restore as desired for the destination cluster.
 func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
-	restorePVs := true
 	restore.Spec = velero.RestoreSpec{
-		BackupName: backupName,
-		RestorePVs: &restorePVs,
+		BackupName:        backupName,
+		RestorePVs:        pointer.BoolPtr(true),
+		ExcludedResources: t.PlanResources.MigPlan.Status.ResourceList(),
 	}
 
 	t.updateNamespaceMapping(restore)
