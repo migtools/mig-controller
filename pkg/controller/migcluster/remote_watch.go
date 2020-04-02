@@ -18,10 +18,7 @@ package migcluster
 
 import (
 	"github.com/konveyor/mig-controller/pkg/controller/remotewatcher"
-	"github.com/konveyor/mig-controller/pkg/imagescheme"
 	"github.com/konveyor/mig-controller/pkg/remote"
-	appsv1 "github.com/openshift/api/apps/v1"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -38,22 +35,6 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
 		log.Error(err, "[rWatch] Unable to set up remote watcher controller manager")
-		return err
-	}
-
-	log.Info("[rWatch] Adding Velero to scheme")
-	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "[rWatch] Unable add Velero APIs to scheme")
-		return err
-	}
-	log.Info("[rWatch] Adding OpenShift imagestream to scheme")
-	if err := imagescheme.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "[rWatch] Unable add OpenShift image APIs to scheme")
-		return err
-	}
-	log.Info("[rWatch] Adding OpenShift deploymentconfig to scheme")
-	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "[rWatch] Unable add OpenShift apps APIs to scheme")
 		return err
 	}
 
