@@ -121,13 +121,13 @@ func clustersReady(plan *migapi.MigPlan) bool {
 // Compare GVKs on both clusters, find incompatible GVKs
 // and check each plan source namespace for existence of incompatible GVKs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
-	srcResourceList, err := collectResources(r.SrcDiscovery)
+	srcResourceList, err := migapi.CollectResources(r.SrcDiscovery)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 
-	dstResourceList, err := collectResources(r.DstDiscovery)
+	dstResourceList, err := migapi.CollectResources(r.DstDiscovery)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
@@ -140,7 +140,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	resourcesDiff := compareResources(srcResourceList, dstResourceList)
-	incompatibleGVKs, err := incompatibleResources(resourcesDiff)
+	incompatibleGVKs, err := migapi.ConvertToGVRList(resourcesDiff)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
@@ -258,39 +258,6 @@ func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
 	return namespacesOccurred, nil
 }
 
-func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	resources, err := discovery.ServerResources()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, res := range resources {
-		res.APIResources = namespaced(res.APIResources)
-		res.APIResources = excludeSubresources(res.APIResources)
-		// Some resources appear not to have permissions to list, need to exclude those.
-		res.APIResources = listAllowed(res.APIResources)
-	}
-
-	return resources, nil
-}
-
-func incompatibleResources(resourceDiff []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
-	incompatibleGVKs := []schema.GroupVersionResource{}
-	for _, resourceList := range resourceDiff {
-		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, resource := range resourceList.APIResources {
-			gvk := gv.WithResource(resource.Name)
-			incompatibleGVKs = append(incompatibleGVKs, gvk)
-		}
-	}
-
-	return incompatibleGVKs, nil
-}
-
 func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.APIResourceList, error) {
 	options := metav1.ListOptions{}
 	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
@@ -316,42 +283,6 @@ func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.AP
 	}
 
 	return updatedLists, nil
-}
-
-func excludeSubresources(resources []metav1.APIResource) []metav1.APIResource {
-	filteredList := []metav1.APIResource{}
-	for _, res := range resources {
-		if !strings.Contains(res.Name, "/") {
-			filteredList = append(filteredList, res)
-		}
-	}
-
-	return filteredList
-}
-
-func namespaced(resources []metav1.APIResource) []metav1.APIResource {
-	filteredList := []metav1.APIResource{}
-	for _, res := range resources {
-		if res.Namespaced {
-			filteredList = append(filteredList, res)
-		}
-	}
-
-	return filteredList
-}
-
-func listAllowed(resources []metav1.APIResource) []metav1.APIResource {
-	filteredList := []metav1.APIResource{}
-	for _, res := range resources {
-		for _, verb := range res.Verbs {
-			if verb == "list" {
-				filteredList = append(filteredList, res)
-				break
-			}
-		}
-	}
-
-	return filteredList
 }
 
 func resourceExist(resource metav1.APIResource, resources []metav1.APIResource) bool {

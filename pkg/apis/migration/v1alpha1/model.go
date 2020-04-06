@@ -2,11 +2,17 @@ package v1alpha1
 
 import (
 	"context"
+	"strconv"
+
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
 )
 
 //
@@ -160,4 +166,82 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 	}
 
 	return &object, err
+}
+
+// DeleteMigrated - dispatches delete requests for migrated resources
+func DeleteMigrated(config *rest.Config, uid string) error {
+	GVRs, err := getGVRs(config)
+	if err != nil {
+		return err
+	}
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		MigratedByLabel: uid,
+	}).AsListOptions()
+	foreground := metav1.DeletePropagationForeground
+	deleteOptions := (&k8sclient.DeleteOptions{
+		PropagationPolicy: &foreground,
+	}).AsDeleteOptions()
+
+	for _, gvr := range GVRs {
+		list, err := client.Resource(gvr).List(*listOptions)
+		if err != nil {
+			return err
+		}
+		for _, r := range list.Items {
+			err = client.Resource(gvr).Namespace(r.GetNamespace()).Delete(r.GetName(), deleteOptions)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// WaitForMigratedDeletion - returns true if all of the migrated resources were deleted
+func WaitForMigratedDeletion(config *rest.Config, uid string) (bool, error) {
+	GVRs, err := getGVRs(config)
+	if err != nil {
+		return false, err
+	}
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		MigratedByLabel: uid,
+	}).AsListOptions()
+	for _, gvr := range GVRs {
+		// Count resource occurences
+		list, err := client.Resource(gvr).List(*listOptions)
+		if err != nil {
+			return false, err
+		}
+		if len(list.Items) > 0 {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func getGVRs(config *rest.Config) ([]schema.GroupVersionResource, error) {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	resourceList, err := CollectResources(discoveryClient)
+	if err != nil {
+		return nil, err
+	}
+	GVRs, err := ConvertToGVRList(resourceList)
+	if err != nil {
+		return nil, err
+	}
+
+	return GVRs, nil
 }

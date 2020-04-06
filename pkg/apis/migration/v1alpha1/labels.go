@@ -1,15 +1,17 @@
 package v1alpha1
 
 import (
+	"strings"
+
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/types"
-	"strings"
 )
 
 // Labels
 const (
-	PartOfLabel = "app.kubernetes.io/part-of" // = Application
-	Application = "openshift-migration"
+	PartOfLabel     = "app.kubernetes.io/part-of" // = Application
+	Application     = "openshift-migration"
+	MigratedByLabel = "migration.openshift.io/migrated-by" // (migmigration UID)
 )
 
 // Build label (key, value) used to correlate CRs.

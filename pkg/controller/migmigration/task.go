@@ -46,6 +46,8 @@ const (
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
+	EnsureMigratedDeleted         = "EnsureMigratedDeleted"
+	DeleteMigrated                = "DeleteMigrated"
 	DeleteBackups                 = "DeleteBackups"
 	DeleteRestores                = "DeleteRestores"
 	Canceling                     = "Canceling"
@@ -119,6 +121,8 @@ var CancelItinerary = Itinerary{
 	{phase: Canceling},
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
+	{phase: DeleteMigrated},
+	{phase: EnsureMigratedDeleted},
 	{phase: UnQuiesceApplications, all: Quiesce},
 	{phase: DeleteBackups},
 	{phase: DeleteRestores},
@@ -129,6 +133,8 @@ var CancelItinerary = Itinerary{
 var FailedItinerary = Itinerary{
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
+	{phase: DeleteMigrated},
+	{phase: EnsureMigratedDeleted},
 	{phase: UnQuiesceApplications, all: Quiesce},
 	{phase: Completed},
 }
@@ -526,6 +532,24 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next(step)
+	case DeleteMigrated:
+		err := t.deleteMigrated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.next(step)
+	case EnsureMigratedDeleted:
+		deleted, err := t.waitForDeleteMigrated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if deleted {
+			t.next(step)
+		} else {
+			t.Requeue = PollReQ
+		}
 	case DeleteBackups:
 		if err := t.deleteBackups(); err != nil {
 			log.Trace(err)

@@ -285,6 +285,46 @@ func (t *Task) deleteRestores() error {
 	return nil
 }
 
+func (t *Task) deleteMigrated() error {
+	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	config, err := cluster.BuildRestConfig(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = migapi.DeleteMigrated(config, string(t.Owner.UID))
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+func (t *Task) waitForDeleteMigrated() (bool, error) {
+	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	config, err := cluster.BuildRestConfig(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	deleted, err := migapi.WaitForMigratedDeletion(config, string(t.Owner.UID))
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	return deleted, nil
+}
+
 // Update namespace mapping for restore
 func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
 	namespaceMapping := make(map[string]string)
