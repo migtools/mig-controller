@@ -4,6 +4,7 @@
 
 __1. Install prerequisites__
 
+
  - golang compiler (tested @ 1.11.5)
  - kubebuilder (tested @ 1.0.7)
  - dep (tested @ v0.5.0)
