@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -21,7 +22,11 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+
+	"github.com/konveyor/mig-controller/pkg/settings"
 )
+
+var Settings = &settings.Settings
 
 // Credentials Secret.
 const (
@@ -139,7 +144,11 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	if envVars == nil {
+		envVars = []kapi.EnvVar{}
+	}
+	s3EnvVars := []kapi.EnvVar{
 		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "s3",
@@ -183,6 +192,8 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Value: strconv.FormatBool(p.Insecure),
 		},
 	}
+	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
+
 	if len(p.CustomCABundle) > 0 {
 		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
@@ -355,9 +366,24 @@ func (r *S3Test) Run() error {
 }
 
 func (r *S3Test) newSession() (*session.Session, error) {
+	// copied from net/http
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: r.insecure},
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: r.insecure,
+		},
 	}
+
 	client := &http.Client{Transport: transport}
 	sessionOptions := session.Options{
 		Config: aws.Config{

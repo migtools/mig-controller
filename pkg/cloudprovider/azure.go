@@ -121,7 +121,11 @@ func (p *AzureProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret
 }
 
 func (p *AzureProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
-	dc.Spec.Template.Spec.Containers[0].Env = []kapi.EnvVar{
+	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	if envVars == nil {
+		envVars = []kapi.EnvVar{}
+	}
+	azureEnvVars := []kapi.EnvVar{
 		{
 			Name:  "REGISTRY_STORAGE",
 			Value: "azure",
@@ -144,6 +148,7 @@ func (p *AzureProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirN
 			},
 		},
 	}
+	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, azureEnvVars...)
 }
 
 func (p *AzureProvider) Validate(secret *kapi.Secret) []string {
