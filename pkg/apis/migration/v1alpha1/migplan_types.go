@@ -28,6 +28,7 @@ import (
 
 	pvdr "github.com/fusor/mig-controller/pkg/cloudprovider"
 	migref "github.com/fusor/mig-controller/pkg/reference"
+	"github.com/fusor/mig-controller/pkg/settings"
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var Settings = &settings.Settings
 
 // Cache Indexes.
 const (
@@ -369,8 +372,32 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 	return deploymentconfig, err
 }
 
+func buildProxyEnvVars() []kapi.EnvVar {
+	envVars := []kapi.EnvVar{}
+	if found, s := Settings.HasProxyVar(settings.HttpProxy); found {
+		envVars = append(envVars, kapi.EnvVar{
+			Name:  settings.HttpProxy,
+			Value: s,
+		})
+	}
+	if found, s := Settings.HasProxyVar(settings.HttpsProxy); found {
+		envVars = append(envVars, kapi.EnvVar{
+			Name:  settings.HttpsProxy,
+			Value: s,
+		})
+	}
+	if found, s := Settings.HasProxyVar(settings.NoProxy); found {
+		envVars = append(envVars, kapi.EnvVar{
+			Name:  settings.NoProxy,
+			Value: s,
+		})
+	}
+	return envVars
+}
+
 // Update a Registry DeploymentConfig as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
+	envVars := buildProxyEnvVars()
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
@@ -389,6 +416,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
+						Env:   envVars,
 						Image: migRegistryImageRef(),
 						Name:  "registry",
 						Ports: []kapi.ContainerPort{
