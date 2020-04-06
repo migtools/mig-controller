@@ -17,10 +17,11 @@ limitations under the License.
 package migmigration
 
 import (
-	"github.com/onsi/gomega"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -86,26 +87,23 @@ func TestReconcile(t *testing.T) {
 // but for not they are expected to be the identical.
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	stage := StageItinerary[4 : len(StageItinerary)-1]
+	stage := StageItinerary
+	common := Itinerary{}
 
-	begin := 0
-	for i, step := range FinalItinerary {
-		if step.phase == stage[0].phase {
-			begin = i
-			break
+	for i, step := range StageItinerary {
+		found := false
+		for _, finalStep := range FinalItinerary[i:] {
+			if step.phase == finalStep.phase {
+				common = append(common, step)
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("'%s' is not contained within the final itinerary", step.phase)
 		}
 	}
-	end := 0
-	last := stage[len(stage)-1]
-	for i, step := range FinalItinerary {
-		if step.phase == last.phase {
-			end = i + 1
-			break
-		}
-	}
-	final := FinalItinerary[begin:end]
 
-	g.Expect(begin == 0).To(gomega.BeFalse())
-	g.Expect(end < len(FinalItinerary)).To(gomega.BeTrue())
-	g.Expect(reflect.DeepEqual(stage, final)).To(gomega.BeTrue())
+	g.Expect(reflect.DeepEqual(stage, common)).To(gomega.BeTrue())
+
 }

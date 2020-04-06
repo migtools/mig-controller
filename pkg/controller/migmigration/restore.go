@@ -10,6 +10,9 @@ import (
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -258,6 +261,26 @@ func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	t.updateNamespaceMapping(restore)
 }
 
+// Update namespace mapping for restore
+func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
+	namespaceMapping := make(map[string]string)
+	for _, namespace := range t.namespaces() {
+		mapping := strings.Split(namespace, ":")
+		if len(mapping) == 2 {
+			if mapping[0] == mapping[1] {
+				continue
+			}
+			if mapping[1] != "" {
+				namespaceMapping[mapping[0]] = mapping[1]
+			}
+		}
+	}
+
+	if len(namespaceMapping) != 0 {
+		restore.Spec.NamespaceMapping = namespaceMapping
+	}
+}
+
 func (t *Task) deleteRestores() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
@@ -286,61 +309,114 @@ func (t *Task) deleteRestores() error {
 }
 
 func (t *Task) deleteMigrated() error {
-	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
-	config, err := cluster.BuildRestConfig(t.Client)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	err = migapi.DeleteMigrated(config, string(t.Owner.UID))
-	if err != nil {
-		log.Trace(err)
-		return err
+
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		migapi.MigratedByLabel: string(t.Owner.UID),
+	}).AsListOptions()
+	foreground := metav1.DeletePropagationForeground
+	deleteOptions := (&k8sclient.DeleteOptions{
+		PropagationPolicy: &foreground,
+	}).AsDeleteOptions()
+
+	for _, gvr := range GVRs {
+		list, err := client.Resource(gvr).List(*listOptions)
+		if err != nil {
+			return err
+		}
+		for _, r := range list.Items {
+			err = client.Resource(gvr).Namespace(r.GetNamespace()).Delete(r.GetName(), deleteOptions)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
 }
 
 func (t *Task) waitForDeleteMigrated() (bool, error) {
-	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
-		log.Trace(err)
-		return false, err
-	}
-	config, err := cluster.BuildRestConfig(t.Client)
-	if err != nil {
-		log.Trace(err)
-		return false, err
-	}
-	deleted, err := migapi.WaitForMigratedDeletion(config, string(t.Owner.UID))
-	if err != nil {
-		log.Trace(err)
 		return false, err
 	}
 
-	return deleted, nil
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		migapi.MigratedByLabel: string(t.Owner.UID),
+	}).AsListOptions()
+	for _, gvr := range GVRs {
+		// Count resource occurences
+		list, err := client.Resource(gvr).List(*listOptions)
+		if err != nil {
+			return false, err
+		}
+		if len(list.Items) > 0 {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
-// Update namespace mapping for restore
-func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
-	namespaceMapping := make(map[string]string)
-	for _, namespace := range t.namespaces() {
-		mapping := strings.Split(namespace, ":")
-		if len(mapping) == 2 {
-			if mapping[0] == mapping[1] {
-				continue
-			}
-			if mapping[1] != "" {
-				namespaceMapping[mapping[0]] = mapping[1]
+func (t *Task) deleteLabels() error {
+	client, GVRs, err := t.getResourcesForDelete()
+	if err != nil {
+		return err
+	}
+
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		migapi.MigratedByLabel: string(t.Owner.UID),
+	}).AsListOptions()
+
+	for _, gvr := range GVRs {
+		list, err := client.Resource(gvr).List(*listOptions)
+		if err != nil {
+			return err
+		}
+		for _, r := range list.Items {
+			labels := r.GetLabels()
+			delete(labels, migapi.MigratedByLabel)
+			r.SetLabels(labels)
+			_, err = client.Resource(gvr).Namespace(r.GetNamespace()).Update(&r, metav1.UpdateOptions{})
+			if err != nil {
+				return err
 			}
 		}
 	}
 
-	if len(namespaceMapping) != 0 {
-		restore.Spec.NamespaceMapping = namespaceMapping
+	return nil
+}
+
+func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersionResource, error) {
+	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
 	}
+	config, err := cluster.BuildRestConfig(t.Client)
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	resourceList, err := migapi.CollectResources(discoveryClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	GVRs, err := migapi.ConvertToGVRList(resourceList)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, GVRs, nil
 }

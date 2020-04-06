@@ -46,6 +46,7 @@ const (
 	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
+	EnsureLabelsDeleted           = "EnsureLabelsDeleted"
 	EnsureMigratedDeleted         = "EnsureMigratedDeleted"
 	DeleteMigrated                = "DeleteMigrated"
 	DeleteBackups                 = "DeleteBackups"
@@ -85,6 +86,7 @@ var StageItinerary = Itinerary{
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureStagePodsTerminated, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
+	{phase: EnsureLabelsDeleted},
 	{phase: Completed},
 }
 
@@ -113,19 +115,20 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
+	{phase: EnsureLabelsDeleted},
 	{phase: Verification, all: HasVerify},
 	{phase: Completed},
 }
 
 var CancelItinerary = Itinerary{
 	{phase: Canceling},
+	{phase: DeleteBackups},
+	{phase: DeleteRestores},
 	{phase: EnsureStagePodsDeleted, all: HasStagePods},
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
 	{phase: DeleteMigrated},
 	{phase: EnsureMigratedDeleted},
 	{phase: UnQuiesceApplications, all: Quiesce},
-	{phase: DeleteBackups},
-	{phase: DeleteRestores},
 	{phase: Canceled},
 	{phase: Completed},
 }
@@ -447,6 +450,15 @@ func (t *Task) Run() error {
 	case EnsureAnnotationsDeleted:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+		}
+		t.next(step)
+	case EnsureLabelsDeleted:
+		if !t.keepAnnotations() {
+			err := t.deleteLabels()
 			if err != nil {
 				log.Trace(err)
 				return err
