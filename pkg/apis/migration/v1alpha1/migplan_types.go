@@ -389,6 +389,9 @@ func (r *MigPlan) BuildRegistryProxyEnvVars(client k8sclient.Client) []kapi.EnvV
 	if err != nil {
 		return envVars
 	}
+	if secret == nil {
+		return envVars
+	}
 
 	s, found := secret.Data[settings.HttpProxyKey]
 	if found {
