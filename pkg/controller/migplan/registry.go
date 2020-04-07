@@ -152,7 +152,12 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage, secret *kapi.Secret) error {
 	name := secret.GetName()
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
-	newDC, err := plan.BuildRegistryDC(storage, name, dirName)
+
+	// Get Proxy Env Vars for DC
+	envVars := plan.BuildRegistryProxyEnvVars(client)
+
+	//Construct Registry DC
+	newDC, err := plan.BuildRegistryDC(storage, envVars, name, dirName)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -173,7 +178,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	if plan.EqualsRegistryDC(newDC, foundDC) {
 		return nil
 	}
-	plan.UpdateRegistryDC(storage, foundDC, name, dirName)
+	plan.UpdateRegistryDC(storage, foundDC, envVars, name, dirName)
 	err = client.Update(context.TODO(), foundDC)
 	if err != nil {
 		log.Trace(err)

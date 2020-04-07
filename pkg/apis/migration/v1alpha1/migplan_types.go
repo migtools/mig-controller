@@ -360,7 +360,7 @@ func (r *MigPlan) EqualsRegistryImageStream(a, b *imagev1.ImageStream) bool {
 }
 
 // Build a Registry DeploymentConfig as desired for the source cluster.
-func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*appsv1.DeploymentConfig, error) {
+func (r *MigPlan) BuildRegistryDC(storage *MigStorage, envVars []kapi.EnvVar, name, dirName string) (*appsv1.DeploymentConfig, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -371,36 +371,51 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryDC(storage, deploymentconfig, name, dirName)
+	err := r.UpdateRegistryDC(storage, deploymentconfig, envVars, name, dirName)
 	return deploymentconfig, err
 }
 
-func buildProxyEnvVars() []kapi.EnvVar {
+// Build up proxy env vars for registry DC
+// Returns empty array if secret isn't found or no configuration exists
+func (r *MigPlan) BuildRegistryProxyEnvVars(client k8sclient.Client) []kapi.EnvVar {
 	envVars := []kapi.EnvVar{}
-	if found, s := Settings.HasProxyVar(settings.HttpProxy); found {
+	secret, err := GetSecret(
+		client,
+		&kapi.ObjectReference{
+			Namespace: VeleroNamespace,
+			Name:      ProxySecret,
+		},
+	)
+	if err != nil {
+		return envVars
+	}
+
+	s, found := secret.Data[settings.HttpProxyKey]
+	if found {
 		envVars = append(envVars, kapi.EnvVar{
 			Name:  settings.HttpProxy,
-			Value: s,
+			Value: string(s),
 		})
 	}
-	if found, s := Settings.HasProxyVar(settings.HttpsProxy); found {
+	s, found = secret.Data[settings.HttpsProxyKey]
+	if found {
 		envVars = append(envVars, kapi.EnvVar{
 			Name:  settings.HttpsProxy,
-			Value: s,
+			Value: string(s),
 		})
 	}
-	if found, s := Settings.HasProxyVar(settings.NoProxy); found {
+	s, found = secret.Data[settings.NoProxyKey]
+	if found {
 		envVars = append(envVars, kapi.EnvVar{
 			Name:  settings.NoProxy,
-			Value: s,
+			Value: string(s),
 		})
 	}
 	return envVars
 }
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
-	envVars := buildProxyEnvVars()
+func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, envVars []kapi.EnvVar, name, dirName string) error {
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
