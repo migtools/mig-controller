@@ -10,6 +10,7 @@ import (
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -20,6 +21,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/konveyor/mig-controller/pkg/settings"
 )
 
 // Types
@@ -37,6 +39,7 @@ const (
 	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
 	NsLimitExceeded                = "NamespaceLimitExceeded"
 	PodLimitExceeded               = "PodLimitExceeded"
+	ProxySecretMisconfigured       = "ProxySecretMisconfigured"
 	PlanConflict                   = "PlanConflict"
 	PvInvalidAction                = "PvInvalidAction"
 	PvNoSupportedAction            = "PvNoSupportedAction"
@@ -69,14 +72,15 @@ const (
 
 // Reasons
 const (
-	NotSet        = "NotSet"
-	NotFound      = "NotFound"
-	NotDistinct   = "NotDistinct"
-	LimitExceeded = "LimitExceeded"
-	NotDone       = "NotDone"
-	Done          = "Done"
-	Conflict      = "Conflict"
-	NotHealthy    = "NotHealthy"
+	NotSet                     = "NotSet"
+	NotFound                   = "NotFound"
+	NotDistinct                = "NotDistinct"
+	ProxySecretIsMisconfigured = "ProxySecretIsMisconfigured"
+	LimitExceeded              = "LimitExceeded"
+	NotDone                    = "NotDone"
+	Done                       = "Done"
+	Conflict                   = "Conflict"
+	NotHealthy                 = "NotHealthy"
 )
 
 // Statuses
@@ -102,6 +106,7 @@ const (
 	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
 	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
 	PodLimitExceededMessage               = "Pod limit: %d exceeded, found: %d."
+	ProxySecretMisconfiguredMessage       = "Proxy secret is misconfigured."
 	PlanConflictMessage                   = "The plan is in conflict with []."
 	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
@@ -172,6 +177,13 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Conflict
 	err = r.validateConflict(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Registry proxy secret
+	err = r.validateRegistryProxySecret(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -756,6 +768,115 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		})
 	}
 
+	return nil
+}
+
+// Validate proxy secrets. Should only exist 1 or none
+func (r ReconcileMigPlan) validateRegistryProxySecret(plan *migapi.MigPlan) error {
+	misconfiguredClusters := 0
+	if plan.Status.HasAnyCondition(Suspended) {
+		return nil
+	}
+
+	list := kapi.SecretList{}
+	selector := k8sLabels.SelectorFromSet(map[string]string{
+		"migration-proxy-config": "true",
+	})
+
+	// Source cluster proxy secret validation
+	srcCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if srcCluster == nil || !srcCluster.Status.IsReady() {
+		return nil
+	}
+
+	srcClient, err := srcCluster.GetClient(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = srcClient.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     migapi.VeleroNamespace,
+			LabelSelector: selector,
+		},
+		&list,
+	)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// If more than 1 secret is found then we are in a bad state
+	if len(list.Items) > 1 {
+		misconfiguredClusters += 1
+	} else if len(list.Items) == 1 {
+		// Check if secret has at least one proxy key
+		_, foundHttp := list.Items[0].Data[settings.HttpProxy]
+		_, foundHttps := list.Items[0].Data[settings.HttpsProxy]
+		_, foundNoProxy := list.Items[0].Data[settings.NoProxy]
+		if !foundHttp && !foundHttps && !foundNoProxy {
+			misconfiguredClusters += 1
+		}
+	}
+
+	// Reset list
+	list = kapi.SecretList{}
+
+	// Now validate dest cluster
+	destCluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if destCluster == nil || !destCluster.Status.IsReady() {
+		return nil
+	}
+
+	destClient, err := destCluster.GetClient(r)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	err = destClient.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     migapi.VeleroNamespace,
+			LabelSelector: selector,
+		},
+		&list,
+	)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	// If more than 1 secret is found then we are in a bad state
+	if len(list.Items) > 1 {
+		misconfiguredClusters += 1
+	} else if len(list.Items) == 1 {
+		// Check if secret has at least one proxy key
+		_, foundHttp := list.Items[0].Data[settings.HttpProxy]
+		_, foundHttps := list.Items[0].Data[settings.HttpsProxy]
+		_, foundNoProxy := list.Items[0].Data[settings.NoProxy]
+		if !foundHttp && !foundHttps && !foundNoProxy {
+			misconfiguredClusters += 1
+		}
+	}
+	if misconfiguredClusters > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     ProxySecretMisconfigured,
+			Status:   True,
+			Reason:   ProxySecretIsMisconfigured,
+			Category: Warn,
+			Message:  ProxySecretMisconfiguredMessage,
+		})
+	}
 	return nil
 }
 

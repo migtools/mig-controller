@@ -403,21 +403,8 @@ func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret,
 	if len(list.Items) > 1 {
 		return nil, errors.New("found multiple proxy config secrets")
 	}
-	secret, err := GetSecret(
-		client,
-		&kapi.ObjectReference{
-			Namespace: VeleroNamespace,
-			Name:      list.Items[0].Name,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	if secret == nil {
-		return nil, errors.New("failed to get proxy secret")
-	}
 
-	return secret, nil
+	return &list.Items[0], nil
 }
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
@@ -428,7 +415,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 		source := kapi.EnvFromSource{
 			SecretRef: &kapi.SecretEnvSource{
 				LocalObjectReference: kapi.LocalObjectReference{
-					proxySecret.Name,
+					Name: proxySecret.Name,
 				},
 			},
 		}
