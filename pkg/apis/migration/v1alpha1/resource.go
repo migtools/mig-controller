@@ -2,7 +2,6 @@ package v1alpha1
 
 const (
 	VeleroNamespace = "openshift-migration"
-	ProxySecret     = "migration-proxy"
 )
 
 // Migration application CR.
