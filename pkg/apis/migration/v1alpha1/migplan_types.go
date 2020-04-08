@@ -232,19 +232,14 @@ func migRegistryImageRef() string {
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
-	strippedName, err := toDnsLabel(r.GetName())
-	if err != nil {
-		return nil, err
-	}
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       labels,
-			GenerateName: "registry-" + strippedName + "-",
+			GenerateName: "registry-" + string(r.UID) + "-",
 			Namespace:    VeleroNamespace,
 		},
 	}
-	err = r.UpdateRegistrySecret(client, storage, secret)
-	return secret, err
+	return secret, r.UpdateRegistrySecret(client, storage, secret)
 }
 
 // Update a Registry credentials secret as desired for the specified cluster.
