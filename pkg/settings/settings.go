@@ -23,6 +23,11 @@ const (
 	HttpProxy  = "HTTP_PROXY"
 	HttpsProxy = "HTTPS_PROXY"
 	NoProxy    = "NO_PROXY"
+
+	ClusterRole   = "cluster"
+	PlanRole      = "plan"
+	MigrationRole = "migration"
+	StorageRole   = "storage"
 )
 
 // Global
@@ -83,10 +88,10 @@ func (r *_Settings) loadRoles() error {
 		for _, role := range strings.Split(s, ",") {
 			role = strings.ToLower(strings.TrimSpace(role))
 			switch role {
-			case CamRole, DiscoveryRole:
+			case ClusterRole, MigrationRole, PlanRole, StorageRole, DiscoveryRole:
 				r.Roles[role] = true
 			default:
-				list := strings.Join([]string{CamRole, DiscoveryRole}, "|")
+				list := strings.Join([]string{ClusterRole, MigrationRole, PlanRole, StorageRole, DiscoveryRole}, "|")
 				return errors.New(
 					fmt.Sprintf(
 						"%s must be (%s)",
@@ -96,7 +101,10 @@ func (r *_Settings) loadRoles() error {
 		}
 	} else {
 		r.Roles[DiscoveryRole] = true
-		r.Roles[CamRole] = true
+		r.Roles[ClusterRole] = true
+		r.Roles[PlanRole] = true
+		r.Roles[MigrationRole] = true
+		r.Roles[StorageRole] = true
 	}
 
 	return nil
