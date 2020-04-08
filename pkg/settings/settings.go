@@ -23,10 +23,6 @@ const (
 	HttpProxy  = "HTTP_PROXY"
 	HttpsProxy = "HTTPS_PROXY"
 	NoProxy    = "NO_PROXY"
-	// Proxy secret keys
-	HttpProxyKey  = "http_proxy"
-	HttpsProxyKey = "https_proxy"
-	NoProxyKey    = "no_proxy"
 )
 
 // Global
