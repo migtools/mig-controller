@@ -154,10 +154,14 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
 
 	// Get Proxy Env Vars for DC
-	envVars := plan.BuildRegistryProxyEnvVars(client)
+	proxySecret, err := plan.GetRegistryProxySecret(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
 
 	//Construct Registry DC
-	newDC, err := plan.BuildRegistryDC(storage, envVars, name, dirName)
+	newDC, err := plan.BuildRegistryDC(storage, proxySecret, name, dirName)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -178,7 +182,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	if plan.EqualsRegistryDC(newDC, foundDC) {
 		return nil
 	}
-	plan.UpdateRegistryDC(storage, foundDC, envVars, name, dirName)
+	plan.UpdateRegistryDC(storage, foundDC, proxySecret, name, dirName)
 	err = client.Update(context.TODO(), foundDC)
 	if err != nil {
 		log.Trace(err)
