@@ -20,6 +20,11 @@ run: generate fmt vet
 	./hack/controller-sa-login.sh
 	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} go run ./cmd/manager/main.go
 
+
+# Run against the configured Kubernetes cluster in ~/.kube/config, skip login to mig-controller SA
+run-skip-sa-login: generate fmt vet
+	go run ./cmd/manager/main.go
+
 # Install CRDs into a cluster
 install: manifests
 	kubectl apply -f config/crds
