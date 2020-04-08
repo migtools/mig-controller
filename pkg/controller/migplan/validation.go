@@ -26,40 +26,41 @@ import (
 
 // Types
 const (
-	Suspended                      = "Suspended"
-	InvalidSourceClusterRef        = "InvalidSourceClusterRef"
-	InvalidDestinationClusterRef   = "InvalidDestinationClusterRef"
-	InvalidStorageRef              = "InvalidStorageRef"
-	SourceClusterNotReady          = "SourceClusterNotReady"
-	DestinationClusterNotReady     = "DestinationClusterNotReady"
-	StorageNotReady                = "StorageNotReady"
-	NsListEmpty                    = "NamespaceListEmpty"
-	InvalidDestinationCluster      = "InvalidDestinationCluster"
-	NsNotFoundOnSourceCluster      = "NamespaceNotFoundOnSourceCluster"
-	NsNotFoundOnDestinationCluster = "NamespaceNotFoundOnDestinationCluster"
-	NsLimitExceeded                = "NamespaceLimitExceeded"
-	PodLimitExceeded               = "PodLimitExceeded"
-	ProxySecretMisconfigured       = "ProxySecretMisconfigured"
-	PlanConflict                   = "PlanConflict"
-	PvInvalidAction                = "PvInvalidAction"
-	PvNoSupportedAction            = "PvNoSupportedAction"
-	PvInvalidStorageClass          = "PvInvalidStorageClass"
-	PvInvalidAccessMode            = "PvInvalidAccessMode"
-	PvNoStorageClassSelection      = "PvNoStorageClassSelection"
-	PvWarnNoCephAvailable          = "PvWarnNoCephAvailable"
-	PvWarnAccessModeUnavailable    = "PvWarnAccessModeUnavailable"
-	PvInvalidCopyMethod            = "PvInvalidCopyMethod"
-	PvNoCopyMethodSelection        = "PvNoCopyMethodSelection"
-	PvWarnCopyMethodSnapshot       = "PvWarnCopyMethodSnapshot"
-	NfsNotAccessible               = "NfsNotAccessible"
-	NfsAccessCannotBeValidated     = "NfsAccessCannotBeValidated"
-	PvLimitExceeded                = "PvLimitExceeded"
-	StorageEnsured                 = "StorageEnsured"
-	RegistriesEnsured              = "RegistriesEnsured"
-	PvsDiscovered                  = "PvsDiscovered"
-	Closed                         = "Closed"
-	SourcePodsNotHealthy           = "SourcePodsNotHealthy"
-	GVKsIncompatible               = "GVKsIncompatible"
+	Suspended                                  = "Suspended"
+	InvalidSourceClusterRef                    = "InvalidSourceClusterRef"
+	InvalidDestinationClusterRef               = "InvalidDestinationClusterRef"
+	InvalidStorageRef                          = "InvalidStorageRef"
+	SourceClusterNotReady                      = "SourceClusterNotReady"
+	DestinationClusterNotReady                 = "DestinationClusterNotReady"
+	StorageNotReady                            = "StorageNotReady"
+	NsListEmpty                                = "NamespaceListEmpty"
+	InvalidDestinationCluster                  = "InvalidDestinationCluster"
+	NsNotFoundOnSourceCluster                  = "NamespaceNotFoundOnSourceCluster"
+	NsNotFoundOnDestinationCluster             = "NamespaceNotFoundOnDestinationCluster"
+	NsLimitExceeded                            = "NamespaceLimitExceeded"
+	PodLimitExceeded                           = "PodLimitExceeded"
+	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
+	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
+	PlanConflict                               = "PlanConflict"
+	PvInvalidAction                            = "PvInvalidAction"
+	PvNoSupportedAction                        = "PvNoSupportedAction"
+	PvInvalidStorageClass                      = "PvInvalidStorageClass"
+	PvInvalidAccessMode                        = "PvInvalidAccessMode"
+	PvNoStorageClassSelection                  = "PvNoStorageClassSelection"
+	PvWarnNoCephAvailable                      = "PvWarnNoCephAvailable"
+	PvWarnAccessModeUnavailable                = "PvWarnAccessModeUnavailable"
+	PvInvalidCopyMethod                        = "PvInvalidCopyMethod"
+	PvNoCopyMethodSelection                    = "PvNoCopyMethodSelection"
+	PvWarnCopyMethodSnapshot                   = "PvWarnCopyMethodSnapshot"
+	NfsNotAccessible                           = "NfsNotAccessible"
+	NfsAccessCannotBeValidated                 = "NfsAccessCannotBeValidated"
+	PvLimitExceeded                            = "PvLimitExceeded"
+	StorageEnsured                             = "StorageEnsured"
+	RegistriesEnsured                          = "RegistriesEnsured"
+	PvsDiscovered                              = "PvsDiscovered"
+	Closed                                     = "Closed"
+	SourcePodsNotHealthy                       = "SourcePodsNotHealthy"
+	GVKsIncompatible                           = "GVKsIncompatible"
 )
 
 // Categories
@@ -72,15 +73,15 @@ const (
 
 // Reasons
 const (
-	NotSet                     = "NotSet"
-	NotFound                   = "NotFound"
-	NotDistinct                = "NotDistinct"
-	ProxySecretIsMisconfigured = "ProxySecretIsMisconfigured"
-	LimitExceeded              = "LimitExceeded"
-	NotDone                    = "NotDone"
-	Done                       = "Done"
-	Conflict                   = "Conflict"
-	NotHealthy                 = "NotHealthy"
+	NotSet        = "NotSet"
+	NotFound      = "NotFound"
+	KeyNotFound   = "KeyNotFound"
+	NotDistinct   = "NotDistinct"
+	LimitExceeded = "LimitExceeded"
+	NotDone       = "NotDone"
+	Done          = "Done"
+	Conflict      = "Conflict"
+	NotHealthy    = "NotHealthy"
 )
 
 // Statuses
@@ -91,41 +92,42 @@ const (
 
 // Messages
 const (
-	ReadyMessage                          = "The migration plan is ready."
-	SuspendedMessage                      = "Limited validation; PV discovery and resource reconciliation suspended."
-	InvalidSourceClusterRefMessage        = "The `srcMigClusterRef` must reference a `migcluster`."
-	InvalidDestinationClusterRefMessage   = "The `dstMigClusterRef` must reference a `migcluster`."
-	InvalidStorageRefMessage              = "The `migStorageRef` must reference a `migstorage`."
-	SourceClusterNotReadyMessage          = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
-	DestinationClusterNotReadyMessage     = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
-	StorageNotReadyMessage                = "The referenced `migStorageRef` does not have a `Ready` condition."
-	NsListEmptyMessage                    = "The `namespaces` list may not be empty."
-	InvalidDestinationClusterMessage      = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	NsGVKsIncompatible                    = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
-	NsNotFoundOnSourceClusterMessage      = "Namespaces [] not found on the source cluster."
-	NsNotFoundOnDestinationClusterMessage = "Namespaces [] not found on the destination cluster."
-	NsLimitExceededMessage                = "Namespace limit: %d exceeded, found:%d."
-	PodLimitExceededMessage               = "Pod limit: %d exceeded, found: %d."
-	ProxySecretMisconfiguredMessage       = "Proxy secret is misconfigured."
-	PlanConflictMessage                   = "The plan is in conflict with []."
-	PvInvalidActionMessage                = "PV in `persistentVolumes` [] has an unsupported `action`."
-	PvNoSupportedActionMessage            = "PV in `persistentVolumes` [] with no `SupportedActions`."
-	PvInvalidStorageClassMessage          = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
-	PvInvalidAccessModeMessage            = "PV in `persistentVolumes` [] has an invalid `accessMode`."
-	PvNoStorageClassSelectionMessage      = "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static persistent volumes exist in the destination cluster."
-	PvWarnNoCephAvailableMessage          = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
-	PvWarnAccessModeUnavailableMessage    = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
-	PvInvalidCopyMethodMessage            = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
-	PvNoCopyMethodSelectionMessage        = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
-	PvWarnCopyMethodSnapshotMessage       = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
-	PvLimitExceededMessage                = "PV limit: %d exceeded, found: %d."
-	NfsNotAccessibleMessage               = "NFS servers [] not accessible on the destination cluster."
-	NfsAccessCannotBeValidatedMessage     = "NFS access cannot be validated on the destination cluster."
-	StorageEnsuredMessage                 = "The storage resources have been created."
-	RegistriesEnsuredMessage              = "The migration registry resources have been created."
-	PvsDiscoveredMessage                  = "The `persistentVolumes` list has been updated with discovered PVs."
-	ClosedMessage                         = "The migration plan is closed."
-	SourcePodsNotHealthyMessage           = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
+	ReadyMessage                                      = "The migration plan is ready."
+	SuspendedMessage                                  = "Limited validation; PV discovery and resource reconciliation suspended."
+	InvalidSourceClusterRefMessage                    = "The `srcMigClusterRef` must reference a `migcluster`."
+	InvalidDestinationClusterRefMessage               = "The `dstMigClusterRef` must reference a `migcluster`."
+	InvalidStorageRefMessage                          = "The `migStorageRef` must reference a `migstorage`."
+	SourceClusterNotReadyMessage                      = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
+	DestinationClusterNotReadyMessage                 = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
+	StorageNotReadyMessage                            = "The referenced `migStorageRef` does not have a `Ready` condition."
+	NsListEmptyMessage                                = "The `namespaces` list may not be empty."
+	InvalidDestinationClusterMessage                  = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
+	NsGVKsIncompatible                                = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
+	NsNotFoundOnSourceClusterMessage                  = "Namespaces [] not found on the source cluster."
+	NsNotFoundOnDestinationClusterMessage             = "Namespaces [] not found on the destination cluster."
+	NsLimitExceededMessage                            = "Namespace limit: %d exceeded, found:%d."
+	PodLimitExceededMessage                           = "Pod limit: %d exceeded, found: %d."
+	SourceClusterProxySecretMisconfiguredMessage      = "Source cluster proxy secret is misconfigured"
+	DestinationClusterProxySecretMisconfiguredMessage = "Destination cluster proxy secret is misconfigured"
+	PlanConflictMessage                               = "The plan is in conflict with []."
+	PvInvalidActionMessage                            = "PV in `persistentVolumes` [] has an unsupported `action`."
+	PvNoSupportedActionMessage                        = "PV in `persistentVolumes` [] with no `SupportedActions`."
+	PvInvalidStorageClassMessage                      = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
+	PvInvalidAccessModeMessage                        = "PV in `persistentVolumes` [] has an invalid `accessMode`."
+	PvNoStorageClassSelectionMessage                  = "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static persistent volumes exist in the destination cluster."
+	PvWarnNoCephAvailableMessage                      = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
+	PvWarnAccessModeUnavailableMessage                = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
+	PvInvalidCopyMethodMessage                        = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
+	PvNoCopyMethodSelectionMessage                    = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
+	PvWarnCopyMethodSnapshotMessage                   = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
+	PvLimitExceededMessage                            = "PV limit: %d exceeded, found: %d."
+	NfsNotAccessibleMessage                           = "NFS servers [] not accessible on the destination cluster."
+	NfsAccessCannotBeValidatedMessage                 = "NFS access cannot be validated on the destination cluster."
+	StorageEnsuredMessage                             = "The storage resources have been created."
+	RegistriesEnsuredMessage                          = "The migration registry resources have been created."
+	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
+	ClosedMessage                                     = "The migration plan is closed."
+	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
 )
 
 // Valid AccessMode values
@@ -183,7 +185,7 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	}
 
 	// Registry proxy secret
-	err = r.validateRegistryProxySecret(plan)
+	err = r.validateRegistryProxySecrets(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -772,9 +774,33 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 }
 
 // Validate proxy secrets. Should only exist 1 or none
-func (r ReconcileMigPlan) validateRegistryProxySecret(plan *migapi.MigPlan) error {
-	misconfiguredClusters := 0
-	if plan.Status.HasAnyCondition(Suspended) {
+func (r ReconcileMigPlan) validateRegistryProxySecrets(plan *migapi.MigPlan) error {
+	err := r.validateSourceRegistryProxySecret(plan)
+	if err != nil {
+		return err
+	}
+	return r.validateDestinationRegistryProxySecret(plan)
+}
+
+// Validate registry proxy secret ensuring it has the proper keys
+func (r *ReconcileMigPlan) validateRegistryProxySecret(secret *kapi.Secret) bool {
+	fields := []string{
+		settings.HttpProxy,
+		settings.HttpsProxy,
+		settings.NoProxy,
+	}
+	for _, key := range fields {
+		if _, found := secret.Data[key]; found {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Validate source proxy secret
+func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(Suspended, InvalidSourceClusterRef, SourceClusterNotReady) {
 		return nil
 	}
 
@@ -811,23 +837,44 @@ func (r ReconcileMigPlan) validateRegistryProxySecret(plan *migapi.MigPlan) erro
 		log.Trace(err)
 		return err
 	}
-	// If more than 1 secret is found then we are in a bad state
+	if len(list.Items) == 0 {
+		// No proxy secret is valid configuration
+		return nil
+	}
 	if len(list.Items) > 1 {
-		misconfiguredClusters += 1
-	} else if len(list.Items) == 1 {
-		// Check if secret has at least one proxy key
-		_, foundHttp := list.Items[0].Data[settings.HttpProxy]
-		_, foundHttps := list.Items[0].Data[settings.HttpsProxy]
-		_, foundNoProxy := list.Items[0].Data[settings.NoProxy]
-		if !foundHttp && !foundHttps && !foundNoProxy {
-			misconfiguredClusters += 1
-		}
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourceClusterProxySecretMisconfigured,
+			Status:   True,
+			Reason:   Conflict,
+			Category: Critical,
+			Message:  SourceClusterProxySecretMisconfiguredMessage,
+		})
+		return nil
+	}
+	if !r.validateRegistryProxySecret(&list.Items[0]) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourceClusterProxySecretMisconfigured,
+			Status:   True,
+			Reason:   KeyNotFound,
+			Category: Critical,
+			Message:  SourceClusterProxySecretMisconfiguredMessage,
+		})
+	}
+	return nil
+}
+
+// Validate destination proxy secret
+func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.MigPlan) error {
+	if plan.Status.HasAnyCondition(Suspended, InvalidDestinationClusterRef, DestinationClusterNotReady) {
+		return nil
 	}
 
-	// Reset list
-	list = kapi.SecretList{}
+	list := kapi.SecretList{}
+	selector := k8sLabels.SelectorFromSet(map[string]string{
+		"migration-proxy-config": "true",
+	})
 
-	// Now validate dest cluster
+	// Destination cluster proxy secret validation
 	destCluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		log.Trace(err)
@@ -843,7 +890,6 @@ func (r ReconcileMigPlan) validateRegistryProxySecret(plan *migapi.MigPlan) erro
 		log.Trace(err)
 		return err
 	}
-
 	err = destClient.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
@@ -856,25 +902,23 @@ func (r ReconcileMigPlan) validateRegistryProxySecret(plan *migapi.MigPlan) erro
 		log.Trace(err)
 		return err
 	}
-	// If more than 1 secret is found then we are in a bad state
 	if len(list.Items) > 1 {
-		misconfiguredClusters += 1
-	} else if len(list.Items) == 1 {
-		// Check if secret has at least one proxy key
-		_, foundHttp := list.Items[0].Data[settings.HttpProxy]
-		_, foundHttps := list.Items[0].Data[settings.HttpsProxy]
-		_, foundNoProxy := list.Items[0].Data[settings.NoProxy]
-		if !foundHttp && !foundHttps && !foundNoProxy {
-			misconfiguredClusters += 1
-		}
-	}
-	if misconfiguredClusters > 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     ProxySecretMisconfigured,
+			Type:     DestinationClusterProxySecretMisconfigured,
 			Status:   True,
-			Reason:   ProxySecretIsMisconfigured,
-			Category: Warn,
-			Message:  ProxySecretMisconfiguredMessage,
+			Reason:   Conflict,
+			Category: Critical,
+			Message:  DestinationClusterProxySecretMisconfiguredMessage,
+		})
+		return nil
+	}
+	if !r.validateRegistryProxySecret(&list.Items[0]) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     DestinationClusterProxySecretMisconfigured,
+			Status:   True,
+			Reason:   KeyNotFound,
+			Category: Critical,
+			Message:  DestinationClusterProxySecretMisconfiguredMessage,
 		})
 	}
 	return nil
