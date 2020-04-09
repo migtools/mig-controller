@@ -902,6 +902,10 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 		log.Trace(err)
 		return err
 	}
+	if len(list.Items) == 0 {
+		// No proxy secret is valid configuration
+		return nil
+	}
 	if len(list.Items) > 1 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     DestinationClusterProxySecretMisconfigured,
