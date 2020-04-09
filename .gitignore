@@ -27,3 +27,6 @@ bin
 # ignored dirs for sample resources
 migstuff
 migsamples
+
+# tilt settings
+tools/tilt/tilt-settings.json

@@ -18,6 +18,9 @@ manager: generate fmt vet
 run: generate fmt vet
 	go run ./cmd/manager/main.go
 
+tilt:
+	 IMG=${IMG} TEMPLATE=${TEMPLATE} tilt up --hud=false --no-browser --file tools/tilt/Tiltfile
+
 # Install CRDs into a cluster
 install: manifests
 	kubectl apply -f config/crds
