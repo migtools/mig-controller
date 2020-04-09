@@ -816,7 +816,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 		return err
 	}
 
-	if srcCluster == nil || !srcCluster.Status.IsReady() {
+	if srcCluster == nil {
 		return nil
 	}
 
@@ -881,7 +881,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 		return err
 	}
 
-	if destCluster == nil || !destCluster.Status.IsReady() {
+	if destCluster == nil {
 		return nil
 	}
 
