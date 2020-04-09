@@ -4,23 +4,34 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/google/uuid"
 )
 
 const (
+	TouchAnnotation = "openshift.io/touch"
 	VeleroNamespace = "openshift-migration"
 )
 
 // Migration application CR.
 type MigResource interface {
 	// Get a map containing the correlation label.
+	// Correlation labels are used to track any resource
+	// created by the controller.  The includes the application
+	// (global) label and the resource label.
 	GetCorrelationLabels() map[string]string
-	// Get the correlation label (key, value).
+	// Get the resource correlation label.
+	// The label is used to track resources created by the
+	// controller that is related to this resource.
 	GetCorrelationLabel() (string, string)
 	// Get the resource namespace.
 	GetNamespace() string
 	// Get the resource name.
 	GetName() string
 	// Mark the resource as having been reconciled.
+	// Updates the ObservedDigest.
+	// Update the touch annotation. This ensures that the resource
+	// is changed on every reconcile. This needed to support
+	// remote watch event propagation on OCP4.
 	MarkReconciled()
 	// Get whether the resource has been reconciled.
 	HasReconciled() bool
@@ -48,6 +59,11 @@ func (r *MigPlan) GetName() string {
 }
 
 func (r *MigPlan) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
@@ -77,6 +93,11 @@ func (r *MigStorage) GetName() string {
 }
 
 func (r *MigStorage) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
@@ -106,6 +127,11 @@ func (r *MigCluster) GetName() string {
 }
 
 func (r *MigCluster) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
@@ -135,6 +161,11 @@ func (r *MigMigration) GetName() string {
 }
 
 func (r *MigMigration) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
