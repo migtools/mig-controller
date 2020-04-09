@@ -2,6 +2,7 @@ package migplan
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/common"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"reflect"
@@ -14,6 +15,9 @@ type PlanPredicate struct {
 }
 
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
+	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+		return false
+	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
 		r.mapRefs(plan)
@@ -22,6 +26,9 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigPlan)
 	if !cast {
 		return true
@@ -40,6 +47,9 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
+	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+		return false
+	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
 		r.unmapRefs(plan)
@@ -136,6 +146,9 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSingletonNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
 	if !cast {
 		return false
@@ -153,6 +166,9 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
 	if !cast {
 		return false
@@ -170,6 +186,9 @@ func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
 	if !cast {
 		return false

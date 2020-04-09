@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/common"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -13,6 +14,9 @@ type MigrationPredicate struct {
 }
 
 func (r MigrationPredicate) Create(e event.CreateEvent) bool {
+	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+		return false
+	}
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
 		r.mapRefs(migration)
@@ -21,6 +25,9 @@ func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
 	if !cast {
 		return true
@@ -40,6 +47,9 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
+	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+		return false
+	}
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
 		r.unmapRefs(migration)
@@ -96,6 +106,9 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
+	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+		return false
+	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
 	if !cast {
 		return false

@@ -12,22 +12,19 @@ import (
 // Manager roles.
 const (
 	// Role environment variable.
-	Role = "ROLE"
-	// CAM role.
-	// Only migration controllers should be loaded.
-	CamRole = "cam"
-	// Discovery role.
-	// Only the discovery should be loaded.
+	Role          = "ROLE"
+	ClusterRole   = "cluster"
+	PlanRole      = "plan"
+	MigrationRole = "migration"
+	StorageRole   = "storage"
 	DiscoveryRole = "discovery"
 	// Proxy environment variables
 	HttpProxy  = "HTTP_PROXY"
 	HttpsProxy = "HTTPS_PROXY"
 	NoProxy    = "NO_PROXY"
-
-	ClusterRole   = "cluster"
-	PlanRole      = "plan"
-	MigrationRole = "migration"
-	StorageRole   = "storage"
+	//
+	SingletonNamespace = "SINGLETON_NAMESPACE"
+	SandboxNamespace   = "SANDBOX_NAMESPACE"
 )
 
 // Global
@@ -38,8 +35,10 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
-	Roles     map[string]bool
-	ProxyVars map[string]string
+	Roles              map[string]bool
+	ProxyVars          map[string]string
+	SingletonNamespace string
+	SandboxNamespace   string
 }
 
 // Load settings.
@@ -64,9 +63,15 @@ func (r *_Settings) Load() error {
 	return nil
 }
 
-//
-// Load the manager role.
-// The default is ALL roles.
+func (r *_Settings) loadNamespaceVars() error {
+	if s, found := os.LookupEnv(SandboxNamespace); found {
+		r.SandboxNamespace = s
+	}
+	if s, found := os.LookupEnv(SingletonNamespace); found {
+		r.SingletonNamespace = s
+	}
+	return nil
+}
 
 func (r *_Settings) loadProxyVars() error {
 	r.ProxyVars = map[string]string{}
@@ -82,6 +87,9 @@ func (r *_Settings) loadProxyVars() error {
 	return nil
 }
 
+//
+// Load the manager role.
+// The default is ALL roles.
 func (r *_Settings) loadRoles() error {
 	r.Roles = map[string]bool{}
 	if s, found := os.LookupEnv(Role); found {
