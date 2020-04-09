@@ -32,6 +32,7 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -355,7 +356,7 @@ func (r *MigPlan) EqualsRegistryImageStream(a, b *imagev1.ImageStream) bool {
 }
 
 // Build a Registry DeploymentConfig as desired for the source cluster.
-func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*appsv1.DeploymentConfig, error) {
+func (r *MigPlan) BuildRegistryDC(storage *MigStorage, proxySecret *kapi.Secret, name, dirName string) (*appsv1.DeploymentConfig, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -366,36 +367,55 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, name, dirName string) (*a
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryDC(storage, deploymentconfig, name, dirName)
+	err := r.UpdateRegistryDC(storage, deploymentconfig, proxySecret, name, dirName)
 	return deploymentconfig, err
 }
 
-func buildProxyEnvVars() []kapi.EnvVar {
-	envVars := []kapi.EnvVar{}
-	if found, s := Settings.HasProxyVar(settings.HttpProxy); found {
-		envVars = append(envVars, kapi.EnvVar{
-			Name:  settings.HttpProxy,
-			Value: s,
-		})
+// Get registry proxy secret for registry DC
+// Returns nil if secret isn't found or no configuration exists
+func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret, error) {
+	list := kapi.SecretList{}
+	selector := k8sLabels.SelectorFromSet(map[string]string{
+		"migration-proxy-config": "true",
+	})
+	err := client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     VeleroNamespace,
+			LabelSelector: selector,
+		},
+		&list,
+	)
+	// If error listing secrets return no env vars
+	if err != nil {
+		return nil, err
 	}
-	if found, s := Settings.HasProxyVar(settings.HttpsProxy); found {
-		envVars = append(envVars, kapi.EnvVar{
-			Name:  settings.HttpsProxy,
-			Value: s,
-		})
+	// If no secrets found, return nil and no error
+	// This means no proxy is configured
+	if len(list.Items) == 0 {
+		return nil, nil
 	}
-	if found, s := Settings.HasProxyVar(settings.NoProxy); found {
-		envVars = append(envVars, kapi.EnvVar{
-			Name:  settings.NoProxy,
-			Value: s,
-		})
+	if len(list.Items) > 1 {
+		return nil, errors.New("found multiple proxy config secrets")
 	}
-	return envVars
+
+	return &list.Items[0], nil
 }
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, name, dirName string) error {
-	envVars := buildProxyEnvVars()
+func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, proxySecret *kapi.Secret, name, dirName string) error {
+	envFrom := []kapi.EnvFromSource{}
+	// If Proxy secret exists, set env from it
+	if proxySecret != nil {
+		source := kapi.EnvFromSource{
+			SecretRef: &kapi.SecretEnvSource{
+				LocalObjectReference: kapi.LocalObjectReference{
+					Name: proxySecret.Name,
+				},
+			},
+		}
+		envFrom = append(envFrom, source)
+	}
 	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
 		Replicas: 1,
 		Selector: map[string]string{
@@ -414,9 +434,9 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						Env:   envVars,
-						Image: migRegistryImageRef(),
-						Name:  "registry",
+						EnvFrom: envFrom,
+						Image:   migRegistryImageRef(),
+						Name:    "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
