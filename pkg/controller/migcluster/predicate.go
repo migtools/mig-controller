@@ -15,7 +15,7 @@ type ClusterPredicate struct {
 }
 
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+	if !common.IsInSingletonNamespace(e.Meta.GetNamespace()) {
 		return false
 	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
@@ -26,7 +26,7 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
+	if !common.IsInSingletonNamespace(e.MetaNew.GetNamespace()) {
 		return false
 	}
 	old, cast := e.ObjectOld.(*migapi.MigCluster)
@@ -47,7 +47,7 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
+	if !common.IsInSingletonNamespace(e.Meta.GetNamespace()) {
 		return false
 	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
