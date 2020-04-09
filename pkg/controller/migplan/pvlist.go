@@ -8,11 +8,10 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type PvMap map[types.NamespacedName]core.PersistentVolume
+type PvMap map[k8sclient.ObjectKey]core.PersistentVolume
 type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
@@ -82,7 +81,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return err
 	}
 	for _, claim := range claims {
-		key := types.NamespacedName{
+		key := k8sclient.ObjectKey{
 			Namespace: claim.Namespace,
 			Name:      claim.Name,
 		}
@@ -170,7 +169,7 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 		}
 		claim := pv.Spec.ClaimRef
 		if migref.RefSet(claim) {
-			key := types.NamespacedName{
+			key := k8sclient.ObjectKey{
 				Namespace: claim.Namespace,
 				Name:      claim.Name,
 			}
@@ -181,42 +180,24 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 	return pvMap, nil
 }
 
-// Get a list of PVCs found on pods with the specified namespaces.
+// Get a list of PVCs found within the specified namespaces.
 func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []string) (Claims, error) {
 	claims := Claims{}
 	for _, ns := range namespaces {
-		list := &core.PodList{}
+		list := &core.PersistentVolumeClaimList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, list)
 		if err != nil {
 			log.Trace(err)
 			return nil, err
 		}
-		for _, pod := range list.Items {
-			for _, volume := range pod.Spec.Volumes {
-				claimRef := volume.VolumeSource.PersistentVolumeClaim
-				if claimRef == nil {
-					continue
-				}
-				pvc := core.PersistentVolumeClaim{}
-				// Get PVC
-				ref := types.NamespacedName{
-					Namespace: pod.Namespace,
-					Name:      claimRef.ClaimName,
-				}
-				err := client.Get(context.TODO(), ref, &pvc)
-				if err != nil {
-					log.Trace(err)
-					return nil, err
-				}
-
-				claims = append(
-					claims, migapi.PVC{
-						Namespace:   pod.Namespace,
-						Name:        claimRef.ClaimName,
-						AccessModes: pvc.Spec.AccessModes,
-					})
-			}
+		for _, pvc := range list.Items {
+			claims = append(
+				claims, migapi.PVC{
+					Namespace:   ns,
+					Name:        pvc.Name,
+					AccessModes: pvc.Spec.AccessModes,
+				})
 		}
 	}
 

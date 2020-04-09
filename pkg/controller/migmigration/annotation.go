@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -125,7 +124,7 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 		pvc := corev1.PersistentVolumeClaim{}
 		err := client.Get(
 			context.TODO(),
-			types.NamespacedName{
+			k8sclient.ObjectKey{
 				Namespace: pod.Namespace,
 				Name:      claim.ClaimName,
 			},
@@ -181,7 +180,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
-			types.NamespacedName{
+			k8sclient.ObjectKey{
 				Name: ns,
 			},
 			&namespace)
@@ -214,66 +213,50 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 // Returns a set of referenced service accounts.
 func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 	serviceAccounts := ServiceAccounts{}
-	for _, ns := range t.sourceNamespaces() {
-		list := corev1.PodList{}
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &list)
+	list := corev1.PodList{}
+	// include stage pods only
+	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
+	err := client.List(context.TODO(), options, &list)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	for _, pod := range list.Items {
+		// Annotate PVCs.
+		volumes, verifyVolumes, err := t.annotatePVCs(client, pod)
 		if err != nil {
 			log.Trace(err)
 			return nil, err
 		}
-		for _, pod := range list.Items {
-			if pod.Labels == nil {
-				pod.Labels = make(map[string]string)
-			}
-			// Skip stage pods.
-			cLabel, _ := t.Owner.GetCorrelationLabel()
-			if _, found := pod.Labels[cLabel]; found {
-				continue
-			}
-			// Skip stateless pods.
-			if len(pod.Spec.Volumes) == 0 {
-				continue
-			}
-			// Annotate PVCs.
-			volumes, verifyVolumes, err := t.annotatePVCs(client, pod)
-			if err != nil {
-				log.Trace(err)
-				return nil, err
-			}
-			if len(volumes) == 0 {
-				continue
-			}
-			// Restic annotation used to specify volumes.
-			if pod.Annotations == nil {
-				pod.Annotations = make(map[string]string)
-			}
-			pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
-			pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
-			// Add label used by stage backup label selector.
-			if pod.Labels == nil {
-				pod.Labels = make(map[string]string)
-			}
-			pod.Labels[ApplicationPodLabel] = t.UID()
-			// Update
-			err = client.Update(context.TODO(), &pod)
-			if err != nil {
-				log.Trace(err)
-				return nil, err
-			}
-			log.Info(
-				"Pod annotations/labels added.",
-				"ns",
-				pod.Namespace,
-				"name",
-				pod.Name)
-			sa := pod.Spec.ServiceAccountName
-			names, found := serviceAccounts[pod.Namespace]
-			if !found {
-				serviceAccounts[pod.Namespace] = map[string]bool{sa: true}
-			} else {
-				names[sa] = true
-			}
+		// Restic annotation used to specify volumes.
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
+		pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
+		// Add label used by stage backup label selector.
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		pod.Labels[ApplicationPodLabel] = t.UID()
+		// Update
+		err = client.Update(context.TODO(), &pod)
+		if err != nil {
+			log.Trace(err)
+			return nil, err
+		}
+		log.Info(
+			"Pod annotations/labels added.",
+			"ns",
+			pod.Namespace,
+			"name",
+			pod.Name)
+		sa := pod.Spec.ServiceAccountName
+		names, found := serviceAccounts[pod.Namespace]
+		if !found {
+			serviceAccounts[pod.Namespace] = map[string]bool{sa: true}
+		} else {
+			names[sa] = true
 		}
 	}
 
@@ -291,7 +274,7 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 		resource := corev1.PersistentVolume{}
 		err := client.Get(
 			context.TODO(),
-			types.NamespacedName{
+			k8sclient.ObjectKey{
 				Name: pv.Name,
 			},
 			&resource)
@@ -465,7 +448,7 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []st
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
-			types.NamespacedName{
+			k8sclient.ObjectKey{
 				Name: ns,
 			},
 			&namespace)
@@ -540,6 +523,9 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 			return err
 		}
 		for _, pvc := range pvcList.Items {
+			if pvc.Spec.VolumeName == "" {
+				continue
+			}
 			needsUpdate := false
 			if pvc.Annotations != nil {
 				if _, found := pvc.Annotations[PvActionAnnotation]; found {

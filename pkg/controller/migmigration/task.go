@@ -312,7 +312,7 @@ func (t *Task) Run() error {
 		}
 		t.next()
 	case EnsureStagePods:
-		_, err := t.ensureStagePodsCreated()
+		err := t.ensureStagePodsCreated()
 		if err != nil {
 			log.Trace(err)
 			return err

@@ -1,10 +1,20 @@
 package reference
 
 import (
-	kapi "k8s.io/api/core/v1"
 	"reflect"
 	"strings"
+
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func ObjectKey(obj metav1.Object) client.ObjectKey {
+	return client.ObjectKey{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}
+}
 
 func RefSet(ref *kapi.ObjectReference) bool {
 	return ref != nil &&
