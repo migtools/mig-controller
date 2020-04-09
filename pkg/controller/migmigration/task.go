@@ -327,7 +327,7 @@ func (t *Task) Run() error {
 		if started {
 			t.next()
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case RestartRestic:
 		err := t.restartResticPods()
@@ -379,7 +379,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Requeue = 0
+		t.Requeue = NoReQ
 		t.next()
 	case StageBackupCreated:
 		backup, err := t.ensureStageBackup()

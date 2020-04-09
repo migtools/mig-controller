@@ -21,11 +21,37 @@ import (
 var DefaultTemplates = []migapi.TemplateResource{
 	{
 		Resource:     "cronjob.batch",
-		TemplatePath: ".spec.jobtemplate.spec.template",
+		TemplatePath: ".spec.jobTemplate.spec.template",
+	},
+	{
+		Resource:     "deployment.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "deploymentconfig.apps.openshift.io",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "replicationcontroller",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "daemonset.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "statefulset.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "replicaset.apps",
+		TemplatePath: ".spec.template",
 	},
 }
 
-type StagePod corev1.Pod
+type StagePod struct {
+	corev1.Pod
+}
 
 type StagePodList []StagePod
 
@@ -70,6 +96,17 @@ func (l *StagePodList) merge(list ...StagePod) {
 	}
 }
 
+func (l *StagePodList) create(client k8sclient.Client) error {
+	for _, template := range *l {
+		err := client.Create(context.TODO(), &template.Pod)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Build a stage pod based on `template`.
 func (t *Task) buildStagePod(ref k8sclient.ObjectKey, podSpec *corev1.PodTemplateSpec) StagePod {
 	labels := t.Owner.GetCorrelationLabels()
@@ -82,18 +119,20 @@ func (t *Task) buildStagePod(ref k8sclient.ObjectKey, podSpec *corev1.PodTemplat
 	}
 	// Base pod.
 	newPod := StagePod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ref.Namespace,
-			Name:      ref.Name + "-" + "stage",
-			Labels:    labels,
-		},
-		Spec: corev1.PodSpec{
-			Containers:                   []corev1.Container{},
-			NodeName:                     podSpec.Spec.NodeName,
-			Volumes:                      podSpec.Spec.Volumes,
-			SecurityContext:              podSpec.Spec.SecurityContext,
-			ServiceAccountName:           podSpec.Spec.ServiceAccountName,
-			AutomountServiceAccountToken: podSpec.Spec.AutomountServiceAccountToken,
+		Pod: corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ref.Namespace,
+				Name:      ref.Name + "-" + "stage",
+				Labels:    labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers:                   []corev1.Container{},
+				NodeName:                     podSpec.Spec.NodeName,
+				Volumes:                      podSpec.Spec.Volumes,
+				SecurityContext:              podSpec.Spec.SecurityContext,
+				ServiceAccountName:           podSpec.Spec.ServiceAccountName,
+				AutomountServiceAccountToken: podSpec.Spec.AutomountServiceAccountToken,
+			},
 		},
 	}
 	// Add containers.
@@ -119,7 +158,7 @@ func (t *Task) ensureStagePodsCreated() error {
 		return err
 	}
 
-	templates := StagePodList{}
+	templates := &StagePodList{}
 
 	fromRunning, err := t.ensureStagePodsFromRunning(client)
 	if err != nil {
@@ -136,14 +175,20 @@ func (t *Task) ensureStagePodsCreated() error {
 	}
 	templates.merge(fromTemplates...)
 
-	if len(templates) > 0 {
+	err = templates.create(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if len(*templates) > 0 {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StagePodsCreated,
 			Status:   True,
 			Reason:   Created,
 			Category: Advisory,
 			Message:  "[] Stage pods created.",
-			Items:    []string{strconv.Itoa(len(templates))},
+			Items:    []string{strconv.Itoa(len(*templates))},
 			Durable:  true,
 		})
 	}
@@ -186,29 +231,7 @@ func (t *Task) ensureStagePodsFromTemplates(client k8sclient.Client, templates .
 			if err != nil {
 				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %w", template.TemplatePath, err)
 			}
-			// annotations := map[string]string{
-			// 	ResticPvBackupAnnotation: pod.Annotations[ResticPvBackupAnnotation],
-			// 	ResticPvVerifyAnnotation: pod.Annotations[ResticPvVerifyAnnotation],
-			// }
 			stagePods.merge(t.buildStagePod(migref.ObjectKey(&resource), &podTemplate))
-			// err = client.Create(context.TODO(), newPod)
-			// if !errors.IsAlreadyExists(err) {
-			// 	log.Trace(err)
-			// 	return 0, err
-			// }
-			// log.Info(
-			// 	"Stage pod created.",
-			// 	"ns",
-			// 	newPod.Namespace,
-			// 	"name",
-			// 	newPod.Name)
-			// delete(pod.Annotations, ResticPvBackupAnnotation)
-			// delete(pod.Annotations, ResticPvVerifyAnnotation)
-			// err = client.Update(context.TODO(), &pod)
-			// if err != nil {
-			// 	log.Trace(err)
-			// 	return err
-			// }
 		}
 	}
 
@@ -235,23 +258,6 @@ func (t *Task) ensureStagePodsFromRunning(client k8sclient.Client) (StagePodList
 				Spec: pod.Spec,
 			}
 			stagePods.merge(t.buildStagePod(migref.ObjectKey(&pod), &template))
-			// annotations := map[string]string{
-			// 	ResticPvBackupAnnotation: pod.Annotations[ResticPvBackupAnnotation],
-			// 	ResticPvVerifyAnnotation: pod.Annotations[ResticPvVerifyAnnotation],
-			// }
-			// 	log.Info(
-			// 		"Stage pod created.",
-			// 		"ns",
-			// 		newPod.Namespace,
-			// 		"name",
-			// 		newPod.Name)
-			// delete(pod.Annotations, ResticPvBackupAnnotation)
-			// delete(pod.Annotations, ResticPvVerifyAnnotation)
-			// err = client.Update(context.TODO(), &pod)
-			// if err != nil {
-			// 	log.Trace(err)
-			// 	return err
-			// }
 		}
 	}
 

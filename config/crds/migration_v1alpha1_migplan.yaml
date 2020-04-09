@@ -110,6 +110,18 @@ spec:
               type: array
             srcMigClusterRef:
               type: object
+            templates:
+              items:
+                properties:
+                  resource:
+                    type: string
+                  templatePath:
+                    type: string
+                required:
+                - resource
+                - templatePath
+                type: object
+              type: array
           type: object
         status:
           properties:
