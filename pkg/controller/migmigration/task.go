@@ -67,21 +67,21 @@ var StageItinerary = Itinerary{
 	{phase: Started},
 	{phase: Prepare},
 	{phase: EnsureCloudSecretPropagated},
-	{phase: AnnotateResources, flags: HasPVs},
-	{phase: EnsureStagePods, flags: HasPVs},
-	{phase: StagePodsCreated, flags: HasStagePods},
-	{phase: RestartRestic, flags: HasStagePods},
-	{phase: ResticRestarted, flags: HasStagePods},
-	{phase: QuiesceApplications, flags: Quiesce},
-	{phase: EnsureQuiesced, flags: Quiesce},
-	{phase: EnsureStageBackup, flags: HasPVs},
-	{phase: StageBackupCreated, flags: HasPVs},
-	{phase: EnsureStageBackupReplicated, flags: HasPVs},
-	{phase: EnsureStageRestore, flags: HasPVs},
-	{phase: StageRestoreCreated, flags: HasPVs},
-	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
-	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: AnnotateResources, all: HasPVs},
+	{phase: EnsureStagePods, all: HasPVs},
+	{phase: StagePodsCreated, all: HasStagePods},
+	{phase: RestartRestic, all: HasStagePods},
+	{phase: ResticRestarted, all: HasStagePods},
+	{phase: QuiesceApplications, all: Quiesce},
+	{phase: EnsureQuiesced, all: Quiesce},
+	{phase: EnsureStageBackup, all: HasPVs},
+	{phase: StageBackupCreated, all: HasPVs},
+	{phase: EnsureStageBackupReplicated, all: HasPVs},
+	{phase: EnsureStageRestore, all: HasPVs},
+	{phase: StageRestoreCreated, all: HasPVs},
+	{phase: EnsureStagePodsDeleted, all: HasStagePods},
+	{phase: EnsureStagePodsTerminated, all: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, all: HasPVs},
 	{phase: Completed},
 }
 
@@ -92,32 +92,32 @@ var FinalItinerary = Itinerary{
 	{phase: EnsureCloudSecretPropagated},
 	{phase: EnsureInitialBackup},
 	{phase: InitialBackupCreated},
-	{phase: AnnotateResources, flags: HasPVs},
-	{phase: EnsureStagePods, flags: HasPVs},
-	{phase: StagePodsCreated, flags: HasStagePods},
-	{phase: RestartRestic, flags: HasStagePods},
-	{phase: ResticRestarted, flags: HasStagePods},
-	{phase: QuiesceApplications, flags: Quiesce},
-	{phase: EnsureQuiesced, flags: Quiesce},
-	{phase: EnsureStageBackup, flags: HasPVs},
-	{phase: StageBackupCreated, flags: HasPVs},
-	{phase: EnsureStageBackupReplicated, flags: HasPVs},
-	{phase: EnsureStageRestore, flags: HasPVs},
-	{phase: StageRestoreCreated, flags: HasPVs},
-	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
-	{phase: EnsureStagePodsTerminated, flags: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: AnnotateResources, all: HasPVs},
+	{phase: EnsureStagePods, all: HasPVs},
+	{phase: StagePodsCreated, all: HasStagePods},
+	{phase: RestartRestic, all: HasStagePods},
+	{phase: ResticRestarted, all: HasStagePods},
+	{phase: QuiesceApplications, all: Quiesce},
+	{phase: EnsureQuiesced, all: Quiesce},
+	{phase: EnsureStageBackup, all: HasPVs},
+	{phase: StageBackupCreated, all: HasPVs},
+	{phase: EnsureStageBackupReplicated, all: HasPVs},
+	{phase: EnsureStageRestore, all: HasPVs},
+	{phase: StageRestoreCreated, all: HasPVs},
+	{phase: EnsureStagePodsDeleted, all: HasStagePods},
+	{phase: EnsureStagePodsTerminated, all: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, all: HasPVs},
 	{phase: EnsureInitialBackupReplicated},
 	{phase: EnsureFinalRestore},
 	{phase: FinalRestoreCreated},
-	{phase: Verification, flags: HasVerify},
+	{phase: Verification, all: HasVerify},
 	{phase: Completed},
 }
 
 var CancelItinerary = Itinerary{
 	{phase: Canceling},
-	{phase: EnsureStagePodsDeleted, flags: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, flags: HasPVs},
+	{phase: EnsureStagePodsDeleted, all: HasStagePods},
+	{phase: EnsureAnnotationsDeleted, all: HasPVs},
 	{phase: DeleteBackups},
 	{phase: DeleteRestores},
 	{phase: Cancelled},
@@ -125,11 +125,13 @@ var CancelItinerary = Itinerary{
 }
 
 // Step
-// phase - Phase name.
-// flags - Used to qualify the step.
 type Step struct {
+	// A phase name.
 	phase string
-	flags uint8
+	// Step included when ALL flags evaluate true.
+	all uint8
+	// Step included when ANY flag evaluates true.
+	any uint8
 }
 
 // Get a progress report.
@@ -590,22 +592,52 @@ func (t *Task) next() {
 	}
 	for n := current + 1; n < len(t.Itinerary); n++ {
 		next := t.Itinerary[n]
-		if next.flags&HasPVs != 0 && !t.hasPVs() {
+		if !t.allFlags(next) {
 			continue
 		}
-		if next.flags&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
-			continue
-		}
-		if next.flags&Quiesce != 0 && !t.quiesce() {
-			continue
-		}
-		if next.flags&HasVerify != 0 && !t.hasVerify() {
+		if !t.anyFlags(next) {
 			continue
 		}
 		t.Phase = next.phase
 		return
 	}
 	t.Phase = Completed
+}
+
+// Evaluate `all` flags.
+func (t *Task) allFlags(step Step) bool {
+	if step.all&HasPVs != 0 && !t.hasPVs() {
+		return false
+	}
+	if step.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
+		return false
+	}
+	if step.all&Quiesce != 0 && !t.quiesce() {
+		return false
+	}
+	if step.all&HasVerify != 0 && !t.hasVerify() {
+		return false
+	}
+
+	return true
+}
+
+// Evaluate `any` flags.
+func (t *Task) anyFlags(step Step) bool {
+	if step.any&HasPVs != 0 && t.hasPVs() {
+		return true
+	}
+	if step.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
+		return true
+	}
+	if step.any&Quiesce != 0 && t.quiesce() {
+		return true
+	}
+	if step.any&HasVerify != 0 && t.hasVerify() {
+		return true
+	}
+
+	return step.any == uint8(0)
 }
 
 // Phase failed.
