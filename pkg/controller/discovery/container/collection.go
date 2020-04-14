@@ -103,12 +103,12 @@ type SimpleReconciler struct {
 // Reconcile the resources on the cluster and the collection in the DB.
 // Using the `GetDiscovered()` and `GetStored()` methods, a disposition
 // is constructed and used to update the DB.
-func (r *SimpleReconciler) Reconcile(collection Collection) error {
+func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 	dispositions := map[string]*Disposition{}
 	stored, err := collection.GetStored()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
 	for _, m := range stored {
 		dispositions[m.Meta().PK] = &Disposition{
@@ -118,7 +118,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 	discovered, err := collection.GetDiscovered()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
 	for _, m := range discovered {
 		m.SetPk()
@@ -136,26 +136,30 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 	tx, err := r.Db.Begin()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 	// Delete
 	for _, dpn := range dispositions {
 		if dpn.stored != nil && dpn.discovered == nil {
-			err := dpn.stored.Delete(tx)
+			err = dpn.stored.Delete(tx)
 			if err != nil {
 				Log.Trace(err)
-				return err
+				return
 			}
 		}
 	}
 	// Add
 	for _, dpn := range dispositions {
 		if dpn.discovered != nil && dpn.stored == nil {
-			err := dpn.discovered.Insert(tx)
+			err = dpn.discovered.Insert(tx)
 			if err != nil {
 				Log.Trace(err)
-				return err
+				return
 			}
 		}
 	}
@@ -167,17 +171,17 @@ func (r *SimpleReconciler) Reconcile(collection Collection) error {
 		if dpn.discovered.Meta().Version == dpn.stored.Meta().Version {
 			continue
 		}
-		err := dpn.discovered.Update(tx)
+		err = dpn.discovered.Update(tx)
 		if err != nil {
 			Log.Trace(err)
-			return err
+			return
 		}
 	}
 	err = tx.Commit()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
 
-	return nil
+	return
 }

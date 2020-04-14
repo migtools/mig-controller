@@ -279,35 +279,40 @@ type ModelEvent struct {
 
 //
 // Apply the change to the DB.
-func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) error {
+func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 	tx, err := db.Begin()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
 	version := r.model.Meta().Version
 	switch r.action {
 	case 0x01: // Create
 		if version > versionThreshold {
-			err := r.model.Insert(tx)
+			err = r.model.Insert(tx)
 			if err != nil {
 				Log.Trace(err)
-				return err
+				return
 			}
 		}
 	case 0x02: // Update
 		if version > versionThreshold {
-			err := r.model.Update(tx)
+			err = r.model.Update(tx)
 			if err != nil {
 				Log.Trace(err)
-				return err
+				return
 			}
 		}
 	case 0x04: // Delete
-		err := r.model.Delete(tx)
+		err = r.model.Delete(tx)
 		if err != nil {
 			Log.Trace(err)
-			return err
+			return
 		}
 	default:
 		return errors.New("unknown action")
@@ -315,10 +320,10 @@ func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) error {
 	err = tx.Commit()
 	if err != nil {
 		Log.Trace(err)
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 //
