@@ -1,4 +1,4 @@
-package reference
+package mighook
 
 import "regexp"
 

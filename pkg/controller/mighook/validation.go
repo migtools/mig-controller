@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/reference"
 )
 
 // Types
@@ -73,7 +72,7 @@ func (r ReconcileMigHook) validate(hook *migapi.MigHook) error {
 }
 
 func (r ReconcileMigHook) validateImage(hook *migapi.MigHook) error {
-	match := reference.ReferenceRegexp.MatchString(hook.Spec.Image)
+	match := ReferenceRegexp.MatchString(hook.Spec.Image)
 
 	if !match {
 		hook.Status.SetCondition(migapi.Condition{

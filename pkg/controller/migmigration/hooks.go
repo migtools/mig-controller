@@ -15,6 +15,8 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const HookJobFailedLimit = 5
+
 func (t *Task) runHooks() (bool, error) {
 	hook := migapi.MigPlanHook{}
 	var client k8sclient.Client
@@ -27,7 +29,6 @@ func (t *Task) runHooks() (bool, error) {
 	}
 
 	migHook := migapi.MigHook{}
-	job := &batchv1.Job{}
 
 	if hook.Reference != nil {
 		err = t.Client.Get(
@@ -42,73 +43,99 @@ func (t *Task) runHooks() (bool, error) {
 			return false, err
 		}
 
-		switch migHook.Spec.TargetCluster {
-		case "destination":
-			client, err = t.getDestinationClient()
-			if err != nil {
-				log.Trace(err)
-				return false, err
-			}
-		case "source":
-			client, err = t.getSourceClient()
-			if err != nil {
-				log.Trace(err)
-				return false, err
-			}
-		default:
-			err := fmt.Errorf("targetCluster must be 'source' or 'destination'. %s unknown", migHook.Spec.TargetCluster)
+		client, err = t.getHookClient(migHook)
+		if err != nil {
 			log.Trace(err)
 			return false, err
 		}
 
-		if migHook.Spec.Custom {
-			job = t.baseJobTemplate(hook, migHook)
-		} else {
-
-			configMap, err := t.configMapTemplate(hook, migHook)
-			if err != nil {
-				log.Trace(err)
-				return false, err
-			}
-
-			phaseConfigMap, err := migHook.GetPhaseConfigMap(client, t.Phase)
-			if phaseConfigMap == nil && err == nil {
-
-				err = client.Create(context.TODO(), configMap)
-				if err != nil {
-					log.Trace(err)
-					return false, err
-				}
-			} else if err != nil {
-				log.Trace(err)
-				return false, err
-			}
-			job = t.playbookJobTemplate(hook, migHook, configMap.Name)
+		job, err := t.prepareJob(hook, migHook, client)
+		if err != nil {
+			log.Trace(err)
+			return false, err
 		}
 
-		runningJob, err := migHook.GetPhaseJob(client, t.Phase)
-		if runningJob == nil && err == nil {
-			err = client.Create(context.TODO(), job)
+		result, err := t.ensureJob(job, migHook, client)
+		if err != nil {
+			log.Trace(err)
+			return false, err
+		}
+
+		return result, nil
+	}
+	return true, nil
+}
+
+func (t *Task) ensureJob(job *batchv1.Job, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
+	runningJob, err := migHook.GetPhaseJob(client, t.Phase)
+	if runningJob == nil && err == nil {
+		err = client.Create(context.TODO(), job)
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	} else if err != nil {
+		return false, err
+	} else if runningJob.Status.Failed >= HookJobFailedLimit {
+		err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
+		return false, err
+	} else if runningJob.Status.Succeeded == 1 {
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+func (t *Task) prepareJob(hook migapi.MigPlanHook, migHook migapi.MigHook, client k8sclient.Client) (*batchv1.Job, error) {
+	job := &batchv1.Job{}
+
+	if migHook.Spec.Custom {
+		job = t.baseJobTemplate(hook, migHook)
+	} else {
+
+		configMap, err := t.configMapTemplate(hook, migHook)
+		if err != nil {
+			return nil, err
+		}
+
+		phaseConfigMap, err := migHook.GetPhaseConfigMap(client, t.Phase)
+		if phaseConfigMap == nil && err == nil {
+
+			err = client.Create(context.TODO(), configMap)
 			if err != nil {
-				log.Trace(err)
-				return false, err
+				return nil, err
 			}
-			return false, nil
 		} else if err != nil {
-			log.Trace(err)
-			return false, err
-		} else if runningJob.Status.Failed >= 5 {
-			err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
-			log.Trace(err)
-			return false, err
-		} else if runningJob.Status.Succeeded == 1 {
-			return true, nil
-		} else {
-			return false, nil
+			return nil, err
 		}
+		job = t.playbookJobTemplate(hook, migHook, configMap.Name)
 	}
 
-	return true, nil
+	return job, nil
+}
+
+func (t *Task) getHookClient(migHook migapi.MigHook) (k8sclient.Client, error) {
+	var client k8sclient.Client
+	var err error
+
+	switch migHook.Spec.TargetCluster {
+	case "destination":
+		client, err = t.getDestinationClient()
+		if err != nil {
+			return nil, err
+		}
+	case "source":
+		client, err = t.getSourceClient()
+		if err != nil {
+			log.Trace(err)
+			return nil, err
+		}
+	default:
+		err := fmt.Errorf("targetCluster must be 'source' or 'destination'. %s unknown", migHook.Spec.TargetCluster)
+		log.Trace(err)
+		return nil, err
+	}
+	return client, nil
 }
 
 func (t *Task) configMapTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) (*corev1.ConfigMap, error) {
