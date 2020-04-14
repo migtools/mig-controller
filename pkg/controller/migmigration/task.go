@@ -48,7 +48,7 @@ const (
 	DeleteBackups                 = "DeleteBackups"
 	DeleteRestores                = "DeleteRestores"
 	Canceling                     = "Canceling"
-	Cancelled                     = "Cancelled"
+	Canceled                      = "Canceled"
 	Completed                     = "Completed"
 )
 
@@ -120,7 +120,7 @@ var CancelItinerary = Itinerary{
 	{phase: EnsureAnnotationsDeleted, all: HasPVs},
 	{phase: DeleteBackups},
 	{phase: DeleteRestores},
-	{phase: Cancelled},
+	{phase: Canceled},
 	{phase: Completed},
 }
 
@@ -521,14 +521,14 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
-	case Cancelled:
+	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceled,
 			Status:   True,
 			Reason:   Cancel,
 			Category: Advisory,
-			Message:  CancelledMessage,
+			Message:  CanceledMessage,
 			Durable:  true,
 		})
 		t.next()
@@ -667,9 +667,9 @@ func (t *Task) UID() string {
 	return string(t.Owner.UID)
 }
 
-// Get whether the migration is cancelled.
+// Get whether the migration is canceled.
 func (t *Task) canceled() bool {
-	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Cancelling)
+	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Canceling)
 }
 
 // Get whether the migration is stage.
