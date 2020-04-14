@@ -301,6 +301,7 @@ func (t *Task) deleteRestores() error {
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			log.Trace(err)
+			log.Trace(err)
 			return err
 		}
 	}
@@ -311,26 +312,32 @@ func (t *Task) deleteRestores() error {
 func (t *Task) deleteMigrated() error {
 	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
 		migapi.MigratedByLabel: string(t.Owner.UID),
 	}).AsListOptions()
-	foreground := metav1.DeletePropagationForeground
-	deleteOptions := (&k8sclient.DeleteOptions{
-		PropagationPolicy: &foreground,
-	}).AsDeleteOptions()
 
 	for _, gvr := range GVRs {
-		list, err := client.Resource(gvr).List(*listOptions)
-		if err != nil {
-			return err
-		}
-		for _, r := range list.Items {
-			err = client.Resource(gvr).Namespace(r.GetNamespace()).Delete(r.GetName(), deleteOptions)
+		for _, ns := range t.destinationNamespaces() {
+			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
+				log.Trace(err)
 				return err
+			}
+			for _, r := range list.Items {
+				err = client.Resource(gvr).Namespace(ns).Delete(r.GetName(), nil)
+				if err != nil {
+					// Will ignore the ones that were removed, or for some reason are not supported
+					// Assuming that main resources will be removed, such as pods and pvcs
+					if k8serror.IsMethodNotSupported(err) || k8serror.IsNotFound(err) {
+						continue
+					}
+					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
+					return err
+				}
 			}
 		}
 	}
@@ -341,6 +348,7 @@ func (t *Task) deleteMigrated() error {
 func (t *Task) waitForDeleteMigrated() (bool, error) {
 	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
+		log.Trace(err)
 		return false, err
 	}
 
@@ -348,13 +356,16 @@ func (t *Task) waitForDeleteMigrated() (bool, error) {
 		migapi.MigratedByLabel: string(t.Owner.UID),
 	}).AsListOptions()
 	for _, gvr := range GVRs {
-		// Count resource occurences
-		list, err := client.Resource(gvr).List(*listOptions)
-		if err != nil {
-			return false, err
-		}
-		if len(list.Items) > 0 {
-			return false, nil
+		for _, ns := range t.destinationNamespaces() {
+			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
+			if err != nil {
+				log.Trace(err)
+				return false, err
+			}
+			// Wait for resources with deletion timestamps
+			if len(list.Items) > 0 {
+				return false, err
+			}
 		}
 	}
 
@@ -364,6 +375,7 @@ func (t *Task) waitForDeleteMigrated() (bool, error) {
 func (t *Task) deleteLabels() error {
 	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
+		log.Trace(err)
 		return err
 	}
 
@@ -372,17 +384,21 @@ func (t *Task) deleteLabels() error {
 	}).AsListOptions()
 
 	for _, gvr := range GVRs {
-		list, err := client.Resource(gvr).List(*listOptions)
-		if err != nil {
-			return err
-		}
-		for _, r := range list.Items {
-			labels := r.GetLabels()
-			delete(labels, migapi.MigratedByLabel)
-			r.SetLabels(labels)
-			_, err = client.Resource(gvr).Namespace(r.GetNamespace()).Update(&r, metav1.UpdateOptions{})
+		for _, ns := range t.destinationNamespaces() {
+			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
+				log.Trace(err)
 				return err
+			}
+			for _, r := range list.Items {
+				labels := r.GetLabels()
+				delete(labels, migapi.MigratedByLabel)
+				r.SetLabels(labels)
+				_, err = client.Resource(gvr).Namespace(ns).Update(&r, metav1.UpdateOptions{})
+				if err != nil {
+					log.Trace(err)
+					return err
+				}
 			}
 		}
 	}
@@ -403,19 +419,23 @@ func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersion
 	}
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
+		log.Trace(err)
 		return nil, nil, err
 	}
 	resourceList, err := migapi.CollectResources(discoveryClient)
 	if err != nil {
+		log.Trace(err)
 		return nil, nil, err
 	}
 	GVRs, err := migapi.ConvertToGVRList(resourceList)
 	if err != nil {
+		log.Trace(err)
 		return nil, nil, err
 	}
 
 	client, err := dynamic.NewForConfig(config)
 	if err != nil {
+		log.Trace(err)
 		return nil, nil, err
 	}
 	return client, GVRs, nil
