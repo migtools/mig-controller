@@ -51,6 +51,7 @@ func (i *Incompatible) ResourceList() (incompatible []string) {
 	return
 }
 
+// CollectResources collects all namespaced scoped apiResources from the cluster
 func CollectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	resources, err := discovery.ServerResources()
 	if err != nil {
@@ -67,6 +68,7 @@ func CollectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 	return resources, nil
 }
 
+// ConvertToGVRList converts provided apiResourceList to list of GroupVersionResources from the server
 func ConvertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	GVRs := []schema.GroupVersionResource{}
 	for _, resourceList := range resourceList {

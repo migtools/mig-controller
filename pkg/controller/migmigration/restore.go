@@ -317,7 +317,7 @@ func (t *Task) deleteMigrated() error {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		migapi.MigratedByLabel: string(t.Owner.UID),
+		MigratedByLabel: string(t.Owner.UID),
 	}).AsListOptions()
 
 	for _, gvr := range GVRs {
@@ -345,7 +345,7 @@ func (t *Task) deleteMigrated() error {
 	return nil
 }
 
-func (t *Task) waitForDeleteMigrated() (bool, error) {
+func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	client, GVRs, err := t.getResourcesForDelete()
 	if err != nil {
 		log.Trace(err)
@@ -353,7 +353,7 @@ func (t *Task) waitForDeleteMigrated() (bool, error) {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		migapi.MigratedByLabel: string(t.Owner.UID),
+		MigratedByLabel: string(t.Owner.UID),
 	}).AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
@@ -372,40 +372,6 @@ func (t *Task) waitForDeleteMigrated() (bool, error) {
 	return true, nil
 }
 
-func (t *Task) deleteLabels() error {
-	client, GVRs, err := t.getResourcesForDelete()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	listOptions := k8sclient.MatchingLabels(map[string]string{
-		migapi.MigratedByLabel: string(t.Owner.UID),
-	}).AsListOptions()
-
-	for _, gvr := range GVRs {
-		for _, ns := range t.destinationNamespaces() {
-			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
-			if err != nil {
-				log.Trace(err)
-				return err
-			}
-			for _, r := range list.Items {
-				labels := r.GetLabels()
-				delete(labels, migapi.MigratedByLabel)
-				r.SetLabels(labels)
-				_, err = client.Resource(gvr).Namespace(ns).Update(&r, metav1.UpdateOptions{})
-				if err != nil {
-					log.Trace(err)
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersionResource, error) {
 	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
 	if err != nil {
@@ -417,23 +383,17 @@ func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersion
 		log.Trace(err)
 		return nil, nil, err
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
-	resourceList, err := migapi.CollectResources(discoveryClient)
+	resourceList, err := migapi.CollectResources(client.(discovery.DiscoveryInterface))
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
 	GVRs, err := migapi.ConvertToGVRList(resourceList)
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-
-	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err

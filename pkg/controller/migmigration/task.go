@@ -552,7 +552,7 @@ func (t *Task) Run() error {
 		}
 		t.next(step)
 	case EnsureMigratedDeleted:
-		deleted, err := t.waitForDeleteMigrated()
+		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
 			log.Trace(err)
 			return err

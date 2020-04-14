@@ -9,9 +9,8 @@ import (
 
 // Labels
 const (
-	PartOfLabel     = "app.kubernetes.io/part-of" // = Application
-	Application     = "openshift-migration"
-	MigratedByLabel = "migration.openshift.io/migrated-by" // (migmigration UID)
+	PartOfLabel = "app.kubernetes.io/part-of" // = Application
+	Application = "openshift-migration"
 )
 
 // Build label (key, value) used to correlate CRs.
