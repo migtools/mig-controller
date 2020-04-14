@@ -21,6 +21,7 @@ import (
 // A smart client.
 // Provides seamless API version compatibility.
 type Client struct {
+	*rest.Config
 	k8sclient.Client
 	dapi.DiscoveryInterface
 	// major k8s version.
@@ -57,6 +58,7 @@ func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
 		return nil, err
 	}
 	nClient := &Client{
+		Config:             restCfg,
 		Client:             rClient,
 		DiscoveryInterface: dClient,
 		Major:              major,

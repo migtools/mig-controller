@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -373,22 +373,18 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 }
 
 func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersionResource, error) {
-	cluster, err := t.PlanResources.MigPlan.GetDestinationCluster(t.Client)
+	c, err := t.getDestinationClient()
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
-	config, err := cluster.BuildRestConfig(t.Client)
+	dstClient := c.(*compat.Client)
+	client, err := dynamic.NewForConfig(dstClient.Config)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	resourceList, err := migapi.CollectResources(client.(discovery.DiscoveryInterface))
+	resourceList, err := migapi.CollectResources(dstClient)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
