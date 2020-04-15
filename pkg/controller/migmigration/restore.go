@@ -7,6 +7,7 @@ import (
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -384,12 +385,12 @@ func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersion
 		log.Trace(err)
 		return nil, nil, err
 	}
-	resourceList, err := migapi.CollectResources(dstClient)
+	resourceList, err := gvk.CollectResources(dstClient)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
 	}
-	GVRs, err := migapi.ConvertToGVRList(resourceList)
+	GVRs, err := gvk.ConvertToGVRList(resourceList)
 	if err != nil {
 		log.Trace(err)
 		return nil, nil, err
