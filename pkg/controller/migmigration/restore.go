@@ -302,7 +302,6 @@ func (t *Task) deleteRestores() error {
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			log.Trace(err)
-			log.Trace(err)
 			return err
 		}
 	}
@@ -323,6 +322,14 @@ func (t *Task) deleteMigrated() error {
 
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
+			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
+			if err == nil {
+				continue
+			}
+			if !k8serror.IsMethodNotSupported(err) && !k8serror.IsNotFound(err) {
+				log.Trace(err)
+				return err
+			}
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
 				log.Trace(err)

@@ -64,82 +64,97 @@ const (
 	HasVerify    = 0x08 // Only when the plan has enabled verification
 )
 
-type Itinerary []Step
+type Itinerary struct {
+	Name  string
+	Steps []Step
+}
 
 var StageItinerary = Itinerary{
-	{phase: Created},
-	{phase: Started},
-	{phase: Prepare},
-	{phase: EnsureCloudSecretPropagated},
-	{phase: AnnotateResources, all: HasPVs},
-	{phase: EnsureStagePods, all: HasPVs},
-	{phase: StagePodsCreated, all: HasStagePods},
-	{phase: RestartRestic, all: HasStagePods},
-	{phase: ResticRestarted, all: HasStagePods},
-	{phase: QuiesceApplications, all: Quiesce},
-	{phase: EnsureQuiesced, all: Quiesce},
-	{phase: EnsureStageBackup, all: HasPVs},
-	{phase: StageBackupCreated, all: HasPVs},
-	{phase: EnsureStageBackupReplicated, all: HasPVs},
-	{phase: EnsureStageRestore, all: HasPVs},
-	{phase: StageRestoreCreated, all: HasPVs},
-	{phase: EnsureStagePodsDeleted, all: HasStagePods},
-	{phase: EnsureStagePodsTerminated, all: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: EnsureLabelsDeleted},
-	{phase: Completed},
+	Name: "Stage",
+	Steps: []Step{
+		{phase: Created},
+		{phase: Started},
+		{phase: Prepare},
+		{phase: EnsureCloudSecretPropagated},
+		{phase: AnnotateResources, all: HasPVs},
+		{phase: EnsureStagePods, all: HasPVs},
+		{phase: StagePodsCreated, all: HasStagePods},
+		{phase: RestartRestic, all: HasStagePods},
+		{phase: ResticRestarted, all: HasStagePods},
+		{phase: QuiesceApplications, all: Quiesce},
+		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureStageBackup, all: HasPVs},
+		{phase: StageBackupCreated, all: HasPVs},
+		{phase: EnsureStageBackupReplicated, all: HasPVs},
+		{phase: EnsureStageRestore, all: HasPVs},
+		{phase: StageRestoreCreated, all: HasPVs},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureStagePodsTerminated, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureLabelsDeleted},
+		{phase: Completed},
+	},
 }
 
 var FinalItinerary = Itinerary{
-	{phase: Created},
-	{phase: Started},
-	{phase: Prepare},
-	{phase: EnsureCloudSecretPropagated},
-	{phase: EnsureInitialBackup},
-	{phase: InitialBackupCreated},
-	{phase: AnnotateResources, all: HasPVs},
-	{phase: EnsureStagePods, all: HasPVs},
-	{phase: StagePodsCreated, all: HasStagePods},
-	{phase: RestartRestic, all: HasStagePods},
-	{phase: ResticRestarted, all: HasStagePods},
-	{phase: QuiesceApplications, all: Quiesce},
-	{phase: EnsureQuiesced, all: Quiesce},
-	{phase: EnsureStageBackup, all: HasPVs},
-	{phase: StageBackupCreated, all: HasPVs},
-	{phase: EnsureStageBackupReplicated, all: HasPVs},
-	{phase: EnsureStageRestore, all: HasPVs},
-	{phase: StageRestoreCreated, all: HasPVs},
-	{phase: EnsureStagePodsDeleted, all: HasStagePods},
-	{phase: EnsureStagePodsTerminated, all: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: EnsureInitialBackupReplicated},
-	{phase: EnsureFinalRestore},
-	{phase: FinalRestoreCreated},
-	{phase: EnsureLabelsDeleted},
-	{phase: Verification, all: HasVerify},
-	{phase: Completed},
+	Name: "Final",
+	Steps: []Step{
+		{phase: Created},
+		{phase: Started},
+		{phase: Prepare},
+		{phase: EnsureCloudSecretPropagated},
+		{phase: EnsureInitialBackup},
+		{phase: InitialBackupCreated},
+		{phase: AnnotateResources, all: HasPVs},
+		{phase: EnsureStagePods, all: HasPVs},
+		{phase: StagePodsCreated, all: HasStagePods},
+		{phase: RestartRestic, all: HasStagePods},
+		{phase: ResticRestarted, all: HasStagePods},
+		{phase: QuiesceApplications, all: Quiesce},
+		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureStageBackup, all: HasPVs},
+		{phase: StageBackupCreated, all: HasPVs},
+		{phase: EnsureStageBackupReplicated, all: HasPVs},
+		{phase: EnsureStageRestore, all: HasPVs},
+		{phase: StageRestoreCreated, all: HasPVs},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureStagePodsTerminated, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureInitialBackupReplicated},
+		{phase: EnsureFinalRestore},
+		{phase: FinalRestoreCreated},
+		{phase: EnsureLabelsDeleted},
+		{phase: Verification, all: HasVerify},
+		{phase: Completed},
+	},
 }
 
 var CancelItinerary = Itinerary{
-	{phase: Canceling},
-	{phase: DeleteBackups},
-	{phase: DeleteRestores},
-	{phase: EnsureStagePodsDeleted, all: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: DeleteMigrated},
-	{phase: EnsureMigratedDeleted},
-	{phase: UnQuiesceApplications, all: Quiesce},
-	{phase: Canceled},
-	{phase: Completed},
+	Name: "Cancel",
+	Steps: []Step{
+		{phase: Canceling},
+		{phase: DeleteBackups},
+		{phase: DeleteRestores},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: DeleteMigrated},
+		{phase: EnsureMigratedDeleted},
+		{phase: UnQuiesceApplications, all: Quiesce},
+		{phase: Canceled},
+		{phase: Completed},
+	},
 }
 
 var FailedItinerary = Itinerary{
-	{phase: EnsureStagePodsDeleted, all: HasStagePods},
-	{phase: EnsureAnnotationsDeleted, all: HasPVs},
-	{phase: DeleteMigrated},
-	{phase: EnsureMigratedDeleted},
-	{phase: UnQuiesceApplications, all: Quiesce},
-	{phase: Completed},
+	Name: "Failed",
+	Steps: []Step{
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: DeleteMigrated},
+		{phase: EnsureMigratedDeleted},
+		{phase: UnQuiesceApplications, all: Quiesce},
+		{phase: Completed},
+	},
 }
 
 // Step
@@ -156,8 +171,8 @@ type Step struct {
 // Returns: phase, n, total.
 func (r Itinerary) progressReport(phase string) (string, int, int) {
 	n := 0
-	total := len(r)
-	for i, step := range r {
+	total := len(r.Steps)
+	for i, step := range r.Steps {
 		if step.phase == phase {
 			n = i + 1
 			break
@@ -202,12 +217,11 @@ func (t *Task) Run() error {
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
 	t.init()
-	step := t.setStep()
 
 	// Run the current phase.
 	switch t.Phase {
 	case Created, Started:
-		t.next(step)
+		t.next()
 	case Prepare:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -219,7 +233,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -235,7 +249,7 @@ func (t *Task) Run() error {
 			}
 		}
 		if count == 2 {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -246,7 +260,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next(step)
+		t.next()
 	case InitialBackupCreated:
 		backup, err := t.ensureInitialBackup()
 		if err != nil {
@@ -265,7 +279,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(InitialBackupFailed, reasons)
 			} else {
-				t.next(step)
+				t.next()
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -276,14 +290,14 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureStagePods:
 		_, err := t.ensureStagePodsCreated()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case StagePodsCreated:
 		started, err := t.ensureStagePodsStarted()
 		if err != nil {
@@ -291,7 +305,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -302,7 +316,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = PollReQ
-		t.next(step)
+		t.next()
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
@@ -310,7 +324,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if started {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -320,7 +334,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
@@ -328,7 +342,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if quiesced {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -338,7 +352,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
@@ -346,7 +360,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = 0
-		t.next(step)
+		t.next()
 	case StageBackupCreated:
 		backup, err := t.ensureStageBackup()
 		if err != nil {
@@ -365,7 +379,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageBackupFailed, reasons)
 			} else {
-				t.next(step)
+				t.next()
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -385,7 +399,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -404,7 +418,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next(step)
+		t.next()
 	case StageRestoreCreated:
 		restore, err := t.ensureStageRestore()
 		if err != nil {
@@ -424,7 +438,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageRestoreFailed, reasons)
 			} else {
-				t.next(step)
+				t.next()
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -435,7 +449,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
@@ -443,7 +457,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if terminated {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -455,7 +469,7 @@ func (t *Task) Run() error {
 				return err
 			}
 		}
-		t.next(step)
+		t.next()
 	case EnsureLabelsDeleted:
 		if !t.keepAnnotations() {
 			err := t.deleteLabels()
@@ -464,7 +478,7 @@ func (t *Task) Run() error {
 				return err
 			}
 		}
-		t.next(step)
+		t.next()
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -480,7 +494,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if replicated {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -499,7 +513,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.Requeue = NoReQ
-		t.next(step)
+		t.next()
 	case FinalRestoreCreated:
 		restore, err := t.ensureFinalRestore()
 		if err != nil {
@@ -518,7 +532,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(FinalRestoreFailed, reasons)
 			} else {
-				t.next(step)
+				t.next()
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -530,7 +544,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if completed {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -543,14 +557,14 @@ func (t *Task) Run() error {
 			Message:  CancelInProgressMessage,
 			Durable:  true,
 		})
-		t.next(step)
+		t.next()
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case EnsureMigratedDeleted:
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
@@ -558,7 +572,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if deleted {
-			t.next(step)
+			t.next()
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -567,13 +581,13 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case DeleteRestores:
 		if err := t.deleteRestores(); err != nil {
 			log.Trace(err)
 			return err
 		}
-		t.next(step)
+		t.next()
 	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
@@ -584,11 +598,11 @@ func (t *Task) Run() error {
 			Message:  CanceledMessage,
 			Durable:  true,
 		})
-		t.next(step)
+		t.next()
 	// Out of tree states - needs to be triggered manually with t.fail(...)
 	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
 		t.Requeue = NoReQ
-		t.next(step)
+		t.next()
 	case Completed:
 	}
 
@@ -612,12 +626,15 @@ func (t *Task) init() {
 	} else {
 		t.Itinerary = FinalItinerary
 	}
+	if t.Owner.Status.Itenerary != t.Itinerary.Name {
+		t.Phase = t.Itinerary.Steps[0].phase
+	}
 }
 
-// Set the step which will be executed.
-func (t *Task) setStep() int {
+// Advance the task to the next phase.
+func (t *Task) next() {
 	current := -1
-	for i, step := range t.Itinerary {
+	for i, step := range t.Itinerary.Steps {
 		if step.phase != t.Phase {
 			continue
 		}
@@ -625,21 +642,11 @@ func (t *Task) setStep() int {
 		break
 	}
 	if current == -1 {
-		if t.failed() || t.canceled() {
-			current = 0
-		} else {
-			current = len(t.Itinerary) - 1
-		}
-		t.Phase = t.Itinerary[current].phase
+		t.Phase = Completed
+		return
 	}
-
-	return current
-}
-
-// Advance the task to the next phase.
-func (t *Task) next(currentPhaseIndex int) {
-	for n := currentPhaseIndex + 1; n < len(t.Itinerary); n++ {
-		next := t.Itinerary[n]
+	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
+		next := t.Itinerary.Steps[n]
 		if !t.allFlags(next) {
 			continue
 		}

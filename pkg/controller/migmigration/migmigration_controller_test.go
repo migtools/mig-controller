@@ -90,11 +90,11 @@ func Test_Itineraries(t *testing.T) {
 	stage := StageItinerary
 	common := Itinerary{}
 
-	for i, step := range StageItinerary {
+	for i, step := range StageItinerary.Steps {
 		found := false
-		for _, finalStep := range FinalItinerary[i:] {
+		for _, finalStep := range FinalItinerary.Steps[i:] {
 			if step.phase == finalStep.phase {
-				common = append(common, step)
+				common.Steps = append(common.Steps, step)
 				found = true
 				break
 			}
@@ -104,6 +104,6 @@ func Test_Itineraries(t *testing.T) {
 		}
 	}
 
-	g.Expect(reflect.DeepEqual(stage, common)).To(gomega.BeTrue())
+	g.Expect(reflect.DeepEqual(stage.Steps, common.Steps)).To(gomega.BeTrue())
 
 }
