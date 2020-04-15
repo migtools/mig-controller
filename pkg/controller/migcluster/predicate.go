@@ -57,6 +57,10 @@ func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
 	return true
 }
 
+func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
 func (r ClusterPredicate) mapRefs(cluster *migapi.MigCluster) {
 	refMap := migref.GetMap()
 

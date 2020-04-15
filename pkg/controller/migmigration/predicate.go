@@ -116,3 +116,12 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 	// Reconciled by the controller.
 	return new.HasReconciled()
 }
+
+func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
+func (r PlanPredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+

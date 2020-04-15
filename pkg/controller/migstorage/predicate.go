@@ -56,6 +56,10 @@ func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
 	return true
 }
 
+func (r StoragePredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
 func (r StoragePredicate) mapRefs(storage *migapi.MigStorage) {
 	refMap := migref.GetMap()
 

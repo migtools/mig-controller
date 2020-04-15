@@ -97,6 +97,10 @@ func (r PlanPredicate) mapRefs(plan *migapi.MigPlan) {
 	}
 }
 
+func (r PlanPredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
 func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 	refMap := migref.GetMap()
 
@@ -157,6 +161,14 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 	return new.HasReconciled()
 }
 
+func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
+	return common.IsInSingletonNamespace(e.Meta.GetNamespace())
+}
+
+func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSingletonNamespace(e.Meta.GetNamespace())
+}
+
 type StoragePredicate struct {
 	predicate.Funcs
 }
@@ -175,6 +187,14 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 	}
 	// Reconciled by the controller.
 	return new.HasReconciled()
+}
+
+func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
+func (r StoragePredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
 }
 
 type MigrationPredicate struct {
@@ -206,4 +226,12 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	}
 
 	return false
+}
+
+func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+}
+
+func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
+	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
 }
