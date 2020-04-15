@@ -22,7 +22,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	k8sconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 // Types
@@ -1023,19 +1022,11 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 }
 
 func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
-
-	client, err := k8sclient.New(k8sconfig.GetConfigOrDie(), k8sclient.Options{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
 	var preBackupCount, postBackupCount, preRestoreCount, postRestoreCount int = 0, 0, 0, 0
 
 	for _, hook := range plan.Spec.Hooks {
-
 		migHook := migapi.MigHook{}
-		err := client.Get(
+		err := r.Get(
 			context.TODO(),
 			types.NamespacedName{
 				Name:      hook.Reference.Name,
