@@ -18,7 +18,7 @@ func (r HookPredicate) Create(e event.CreateEvent) bool {
 func (r HookPredicate) Update(e event.UpdateEvent) bool {
 	old, cast := e.ObjectOld.(*migapi.MigHook)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigHook)
 	if !cast {
