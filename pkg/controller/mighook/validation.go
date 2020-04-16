@@ -40,10 +40,10 @@ const (
 const (
 	ReadyMessage                = "The hook is ready."
 	InvalidTargetClusterMessage = "Only 'source' and 'destination' are accepted as values for spec.targetCluster."
-	InvalidImageMessage         = "The image name specified in spec.Image is an invalid."
+	InvalidImageMessage         = "The image name specified in spec.Image is invalid."
 	InvalidPlaybookDataMessage  = "Spec.Playbook should contain a base64 encoded playbook."
-	InvalidAnsibleHookMessage   = "An Ansible Playbook must be specified spec.custom is false"
-	InvalidCustomHookMessage    = "An Ansible Playbook must not be specified spec.custom is true"
+	InvalidAnsibleHookMessage   = "An Ansible Playbook must be specified when spec.custom is false."
+	InvalidCustomHookMessage    = "An Ansible Playbook must not be specified when spec.custom is true."
 )
 
 // Validate the hook resource.
