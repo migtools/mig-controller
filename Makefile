@@ -1,6 +1,7 @@
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/ocpmigrate/mig-controller:latest
 GOOS ?= `go env GOOS`
+KUBECONFIG_POSTFIX ?= mig-controller
 
 ci: all
 
@@ -14,8 +15,14 @@ test: generate fmt vet manifests
 manager: generate fmt vet
 	go build -o bin/manager github.com/konveyor/mig-controller/cmd/manager
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
+# Run against the configured Kubernetes cluster in ~/.kube/config after login as mig controller SA
 run: generate fmt vet
+	./hack/controller-sa-login.sh
+	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} go run ./cmd/manager/main.go
+
+
+# Run against the configured Kubernetes cluster in ~/.kube/config, skip login to mig-controller SA
+run-skip-sa-login: generate fmt vet
 	go run ./cmd/manager/main.go
 
 tilt:
