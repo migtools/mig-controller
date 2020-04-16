@@ -25,7 +25,13 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const PhaseLabel = "phase"
+const (
+	PhaseLabel           = "phase"
+	PreBackupHookPhase   = "PreBackup"
+	PostBackupHookPhase  = "PostBackup"
+	PreRestoreHookPhase  = "PreRestore"
+	PostRestoreHookPhase = "PostRestore"
+)
 
 // MigHookSpec defines the desired state of MigHook
 type MigHookSpec struct {

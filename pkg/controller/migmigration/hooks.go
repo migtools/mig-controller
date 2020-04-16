@@ -17,13 +17,13 @@ import (
 
 const HookJobFailedLimit = 5
 
-func (t *Task) runHooks() (bool, error) {
+func (t *Task) runHooks(hookPhase string) (bool, error) {
 	hook := migapi.MigPlanHook{}
 	var client k8sclient.Client
 	var err error
 
 	for _, h := range t.PlanResources.MigPlan.Spec.Hooks {
-		if (h.Phase + "Hooks") == t.Phase {
+		if h.Phase == hookPhase {
 			hook = h
 		}
 	}
@@ -55,7 +55,7 @@ func (t *Task) runHooks() (bool, error) {
 			return false, err
 		}
 
-		result, err := t.ensureJob(job, migHook, client)
+		result, err := t.ensureJob(job, hook, migHook, client)
 		if err != nil {
 			log.Trace(err)
 			return false, err
@@ -66,8 +66,8 @@ func (t *Task) runHooks() (bool, error) {
 	return true, nil
 }
 
-func (t *Task) ensureJob(job *batchv1.Job, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
-	runningJob, err := migHook.GetPhaseJob(client, t.Phase)
+func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
+	runningJob, err := migHook.GetPhaseJob(client, hook.Phase)
 	if runningJob == nil && err == nil {
 		err = client.Create(context.TODO(), job)
 		if err != nil {
@@ -98,7 +98,7 @@ func (t *Task) prepareJob(hook migapi.MigPlanHook, migHook migapi.MigHook, clien
 			return nil, err
 		}
 
-		phaseConfigMap, err := migHook.GetPhaseConfigMap(client, t.Phase)
+		phaseConfigMap, err := migHook.GetPhaseConfigMap(client, hook.Phase)
 		if phaseConfigMap == nil && err == nil {
 
 			err = client.Create(context.TODO(), configMap)
@@ -141,7 +141,7 @@ func (t *Task) getHookClient(migHook migapi.MigHook) (k8sclient.Client, error) {
 func (t *Task) configMapTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) (*corev1.ConfigMap, error) {
 
 	labels := migHook.GetCorrelationLabels()
-	labels["phase"] = t.Phase
+	labels["phase"] = hook.Phase
 
 	playbookData, err := base64.StdEncoding.DecodeString(migHook.Spec.Playbook)
 	if err != nil {
@@ -151,7 +151,7 @@ func (t *Task) configMapTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    hook.ExecutionNamespace,
-			GenerateName: strings.ToLower(t.PlanResources.MigPlan.Name + "-" + t.Phase + "-"),
+			GenerateName: strings.ToLower(t.PlanResources.MigPlan.Name + "-" + hook.Phase + "-"),
 			Labels:       labels,
 		},
 		BinaryData: map[string][]byte{
@@ -203,12 +203,12 @@ func (t *Task) baseJobTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) 
 	}
 
 	labels := migHook.GetCorrelationLabels()
-	labels["phase"] = t.Phase
+	labels["phase"] = hook.Phase
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    hook.ExecutionNamespace,
-			GenerateName: strings.ToLower(t.PlanResources.MigPlan.Name + "-" + t.Phase + "-"),
+			GenerateName: strings.ToLower(t.PlanResources.MigPlan.Name + "-" + hook.Phase + "-"),
 			Labels:       labels,
 		},
 		Spec: batchv1.JobSpec{
@@ -216,7 +216,7 @@ func (t *Task) baseJobTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) 
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  strings.ToLower(t.PlanResources.MigPlan.Name + "-" + t.Phase),
+							Name:  strings.ToLower(t.PlanResources.MigPlan.Name + "-" + hook.Phase),
 							Image: migHook.Spec.Image,
 						},
 					},

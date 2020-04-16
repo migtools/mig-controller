@@ -262,7 +262,7 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case PreBackupHooks:
-		status, err := t.runHooks()
+		status, err := t.runHooks(migapi.PreBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -423,7 +423,7 @@ func (t *Task) Run() error {
 			t.Requeue = NoReQ
 		}
 	case PostBackupHooks:
-		status, err := t.runHooks()
+		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -434,7 +434,7 @@ func (t *Task) Run() error {
 			t.Requeue = NoReQ
 		}
 	case PreRestoreHooks:
-		status, err := t.runHooks()
+		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -579,7 +579,7 @@ func (t *Task) Run() error {
 			t.Requeue = NoReQ
 		}
 	case PostRestoreHooks:
-		status, err := t.runHooks()
+		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
 			return err

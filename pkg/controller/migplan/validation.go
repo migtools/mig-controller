@@ -65,10 +65,6 @@ const (
 	HookNotReady                               = "HookNotReady"
 	InvalidHookNSName                          = "InvalidHookNSName"
 	InvalidHookSAName                          = "InvalidHookSAName"
-	PreBackupPhase                             = "PreBackup"
-	PostBackupPhase                            = "PostBackup"
-	PreRestorePhase                            = "PreRestore"
-	PostRestorePhase                           = "PostRestore"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 )
@@ -1083,13 +1079,13 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 		}
 
 		switch hook.Phase {
-		case PreRestorePhase:
+		case migapi.PreRestoreHookPhase:
 			preRestoreCount++
-		case PostRestorePhase:
+		case migapi.PostRestoreHookPhase:
 			postRestoreCount++
-		case PreBackupPhase:
+		case migapi.PreBackupHookPhase:
 			preBackupCount++
-		case PostBackupPhase:
+		case migapi.PostBackupHookPhase:
 			postBackupCount++
 		default:
 			plan.Status.SetCondition(migapi.Condition{
