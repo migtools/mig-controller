@@ -48,6 +48,14 @@ const (
 	ClosedIndexField = "closed"
 )
 
+// MigPlanHook hold a referene to a MigHook along with the desired phase to run it in
+type MigPlanHook struct {
+	Reference          *kapi.ObjectReference `json:"reference"`
+	Phase              string                `json:"phase"`
+	ExecutionNamespace string                `json:"executionNamespace"`
+	ServiceAccount     string                `json:"serviceAccount"`
+}
+
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
 	UnhealthyResources
@@ -57,6 +65,7 @@ type MigPlanSpec struct {
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 	Closed            bool                  `json:"closed,omitempty"`
+	Hooks             []MigPlanHook         `json:"hooks,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan

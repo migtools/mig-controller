@@ -16,6 +16,7 @@ package remotewatcher
 import (
 	"github.com/konveyor/mig-controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -167,6 +168,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Type: &storageapi.StorageClass{},
 		},
 		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// Job
+	err = c.Watch(
+		&source.Kind{
+			Type: &batchv1.Job{},
+		},
+		&handler.EnqueueRequestForObject{},
+		&JobPredicate{})
 	if err != nil {
 		log.Trace(err)
 		return err
