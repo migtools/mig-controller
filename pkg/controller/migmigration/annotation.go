@@ -7,8 +7,6 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -20,10 +18,6 @@ const (
 	PvStorageClassAnnotation = "openshift.io/target-storage-class" // storageClassName
 	PvAccessModeAnnotation   = "openshift.io/target-access-mode"   // accessMode
 	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods" // (true|false)
-	QuiesceNodeSelector      = "migration.openshift.io/quiesceDaemonSet"
-	SuspendAnnotation        = "migration.openshift.io/preQuiesceSuspend"
-	ReplicasAnnotation       = "migration.openshift.io/preQuiesceReplicas"
-	NodeSelectorAnnotation   = "migration.openshift.io/preQuiesceNodeSelector"
 )
 
 // Restic Annotations
@@ -52,10 +46,6 @@ const (
 	// Designated as a `final` Restore.
 	// The value is the Task.UID().
 	FinalRestoreLabel = "migration-final-restore"
-	// Identifies the resource as migrated by us
-	// for easy search or application rollback.
-	// The value is the Task.UID().
-	MigratedByLabel = "migration.openshift.io/migrated-by" // (migmigration UID)
 )
 
 // Set of Service Accounts.
@@ -484,47 +474,6 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []st
 			return err
 		}
 	}
-	return nil
-}
-
-// deleteLabels will delete all migration.openshift.io/migrated-by labels
-// from the application upon successful completion
-func (t *Task) deleteLabels() error {
-	client, GVRs, err := t.getResourcesForDelete()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
-	}).AsListOptions()
-
-	for _, gvr := range GVRs {
-		for _, ns := range t.destinationNamespaces() {
-			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
-			if err != nil {
-				log.Trace(err)
-				return err
-			}
-			for _, r := range list.Items {
-				labels := r.GetLabels()
-				delete(labels, MigratedByLabel)
-				r.SetLabels(labels)
-				_, err = client.Resource(gvr).Namespace(ns).Update(&r, metav1.UpdateOptions{})
-				if err != nil {
-					// The part touches the application on the destination side, fail safe to ensure
-					// this won't block the migration
-					if k8serror.IsMethodNotSupported(err) {
-						continue
-					}
-					log.Trace(err)
-					return err
-				}
-			}
-		}
-	}
-
 	return nil
 }
 
