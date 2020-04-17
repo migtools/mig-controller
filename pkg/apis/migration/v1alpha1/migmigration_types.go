@@ -44,6 +44,7 @@ type MigMigrationStatus struct {
 	ObservedDigest string       `json:"observedDigest,omitempty"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
+	Itenerary      string       `json:"itenerary,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
 }
 
@@ -91,4 +92,9 @@ func (r *MigMigration) AddErrors(errors []string) {
 			r.Status.Errors = append(r.Status.Errors, error)
 		}
 	}
+}
+
+// HasErrors will notify about error presence on the MigMigration resource
+func (r *MigMigration) HasErrors() bool {
+	return len(r.Status.Errors) > 0
 }

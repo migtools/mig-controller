@@ -6,10 +6,14 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -258,6 +262,26 @@ func (t *Task) updateRestore(restore *velero.Restore, backupName string) {
 	t.updateNamespaceMapping(restore)
 }
 
+// Update namespace mapping for restore
+func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
+	namespaceMapping := make(map[string]string)
+	for _, namespace := range t.namespaces() {
+		mapping := strings.Split(namespace, ":")
+		if len(mapping) == 2 {
+			if mapping[0] == mapping[1] {
+				continue
+			}
+			if mapping[1] != "" {
+				namespaceMapping[mapping[0]] = mapping[1]
+			}
+		}
+	}
+
+	if len(namespaceMapping) != 0 {
+		restore.Spec.NamespaceMapping = namespaceMapping
+	}
+}
+
 func (t *Task) deleteRestores() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
@@ -285,22 +309,98 @@ func (t *Task) deleteRestores() error {
 	return nil
 }
 
-// Update namespace mapping for restore
-func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
-	namespaceMapping := make(map[string]string)
-	for _, namespace := range t.namespaces() {
-		mapping := strings.Split(namespace, ":")
-		if len(mapping) == 2 {
-			if mapping[0] == mapping[1] {
+func (t *Task) deleteMigrated() error {
+	client, GVRs, err := t.getResourcesForDelete()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		MigratedByLabel: string(t.Owner.UID),
+	}).AsListOptions()
+
+	for _, gvr := range GVRs {
+		for _, ns := range t.destinationNamespaces() {
+			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
+			if err == nil {
 				continue
 			}
-			if mapping[1] != "" {
-				namespaceMapping[mapping[0]] = mapping[1]
+			if !k8serror.IsMethodNotSupported(err) && !k8serror.IsNotFound(err) {
+				log.Trace(err)
+				return err
+			}
+			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
+			if err != nil {
+				log.Trace(err)
+				return err
+			}
+			for _, r := range list.Items {
+				err = client.Resource(gvr).Namespace(ns).Delete(r.GetName(), nil)
+				if err != nil {
+					// Will ignore the ones that were removed, or for some reason are not supported
+					// Assuming that main resources will be removed, such as pods and pvcs
+					if k8serror.IsMethodNotSupported(err) || k8serror.IsNotFound(err) {
+						continue
+					}
+					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
+					return err
+				}
 			}
 		}
 	}
 
-	if len(namespaceMapping) != 0 {
-		restore.Spec.NamespaceMapping = namespaceMapping
+	return nil
+}
+
+func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
+	client, GVRs, err := t.getResourcesForDelete()
+	if err != nil {
+		log.Trace(err)
+		return false, err
 	}
+
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		MigratedByLabel: string(t.Owner.UID),
+	}).AsListOptions()
+	for _, gvr := range GVRs {
+		for _, ns := range t.destinationNamespaces() {
+			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
+			if err != nil {
+				log.Trace(err)
+				return false, err
+			}
+			// Wait for resources with deletion timestamps
+			if len(list.Items) > 0 {
+				return false, err
+			}
+		}
+	}
+
+	return true, nil
+}
+
+func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersionResource, error) {
+	c, err := t.getDestinationClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	dstClient := c.(*compat.Client)
+	client, err := dynamic.NewForConfig(dstClient.Config)
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	resourceList, err := gvk.CollectResources(dstClient)
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	GVRs, err := gvk.ConvertToGVRList(resourceList)
+	if err != nil {
+		log.Trace(err)
+		return nil, nil, err
+	}
+	return client, GVRs, nil
 }
