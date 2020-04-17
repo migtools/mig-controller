@@ -29,6 +29,7 @@ type Compare struct {
 func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 	// No spec chage this time
 	if plan.HasReconciled() || !clustersReady(plan) {
+		plan.Status.StageCondition(GVKsIncompatible)
 		return nil
 	}
 
