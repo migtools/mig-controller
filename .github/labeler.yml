@@ -1,4 +1,0 @@
-
-# Add 'update-operator' to any changes within 'config/crds' dir
-update-operator:
-  - config/crds/*
