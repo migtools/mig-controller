@@ -8,7 +8,7 @@ metadata:
 spec:
   group: migration.openshift.io
   names:
-    kind: MigPlan
+    kind: Foobar
     plural: migplans
   scope: Namespaced
   validation:
