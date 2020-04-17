@@ -19,6 +19,8 @@ const (
 	Created                       = ""
 	Started                       = "Started"
 	Prepare                       = "Prepare"
+	Authorization                 = "Authorization"
+	NotAuthorized                 = "NotAuthorized"
 	EnsureCloudSecretPropagated   = "EnsureCloudSecretPropagated"
 	EnsureInitialBackup           = "EnsureInitialBackup"
 	InitialBackupCreated          = "InitialBackupCreated"
@@ -67,6 +69,7 @@ var StageItinerary = Itinerary{
 	{phase: Created},
 	{phase: Started},
 	{phase: Prepare},
+	{phase: Authorization},
 	{phase: EnsureCloudSecretPropagated},
 	{phase: AnnotateResources, all: HasPVs},
 	{phase: EnsureStagePods, all: HasPVs},
@@ -91,6 +94,7 @@ var FinalItinerary = Itinerary{
 	{phase: Created},
 	{phase: Started},
 	{phase: Prepare},
+	{phase: Authorization},
 	{phase: EnsureCloudSecretPropagated},
 	{phase: EnsureInitialBackup},
 	{phase: InitialBackupCreated},
@@ -204,6 +208,17 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
+	case Authorization:
+		unauthorized, err := t.EnsureAuthorized()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if len(unauthorized) > 0 {
+			t.failed(NotAuthorized, unauthorized)
+		} else {
+			t.next()
+		}
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -557,7 +572,7 @@ func (t *Task) Run() error {
 		}
 		t.Requeue = NoReQ
 		t.next()
-	case InitialBackupFailed, FinalRestoreFailed:
+	case NotAuthorized, InitialBackupFailed, FinalRestoreFailed:
 		t.next()
 	case Completed:
 	}
