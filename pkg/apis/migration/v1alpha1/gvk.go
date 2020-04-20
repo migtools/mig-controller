@@ -1,6 +1,8 @@
 package v1alpha1
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 // Incompatible - list of namespaces containing incompatible resources for migration
 // which are being selected in the MigPlan

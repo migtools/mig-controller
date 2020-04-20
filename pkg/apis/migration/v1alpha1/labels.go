@@ -1,9 +1,10 @@
 package v1alpha1
 
 import (
+	"strings"
+
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/types"
-	"strings"
 )
 
 // Labels
