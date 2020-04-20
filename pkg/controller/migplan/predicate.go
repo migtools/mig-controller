@@ -2,7 +2,6 @@ package migplan
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/controller/common"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"reflect"
@@ -107,7 +106,6 @@ func (r PlanPredicate) mapRefs(plan *migapi.MigPlan) {
 		})
 	}
 }
-
 
 func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 	refMap := migref.GetMap()

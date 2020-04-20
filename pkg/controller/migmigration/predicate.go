@@ -122,4 +122,3 @@ func (r PlanPredicate) Generic(e event.GenericEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	return cast && plan.InSandbox()
 }
-

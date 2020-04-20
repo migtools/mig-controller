@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 //
@@ -63,14 +61,6 @@ func (r *_Settings) Load() error {
 	}
 
 	return nil
-}
-
-func (r *_Settings) InSandbox(m v1alpha1.MigResource) bool {
-	return m.GetNamespace() == r.SandboxNamespace
-}
-
-func (r *_Settings) InPrivileged(m v1alpha1.MigResource) bool {
-	return m.GetNamespace() == r.PrivilegedNamespace
 }
 
 func (r *_Settings) loadNamespaceVars() error {

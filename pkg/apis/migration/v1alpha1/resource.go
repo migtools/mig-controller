@@ -77,11 +77,11 @@ func (r *MigPlan) HasReconciled() bool {
 }
 
 func (r *MigPlan) InSandbox() bool {
-	return settings.Settings.InSandbox(r)
+	return r.GetNamespace() == settings.Settings.SandboxNamespace
 }
 
 func (r *MigPlan) InPrivileged() bool {
-	return settings.Settings.InPrivileged(r)
+	return r.GetNamespace() == settings.Settings.PrivilegedNamespace
 }
 
 // Storage
@@ -119,10 +119,11 @@ func (r *MigStorage) HasReconciled() bool {
 }
 
 func (r *MigStorage) InSandbox() bool {
-	return settings.Settings.InSandbox(r)
+	return r.GetNamespace() == settings.Settings.SandboxNamespace
 }
+
 func (r *MigStorage) InPrivileged() bool {
-	return settings.Settings.InPrivileged(r)
+	return r.GetNamespace() == settings.Settings.PrivilegedNamespace
 }
 
 // Cluster
@@ -160,11 +161,11 @@ func (r *MigCluster) HasReconciled() bool {
 }
 
 func (r *MigCluster) InSandbox() bool {
-	return settings.Settings.InSandbox(r)
+	return r.GetNamespace() == settings.Settings.SandboxNamespace
 }
 
 func (r *MigCluster) InPrivileged() bool {
-	return settings.Settings.InPrivileged(r)
+	return r.GetNamespace() == settings.Settings.PrivilegedNamespace
 }
 
 // Migration
@@ -202,11 +203,11 @@ func (r *MigMigration) HasReconciled() bool {
 }
 
 func (r *MigMigration) InSandbox() bool {
-	return settings.Settings.InSandbox(r)
+	return r.GetNamespace() == settings.Settings.SandboxNamespace
 }
 
 func (r *MigMigration) InPrivileged() bool {
-	return settings.Settings.InPrivileged(r)
+	return r.GetNamespace() == settings.Settings.PrivilegedNamespace
 }
 
 //
