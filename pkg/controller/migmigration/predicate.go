@@ -2,7 +2,6 @@ package migmigration
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/controller/common"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -14,27 +13,27 @@ type MigrationPredicate struct {
 }
 
 func (r MigrationPredicate) Create(e event.CreateEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
+		if !migration.InSandbox() {
+			return false
+		}
 		r.mapRefs(migration)
 	}
 	return true
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigMigration)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InSandbox() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		(old.Status.HasCondition(HasFinalMigration) &&
@@ -47,11 +46,11 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
+		if !migration.InSandbox() {
+			return false
+		}
 		r.unmapRefs(migration)
 	}
 	return true
@@ -106,22 +105,21 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
-	if !cast {
-		return false
+	if cast && new.InSandbox() {
+		// Reconciled by the controller.
+		return new.HasReconciled()
 	}
-	// Reconciled by the controller.
-	return new.HasReconciled()
+	return false
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	plan, cast := e.Object.(*migapi.MigPlan)
+	return cast && plan.InSandbox()
 }
 
 func (r PlanPredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	plan, cast := e.Object.(*migapi.MigPlan)
+	return cast && plan.InSandbox()
 }
 

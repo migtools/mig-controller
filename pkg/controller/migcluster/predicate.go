@@ -2,7 +2,6 @@ package migcluster
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/controller/common"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"reflect"
@@ -15,27 +14,27 @@ type ClusterPredicate struct {
 }
 
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
-	if !common.IsInSingletonNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
 		r.mapRefs(cluster)
 	}
 	return true
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSingletonNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	old, cast := e.ObjectOld.(*migapi.MigCluster)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InPrivileged() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
@@ -47,18 +46,25 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
-	if !common.IsInSingletonNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
 		r.unmapRefs(cluster)
 	}
 	return true
 }
 
 func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
+		r.mapRefs(cluster)
+	}
+	return true
 }
 
 func (r ClusterPredicate) mapRefs(cluster *migapi.MigCluster) {

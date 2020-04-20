@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 //
@@ -23,8 +25,8 @@ const (
 	HttpsProxy = "HTTPS_PROXY"
 	NoProxy    = "NO_PROXY"
 	//
-	SingletonNamespace = "SINGLETON_NAMESPACE"
-	SandboxNamespace   = "SANDBOX_NAMESPACE"
+	PrivilegedNamespace = "PRIVILEGED_NAMESPACE"
+	SandboxNamespace    = "SANDBOX_NAMESPACE"
 )
 
 // Global
@@ -35,10 +37,10 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
-	Roles              map[string]bool
-	ProxyVars          map[string]string
-	SingletonNamespace string
-	SandboxNamespace   string
+	Roles               map[string]bool
+	ProxyVars           map[string]string
+	PrivilegedNamespace string
+	SandboxNamespace    string
 }
 
 // Load settings.
@@ -63,12 +65,20 @@ func (r *_Settings) Load() error {
 	return nil
 }
 
+func (r *_Settings) InSandbox(m v1alpha1.MigResource) bool {
+	return m.GetNamespace() == r.SandboxNamespace
+}
+
+func (r *_Settings) InPrivileged(m v1alpha1.MigResource) bool {
+	return m.GetNamespace() == r.PrivilegedNamespace
+}
+
 func (r *_Settings) loadNamespaceVars() error {
 	if s, found := os.LookupEnv(SandboxNamespace); found {
 		r.SandboxNamespace = s
 	}
-	if s, found := os.LookupEnv(SingletonNamespace); found {
-		r.SingletonNamespace = s
+	if s, found := os.LookupEnv(PrivilegedNamespace); found {
+		r.PrivilegedNamespace = s
 	}
 	return nil
 }

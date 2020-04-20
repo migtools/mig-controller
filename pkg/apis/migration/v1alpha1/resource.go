@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/google/uuid"
+	"github.com/konveyor/mig-controller/pkg/settings"
 )
 
 const (
@@ -35,6 +36,10 @@ type MigResource interface {
 	MarkReconciled()
 	// Get whether the resource has been reconciled.
 	HasReconciled() bool
+	// Get whether the resource lives in the sandbox namespace.
+	InSandbox() bool
+	// Get whether the resource lives in the privileged namespace.
+	InPrivileged() bool
 }
 
 // Plan
@@ -71,6 +76,14 @@ func (r *MigPlan) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
+func (r *MigPlan) InSandbox() bool {
+	return settings.Settings.InSandbox(r)
+}
+
+func (r *MigPlan) InPrivileged() bool {
+	return settings.Settings.InPrivileged(r)
+}
+
 // Storage
 func (r *MigStorage) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
@@ -103,6 +116,13 @@ func (r *MigStorage) MarkReconciled() {
 
 func (r *MigStorage) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
+func (r *MigStorage) InSandbox() bool {
+	return settings.Settings.InSandbox(r)
+}
+func (r *MigStorage) InPrivileged() bool {
+	return settings.Settings.InPrivileged(r)
 }
 
 // Cluster
@@ -139,6 +159,14 @@ func (r *MigCluster) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
+func (r *MigCluster) InSandbox() bool {
+	return settings.Settings.InSandbox(r)
+}
+
+func (r *MigCluster) InPrivileged() bool {
+	return settings.Settings.InPrivileged(r)
+}
+
 // Migration
 func (r *MigMigration) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
@@ -171,6 +199,14 @@ func (r *MigMigration) MarkReconciled() {
 
 func (r *MigMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
+func (r *MigMigration) InSandbox() bool {
+	return settings.Settings.InSandbox(r)
+}
+
+func (r *MigMigration) InPrivileged() bool {
+	return settings.Settings.InPrivileged(r)
 }
 
 //

@@ -15,27 +15,27 @@ type StoragePredicate struct {
 }
 
 func (r StoragePredicate) Create(e event.CreateEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
+		if !storage.InSandbox() {
+			return false
+		}
 		r.mapRefs(storage)
 	}
 	return true
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	old, cast := e.ObjectOld.(*migapi.MigStorage)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InSandbox() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec)
 	if changed {
@@ -46,18 +46,25 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
+		if !storage.InSandbox() {
+			return false
+		}
 		r.unmapRefs(storage)
 	}
 	return true
 }
 
 func (r StoragePredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	storage, cast := e.Object.(*migapi.MigStorage)
+	if cast {
+		if !storage.InSandbox() {
+			return false
+		}
+		r.mapRefs(storage)
+	}
+	return true
 }
 
 func (r StoragePredicate) mapRefs(storage *migapi.MigStorage) {

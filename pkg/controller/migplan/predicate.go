@@ -15,27 +15,27 @@ type PlanPredicate struct {
 }
 
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
 		r.mapRefs(plan)
 	}
 	return true
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	old, cast := e.ObjectOld.(*migapi.MigPlan)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InSandbox() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
@@ -47,12 +47,23 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	if !common.IsInSandboxNamespace(e.Meta.GetNamespace()) {
-		return false
-	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
 		r.unmapRefs(plan)
+	}
+	return true
+}
+
+func (r PlanPredicate) Generic(e event.GenericEvent) bool {
+	plan, cast := e.Object.(*migapi.MigPlan)
+	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
+		r.mapRefs(plan)
 	}
 	return true
 }
@@ -97,9 +108,6 @@ func (r PlanPredicate) mapRefs(plan *migapi.MigPlan) {
 	}
 }
 
-func (r PlanPredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
-}
 
 func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 	refMap := migref.GetMap()
@@ -150,23 +158,22 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSingletonNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
-	if !cast {
-		return false
+	if cast && new.InPrivileged() {
+		// Reconciled by the controller.
+		return new.HasReconciled()
 	}
-	// Reconciled by the controller.
-	return new.HasReconciled()
+	return false
 }
 
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
-	return common.IsInSingletonNamespace(e.Meta.GetNamespace())
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	return cast && cluster.InPrivileged()
 }
 
 func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSingletonNamespace(e.Meta.GetNamespace())
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	return cast && cluster.InPrivileged()
 }
 
 type StoragePredicate struct {
@@ -178,23 +185,22 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
-	if !cast {
-		return false
+	if cast && new.InSandbox() {
+		// Reconciled by the controller.
+		return new.HasReconciled()
 	}
-	// Reconciled by the controller.
-	return new.HasReconciled()
+	return false
 }
 
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	storage, cast := e.Object.(*migapi.MigStorage)
+	return cast && storage.InSandbox()
 }
 
 func (r StoragePredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	storage, cast := e.Object.(*migapi.MigStorage)
+	return cast && storage.InSandbox()
 }
 
 type MigrationPredicate struct {
@@ -206,15 +212,15 @@ func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
-	if !common.IsInSandboxNamespace(e.MetaNew.GetNamespace()) {
-		return false
-	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
 	if !cast {
 		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigMigration)
 	if !cast {
+		return false
+	}
+	if !old.InSandbox() {
 		return false
 	}
 	started := !old.Status.HasCondition(migctl.Running) &&
@@ -229,9 +235,11 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	migration, cast := e.Object.(*migapi.MigMigration)
+	return cast && migration.InSandbox()
 }
 
 func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
-	return common.IsInSandboxNamespace(e.Meta.GetNamespace())
+	migration, cast := e.Object.(*migapi.MigMigration)
+	return cast && migration.InSandbox()
 }
