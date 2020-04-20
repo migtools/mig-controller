@@ -159,6 +159,8 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 		Host:            m.Spec.URL,
 		BearerToken:     string(secret.Data[SaToken]),
 		TLSClientConfig: tlsClientConfig,
+		Burst:           1000,
+		QPS:             100,
 	}
 
 	return restConfig, nil

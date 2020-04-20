@@ -50,6 +50,8 @@ spec:
                 - serviceAccount
                 type: object
               type: array
+            identitySecretRef:
+              type: object
             migStorageRef:
               type: object
             namespaces:
