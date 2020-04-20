@@ -20,7 +20,13 @@ import (
 //
 // A smart client.
 // Provides seamless API version compatibility.
-type Client struct {
+type Client interface {
+	k8sclient.Client
+	dapi.DiscoveryInterface
+	RestConfig() *rest.Config
+}
+
+type client struct {
 	*rest.Config
 	k8sclient.Client
 	dapi.DiscoveryInterface
@@ -32,7 +38,7 @@ type Client struct {
 
 //
 // Create a new client.
-func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
+func NewClient(restCfg *rest.Config) (Client, error) {
 	rClient, err := k8sclient.New(
 		restCfg,
 		k8sclient.Options{
@@ -57,7 +63,7 @@ func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	nClient := &Client{
+	nClient := &client{
 		Config:             restCfg,
 		Client:             rClient,
 		DiscoveryInterface: dClient,
@@ -68,9 +74,13 @@ func NewClient(restCfg *rest.Config) (k8sclient.Client, error) {
 	return nClient, nil
 }
 
+func (c client) RestConfig() *rest.Config {
+	return c.Config
+}
+
 //
 // supportedVersion will determine correct version of the object provided, based on cluster version
-func (c Client) supportedVersion(obj runtime.Object) runtime.Object {
+func (c client) supportedVersion(obj runtime.Object) runtime.Object {
 	if c.Minor < 16 {
 		switch obj.(type) {
 
@@ -116,7 +126,7 @@ func (c Client) supportedVersion(obj runtime.Object) runtime.Object {
 
 //
 // Down convert a resource as needed based on cluster version.
-func (c Client) downConvert(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
+func (c client) downConvert(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
 	new := c.supportedVersion(obj)
 	if new == obj {
 		return obj, nil
@@ -132,7 +142,7 @@ func (c Client) downConvert(ctx context.Context, obj runtime.Object) (runtime.Ob
 
 //
 // upConvert will convert src resource to dst as needed based on cluster version
-func (c Client) upConvert(ctx context.Context, src runtime.Object, dst runtime.Object) error {
+func (c client) upConvert(ctx context.Context, src runtime.Object, dst runtime.Object) error {
 	if c.supportedVersion(dst) == dst {
 		dst = src
 		return nil
@@ -144,7 +154,7 @@ func (c Client) upConvert(ctx context.Context, src runtime.Object, dst runtime.O
 //
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c Client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Object) error {
+func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Object) error {
 	obj := c.supportedVersion(in)
 	err := c.Client.Get(ctx, key, obj)
 	if err != nil {
@@ -157,7 +167,7 @@ func (c Client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 //
 // List the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c Client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime.Object) error {
+func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime.Object) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
@@ -172,7 +182,7 @@ func (c Client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 
 // Create the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c Client) Create(ctx context.Context, in runtime.Object) error {
+func (c client) Create(ctx context.Context, in runtime.Object) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
@@ -182,7 +192,7 @@ func (c Client) Create(ctx context.Context, in runtime.Object) error {
 
 // Delete the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c Client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.DeleteOptionFunc) error {
+func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.DeleteOptionFunc) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
@@ -192,7 +202,7 @@ func (c Client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 
 // Update the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c Client) Update(ctx context.Context, in runtime.Object) error {
+func (c client) Update(ctx context.Context, in runtime.Object) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err

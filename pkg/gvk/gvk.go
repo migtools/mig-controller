@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,12 +30,12 @@ type Compare struct {
 // Compare GVKs on both clusters, find incompatible GVKs
 // and check each plan source namespace for existence of incompatible GVKs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
-	srcResourceList, err := CollectResources(r.SrcDiscovery)
+	srcResourceList, err := collectResources(r.SrcDiscovery)
 	if err != nil {
 		return nil, err
 	}
 
-	dstResourceList, err := CollectResources(r.DstDiscovery)
+	dstResourceList, err := collectResources(r.DstDiscovery)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	resourcesDiff := compareResources(srcResourceList, dstResourceList)
-	incompatibleGVKs, err := ConvertToGVRList(resourcesDiff)
+	incompatibleGVKs, err := convertToGVRList(resourcesDiff)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 }
 
 // CollectResources collects all namespaced scoped apiResources from the cluster
-func CollectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	resources, err := discovery.ServerResources()
 	if err != nil {
 		return nil, err
@@ -70,8 +71,8 @@ func CollectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 	return resources, nil
 }
 
-// ConvertToGVRList converts provided apiResourceList to list of GroupVersionResources from the server
-func ConvertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
+// convertToGVRList converts provided apiResourceList to list of GroupVersionResources from the server
+func convertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	GVRs := []schema.GroupVersionResource{}
 	for _, resourceList := range resourceList {
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
@@ -86,6 +87,27 @@ func ConvertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVer
 	}
 
 	return GVRs, nil
+}
+
+// GetGVRsForCluster collects all namespaced scoped GVRs for the provided cluster compatible client
+func GetGVRsForCluster(cluster *migapi.MigCluster, c client.Client) (dynamic.Interface, []schema.GroupVersionResource, error) {
+	compat, err := cluster.GetClient(c)
+	if err != nil {
+		return nil, nil, err
+	}
+	dynamic, err := dynamic.NewForConfig(compat.RestConfig())
+	if err != nil {
+		return nil, nil, err
+	}
+	resourceList, err := collectResources(compat)
+	if err != nil {
+		return nil, nil, err
+	}
+	GVRs, err := convertToGVRList(resourceList)
+	if err != nil {
+		return nil, nil, err
+	}
+	return dynamic, GVRs, nil
 }
 
 func excludeSubresources(resources []metav1.APIResource) []metav1.APIResource {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -815,12 +816,12 @@ func (t *Task) keepAnnotations() bool {
 }
 
 // Get a client for the source cluster.
-func (t *Task) getSourceClient() (k8sclient.Client, error) {
+func (t *Task) getSourceClient() (compat.Client, error) {
 	return t.PlanResources.SrcMigCluster.GetClient(t.Client)
 }
 
 // Get a client for the destination cluster.
-func (t *Task) getDestinationClient() (k8sclient.Client, error) {
+func (t *Task) getDestinationClient() (compat.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
