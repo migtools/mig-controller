@@ -461,6 +461,11 @@ func (in *MigPlanSpec) DeepCopyInto(out *MigPlanSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
+	if in.IdentitySecretRef != nil {
+		in, out := &in.IdentitySecretRef, &out.IdentitySecretRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
 	return
 }
 
