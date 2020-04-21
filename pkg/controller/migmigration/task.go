@@ -29,7 +29,8 @@ const (
 	InitialBackupCreated          = "InitialBackupCreated"
 	InitialBackupFailed           = "InitialBackupFailed"
 	AnnotateResources             = "AnnotateResources"
-	EnsureStagePods               = "EnsureStagePods"
+	EnsureStagePodsFromRunning    = "EnsureStagePodsFromRunning"
+	EnsureStagePodsFromTemplates  = "EnsureStagePodsFromTemplates"
 	StagePodsCreated              = "StagePodsCreated"
 	RestartRestic                 = "RestartRestic"
 	ResticRestarted               = "ResticRestarted"
@@ -82,7 +83,8 @@ var StageItinerary = Itinerary{
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: AnnotateResources, all: HasPVs},
-		{phase: EnsureStagePods, all: HasPVs},
+		{phase: EnsureStagePodsFromRunning, all: HasPVs},
+		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
@@ -112,7 +114,8 @@ var FinalItinerary = Itinerary{
 		{phase: EnsureInitialBackup},
 		{phase: InitialBackupCreated},
 		{phase: AnnotateResources, all: HasPVs},
-		{phase: EnsureStagePods, all: HasPVs},
+		{phase: EnsureStagePodsFromRunning, all: HasPVs},
+		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
@@ -311,8 +314,15 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
-	case EnsureStagePods:
-		err := t.ensureStagePodsCreated()
+	case EnsureStagePodsFromRunning:
+		err := t.ensureStagePodsFromRunning()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.next()
+	case EnsureStagePodsFromTemplates:
+		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
 			log.Trace(err)
 			return err
