@@ -29,10 +29,13 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -114,10 +117,16 @@ func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (*MigCluster, e
 	return GetCluster(client, r.Spec.DestMigClusterRef)
 }
 
-// GetStorage - Get the referenced storage..
+// GetStorage - Get the referenced storage.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
+}
+
+// GetTemplateResources - Get the templates to create stage pods from.
+// Returned list is combinded from user specified list, and a default one
+func (r *MigPlan) GetTemplateResources() []TemplateResource {
+	return append(DefaultTemplates, r.Spec.Templates...)
 }
 
 // Resources referenced by the plan.
@@ -217,6 +226,53 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 
 	list := append(stage, final...)
 	return list, nil
+}
+
+// ListTemplates - get list of pod templates, associated with a plan resource
+func (r *MigPlan) ListTemplates(client k8sclient.Client) ([]corev1.PodTemplateSpec, error) {
+	podTemplates := []corev1.PodTemplateSpec{}
+	for _, template := range r.GetTemplateResources() {
+		// Get resources
+		list := unstructured.UnstructuredList{}
+		templateGVK := template.GroupKind().WithVersion("")
+		list.SetGroupVersionKind(templateGVK)
+		err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
+		if err != nil {
+			return nil, err
+		}
+		resources := []unstructured.Unstructured{}
+		for _, resource := range list.Items {
+			for _, ns := range r.GetSourceNamespaces() {
+				if resource.GetNamespace() == ns {
+					resources = append(resources, resource)
+					break
+				}
+			}
+		}
+
+		for _, resource := range resources {
+			podTemplate := corev1.PodTemplateSpec{}
+			unstructuredTemplate, found, err := unstructured.NestedMap(resource.Object, template.Path()...)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				return nil, fmt.Errorf("Template path %s was not found on resource: %s", template.TemplatePath, template.Resource)
+			}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTemplate, &podTemplate)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %w", template.TemplatePath, err)
+			}
+			objectKey := migref.ObjectKey(&resource)
+			podTemplate.ObjectMeta = metav1.ObjectMeta{
+				Name:      objectKey.Name,
+				Namespace: objectKey.Namespace,
+			}
+			podTemplates = append(podTemplates, podTemplate)
+		}
+	}
+
+	return podTemplates, nil
 }
 
 //
@@ -702,6 +758,7 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 const (
 	PvMoveAction = "move"
 	PvCopyAction = "copy"
+	PvSkipAction = "skip"
 )
 
 // PV Copy Methods.
@@ -731,9 +788,10 @@ type PV struct {
 
 // PVC
 type PVC struct {
-	Namespace   string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-	Name        string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	Namespace    string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	Name         string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	HasReference bool                              `json:"hasReference,omitempty"`
 }
 
 // Supported

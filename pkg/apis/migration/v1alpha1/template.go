@@ -15,6 +15,37 @@ type TemplateResource struct {
 	TemplatePath string `json:"templatePath"`
 }
 
+var DefaultTemplates = []TemplateResource{
+	{
+		Resource:     "cronjob.batch",
+		TemplatePath: ".spec.jobTemplate.spec.template",
+	},
+	{
+		Resource:     "deployment.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "deploymentconfig.apps.openshift.io",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "replicationcontroller",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "daemonset.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "statefulset.apps",
+		TemplatePath: ".spec.template",
+	},
+	{
+		Resource:     "replicaset.apps",
+		TemplatePath: ".spec.template",
+	},
+}
+
 func (t *TemplateResource) GroupKind() schema.GroupKind {
 	return schema.ParseGroupKind(t.Resource)
 }

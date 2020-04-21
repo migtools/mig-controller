@@ -74,8 +74,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
-	namespaces := plan.GetSourceNamespaces()
-	claims, err := r.getClaims(client, namespaces)
+	claims, err := r.getClaims(client, plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -100,7 +99,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 				Capacity:     pv.Spec.Capacity[core.ResourceStorage],
 				StorageClass: getStorageClassName(pv),
 				Supported: migapi.Supported{
-					Actions:     r.getSupportedActions(pv),
+					Actions:     r.getSupportedActions(pv, claim),
 					CopyMethods: r.getSupportedCopyMethods(pv),
 				},
 				Selection: selection,
@@ -181,45 +180,63 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 }
 
 // Get a list of PVCs found within the specified namespaces.
-func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []string) (Claims, error) {
+func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPlan) (Claims, error) {
 	claims := Claims{}
-	for _, ns := range namespaces {
-		list := &core.PersistentVolumeClaimList{}
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, list)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
+	list := &core.PersistentVolumeClaimList{}
+	err := client.List(context.TODO(), &k8sclient.ListOptions{}, list)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	templates, err := plan.ListTemplates(client)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	inNamespaces := func(pvc core.PersistentVolumeClaim, namespaces []string) bool {
+		for _, ns := range namespaces {
+			if ns == pvc.Namespace {
+				return true
+			}
 		}
-		for _, pvc := range list.Items {
-			claims = append(
-				claims, migapi.PVC{
-					Namespace:   ns,
-					Name:        pvc.Name,
-					AccessModes: pvc.Spec.AccessModes,
-				})
+		return false
+	}
+
+	for _, pvc := range list.Items {
+		if !inNamespaces(pvc, plan.GetSourceNamespaces()) {
+			continue
 		}
+		claims = append(
+			claims, migapi.PVC{
+				Namespace:    pvc.Namespace,
+				Name:         pvc.Name,
+				AccessModes:  pvc.Spec.AccessModes,
+				HasReference: pvcInTemplates(pvc, templates),
+			})
 	}
 
 	return claims, nil
 }
 
 // Determine the supported PV actions.
-func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []string {
+func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim migapi.PVC) []string {
+	suportedActions := []string{}
+	if !claim.HasReference {
+		suportedActions = append(suportedActions, migapi.PvSkipAction)
+	}
 	if pv.Spec.HostPath != nil {
-		return []string{}
+		return suportedActions
 	}
 	if pv.Spec.NFS != nil ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
-		return []string{
+		return append(suportedActions,
 			migapi.PvCopyAction,
-			migapi.PvMoveAction,
-		}
+			migapi.PvMoveAction)
 	}
-	return []string{
-		migapi.PvCopyAction,
-	}
+	return append(suportedActions, migapi.PvCopyAction)
 }
 
 // Determine the supported PV copy methods.
@@ -251,7 +268,7 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 	if err != nil {
 		return migapi.Selection{}, err
 	}
-	actions := r.getSupportedActions(pv)
+	actions := r.getSupportedActions(pv, claim)
 	selectedAction := ""
 	// if there's only one action, make that the default, otherwise select "copy" (if available)
 	if len(actions) == 1 {
@@ -388,5 +405,17 @@ func isRWO(accessModes []core.PersistentVolumeAccessMode) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func pvcInTemplates(pvc core.PersistentVolumeClaim, templates []core.PodTemplateSpec) bool {
+	for _, template := range templates {
+		for _, volume := range template.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name {
+				return true
+			}
+		}
+	}
+
 	return false
 }

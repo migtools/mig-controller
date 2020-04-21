@@ -2,52 +2,18 @@ package migmigration
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-var DefaultTemplates = []migapi.TemplateResource{
-	{
-		Resource:     "cronjob.batch",
-		TemplatePath: ".spec.jobTemplate.spec.template",
-	},
-	{
-		Resource:     "deployment.apps",
-		TemplatePath: ".spec.template",
-	},
-	{
-		Resource:     "deploymentconfig.apps.openshift.io",
-		TemplatePath: ".spec.template",
-	},
-	{
-		Resource:     "replicationcontroller",
-		TemplatePath: ".spec.template",
-	},
-	{
-		Resource:     "daemonset.apps",
-		TemplatePath: ".spec.template",
-	},
-	{
-		Resource:     "statefulset.apps",
-		TemplatePath: ".spec.template",
-	},
-	{
-		Resource:     "replicaset.apps",
-		TemplatePath: ".spec.template",
-	},
-}
 
 type StagePod struct {
 	corev1.Pod
@@ -133,47 +99,15 @@ func (l *StagePodList) list(client k8sclient.Client, labels map[string]string) e
 // Ensure all stage pods from running pods withing the application were created
 func (t *Task) ensureStagePodsFromTemplates() error {
 	stagePods := StagePodList{}
-	podTemplates := append(DefaultTemplates, t.PlanResources.MigPlan.Spec.Templates...)
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 
-	for _, template := range podTemplates {
-		// Get resources
-		list := unstructured.UnstructuredList{}
-		templateGVK := template.GroupKind().WithVersion("")
-		list.SetGroupVersionKind(templateGVK)
-		err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
-		if err != nil {
-			return err
-		}
-		resources := []unstructured.Unstructured{}
-		for _, resource := range list.Items {
-			for _, ns := range t.sourceNamespaces() {
-				if resource.GetNamespace() == ns {
-					resources = append(resources, resource)
-					break
-				}
-			}
-		}
-
-		for _, resource := range resources {
-			podTemplate := corev1.PodTemplateSpec{}
-			unstructuredTemplate, found, err := unstructured.NestedMap(resource.Object, template.Path()...)
-			if err != nil {
-				return err
-			}
-			if !found {
-				return fmt.Errorf("Template path %s was not found on resource: %s", template.TemplatePath, template.Resource)
-			}
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTemplate, &podTemplate)
-			if err != nil {
-				return fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %w", template.TemplatePath, err)
-			}
-			stagePods.merge(buildStagePodFromTemplate(migref.ObjectKey(&resource), t.stagePodLabels(), &podTemplate))
-		}
+	podTemplates, err := t.PlanResources.MigPlan.ListTemplates(client)
+	for _, podTemplate := range podTemplates {
+		stagePods.merge(buildStagePodFromTemplate(migref.ObjectKey(&podTemplate), t.stagePodLabels(), &podTemplate))
 	}
 
 	created, err := stagePods.create(client)
