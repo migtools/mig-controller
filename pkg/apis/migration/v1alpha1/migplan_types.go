@@ -803,7 +803,7 @@ type Supported struct {
 }
 
 // Selection
-// Action - The PV migration action (move|copy)
+// Action - The PV migration action (move|copy|skip)
 // StorageClass - The PV storage class name to use in the destination cluster.
 // AccessMode   - The PV access mode to use in the destination cluster, if different from src PVC AccessMode
 // CopyMethod   - The PV copy method to use ('filesystem' for restic copy, or 'snapshot' for velero snapshot plugin)

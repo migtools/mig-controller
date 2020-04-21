@@ -835,14 +835,28 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
-// Get the persistent volumes included in the plan.
+// Get the persistent volumes included in the plan which are not skipped.
 func (t *Task) getPVs() migapi.PersistentVolumes {
-	return t.PlanResources.MigPlan.Spec.PersistentVolumes
+	volumes := []migapi.PV{}
+	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
+		if pv.Selection.Action != migapi.PvSkipAction {
+			volumes = append(volumes, pv)
+		}
+	}
+	pvList := t.PlanResources.MigPlan.Spec.PersistentVolumes.DeepCopy()
+	pvList.List = volumes
+	return *pvList
 }
 
-// Get whether the associated plan lists any PVs.
+// Get whether the associated plan lists not skipped PVs.
 func (t *Task) hasPVs() bool {
-	return len(t.getPVs().List) > 0
+	count := 0
+	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
+		if pv.Selection.Action != migapi.PvSkipAction {
+			count++
+		}
+	}
+	return count > 0
 }
 
 // Get whether the verification is desired
