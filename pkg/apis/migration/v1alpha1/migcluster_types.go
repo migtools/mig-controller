@@ -18,12 +18,13 @@ package v1alpha1
 
 import (
 	"context"
+	"time"
+
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"time"
 
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
@@ -104,7 +105,7 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 }
 
 // GetClient get a local or remote client using a MigCluster and an existing client
-func (m *MigCluster) GetClient(c k8sclient.Client) (k8sclient.Client, error) {
+func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err

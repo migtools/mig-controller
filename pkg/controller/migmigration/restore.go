@@ -6,14 +6,11 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -310,7 +307,7 @@ func (t *Task) deleteRestores() error {
 }
 
 func (t *Task) deleteMigrated() error {
-	client, GVRs, err := t.getResourcesForDelete()
+	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -354,7 +351,7 @@ func (t *Task) deleteMigrated() error {
 }
 
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
-	client, GVRs, err := t.getResourcesForDelete()
+	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		log.Trace(err)
 		return false, err
@@ -378,29 +375,4 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	}
 
 	return true, nil
-}
-
-func (t *Task) getResourcesForDelete() (dynamic.Interface, []schema.GroupVersionResource, error) {
-	c, err := t.getDestinationClient()
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	dstClient := c.(*compat.Client)
-	client, err := dynamic.NewForConfig(dstClient.Config)
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	resourceList, err := gvk.CollectResources(dstClient)
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	GVRs, err := gvk.ConvertToGVRList(resourceList)
-	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
-	}
-	return client, GVRs, nil
 }

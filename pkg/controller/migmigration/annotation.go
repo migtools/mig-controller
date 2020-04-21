@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/gvk"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -490,7 +491,7 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []st
 // deleteLabels will delete all migration.openshift.io/migrated-by labels
 // from the application upon successful completion
 func (t *Task) deleteLabels() error {
-	client, GVRs, err := t.getResourcesForDelete()
+	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		log.Trace(err)
 		return err

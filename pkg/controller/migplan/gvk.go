@@ -2,7 +2,6 @@ package migplan
 
 import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -44,19 +43,17 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, err
 		return nil, err
 	}
 
-	src, err := srcCluster.GetClient(r)
+	srcClient, err := srcCluster.GetClient(r)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
-	srcClient := src.(compat.Client)
-	dst, err := dstCluster.GetClient(r)
+	dstClient, err := dstCluster.GetClient(r)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
-	dstClient := dst.(compat.Client)
-	dynamicClient, err := dynamic.NewForConfig(srcClient.Config)
+	dynamicClient, err := dynamic.NewForConfig(srcClient.RestConfig())
 	if err != nil {
 		log.Trace(err)
 		return nil, err
