@@ -33,10 +33,10 @@ type AddFunction func(manager.Manager) error
 
 var Controllers = map[string]AddFunction{
 	settings.ClusterRole:   migcluster.Add,
-	settings.PlanRole:      migplan.Add,
-	settings.MigrationRole: migmigration.Add,
-	settings.StorageRole:   migstorage.Add,
 	settings.DiscoveryRole: discovery.Add,
+	settings.MigrationRole: migmigration.Add,
+	settings.PlanRole:      migplan.Add,
+	settings.StorageRole:   migstorage.Add,
 }
 
 //
@@ -48,7 +48,7 @@ func AddToManager(m manager.Manager) error {
 	}
 
 	for controllerRole, addFunc := range Controllers {
-		if settings.Settings.HasRole(controllerRole) {
+		if settings.Settings.Role.Enabled(controllerRole) {
 			if err := addFunc(m); err != nil {
 				return err
 			}
