@@ -122,6 +122,7 @@ func (r *MigPlan) GetSourceIdentity(client k8sclient.Client) (*migauth.Identity,
 		Token:   srcToken,
 		RestCfg: *srcRestCfg,
 	}
+	srcIdentity.BuildClient()
 	return srcIdentity, nil
 }
 
@@ -147,6 +148,7 @@ func (r *MigPlan) GetDestinationIdentity(client k8sclient.Client) (*migauth.Iden
 		Token:   destToken,
 		RestCfg: *destRestCfg,
 	}
+	destIdentity.BuildClient()
 	return destIdentity, nil
 }
 

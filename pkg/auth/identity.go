@@ -15,12 +15,12 @@ type Authorized map[string]bool
 type Identity struct {
 	Token   string
 	RestCfg rest.Config
-	client  k8sclient.Client
+	Client  k8sclient.Client
 }
 
 func (r *Identity) HasRead(namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
-	err := r.buildClient()
+	err := r.BuildClient()
 	if err != nil {
 		return authorized, err
 	}
@@ -34,7 +34,7 @@ func (r *Identity) HasRead(namespaces []string) (Authorized, error) {
 				},
 			},
 		}
-		err := r.client.Create(context.TODO(), &sar)
+		err := r.Client.Create(context.TODO(), &sar)
 		if err != nil {
 			return authorized, err
 		}
@@ -46,7 +46,7 @@ func (r *Identity) HasRead(namespaces []string) (Authorized, error) {
 
 func (r *Identity) HasMigrate(namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
-	err := r.buildClient()
+	err := r.BuildClient()
 	if err != nil {
 		return authorized, err
 	}
@@ -67,8 +67,8 @@ func (r *Identity) Authenticates(client k8sclient.Client) (bool, error) {
 	return tokenReview.Status.Authenticated, nil
 }
 
-func (r *Identity) buildClient() error {
-	if r.client != nil {
+func (r *Identity) BuildClient() error {
+	if r.Client != nil {
 		return nil
 	}
 	// build client using r.RestCfg and replacing the token with r.Token.
@@ -78,7 +78,6 @@ func (r *Identity) buildClient() error {
 	if err != nil {
 		return err
 	}
-	r.client = client
-
+	r.Client = client
 	return nil
 }
