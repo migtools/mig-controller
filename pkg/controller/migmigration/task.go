@@ -682,6 +682,15 @@ func (t *Task) init() {
 	if t.Owner.Status.Itenerary != t.Itinerary.Name {
 		t.Phase = t.Itinerary.Steps[0].phase
 	}
+	if t.stage() && !t.hasPVs() {
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     StageNoOp,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  StageNoOpMessage,
+			Durable:  true,
+		})
+	}
 }
 
 // Advance the task to the next phase.
