@@ -167,7 +167,7 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return err
 	}
 
-	podTemplates, err := t.PlanResources.MigPlan.ListTemplates(client)
+	podTemplates, err := t.PlanResources.MigPlan.ListTemplatePods(client)
 	for _, podTemplate := range podTemplates {
 		stagePods.merge(buildStagePodFromTemplate(migref.ObjectKey(&podTemplate), t.stagePodLabels(), &podTemplate))
 	}

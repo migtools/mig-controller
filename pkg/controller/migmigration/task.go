@@ -58,6 +58,7 @@ const (
 	DeleteMigrated                  = "DeleteMigrated"
 	DeleteBackups                   = "DeleteBackups"
 	DeleteRestores                  = "DeleteRestores"
+	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
 	Canceled                        = "Canceled"
 	Completed                       = "Completed"
@@ -163,6 +164,7 @@ var CancelItinerary = Itinerary{
 var FailedItinerary = Itinerary{
 	Name: "Failed",
 	Steps: []Step{
+		{phase: MigrationFailed},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, all: HasPVs},
 		{phase: DeleteMigrated},
@@ -303,7 +305,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(InitialBackupFailed, reasons)
+				t.fail(InitialBackupFailed, reasons...)
 			} else {
 				t.next()
 			}
@@ -420,7 +422,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(StageBackupFailed, reasons)
+				t.fail(StageBackupFailed, reasons...)
 			} else {
 				t.next()
 			}
@@ -501,7 +503,7 @@ func (t *Task) Run() error {
 		if completed {
 			t.setResticConditions(restore)
 			if len(reasons) > 0 {
-				t.fail(StageRestoreFailed, reasons)
+				t.fail(StageRestoreFailed, reasons...)
 			} else {
 				t.next()
 			}
@@ -595,7 +597,7 @@ func (t *Task) Run() error {
 		}
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(FinalRestoreFailed, reasons)
+				t.fail(FinalRestoreFailed, reasons...)
 			} else {
 				t.next()
 			}
@@ -676,7 +678,7 @@ func (t *Task) Run() error {
 		})
 		t.next()
 	// Out of tree states - needs to be triggered manually with t.fail(...)
-	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
+	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed, MigrationFailed:
 		t.Requeue = NoReQ
 		t.next()
 	case Completed:
@@ -772,9 +774,8 @@ func (t *Task) anyFlags(step Step) bool {
 }
 
 // Phase fail.
-func (t *Task) fail(nextPhase string, reasons []string) {
+func (t *Task) fail(nextPhase string, reasons ...string) {
 	t.addErrors(reasons)
-	t.Phase = nextPhase
 	t.Owner.AddErrors(t.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     Failed,
@@ -784,6 +785,7 @@ func (t *Task) fail(nextPhase string, reasons []string) {
 		Message:  FailedMessage,
 		Durable:  true,
 	})
+	t.Phase = nextPhase
 }
 
 // Add errors.
