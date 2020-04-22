@@ -17,49 +17,50 @@ var NoReQ = time.Duration(0)
 
 // Phases
 const (
-	Created                       = ""
-	Started                       = "Started"
-	Prepare                       = "Prepare"
-	EnsureCloudSecretPropagated   = "EnsureCloudSecretPropagated"
-	PreBackupHooks                = "PreBackupHooks"
-	PostBackupHooks               = "PostBackupHooks"
-	PreRestoreHooks               = "PreRestoreHooks"
-	PostRestoreHooks              = "PostRestoreHooks"
-	EnsureInitialBackup           = "EnsureInitialBackup"
-	InitialBackupCreated          = "InitialBackupCreated"
-	InitialBackupFailed           = "InitialBackupFailed"
-	AnnotateResources             = "AnnotateResources"
-	EnsureStagePodsFromRunning    = "EnsureStagePodsFromRunning"
-	EnsureStagePodsFromTemplates  = "EnsureStagePodsFromTemplates"
-	StagePodsCreated              = "StagePodsCreated"
-	RestartRestic                 = "RestartRestic"
-	ResticRestarted               = "ResticRestarted"
-	QuiesceApplications           = "QuiesceApplications"
-	EnsureQuiesced                = "EnsureQuiesced"
-	UnQuiesceApplications         = "UnQuiesceApplications"
-	EnsureStageBackup             = "EnsureStageBackup"
-	StageBackupCreated            = "StageBackupCreated"
-	StageBackupFailed             = "StageBackupFailed"
-	EnsureInitialBackupReplicated = "EnsureInitialBackupReplicated"
-	EnsureStageBackupReplicated   = "EnsureStageBackupReplicated"
-	EnsureStageRestore            = "EnsureStageRestore"
-	StageRestoreCreated           = "StageRestoreCreated"
-	StageRestoreFailed            = "StageRestoreFailed"
-	EnsureFinalRestore            = "EnsureFinalRestore"
-	FinalRestoreCreated           = "FinalRestoreCreated"
-	FinalRestoreFailed            = "FinalRestoreFailed"
-	Verification                  = "Verification"
-	EnsureStagePodsDeleted        = "EnsureStagePodsDeleted"
-	EnsureStagePodsTerminated     = "EnsureStagePodsTerminated"
-	EnsureAnnotationsDeleted      = "EnsureAnnotationsDeleted"
-	EnsureLabelsDeleted           = "EnsureLabelsDeleted"
-	EnsureMigratedDeleted         = "EnsureMigratedDeleted"
-	DeleteMigrated                = "DeleteMigrated"
-	DeleteBackups                 = "DeleteBackups"
-	DeleteRestores                = "DeleteRestores"
-	Canceling                     = "Canceling"
-	Canceled                      = "Canceled"
-	Completed                     = "Completed"
+	Created                         = ""
+	Started                         = "Started"
+	Prepare                         = "Prepare"
+	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
+	PreBackupHooks                  = "PreBackupHooks"
+	PostBackupHooks                 = "PostBackupHooks"
+	PreRestoreHooks                 = "PreRestoreHooks"
+	PostRestoreHooks                = "PostRestoreHooks"
+	EnsureInitialBackup             = "EnsureInitialBackup"
+	InitialBackupCreated            = "InitialBackupCreated"
+	InitialBackupFailed             = "InitialBackupFailed"
+	AnnotateResources               = "AnnotateResources"
+	EnsureStagePodsFromRunning      = "EnsureStagePodsFromRunning"
+	EnsureStagePodsFromTemplates    = "EnsureStagePodsFromTemplates"
+	EnsureStagePodsFromOrphanedPVCs = "EnsureStagePodsFromOrphanedPVCs"
+	StagePodsCreated                = "StagePodsCreated"
+	RestartRestic                   = "RestartRestic"
+	ResticRestarted                 = "ResticRestarted"
+	QuiesceApplications             = "QuiesceApplications"
+	EnsureQuiesced                  = "EnsureQuiesced"
+	UnQuiesceApplications           = "UnQuiesceApplications"
+	EnsureStageBackup               = "EnsureStageBackup"
+	StageBackupCreated              = "StageBackupCreated"
+	StageBackupFailed               = "StageBackupFailed"
+	EnsureInitialBackupReplicated   = "EnsureInitialBackupReplicated"
+	EnsureStageBackupReplicated     = "EnsureStageBackupReplicated"
+	EnsureStageRestore              = "EnsureStageRestore"
+	StageRestoreCreated             = "StageRestoreCreated"
+	StageRestoreFailed              = "StageRestoreFailed"
+	EnsureFinalRestore              = "EnsureFinalRestore"
+	FinalRestoreCreated             = "FinalRestoreCreated"
+	FinalRestoreFailed              = "FinalRestoreFailed"
+	Verification                    = "Verification"
+	EnsureStagePodsDeleted          = "EnsureStagePodsDeleted"
+	EnsureStagePodsTerminated       = "EnsureStagePodsTerminated"
+	EnsureAnnotationsDeleted        = "EnsureAnnotationsDeleted"
+	EnsureLabelsDeleted             = "EnsureLabelsDeleted"
+	EnsureMigratedDeleted           = "EnsureMigratedDeleted"
+	DeleteMigrated                  = "DeleteMigrated"
+	DeleteBackups                   = "DeleteBackups"
+	DeleteRestores                  = "DeleteRestores"
+	Canceling                       = "Canceling"
+	Canceled                        = "Canceled"
+	Completed                       = "Completed"
 )
 
 // Flags
@@ -85,6 +86,7 @@ var StageItinerary = Itinerary{
 		{phase: AnnotateResources, all: HasPVs},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
+		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
@@ -116,6 +118,7 @@ var FinalItinerary = Itinerary{
 		{phase: AnnotateResources, all: HasPVs},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
+		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
@@ -320,6 +323,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
+		t.Requeue = NoReQ
 		t.next()
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
@@ -327,6 +331,15 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
+		t.Requeue = NoReQ
+		t.next()
+	case EnsureStagePodsFromOrphanedPVCs:
+		err := t.ensureStagePodsFromOrphanedPVCs()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.Requeue = NoReQ
 		t.next()
 	case StagePodsCreated:
 		started, err := t.ensureStagePodsStarted()
@@ -337,7 +350,7 @@ func (t *Task) Run() error {
 		if started {
 			t.next()
 		} else {
-			t.Requeue = PollReQ
+			t.Requeue = NoReQ
 		}
 	case RestartRestic:
 		err := t.restartResticPods()
@@ -787,7 +800,7 @@ func (t *Task) UID() string {
 
 // Get whether the migration has failed
 func (t *Task) failed() bool {
-	return t.Owner.HasErrors()
+	return t.Owner.HasErrors() || t.Owner.Status.HasCondition(Failed)
 }
 
 // Get whether the migration is cancelled.

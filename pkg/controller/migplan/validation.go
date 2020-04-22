@@ -499,10 +499,10 @@ func (r ReconcileMigPlan) validateAdditionalTemplates(plan *migapi.MigPlan) erro
 		log.Trace(err)
 		return err
 	}
-	_, err = plan.ListTemplates(client)
+	_, err = plan.ListTemplatePods(client)
 	if err != nil {
 		templates := []string{}
-		for _, template := range plan.Spec.TemplateResources.Templates {
+		for _, template := range plan.GetTemplateResources() {
 			templates = append(templates, template.Resource)
 		}
 		plan.Status.SetCondition(migapi.Condition{

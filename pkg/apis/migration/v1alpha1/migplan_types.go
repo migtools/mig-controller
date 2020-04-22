@@ -228,8 +228,8 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 	return list, nil
 }
 
-// ListTemplates - get list of pod templates, associated with a plan resource
-func (r *MigPlan) ListTemplates(client k8sclient.Client) ([]corev1.PodTemplateSpec, error) {
+// ListTemplatePods - get list of pod templates, associated with a plan resource
+func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.PodTemplateSpec, error) {
 	podTemplates := []corev1.PodTemplateSpec{}
 	for _, template := range r.GetTemplateResources() {
 		// Get resources

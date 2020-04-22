@@ -2,9 +2,8 @@ package migmigration
 
 import (
 	"context"
-	"sort"
+	"reflect"
 	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -15,32 +14,27 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// StagePod - wrapper for stage pod, allowing to compare  two stage pods for equality
 type StagePod struct {
 	corev1.Pod
 }
 
+// StagePodList - a list of stage pods, with built-in stage pod deduplication
 type StagePodList []StagePod
 
 func (p StagePod) equals(pod StagePod) bool {
-	if len(p.Spec.Volumes) != len(pod.Spec.Volumes) {
-		return false
-	}
-
-	volumeList := func(list []corev1.Volume) (volumes []string) {
-		for _, vol := range list {
-			volumes = append(volumes, vol.VolumeSource.String())
+	for _, volume := range p.Spec.Volumes {
+		found := false
+		for _, targetVolume := range pod.Spec.Volumes {
+			if reflect.DeepEqual(volume.VolumeSource, targetVolume.VolumeSource) {
+				found = true
+				break
+			}
 		}
-		sort.Strings(volumes)
-		return
-	}
-
-	targetVolumes := volumeList(pod.Spec.Volumes)
-	for i, volume := range volumeList(p.Spec.Volumes) {
-		if volume != targetVolumes[i] {
+		if !found {
 			return false
 		}
 	}
-
 	return true
 }
 
@@ -63,7 +57,7 @@ func (l *StagePodList) merge(list ...StagePod) {
 }
 
 func (l *StagePodList) create(client k8sclient.Client) (int, error) {
-	existingPods := &StagePodList{}
+	existingPods := StagePodList{}
 	if len(*l) > 0 {
 		existingPods.list(client, (*l)[0].Labels)
 	}
@@ -73,13 +67,13 @@ func (l *StagePodList) create(client k8sclient.Client) (int, error) {
 			continue
 		}
 		err := client.Create(context.TODO(), &stagePod.Pod)
-		if err != nil {
+		if err != nil && !errors.IsAlreadyExists(err) {
 			return 0, err
 		}
 		counter++
 	}
 
-	return counter + len(*existingPods), nil
+	return counter + len(existingPods), nil
 }
 
 func (l *StagePodList) list(client k8sclient.Client, labels map[string]string) error {
@@ -91,6 +85,74 @@ func (l *StagePodList) list(client k8sclient.Client, labels map[string]string) e
 	}
 	for _, pod := range podList.Items {
 		l.merge(buildStagePodFromPod(migref.ObjectKey(&pod), pod.Labels, &pod))
+	}
+
+	return nil
+}
+
+func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
+	existingStagePods := StagePodList{}
+	stagePods := StagePodList{}
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	err = existingStagePods.list(client, t.stagePodLabels())
+	if err != nil {
+		log.Trace(err)
+		return nil
+	}
+
+	pvcMounted := func(list StagePodList, claimName string) bool {
+		for _, pod := range list {
+			for _, volume := range pod.Spec.Volumes {
+				claim := volume.PersistentVolumeClaim
+				if claim != nil && claim.ClaimName == claimName {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	for _, ns := range t.sourceNamespaces() {
+		list := &corev1.PersistentVolumeClaimList{}
+		err = client.List(context.TODO(), k8sclient.InNamespace(ns), list)
+		if err != nil {
+			log.Trace(err)
+			return nil
+		}
+		for _, pvc := range list.Items {
+			t.getPVs()
+			// Exclude unbound PVCs
+			if pvc.Status.Phase != corev1.ClaimBound {
+				continue
+			}
+			if pvcMounted(existingStagePods, pvc.Name) {
+				continue
+			}
+			stagePods.merge(buildStagePod(pvc, t.stagePodLabels()))
+		}
+	}
+
+	created, err := stagePods.create(client)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	if created > 0 {
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     StagePodsCreated,
+			Status:   True,
+			Reason:   Created,
+			Category: Advisory,
+			Message:  "[] Stage pods created.",
+			Items:    []string{strconv.Itoa(created)},
+			Durable:  true,
+		})
 	}
 
 	return nil
@@ -146,12 +208,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 			log.Trace(err)
 			return err
 		}
-		cLabel, _ := t.Owner.GetCorrelationLabel()
 		for _, pod := range podList.Items {
-			// Skip already created stage pods.
-			if _, found := pod.Labels[cLabel]; found {
-				continue
-			}
 			stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), t.stagePodLabels(), &pod))
 		}
 	}
@@ -282,17 +339,12 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 
 // Build a stage pod based on `template`.
 func buildStagePodFromTemplate(ref k8sclient.ObjectKey, labels map[string]string, podSpec *corev1.PodTemplateSpec) StagePod {
-	// Map of Restic volumes.
-	resticVolumes := map[string]bool{}
-	for _, name := range strings.Split(podSpec.Annotations[ResticPvBackupAnnotation], ",") {
-		resticVolumes[name] = true
-	}
 	// Base pod.
 	newPod := StagePod{
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ref.Namespace,
-				Name:      ref.Name + "-" + "stage",
+				Name:      "stage-" + ref.Name,
 				Labels:    labels,
 			},
 			Spec: corev1.PodSpec{
@@ -315,6 +367,41 @@ func buildStagePodFromTemplate(ref k8sclient.ObjectKey, labels map[string]string
 			VolumeMounts: container.VolumeMounts,
 		}
 		newPod.Spec.Containers = append(newPod.Spec.Containers, stageContainer)
+	}
+
+	return newPod
+}
+
+// Build a generic stage pod for PVC, where no pod template could be used.
+func buildStagePod(pvc corev1.PersistentVolumeClaim, labels map[string]string) StagePod {
+	// Base pod.
+	newPod := StagePod{
+		Pod: corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: pvc.Namespace,
+				Name:      "stage-" + string(pvc.UID),
+				Labels:    labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:    "sleep",
+					Image:   "registry.access.redhat.com/rhel7",
+					Command: []string{"sleep"},
+					Args:    []string{"infinity"},
+					VolumeMounts: []corev1.VolumeMount{{
+						Name:      "stage",
+						MountPath: "/var/data",
+					}},
+				}},
+				Volumes: []corev1.Volume{{
+					Name: "stage",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
+						}},
+				}},
+			},
+		},
 	}
 
 	return newPod

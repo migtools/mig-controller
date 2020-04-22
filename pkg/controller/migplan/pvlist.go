@@ -189,7 +189,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return nil, err
 	}
 
-	templates, err := plan.ListTemplates(client)
+	templates, err := plan.ListTemplatePods(client)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
