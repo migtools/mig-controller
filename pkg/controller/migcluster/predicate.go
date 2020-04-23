@@ -16,6 +16,9 @@ type ClusterPredicate struct {
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
 		r.mapRefs(cluster)
 	}
 	return true
@@ -24,11 +27,14 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 	old, cast := e.ObjectOld.(*migapi.MigCluster)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InPrivileged() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
@@ -42,7 +48,21 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
 		r.unmapRefs(cluster)
+	}
+	return true
+}
+
+func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	if cast {
+		if !cluster.InPrivileged() {
+			return false
+		}
+		r.mapRefs(cluster)
 	}
 	return true
 }

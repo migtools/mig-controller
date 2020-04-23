@@ -16,6 +16,9 @@ type PlanPredicate struct {
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
 		r.mapRefs(plan)
 	}
 	return true
@@ -24,11 +27,14 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 	old, cast := e.ObjectOld.(*migapi.MigPlan)
 	if !cast {
-		return true
+		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
 	if !cast {
-		return true
+		return false
+	}
+	if !old.InSandbox() {
+		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
@@ -42,7 +48,21 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
 		r.unmapRefs(plan)
+	}
+	return true
+}
+
+func (r PlanPredicate) Generic(e event.GenericEvent) bool {
+	plan, cast := e.Object.(*migapi.MigPlan)
+	if cast {
+		if !plan.InSandbox() {
+			return false
+		}
+		r.mapRefs(plan)
 	}
 	return true
 }
@@ -137,11 +157,21 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
-	if !cast {
-		return false
+	if cast && new.InPrivileged() {
+		// Reconciled by the controller.
+		return new.HasReconciled()
 	}
-	// Reconciled by the controller.
-	return new.HasReconciled()
+	return false
+}
+
+func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	return cast && cluster.InPrivileged()
+}
+
+func (r ClusterPredicate) Generic(e event.GenericEvent) bool {
+	cluster, cast := e.Object.(*migapi.MigCluster)
+	return cast && cluster.InPrivileged()
 }
 
 type StoragePredicate struct {
@@ -154,11 +184,21 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
-	if !cast {
-		return false
+	if cast && new.InSandbox() {
+		// Reconciled by the controller.
+		return new.HasReconciled()
 	}
-	// Reconciled by the controller.
-	return new.HasReconciled()
+	return false
+}
+
+func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
+	storage, cast := e.Object.(*migapi.MigStorage)
+	return cast && storage.InSandbox()
+}
+
+func (r StoragePredicate) Generic(e event.GenericEvent) bool {
+	storage, cast := e.Object.(*migapi.MigStorage)
+	return cast && storage.InSandbox()
 }
 
 type MigrationPredicate struct {
@@ -178,6 +218,9 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
+	if !old.InSandbox() {
+		return false
+	}
 	started := !old.Status.HasCondition(migctl.Running) &&
 		new.Status.HasCondition(migctl.Running)
 	stopped := old.Status.HasCondition(migctl.Running) &&
@@ -187,4 +230,14 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	}
 
 	return false
+}
+
+func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
+	migration, cast := e.Object.(*migapi.MigMigration)
+	return cast && migration.InSandbox()
+}
+
+func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
+	migration, cast := e.Object.(*migapi.MigMigration)
+	return cast && migration.InSandbox()
 }
