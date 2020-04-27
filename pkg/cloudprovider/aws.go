@@ -276,6 +276,9 @@ func (p *AWSProvider) GetRegion() string {
 // Check the scheme on the configured URL. If a URL is not specified, return
 // false
 func (p *AWSProvider) GetDisableSSL() bool {
+	if p.GetURL() == "" {
+		return false
+	}
 	s3Url, err := url.Parse(p.GetURL())
 	if err != nil {
 		return false
