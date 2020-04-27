@@ -6,20 +6,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// TemplateResources - list of additional custom resources,
-// which contain pod template spec for pod replication.
-// Could be extended with user-specified values.
-// Formatting is as follows:
-//
-// templates:
-// - resource:     "cronjob.batch",
-// 	 templatePath: ".spec.jobTemplate.spec.template",
-// - resource:     "deployment.apps",
-// 	 templatePath: ".spec.template",
-type TemplateResources struct {
-	Templates []TemplateResource `json:"templates,omitempty"`
-}
-
 // TemplateResource - contains nessesary information to access
 // pod template spec form on the resource, used to create Stage pods
 type TemplateResource struct {

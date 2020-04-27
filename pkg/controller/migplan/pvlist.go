@@ -189,23 +189,36 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return nil, err
 	}
 
-	templates, err := plan.ListTemplatePods(client)
+	podList, err := plan.ListTemplatePods(client)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 
-	inNamespaces := func(pvc core.PersistentVolumeClaim, namespaces []string) bool {
+	runningPods := &core.PodList{}
+	err = client.List(context.TODO(), &k8sclient.ListOptions{}, runningPods)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	inNamespaces := func(objNamespace string, namespaces []string) bool {
 		for _, ns := range namespaces {
-			if ns == pvc.Namespace {
+			if ns == objNamespace {
 				return true
 			}
 		}
 		return false
 	}
 
+	for _, pod := range runningPods.Items {
+		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
+			podList = append(podList, pod)
+		}
+	}
+
 	for _, pvc := range list.Items {
-		if !inNamespaces(pvc, plan.GetSourceNamespaces()) {
+		if !inNamespaces(pvc.Namespace, plan.GetSourceNamespaces()) {
 			continue
 		}
 		claims = append(
@@ -213,7 +226,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 				Namespace:    pvc.Namespace,
 				Name:         pvc.Name,
 				AccessModes:  pvc.Spec.AccessModes,
-				HasReference: pvcInTemplates(pvc, templates),
+				HasReference: pvcInPodVolumes(pvc, podList),
 			})
 	}
 
@@ -408,9 +421,9 @@ func isRWO(accessModes []core.PersistentVolumeAccessMode) bool {
 	return false
 }
 
-func pvcInTemplates(pvc core.PersistentVolumeClaim, templates []core.PodTemplateSpec) bool {
-	for _, template := range templates {
-		for _, volume := range template.Spec.Volumes {
+func pvcInPodVolumes(pvc core.PersistentVolumeClaim, pods []core.Pod) bool {
+	for _, pod := range pods {
+		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name {
 				return true
 			}

@@ -222,8 +222,8 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 }
 
 // ListTemplatePods - get list of pod templates, associated with a plan resource
-func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.PodTemplateSpec, error) {
-	podTemplates := []corev1.PodTemplateSpec{}
+func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.Pod, error) {
+	pods := []corev1.Pod{}
 	for _, template := range DefaultTemplates {
 		// Get resources
 		list := unstructured.UnstructuredList{}
@@ -256,16 +256,18 @@ func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.PodTemplat
 			if err != nil {
 				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %w", template.TemplatePath, err)
 			}
-			objectKey := migref.ObjectKey(&resource)
-			podTemplate.ObjectMeta = metav1.ObjectMeta{
-				Name:      objectKey.Name,
-				Namespace: objectKey.Namespace,
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resource.GetName(),
+					Namespace: resource.GetNamespace(),
+				},
+				Spec: podTemplate.Spec,
 			}
-			podTemplates = append(podTemplates, podTemplate)
+			pods = append(pods, pod)
 		}
 	}
 
-	return podTemplates, nil
+	return pods, nil
 }
 
 //
