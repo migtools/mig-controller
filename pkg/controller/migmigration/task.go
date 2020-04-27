@@ -51,6 +51,7 @@ const (
 	StageBackupFailed               = "StageBackupFailed"
 	EnsureInitialBackupReplicated   = "EnsureInitialBackupReplicated"
 	EnsureStageBackupReplicated     = "EnsureStageBackupReplicated"
+	EnsureNamespacesCreated         = "EnsureNamespacesCreated"
 	EnsureStageRestore              = "EnsureStageRestore"
 	StageRestoreCreated             = "StageRestoreCreated"
 	StageRestoreFailed              = "StageRestoreFailed"
@@ -68,7 +69,7 @@ const (
 	DeleteRestores                  = "DeleteRestores"
 	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
-	Canceled                        = "Canceled"
+	Cancelled                       = "Cancelled"
 	Completed                       = "Completed"
 )
 
@@ -101,6 +102,7 @@ var StageItinerary = Itinerary{
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureNamespacesCreated},
 		{phase: EnsureStageBackup, all: HasPVs},
 		{phase: StageBackupCreated, all: HasPVs},
 		{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -133,6 +135,7 @@ var FinalItinerary = Itinerary{
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureNamespacesCreated},
 		{phase: EnsureStageBackup, all: HasPVs},
 		{phase: StageBackupCreated, all: HasPVs},
 		{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -164,6 +167,7 @@ var CancelItinerary = Itinerary{
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
 		{phase: UnQuiesceApplications, all: Quiesce},
+		// TODO: @alpatel figure out if we should delete the namespace if we create it
 		{phase: Canceled},
 		{phase: Completed},
 	},
@@ -556,6 +560,13 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
+	case EnsureNamespacesCreated:
+		err := t.ensureNamespacesCreated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.next()
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -662,14 +673,14 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
-	case Canceled:
+	case Cancelled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceled,
 			Status:   True,
 			Reason:   Cancel,
 			Category: Advisory,
-			Message:  CanceledMessage,
+			Message:  CancelledMessage,
 			Durable:  true,
 		})
 		t.next()
