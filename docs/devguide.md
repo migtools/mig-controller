@@ -1,4 +1,4 @@
-# Design patterns and conventions
+# Design patterns, conventions and practices.
 
 ## Error Handling
 
@@ -35,7 +35,9 @@ Top level infrastructure packages:
 
 Provides kubernetes API types.
 
-The `model.go` provides convenience functions to fetch k8s resources and CRs.
+The `model.go` provides convenience functions to fetch k8s resources and CRs. All of the functions swallow
+`NotFound` error and return `nil`.  This means that any error returned should be logged and returned as
+well.  Also, the caller must check for the returned `nil` pointer.
 
 The `resource.go` provides the `MigResource` interface.  ALL of the CRs implement this interface
 which defines common behavior.
@@ -126,6 +128,8 @@ On _error_, the reconciler will:
 - Log the error.
 - Return `ReconcileResult{Requeue: true}`
 
+Method follow the naming convention of `Ensure` prefix. For example: `EnsureSomething()`.
+
 ### Validation
 
 The `validation.go` file contains a `validate() error` method which performs
@@ -167,3 +171,7 @@ The `Condition.Items` array may be used to list details about the condition. The
 _staging_ ends.
 
 All `Conditions` methods are idempotent and most support _varargs_.
+
+# Plan Controller
+
+# Migration Controller
