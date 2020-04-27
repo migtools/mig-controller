@@ -22,6 +22,15 @@ type StagePod struct {
 // StagePodList - a list of stage pods, with built-in stage pod deduplication
 type StagePodList []StagePod
 
+// BuildStagePods - creates a list of stage pods from a list of pods
+func BuildStagePods(list *corev1.PodList) StagePodList {
+	stagePods := StagePodList{}
+	for _, pod := range list.Items {
+		stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), pod.Labels, &pod))
+	}
+	return stagePods
+}
+
 func (p StagePod) equals(pod StagePod) bool {
 	for _, volume := range p.Spec.Volumes {
 		found := false
@@ -208,9 +217,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 			log.Trace(err)
 			return err
 		}
-		for _, pod := range podList.Items {
-			stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), t.stagePodLabels(), &pod))
-		}
+		stagePods.merge(BuildStagePods(&podList)...)
 	}
 
 	created, err := stagePods.create(client)

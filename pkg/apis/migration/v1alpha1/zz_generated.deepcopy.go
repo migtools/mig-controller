@@ -555,7 +555,6 @@ func (in *MigPlanList) DeepCopyObject() runtime.Object {
 func (in *MigPlanSpec) DeepCopyInto(out *MigPlanSpec) {
 	*out = *in
 	in.UnhealthyResources.DeepCopyInto(&out.UnhealthyResources)
-	in.TemplateResources.DeepCopyInto(&out.TemplateResources)
 	in.PersistentVolumes.DeepCopyInto(&out.PersistentVolumes)
 	if in.Namespaces != nil {
 		in, out := &in.Namespaces, &out.Namespaces

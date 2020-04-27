@@ -65,7 +65,6 @@ const (
 	HookNotReady                               = "HookNotReady"
 	InvalidHookNSName                          = "InvalidHookNSName"
 	InvalidHookSAName                          = "InvalidHookSAName"
-	TemplatesInvalid                           = "TemplatesInvalid"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 )
@@ -142,7 +141,6 @@ const (
 	InvalidHookSANameMessage                          = "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'"
 	HookPhaseUnknownMessage                           = "The hook phase must be one of: PreRestore, PostRestore, PreBackup, PostBackup"
 	HookPhaseDuplicateMessage                         = "Only one hook may be specified per phase"
-	TemplatesInvalidMessage                           = "Some of the provided templates are invalid: []."
 )
 
 // Valid AccessMode values
@@ -187,13 +185,6 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	// Required templates
-	err = r.validateAdditionalTemplates(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -483,36 +474,6 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error
 	if err != nil {
 		log.Trace(err)
 		return err
-	}
-
-	return nil
-}
-
-func (r ReconcileMigPlan) validateAdditionalTemplates(plan *migapi.MigPlan) error {
-	cluster, err := plan.GetSourceCluster(r)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	client, err := cluster.GetClient(r)
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	_, err = plan.ListTemplatePods(client)
-	if err != nil {
-		templates := []string{}
-		for _, template := range plan.GetTemplateResources() {
-			templates = append(templates, template.Resource)
-		}
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     TemplatesInvalid,
-			Status:   True,
-			Reason:   Incorrect,
-			Category: Critical,
-			Message:  TemplatesInvalidMessage,
-			Items:    templates,
-		})
 	}
 
 	return nil

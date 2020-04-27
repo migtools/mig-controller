@@ -62,7 +62,6 @@ type MigPlanHook struct {
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
 	UnhealthyResources
-	TemplateResources `json:",inline"`
 	PersistentVolumes `json:",inline"`
 	Namespaces        []string              `json:"namespaces,omitempty"`
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
@@ -121,12 +120,6 @@ func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (*MigCluster, e
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
-}
-
-// GetTemplateResources - Get the templates to create stage pods from.
-// Returned list is combinded from user specified list, and a default one
-func (r *MigPlan) GetTemplateResources() []TemplateResource {
-	return append(DefaultTemplates, r.Spec.Templates...)
 }
 
 // Resources referenced by the plan.
@@ -231,7 +224,7 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 // ListTemplatePods - get list of pod templates, associated with a plan resource
 func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.PodTemplateSpec, error) {
 	podTemplates := []corev1.PodTemplateSpec{}
-	for _, template := range r.GetTemplateResources() {
+	for _, template := range DefaultTemplates {
 		// Get resources
 		list := unstructured.UnstructuredList{}
 		templateGVK := template.GroupKind().WithVersion("")
