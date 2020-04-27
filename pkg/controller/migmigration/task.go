@@ -35,6 +35,7 @@ const (
 	StageBackupFailed             = "StageBackupFailed"
 	EnsureInitialBackupReplicated = "EnsureInitialBackupReplicated"
 	EnsureStageBackupReplicated   = "EnsureStageBackupReplicated"
+	EnsureNamespacesCreated       = "EnsureNamespacesCreated"
 	EnsureStageRestore            = "EnsureStageRestore"
 	StageRestoreCreated           = "StageRestoreCreated"
 	StageRestoreFailed            = "StageRestoreFailed"
@@ -74,6 +75,7 @@ var StageItinerary = Itinerary{
 	{phase: ResticRestarted, all: HasStagePods},
 	{phase: QuiesceApplications, all: Quiesce},
 	{phase: EnsureQuiesced, all: Quiesce},
+	{phase: EnsureNamespacesCreated},
 	{phase: EnsureStageBackup, all: HasPVs},
 	{phase: StageBackupCreated, all: HasPVs},
 	{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -99,6 +101,7 @@ var FinalItinerary = Itinerary{
 	{phase: ResticRestarted, all: HasStagePods},
 	{phase: QuiesceApplications, all: Quiesce},
 	{phase: EnsureQuiesced, all: Quiesce},
+	{phase: EnsureNamespacesCreated},
 	{phase: EnsureStageBackup, all: HasPVs},
 	{phase: StageBackupCreated, all: HasPVs},
 	{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -449,6 +452,13 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = NoReQ
 		}
+	case EnsureNamespacesCreated:
+		err := t.ensureNamespacesCreated()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		t.next()
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
