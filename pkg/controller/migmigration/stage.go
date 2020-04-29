@@ -27,7 +27,10 @@ func BuildStagePods(labels map[string]string, list *[]corev1.Pod) StagePodList {
 	stagePods := StagePodList{}
 	for _, pod := range *list {
 		if pod.Spec.Volumes != nil {
-			stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod))
+			stagePod := buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod)
+			if stagePod != nil {
+				stagePods.merge(*stagePod)
+			}
 		}
 	}
 	return stagePods
@@ -144,7 +147,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			if pvcMounted(existingStagePods, migref.ObjectKey(&pvc)) {
 				continue
 			}
-			stagePods.merge(buildStagePod(pvc, t.stagePodLabels()))
+			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels()))
 		}
 	}
 
@@ -340,9 +343,19 @@ func (t *Task) stagePodLabels() map[string]string {
 }
 
 // Build a stage pod based on existing pod.
-func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod *corev1.Pod) StagePod {
+func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod *corev1.Pod) *StagePod {
+	pvcVolumes := []corev1.Volume{}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			pvcVolumes = append(pvcVolumes, volume)
+		}
+	}
+	if len(pvcVolumes) == 0 {
+		return nil
+	}
+
 	// Base pod.
-	newPod := StagePod{
+	newPod := &StagePod{
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ref.Namespace,
@@ -352,7 +365,7 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 			Spec: corev1.PodSpec{
 				Containers:                   []corev1.Container{},
 				NodeName:                     pod.Spec.NodeName,
-				Volumes:                      pod.Spec.Volumes,
+				Volumes:                      pvcVolumes,
 				SecurityContext:              pod.Spec.SecurityContext,
 				ServiceAccountName:           pod.Spec.ServiceAccountName,
 				AutomountServiceAccountToken: pod.Spec.AutomountServiceAccountToken,
@@ -375,9 +388,9 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 }
 
 // Build a generic stage pod for PVC, where no pod template could be used.
-func buildStagePod(pvc corev1.PersistentVolumeClaim, labels map[string]string) StagePod {
+func buildStagePod(pvc corev1.PersistentVolumeClaim, labels map[string]string) *StagePod {
 	// Base pod.
-	newPod := StagePod{
+	newPod := &StagePod{
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    pvc.Namespace,
