@@ -254,7 +254,7 @@ func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.Pod, error
 			}
 			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTemplate, &podTemplate)
 			if err != nil {
-				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %w", template.TemplatePath, err)
+				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %v", template.TemplatePath, err)
 			}
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

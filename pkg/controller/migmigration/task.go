@@ -84,11 +84,11 @@ var StageItinerary = Itinerary{
 		{phase: Started},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
-		{phase: AnnotateResources, all: HasPVs},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
+		{phase: AnnotateResources, all: HasPVs},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
@@ -116,11 +116,11 @@ var FinalItinerary = Itinerary{
 		{phase: PreBackupHooks},
 		{phase: EnsureInitialBackup},
 		{phase: InitialBackupCreated},
-		{phase: AnnotateResources, all: HasPVs},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
+		{phase: AnnotateResources, all: HasPVs},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
@@ -865,13 +865,12 @@ func (t *Task) getPVs() migapi.PersistentVolumes {
 
 // Get whether the associated plan lists not skipped PVs.
 func (t *Task) hasPVs() bool {
-	count := 0
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
 		if pv.Selection.Action != migapi.PvSkipAction {
-			count++
+			return true
 		}
 	}
-	return count > 0
+	return false
 }
 
 // Get whether the verification is desired

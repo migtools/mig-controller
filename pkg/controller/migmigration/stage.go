@@ -23,11 +23,11 @@ type StagePod struct {
 type StagePodList []StagePod
 
 // BuildStagePods - creates a list of stage pods from a list of pods
-func BuildStagePods(list *[]corev1.Pod) StagePodList {
+func BuildStagePods(labels map[string]string, list *[]corev1.Pod) StagePodList {
 	stagePods := StagePodList{}
 	for _, pod := range *list {
 		if pod.Spec.Volumes != nil {
-			stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), pod.Labels, &pod))
+			stagePods.merge(buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod))
 		}
 	}
 	return stagePods
@@ -94,7 +94,7 @@ func (l *StagePodList) list(client k8sclient.Client, labels map[string]string) e
 	if err != nil {
 		return err
 	}
-	l.merge(BuildStagePods(&podList.Items)...)
+	l.merge(BuildStagePods(labels, &podList.Items)...)
 
 	return nil
 }
@@ -183,7 +183,7 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return err
 	}
 
-	stagePods := BuildStagePods(&podTemplates)
+	stagePods := BuildStagePods(t.stagePodLabels(), &podTemplates)
 
 	created, err := stagePods.create(client)
 	if err != nil {
@@ -202,7 +202,6 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 			Durable:  true,
 		})
 	}
-
 	return nil
 }
 
@@ -221,7 +220,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 			log.Trace(err)
 			return err
 		}
-		stagePods.merge(BuildStagePods(&podList.Items)...)
+		stagePods.merge(BuildStagePods(t.stagePodLabels(), &podList.Items)...)
 	}
 
 	created, err := stagePods.create(client)
