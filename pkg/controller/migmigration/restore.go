@@ -27,6 +27,15 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 		return nil, errors.New("Backup not found")
 	}
 
+	restore, err := t.getFinalRestore()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if restore != nil {
+		return restore, nil
+	}
+
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return nil, err
@@ -62,6 +71,15 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	}
 	if backup == nil {
 		return nil, errors.New("Backup not found")
+	}
+
+	restore, err := t.getStageRestore()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if restore != nil {
+		return restore, nil
 	}
 
 	client, err := t.getDestinationClient()

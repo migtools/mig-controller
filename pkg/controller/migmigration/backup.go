@@ -18,6 +18,15 @@ import (
 // Ensure the initial backup on the source cluster has been created
 // and has the proper settings.
 func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
+	backup, err := t.getInitialBackup()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if backup != nil {
+		return backup, nil
+	}
+
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
@@ -49,6 +58,15 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 // Ensure the second backup on the source cluster has been created and
 // has the proper settings.
 func (t *Task) ensureStageBackup() (*velero.Backup, error) {
+	backup, err := t.getStageBackup()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if backup != nil {
+		return backup, nil
+	}
+
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
