@@ -24,6 +24,8 @@ const (
 	Created                         = ""
 	Started                         = "Started"
 	Prepare                         = "Prepare"
+	Authorization                   = "Authorization"
+	NotAuthorized                   = "NotAuthorized"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
 	PostBackupHooks                 = "PostBackupHooks"
@@ -92,6 +94,8 @@ var StageItinerary = Itinerary{
 		{phase: Created},
 		{phase: Started},
 		{phase: Prepare},
+		{phase: Authorization},
+		{phase: EnsureNamespacesCreated},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
@@ -102,7 +106,6 @@ var StageItinerary = Itinerary{
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureNamespacesCreated},
 		{phase: EnsureStageBackup, all: HasPVs},
 		{phase: StageBackupCreated, all: HasPVs},
 		{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -122,6 +125,7 @@ var FinalItinerary = Itinerary{
 		{phase: Created},
 		{phase: Started},
 		{phase: Prepare},
+		{phase: Authorization},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: PreBackupHooks},
 		{phase: EnsureInitialBackup},
@@ -263,6 +267,17 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
+	case Authorization:
+		unauthorized, err := t.EnsureAuthorized()
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if len(unauthorized) > 0 {
+			t.failed(NotAuthorized, unauthorized)
+		} else {
+			t.next()
+		}
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
