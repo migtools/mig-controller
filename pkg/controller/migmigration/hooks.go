@@ -15,7 +15,8 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const HookJobFailedLimit = 5
+const HookJobFailedLimit = 6
+const BackoffLimitExceededError = "BackoffLimitExceeded"
 
 func (t *Task) runHooks(hookPhase string) (bool, error) {
 	hook := migapi.MigPlanHook{}
@@ -67,7 +68,7 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 }
 
 func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
-	runningJob, err := migHook.GetPhaseJob(client, hook.Phase)
+	runningJob, err := migHook.GetPhaseJob(client, hook.Phase, string(t.Owner.UID))
 	if runningJob == nil && err == nil {
 		err = client.Create(context.TODO(), job)
 		if err != nil {
@@ -77,6 +78,9 @@ func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook miga
 	} else if err != nil {
 		return false, err
 	} else if runningJob.Status.Failed >= HookJobFailedLimit {
+		err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
+		return false, err
+	} else if len(runningJob.Status.Conditions) > 0 && runningJob.Status.Conditions[0].Reason == BackoffLimitExceededError {
 		err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
 		return false, err
 	} else if runningJob.Status.Succeeded == 1 {
@@ -98,7 +102,7 @@ func (t *Task) prepareJob(hook migapi.MigPlanHook, migHook migapi.MigHook, clien
 			return nil, err
 		}
 
-		phaseConfigMap, err := migHook.GetPhaseConfigMap(client, hook.Phase)
+		phaseConfigMap, err := migHook.GetPhaseConfigMap(client, hook.Phase, string(t.Owner.UID))
 		if phaseConfigMap == nil && err == nil {
 
 			err = client.Create(context.TODO(), configMap)
@@ -141,7 +145,8 @@ func (t *Task) getHookClient(migHook migapi.MigHook) (k8sclient.Client, error) {
 func (t *Task) configMapTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) (*corev1.ConfigMap, error) {
 
 	labels := migHook.GetCorrelationLabels()
-	labels["phase"] = hook.Phase
+	labels[migapi.HookPhaseLabel] = hook.Phase
+	labels[migapi.HookOwnerLabel] = string(t.Owner.UID)
 
 	playbookData, err := base64.StdEncoding.DecodeString(migHook.Spec.Playbook)
 	if err != nil {
@@ -203,7 +208,8 @@ func (t *Task) baseJobTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) 
 	}
 
 	labels := migHook.GetCorrelationLabels()
-	labels["phase"] = hook.Phase
+	labels[migapi.HookPhaseLabel] = hook.Phase
+	labels[migapi.HookOwnerLabel] = string(t.Owner.UID)
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
