@@ -345,9 +345,9 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 	newPod := StagePod{
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ref.Namespace,
-				Name:      "stage-" + ref.Name,
-				Labels:    labels,
+				Namespace:    ref.Namespace,
+				GenerateName: migref.TruncateName("stage-"+ref.Name) + "-",
+				Labels:       labels,
 			},
 			Spec: corev1.PodSpec{
 				Containers:                   []corev1.Container{},
@@ -380,9 +380,9 @@ func buildStagePod(pvc corev1.PersistentVolumeClaim, labels map[string]string) S
 	newPod := StagePod{
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: pvc.Namespace,
-				Name:      "stage-" + string(pvc.UID),
-				Labels:    labels,
+				Namespace:    pvc.Namespace,
+				GenerateName: migref.TruncateName("stage-"+pvc.Name) + "-",
+				Labels:       labels,
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{

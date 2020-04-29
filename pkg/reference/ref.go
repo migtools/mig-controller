@@ -2,6 +2,7 @@ package reference
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 
 	kapi "k8s.io/api/core/v1"
@@ -14,6 +15,16 @@ func ObjectKey(obj metav1.Object) client.ObjectKey {
 		Name:      obj.GetName(),
 		Namespace: obj.GetNamespace(),
 	}
+}
+
+func TruncateName(name string) string {
+	r := regexp.MustCompile(`(-+)`)
+	name = r.ReplaceAllString(name, "-")
+	name = strings.TrimRight(name, "-")
+	if len(name) > 57 {
+		name = name[:57]
+	}
+	return name
 }
 
 func RefSet(ref *kapi.ObjectReference) bool {
