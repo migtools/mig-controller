@@ -18,6 +18,23 @@ type Identity struct {
 	Client  k8sclient.Client
 }
 
+func (r *Identity) CanI(namespace, resource, verb string) (bool, error) {
+	sar := authapi.SelfSubjectAccessReview{
+		Spec: authapi.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &authapi.ResourceAttributes{
+				Resource:  resource,
+				Namespace: namespace,
+				Verb:      verb,
+			},
+		},
+	}
+	err := r.Client.Create(context.TODO(), &sar)
+	if err != nil {
+		return false, err
+	}
+	return sar.Status.Allowed, nil
+}
+
 func (r *Identity) HasRead(namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	err := r.BuildClient()
@@ -25,30 +42,41 @@ func (r *Identity) HasRead(namespaces []string) (Authorized, error) {
 		return authorized, err
 	}
 	for _, namespace := range namespaces {
-		sar := authapi.SelfSubjectAccessReview{
-			Spec: authapi.SelfSubjectAccessReviewSpec{
-				ResourceAttributes: &authapi.ResourceAttributes{
-					Resource:  "namespaces",
-					Namespace: namespace,
-					Verb:      "get",
-				},
-			},
-		}
-		err := r.Client.Create(context.TODO(), &sar)
+		allowed, err := r.CanI(namespace, "namespaces", "get")
 		if err != nil {
 			return authorized, err
 		}
-		authorized[namespace] = sar.Status.Allowed
+		authorized[namespace] = allowed
 	}
 
 	return authorized, nil
 }
 
 func (r *Identity) HasMigrate(namespaces []string) (Authorized, error) {
+	resources := []string{"pods", "deployments", "deploymentconfigs", "daemonsets", "replicasets", "statefulsets", "pvcs"}
+	verbs := []string{"get", "create", "update"}
+
 	authorized := Authorized{}
 	err := r.BuildClient()
 	if err != nil {
-		return authorized, err
+		return nil, err
+	}
+
+	for _, namespace := range namespaces {
+		authorized[namespace] = true
+	loop:
+		for _, resource := range resources {
+			for _, verb := range verbs {
+				allowed, err := r.CanI(namespace, resource, verb)
+				if err != nil {
+					return nil, err
+				}
+				if !allowed {
+					authorized[namespace] = false
+					break loop
+				}
+			}
+		}
 	}
 
 	return authorized, nil
