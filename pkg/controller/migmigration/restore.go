@@ -27,45 +27,22 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 		return nil, errors.New("Backup not found")
 	}
 
-	newRestore, err := t.buildRestore(backup.Name)
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+	newRestore, err := t.buildRestore(client, backup.Name)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
-	foundRestore, err := t.getFinalRestore()
+	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
-	if foundRestore == nil {
-		client, err := t.getDestinationClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		err = client.Create(context.TODO(), newRestore)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		return newRestore, nil
-	}
-	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore, backup.Name)
-		client, err := t.getDestinationClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		err = client.Update(context.TODO(), foundRestore)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-	}
-
-	return foundRestore, nil
+	return newRestore, nil
 }
 
 // Get the final restore on the destination cluster.
@@ -87,46 +64,22 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 		return nil, errors.New("Backup not found")
 	}
 
-	newRestore, err := t.buildRestore(backup.Name)
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+	newRestore, err := t.buildRestore(client, backup.Name)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
 	newRestore.Labels[StageRestoreLabel] = t.UID()
-	foundRestore, err := t.getStageRestore()
+	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
-	if foundRestore == nil {
-		newRestore.Spec.BackupName = backup.Name
-		client, err := t.getDestinationClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		err = client.Create(context.TODO(), newRestore)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		return newRestore, nil
-	}
-	if !t.equalsRestore(newRestore, foundRestore) {
-		t.updateRestore(foundRestore, backup.Name)
-		client, err := t.getDestinationClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		err = client.Update(context.TODO(), foundRestore)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-	}
-
-	return foundRestore, nil
+	return newRestore, nil
 }
 
 // Get the stage restore on the destination cluster.
@@ -134,13 +87,6 @@ func (t *Task) getStageRestore() (*velero.Restore, error) {
 	labels := t.Owner.GetCorrelationLabels()
 	labels[StageRestoreLabel] = t.UID()
 	return t.getRestore(labels)
-}
-
-// Get whether the two Restores are equal.
-func (t *Task) equalsRestore(a, b *velero.Restore) bool {
-	match := a.Spec.BackupName == b.Spec.BackupName &&
-		*a.Spec.RestorePVs == *b.Spec.RestorePVs
-	return match
 }
 
 // Get an existing Restore on the destination cluster.
@@ -226,11 +172,7 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore(backupName string) (*velero.Restore, error) {
-	client, err := t.getDestinationClient()
-	if err != nil {
-		return nil, err
-	}
+func (t *Task) buildRestore(client k8sclient.Client, backupName string) (*velero.Restore, error) {
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
 		log.Trace(err)

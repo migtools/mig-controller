@@ -379,7 +379,7 @@ func (t *Task) Run() error {
 			log.Trace(err)
 			return err
 		}
-		t.Requeue = 0
+		t.Requeue = NoReQ
 		t.next()
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
@@ -446,15 +446,7 @@ func (t *Task) Run() error {
 			t.Requeue = NoReQ
 		}
 	case EnsureStageRestore:
-		backup, err := t.getStageBackup()
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
-		if backup == nil {
-			return errors.New("Backup not found")
-		}
-		_, err = t.ensureStageRestore()
+		_, err := t.ensureStageRestore()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -462,7 +454,7 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		t.next()
 	case StageRestoreCreated:
-		restore, err := t.ensureStageRestore()
+		restore, err := t.getStageRestore()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -557,7 +549,7 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		t.next()
 	case FinalRestoreCreated:
-		restore, err := t.ensureFinalRestore()
+		restore, err := t.getFinalRestore()
 		if err != nil {
 			log.Trace(err)
 			return err
