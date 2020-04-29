@@ -86,7 +86,8 @@ func TestReconcile(t *testing.T) {
 // but for not they are expected to be the identical.
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	stage := StageItinerary[4 : len(StageItinerary)-1]
+	start := 5 // Start with AnnotateResources
+	stage := StageItinerary[start : len(StageItinerary)-1]
 
 	begin := 0
 	for i, step := range FinalItinerary {
@@ -104,7 +105,6 @@ func Test_Itineraries(t *testing.T) {
 		}
 	}
 	final := FinalItinerary[begin:end]
-
 	g.Expect(begin == 0).To(gomega.BeFalse())
 	g.Expect(end < len(FinalItinerary)).To(gomega.BeTrue())
 	g.Expect(reflect.DeepEqual(stage, final)).To(gomega.BeTrue())
