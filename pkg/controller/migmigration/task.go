@@ -282,7 +282,7 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		t.next()
 	case InitialBackupCreated:
-		backup, err := t.ensureInitialBackup()
+		backup, err := t.getInitialBackup()
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -382,7 +382,7 @@ func (t *Task) Run() error {
 		t.Requeue = 0
 		t.next()
 	case StageBackupCreated:
-		backup, err := t.ensureStageBackup()
+		backup, err := t.getStageBackup()
 		if err != nil {
 			log.Trace(err)
 			return err
