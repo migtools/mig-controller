@@ -31,6 +31,17 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 
 	migHook := migapi.MigHook{}
 
+	svc := corev1.ServiceAccount{}
+	ref := types.NamespacedName{
+		Namespace: hook.ExecutionNamespace,
+		Name:      hook.ServiceAccount,
+	}
+	err = t.Client.Get(context.TODO(), ref, &svc)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
 	if hook.Reference != nil {
 		err = t.Client.Get(
 			context.TODO(),
