@@ -863,6 +863,19 @@ func (t *Task) getPVs() migapi.PersistentVolumes {
 	return *pvList
 }
 
+// Get the persistentVolumeClaims / action mapping included in the plan which are not skipped.
+func (t *Task) getPVCs() map[k8sclient.ObjectKey]migapi.PV {
+	claims := map[k8sclient.ObjectKey]migapi.PV{}
+	for _, pv := range t.getPVs().List {
+		claimKey := k8sclient.ObjectKey{
+			Name:      pv.PVC.Name,
+			Namespace: pv.PVC.Namespace,
+		}
+		claims[claimKey] = pv
+	}
+	return claims
+}
+
 // Get whether the associated plan lists not skipped PVs.
 func (t *Task) hasPVs() bool {
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {

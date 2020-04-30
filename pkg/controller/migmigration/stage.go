@@ -23,14 +23,32 @@ type StagePod struct {
 type StagePodList []StagePod
 
 // BuildStagePods - creates a list of stage pods from a list of pods
-func BuildStagePods(labels map[string]string, list *[]corev1.Pod) StagePodList {
+func BuildStagePods(labels map[string]string, pvcMapping map[k8sclient.ObjectKey]migapi.PV, list *[]corev1.Pod) StagePodList {
 	stagePods := StagePodList{}
 	for _, pod := range *list {
-		if pod.Spec.Volumes != nil {
-			stagePod := buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod)
-			if stagePod != nil {
-				stagePods.merge(*stagePod)
+		volumes := []corev1.Volume{}
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
 			}
+			claimKey := k8sclient.ObjectKey{
+				Name:      volume.PersistentVolumeClaim.ClaimName,
+				Namespace: pod.Namespace,
+			}
+			pv, found := pvcMapping[claimKey]
+			if !found ||
+				pv.Selection.Action != migapi.PvCopyAction ||
+				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				continue
+			}
+			volumes = append(volumes, volume)
+		}
+		if len(volumes) == 0 {
+			continue
+		}
+		stagePod := buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod, volumes)
+		if stagePod != nil {
+			stagePods.merge(*stagePod)
 		}
 	}
 	return stagePods
@@ -70,13 +88,15 @@ func (l *StagePodList) merge(list ...StagePod) {
 	}
 }
 
-func (l *StagePodList) create(client k8sclient.Client) (int, error) {
-	existingPods := StagePodList{}
-	if len(*l) > 0 {
-		existingPods.list(client, (*l)[0].Labels)
-	}
+func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) (int, error) {
 	counter := 0
-	for _, stagePod := range *l {
+	existingPods, err := t.listStagePods(client)
+	if err != nil {
+		log.Trace(err)
+		return counter, err
+	}
+
+	for _, stagePod := range stagePods {
 		if existingPods.contains(stagePod) {
 			continue
 		}
@@ -90,20 +110,18 @@ func (l *StagePodList) create(client k8sclient.Client) (int, error) {
 	return counter + len(existingPods), nil
 }
 
-func (l *StagePodList) list(client k8sclient.Client, labels map[string]string) error {
+func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	podList := corev1.PodList{}
-	options := k8sclient.MatchingLabels(labels)
+	options := k8sclient.MatchingLabels(t.stagePodLabels())
 	err := client.List(context.TODO(), options, &podList)
 	if err != nil {
-		return err
+		log.Trace(err)
+		return nil, err
 	}
-	l.merge(BuildStagePods(labels, &podList.Items)...)
-
-	return nil
+	return BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items), nil
 }
 
 func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
-	existingStagePods := StagePodList{}
 	stagePods := StagePodList{}
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -111,7 +129,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return err
 	}
 
-	err = existingStagePods.list(client, t.stagePodLabels())
+	existingStagePods, err := t.listStagePods(client)
 	if err != nil {
 		log.Trace(err)
 		return nil
@@ -151,7 +169,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		}
 	}
 
-	created, err := stagePods.create(client)
+	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -186,9 +204,9 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return err
 	}
 
-	stagePods := BuildStagePods(t.stagePodLabels(), &podTemplates)
+	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates)
 
-	created, err := stagePods.create(client)
+	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -223,10 +241,10 @@ func (t *Task) ensureStagePodsFromRunning() error {
 			log.Trace(err)
 			return err
 		}
-		stagePods.merge(BuildStagePods(t.stagePodLabels(), &podList.Items)...)
+		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items)...)
 	}
 
-	created, err := stagePods.create(client)
+	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -343,17 +361,7 @@ func (t *Task) stagePodLabels() map[string]string {
 }
 
 // Build a stage pod based on existing pod.
-func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod *corev1.Pod) *StagePod {
-	pvcVolumes := []corev1.Volume{}
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil {
-			pvcVolumes = append(pvcVolumes, volume)
-		}
-	}
-	if len(pvcVolumes) == 0 {
-		return nil
-	}
-
+func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod *corev1.Pod, pvcVolumes []corev1.Volume) *StagePod {
 	// Base pod.
 	newPod := &StagePod{
 		Pod: corev1.Pod{
