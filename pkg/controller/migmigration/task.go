@@ -291,10 +291,6 @@ func (t *Task) Run() error {
 			return errors.New("Backup not found")
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
 		if completed {
 			if len(reasons) > 0 {
 				t.fail(InitialBackupFailed, reasons)
@@ -391,10 +387,6 @@ func (t *Task) Run() error {
 			return errors.New("Backup not found")
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
 		if completed {
 			if len(reasons) > 0 {
 				t.fail(StageBackupFailed, reasons)
@@ -471,10 +463,6 @@ func (t *Task) Run() error {
 			return errors.New("Restore not found")
 		}
 		completed, reasons := t.hasRestoreCompleted(restore)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
 		if completed {
 			t.setResticConditions(restore)
 			if len(reasons) > 0 {
@@ -566,10 +554,6 @@ func (t *Task) Run() error {
 			return errors.New("Restore not found")
 		}
 		completed, reasons := t.hasRestoreCompleted(restore)
-		if err != nil {
-			log.Trace(err)
-			return err
-		}
 		if completed {
 			if len(reasons) > 0 {
 				t.fail(FinalRestoreFailed, reasons)
