@@ -380,14 +380,30 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 			},
 		},
 	}
+
+	inVolumes := func(mount corev1.VolumeMount) bool {
+		for _, volume := range pvcVolumes {
+			if volume.Name == mount.Name {
+				return true
+			}
+		}
+		return false
+	}
+
 	// Add containers.
 	for i, container := range pod.Spec.Containers {
+		volumeMounts := []corev1.VolumeMount{}
+		for _, mount := range container.VolumeMounts {
+			if inVolumes(mount) {
+				volumeMounts = append(volumeMounts, mount)
+			}
+		}
 		stageContainer := corev1.Container{
 			Name:         "sleep-" + strconv.Itoa(i),
 			Image:        "registry.access.redhat.com/rhel7",
 			Command:      []string{"sleep"},
 			Args:         []string{"infinity"},
-			VolumeMounts: container.VolumeMounts,
+			VolumeMounts: volumeMounts,
 		}
 		newPod.Spec.Containers = append(newPod.Spec.Containers, stageContainer)
 	}
