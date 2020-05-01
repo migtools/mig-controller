@@ -103,13 +103,8 @@ func (t *Task) annotateStageResources() error {
 	return nil
 }
 
-// Add annotations and labels to PVCs.
-// The PvActionAnnotation annotation is added to PVCs as needed by the velero plugin.
-// The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
-// The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
-// The IncludedInStageBackupLabel label is added to PVCs and is referenced
-// by the velero.Backup label selector.
-func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, []string, error) {
+// Gets a list of restic volumes and restic verify volumes for a pod
+func (t *Task) getResticVolumes(client k8sclient.Client, pod corev1.Pod) ([]string, []string, error) {
 	volumes := []string{}
 	verifyVolumes := []string{}
 	pvs := t.getPVs()
@@ -126,17 +121,11 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 				Name:      claim.ClaimName,
 			},
 			&pvc)
-		// PV action (move|copy) annotation needed by the velero plugin.
-		if pvc.Annotations == nil {
-			pvc.Annotations = make(map[string]string)
+		if err != nil {
+			log.Trace(err)
+			return nil, nil, err
 		}
 		pvAction := findPVAction(pvs, pvc.Spec.VolumeName)
-		pvc.Annotations[PvActionAnnotation] = pvAction
-		// Add label used by stage backup label selector.
-		if pvc.Labels == nil {
-			pvc.Labels = make(map[string]string)
-		}
-		pvc.Labels[IncludedInStageBackupLabel] = t.UID()
 		if pvAction == migapi.PvCopyAction {
 			// Add to Restic volume list if copyMethod is "filesystem"
 			if findPVCopyMethod(pvs, pvc.Spec.VolumeName) == migapi.PvFilesystemCopyMethod {
@@ -145,29 +134,8 @@ func (t *Task) annotatePVCs(client k8sclient.Client, pod corev1.Pod) ([]string, 
 					verifyVolumes = append(verifyVolumes, pv.Name)
 				}
 			}
-			// PV storageClass annotation needed by the velero plugin.
-			storageClass := findPVStorageClass(pvs, pvc.Spec.VolumeName)
-			pvc.Annotations[PvStorageClassAnnotation] = storageClass
-			// PV accessMode annotation needed by the velero plugin, if present on the PV.
-			accessMode := findPVAccessMode(pvs, pvc.Spec.VolumeName)
-			if accessMode != "" {
-				pvc.Annotations[PvAccessModeAnnotation] = string(accessMode)
-			}
 		}
-		// Update
-		err = client.Update(context.TODO(), &pvc)
-		if err != nil {
-			log.Trace(err)
-			return nil, nil, err
-		}
-		log.Info(
-			"PVC annotations/labels added.",
-			"ns",
-			pvc.Namespace,
-			"name",
-			pvc.Name)
 	}
-
 	return volumes, verifyVolumes, nil
 }
 
@@ -220,7 +188,7 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 	}
 	for _, pod := range list.Items {
 		// Annotate PVCs.
-		volumes, verifyVolumes, err := t.annotatePVCs(client, pod)
+		volumes, verifyVolumes, err := t.getResticVolumes(client, pod)
 		if err != nil {
 			log.Trace(err)
 			return nil, err
@@ -255,39 +223,40 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 	return serviceAccounts, nil
 }
 
-// Add annotations and labels to PVs.
-// The PvActionAnnotation annotation is added to PVs as needed by the velero plugin.
-// The PvStorageClassAnnotation annotation is added to PVs as needed by the velero plugin.
-// The IncludedInStageBackupLabel label is added to PVs and is referenced
+// Add annotations and labels to PVs and PVCs.
+// The PvActionAnnotation annotation is added to PVs and PVCs as needed by the velero plugin.
+// The PvStorageClassAnnotation annotation is added to PVs and PVCs as needed by the velero plugin.
+// The IncludedInStageBackupLabel label is added to PVs and PVCs and is referenced
 // by the velero.Backup label selector.
+// The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 func (t *Task) annotatePVs(client k8sclient.Client) error {
 	pvs := t.getPVs()
 	for _, pv := range pvs.List {
-		resource := corev1.PersistentVolume{}
+		pvResource := corev1.PersistentVolume{}
 		err := client.Get(
 			context.TODO(),
 			k8sclient.ObjectKey{
 				Name: pv.Name,
 			},
-			&resource)
+			&pvResource)
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		if resource.Annotations == nil {
-			resource.Annotations = make(map[string]string)
+		if pvResource.Annotations == nil {
+			pvResource.Annotations = make(map[string]string)
 		}
 		// PV action (move|copy) needed by the velero plugin.
-		resource.Annotations[PvActionAnnotation] = pv.Selection.Action
+		pvResource.Annotations[PvActionAnnotation] = pv.Selection.Action
 		// PV storageClass annotation needed by the velero plugin.
-		resource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+		pvResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
 		// Add label used by stage backup label selector.
-		if resource.Labels == nil {
-			resource.Labels = make(map[string]string)
+		if pvResource.Labels == nil {
+			pvResource.Labels = make(map[string]string)
 		}
-		resource.Labels[IncludedInStageBackupLabel] = t.UID()
+		pvResource.Labels[IncludedInStageBackupLabel] = t.UID()
 		// Update
-		err = client.Update(context.TODO(), &resource)
+		err = client.Update(context.TODO(), &pvResource)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -296,6 +265,49 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 			"PV annotations/labels added.",
 			"name",
 			pv.Name)
+
+		pvcResource := corev1.PersistentVolumeClaim{}
+		err = client.Get(
+			context.TODO(),
+			k8sclient.ObjectKey{
+				Namespace: pv.PVC.Namespace,
+				Name:      pv.PVC.Name,
+			},
+			&pvcResource)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		if pvcResource.Annotations == nil {
+			pvcResource.Annotations = make(map[string]string)
+		}
+		// PV action (move|copy) needed by the velero plugin.
+		pvcResource.Annotations[PvActionAnnotation] = pv.Selection.Action
+		// Add label used by stage backup label selector.
+		if pvcResource.Labels == nil {
+			pvcResource.Labels = make(map[string]string)
+		}
+		pvcResource.Labels[IncludedInStageBackupLabel] = t.UID()
+		if pv.Selection.Action == migapi.PvCopyAction {
+			// PV storageClass annotation needed by the velero plugin.
+			pvcResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+			// PV accessMode annotation needed by the velero plugin, if present on the PV.
+			if pv.Selection.AccessMode != "" {
+				pvcResource.Annotations[PvAccessModeAnnotation] = string(pv.Selection.AccessMode)
+			}
+		}
+		// Update
+		err = client.Update(context.TODO(), &pvcResource)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		log.Info(
+			"PVC annotations/labels added.",
+			"ns",
+			pv.PVC.Namespace,
+			"name",
+			pv.PVC.Name)
 	}
 
 	return nil

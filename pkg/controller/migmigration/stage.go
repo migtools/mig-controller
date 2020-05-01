@@ -150,6 +150,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return false
 	}
 
+	pvcMapping := t.getPVCs()
 	for _, ns := range t.sourceNamespaces() {
 		list := &corev1.PersistentVolumeClaimList{}
 		err = client.List(context.TODO(), k8sclient.InNamespace(ns), list)
@@ -162,7 +163,14 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			if pvc.Status.Phase != corev1.ClaimBound {
 				continue
 			}
-			if pvcMounted(existingStagePods, migref.ObjectKey(&pvc)) {
+			claimKey := migref.ObjectKey(&pvc)
+			pv, found := pvcMapping[claimKey]
+			if !found ||
+				pv.Selection.Action != migapi.PvCopyAction ||
+				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				continue
+			}
+			if pvcMounted(existingStagePods, claimKey) {
 				continue
 			}
 			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels()))
