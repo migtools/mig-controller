@@ -3,7 +3,6 @@ package migmigration
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -19,7 +18,21 @@ import (
 // Ensure the initial backup on the source cluster has been created
 // and has the proper settings.
 func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
-	newBackup, err := t.buildBackup(nil)
+	backup, err := t.getInitialBackup()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if backup != nil {
+		return backup, nil
+	}
+
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	newBackup, err := t.buildBackup(client)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
@@ -27,39 +40,12 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	newBackup.Labels[InitialBackupLabel] = t.UID()
 	newBackup.Spec.ExcludedResources = excludedInitialResources
 	delete(newBackup.Annotations, QuiesceAnnotation)
-	foundBackup, err := t.getInitialBackup()
+	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		log.Trace(err)
 		return nil, err
 	}
-	if foundBackup == nil {
-		client, err := t.getSourceClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		err = client.Create(context.TODO(), newBackup)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		return newBackup, nil
-	}
-	if !t.equalsBackup(newBackup, foundBackup) {
-		client, err := t.getSourceClient()
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		t.updateBackup(foundBackup)
-		err = client.Update(context.TODO(), foundBackup)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-	}
-
-	return foundBackup, nil
+	return newBackup, nil
 }
 
 // Get the initial backup on the source cluster.
@@ -72,7 +58,21 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 // Ensure the second backup on the source cluster has been created and
 // has the proper settings.
 func (t *Task) ensureStageBackup() (*velero.Backup, error) {
-	newBackup, err := t.buildBackup(nil)
+	backup, err := t.getStageBackup()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	if backup != nil {
+		return backup, nil
+	}
+
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	newBackup, err := t.buildBackup(client)
 	if err != nil {
 		return nil, err
 	}
@@ -84,33 +84,11 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[StageBackupLabel] = t.UID()
 	newBackup.Spec.IncludedResources = stagingResources
 	newBackup.Spec.LabelSelector = &labelSelector
-	foundBackup, err := t.getStageBackup()
+	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		return nil, err
 	}
-	if foundBackup == nil {
-		client, err := t.getSourceClient()
-		if err != nil {
-			return nil, err
-		}
-		err = client.Create(context.TODO(), newBackup)
-		if err != nil {
-			return nil, err
-		}
-		return newBackup, nil
-	}
-	if !t.equalsBackup(newBackup, foundBackup) {
-		client, err := t.getSourceClient()
-		if err != nil {
-			return nil, err
-		}
-		err = client.Update(context.TODO(), foundBackup)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return foundBackup, nil
+	return newBackup, nil
 }
 
 // Get the stage backup on the source cluster.
@@ -118,16 +96,6 @@ func (t *Task) getStageBackup() (*velero.Backup, error) {
 	labels := t.Owner.GetCorrelationLabels()
 	labels[StageBackupLabel] = t.UID()
 	return t.getBackup(labels)
-}
-
-// Get whether the two Backups are equal.
-func (t *Task) equalsBackup(a, b *velero.Backup) bool {
-	match := a.Spec.StorageLocation == b.Spec.StorageLocation &&
-		reflect.DeepEqual(a.Spec.VolumeSnapshotLocations, b.Spec.VolumeSnapshotLocations) &&
-		reflect.DeepEqual(a.Spec.IncludedNamespaces, b.Spec.IncludedNamespaces) &&
-		reflect.DeepEqual(a.Spec.IncludedResources, b.Spec.IncludedResources) &&
-		a.Spec.TTL == b.Spec.TTL
-	return match
 }
 
 // Get an existing Backup on the source cluster.
@@ -225,13 +193,19 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 }
 
 // Build a Backups as desired for the source cluster.
-func (t *Task) buildBackup(includeClusterResources *bool) (*velero.Backup, error) {
-	// Get client of source cluster
-	client, err := t.getSourceClient()
+func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
+	var includeClusterResources *bool = nil
+	annotations, err := t.getAnnotations(client)
 	if err != nil {
+		log.Trace(err)
 		return nil, err
 	}
-	annotations, err := t.getAnnotations(client)
+	backupLocation, err := t.getBSL()
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	snapshotLocation, err := t.getVSL()
 	if err != nil {
 		log.Trace(err)
 		return nil, err
@@ -245,40 +219,17 @@ func (t *Task) buildBackup(includeClusterResources *bool) (*velero.Backup, error
 		},
 		Spec: velero.BackupSpec{
 			IncludeClusterResources: includeClusterResources,
+			StorageLocation:         backupLocation.Name,
+			VolumeSnapshotLocations: []string{snapshotLocation.Name},
+			TTL:                     metav1.Duration{Duration: 720 * time.Hour},
+			IncludedNamespaces:      t.sourceNamespaces(),
+			IncludedResources:       t.BackupResources,
+			Hooks: velero.BackupHooks{
+				Resources: []velero.BackupResourceHookSpec{},
+			},
 		},
 	}
-	err = t.updateBackup(backup)
-	return backup, err
-}
-
-// Update a Backups as desired for the source cluster.
-func (t *Task) updateBackup(backup *velero.Backup) error {
-	backupLocation, err := t.getBSL()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	snapshotLocation, err := t.getVSL()
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-
-	backup.Spec = velero.BackupSpec{
-		StorageLocation:         backupLocation.Name,
-		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      t.sourceNamespaces(),
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
-		Hooks: velero.BackupHooks{
-			Resources: []velero.BackupResourceHookSpec{},
-		},
-		IncludeClusterResources: backup.Spec.IncludeClusterResources,
-	}
-
-	return nil
+	return backup, nil
 }
 
 func (t *Task) deleteBackups() error {
