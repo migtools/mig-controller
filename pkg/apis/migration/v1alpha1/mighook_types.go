@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	PhaseLabel           = "phase"
+	HookPhaseLabel       = "phase"
+	HookOwnerLabel       = "owner"
 	PreBackupHookPhase   = "PreBackup"
 	PostBackupHookPhase  = "PostBackup"
 	PreRestoreHookPhase  = "PreRestore"
@@ -75,10 +76,11 @@ func init() {
 }
 
 // Get an existing hook job.
-func (r *MigHook) GetPhaseJob(client k8sclient.Client, phase string) (*batchv1.Job, error) {
+func (r *MigHook) GetPhaseJob(client k8sclient.Client, phase string, owner string) (*batchv1.Job, error) {
 	list := batchv1.JobList{}
 	labels := r.GetCorrelationLabels()
-	labels[PhaseLabel] = phase
+	labels[HookPhaseLabel] = phase
+	labels[HookOwnerLabel] = owner
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -93,10 +95,11 @@ func (r *MigHook) GetPhaseJob(client k8sclient.Client, phase string) (*batchv1.J
 }
 
 // Get an existing configMap job.
-func (r *MigHook) GetPhaseConfigMap(client k8sclient.Client, phase string) (*corev1.ConfigMap, error) {
+func (r *MigHook) GetPhaseConfigMap(client k8sclient.Client, phase string, owner string) (*corev1.ConfigMap, error) {
 	list := corev1.ConfigMapList{}
 	labels := r.GetCorrelationLabels()
-	labels[PhaseLabel] = phase
+	labels[HookPhaseLabel] = phase
+	labels[HookOwnerLabel] = owner
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),

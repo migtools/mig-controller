@@ -25,6 +25,10 @@ const (
 	PostBackupHooks               = "PostBackupHooks"
 	PreRestoreHooks               = "PreRestoreHooks"
 	PostRestoreHooks              = "PostRestoreHooks"
+	PreBackupHooksFailed          = "PreBackupHooksFailed"
+	PostBackupHooksFailed         = "PostBackupHooksFailed"
+	PreRestoreHooksFailed         = "PreRestoreHooksFailed"
+	PostRestoreHooksFailed        = "PostRestoreHooksFailed"
 	EnsureInitialBackup           = "EnsureInitialBackup"
 	InitialBackupCreated          = "InitialBackupCreated"
 	InitialBackupFailed           = "InitialBackupFailed"
@@ -266,6 +270,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PreBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
+			t.fail(PreBackupHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -419,6 +424,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
+			t.fail(PostBackupHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -430,6 +436,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
+			t.fail(PreRestoreHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -559,6 +566,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
+			t.fail(PostRestoreHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
