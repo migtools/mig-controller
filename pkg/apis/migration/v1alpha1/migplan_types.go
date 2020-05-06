@@ -29,10 +29,13 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -113,7 +116,7 @@ func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (*MigCluster, e
 	return GetCluster(client, r.Spec.DestMigClusterRef)
 }
 
-// GetStorage - Get the referenced storage..
+// GetStorage - Get the referenced storage.
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
@@ -216,6 +219,55 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 
 	list := append(stage, final...)
 	return list, nil
+}
+
+// ListTemplatePods - get list of pod templates, associated with a plan resource
+func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.Pod, error) {
+	pods := []corev1.Pod{}
+	for _, template := range DefaultTemplates {
+		// Get resources
+		list := unstructured.UnstructuredList{}
+		templateGVK := template.GroupKind().WithVersion("")
+		list.SetGroupVersionKind(templateGVK)
+		err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
+		if err != nil {
+			return nil, err
+		}
+		resources := []unstructured.Unstructured{}
+		for _, resource := range list.Items {
+			for _, ns := range r.GetSourceNamespaces() {
+				if resource.GetNamespace() == ns {
+					resources = append(resources, resource)
+					break
+				}
+			}
+		}
+
+		for _, resource := range resources {
+			podTemplate := corev1.PodTemplateSpec{}
+			unstructuredTemplate, found, err := unstructured.NestedMap(resource.Object, template.Path()...)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				return nil, fmt.Errorf("Template path %s was not found on resource: %s", template.TemplatePath, template.Resource)
+			}
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTemplate, &podTemplate)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %v", template.TemplatePath, err)
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resource.GetName(),
+					Namespace: resource.GetNamespace(),
+				},
+				Spec: podTemplate.Spec,
+			}
+			pods = append(pods, pod)
+		}
+	}
+
+	return pods, nil
 }
 
 //
@@ -701,6 +753,7 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 const (
 	PvMoveAction = "move"
 	PvCopyAction = "copy"
+	PvSkipAction = "skip"
 )
 
 // PV Copy Methods.
@@ -730,9 +783,10 @@ type PV struct {
 
 // PVC
 type PVC struct {
-	Namespace   string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-	Name        string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	Namespace    string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	Name         string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	HasReference bool                              `json:"hasReference,omitempty"`
 }
 
 // Supported
@@ -744,7 +798,7 @@ type Supported struct {
 }
 
 // Selection
-// Action - The PV migration action (move|copy)
+// Action - The PV migration action (move|copy|skip)
 // StorageClass - The PV storage class name to use in the destination cluster.
 // AccessMode   - The PV access mode to use in the destination cluster, if different from src PVC AccessMode
 // CopyMethod   - The PV copy method to use ('filesystem' for restic copy, or 'snapshot' for velero snapshot plugin)
