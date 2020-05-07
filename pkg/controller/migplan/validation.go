@@ -43,9 +43,7 @@ const (
 	PodLimitExceeded                           = "PodLimitExceeded"
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
-	IdentitySecretMisconfigured                = "IdentitySecretMisconfigured"
 	SourceIdentityTokenNotAuthorized           = "SourceIdentityTokenNotAuthorized"
-	DestinationIdentityTokenNotAuthorized      = "DestinationIdentityTokenNotAuthorized"
 	PlanConflict                               = "PlanConflict"
 	PvInvalidAction                            = "PvInvalidAction"
 	PvNoSupportedAction                        = "PvNoSupportedAction"
@@ -66,6 +64,10 @@ const (
 	Closed                                     = "Closed"
 	SourcePodsNotHealthy                       = "SourcePodsNotHealthy"
 	GVKsIncompatible                           = "GVKsIncompatible"
+	InvalidSourceTokenRef                      = "InvalidSourceTokenRef"
+	InvalidDestinationTokenRef                 = "InvalidDestinationTokenRef"
+	SourceTokenNotReady                        = "SourceTokenNotReady"
+	DestinationTokenNotReady                   = "DestinationTokenNotReady"
 )
 
 // Categories
@@ -115,9 +117,7 @@ const (
 	PodLimitExceededMessage                           = "Pod limit: %d exceeded, found: %d."
 	SourceClusterProxySecretMisconfiguredMessage      = "Source cluster proxy secret is misconfigured"
 	DestinationClusterProxySecretMisconfiguredMessage = "Destination cluster proxy secret is misconfigured"
-	IdentitySecretMisconfiguredMessage                = "Identity secret is misconfigured"
 	SourceIdentityTokenNotAuthorizedMessage           = "Could not authenticate with source cluster using source identity token"
-	DestinationIdentityTokenNotAuthorizedMessage      = "Could not authenticate with destination cluster using destination identity token"
 	PlanConflictMessage                               = "The plan is in conflict with []."
 	PvInvalidActionMessage                            = "PV in `persistentVolumes` [] has an unsupported `action`."
 	PvNoSupportedActionMessage                        = "PV in `persistentVolumes` [] with no `SupportedActions`."
@@ -137,7 +137,11 @@ const (
 	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                                     = "The migration plan is closed."
 	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
-	NamespacesNotAuthorizedMessage                    = "Source identity not authorized for amespaces []."
+	NamespacesNotAuthorizedMessage                    = "Source identity not authorized for namespaces []."
+	InvalidSourceTokenRefMessage                      = "The `srcMigTokenRef` must reference a `migtoken`."
+	InvalidDestinationTokenRefMessage                 = "The `destMigTokenRef` must reference a `migtoken`."
+	SourceTokenNotReadyMessage                        = "The referenced `srcMigTokenRef` does not have a `Ready` condition."
+	DestinationTokenNotReadyMessage                   = "The referenced `destMigTokenRef` does not have a `Ready` condition."
 )
 
 // Valid AccessMode values
@@ -174,7 +178,12 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	}
 
 	// Validate Identity Tokens
-	err = r.validateIdentityAuthorization(plan)
+	err = r.validateSourceToken(plan)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	err = r.validateDestinationToken(plan)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -227,6 +236,102 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	if err != nil {
 		log.Trace(err)
 		return err
+	}
+
+	return nil
+}
+
+// Validate the referenced source token.
+func (r ReconcileMigPlan) validateSourceToken(plan *migapi.MigPlan) error {
+	ref := plan.Spec.SrcMigTokenRef
+
+	// NotSet
+	if !migref.RefSet(ref) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     InvalidSourceTokenRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  InvalidSourceTokenRefMessage,
+		})
+		return nil
+	}
+
+	token, err := migapi.GetToken(r, ref)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// NotFound
+	if token == nil {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     InvalidSourceTokenRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Critical,
+			Message:  InvalidSourceTokenRefMessage,
+		})
+		return nil
+	}
+
+	// NotReady
+	if !token.Status.IsReady() {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourceTokenNotReady,
+			Status:   True,
+			Category: Critical,
+			Message:  SourceTokenNotReadyMessage,
+		})
+		return nil
+	}
+
+	return nil
+}
+
+// Validate the referenced destination token.
+func (r ReconcileMigPlan) validateDestinationToken(plan *migapi.MigPlan) error {
+	ref := plan.Spec.DestMigTokenRef
+
+	// NotSet
+	if !migref.RefSet(ref) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     InvalidDestinationTokenRef,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  InvalidDestinationTokenRefMessage,
+		})
+		return nil
+	}
+
+	token, err := migapi.GetToken(r, ref)
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+
+	// NotFound
+	if token == nil {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     InvalidDestinationTokenRef,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Critical,
+			Message:  InvalidDestinationTokenRefMessage,
+		})
+		return nil
+	}
+
+	// NotReady
+	if !token.Status.IsReady() {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     DestinationTokenNotReady,
+			Status:   True,
+			Category: Critical,
+			Message:  DestinationTokenNotReadyMessage,
+		})
+		return nil
 	}
 
 	return nil
@@ -619,117 +724,6 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 	return nil
 }
 
-// Validate Identity Authorization
-func (r ReconcileMigPlan) validateIdentityAuthorization(plan *migapi.MigPlan) error {
-	if plan.Status.HasAnyCondition(Suspended) {
-		return nil
-	}
-
-	err := r.ValidateIdentitySecret(plan)
-	if err != nil {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     IdentitySecretMisconfigured,
-			Status:   True,
-			Reason:   KeyNotFound,
-			Category: Error,
-			Message:  IdentitySecretMisconfiguredMessage,
-		})
-		return err
-	}
-	srcAuthenticated, destAuthenticated, err := r.ValidateIdentityTokens(plan)
-	if err != nil {
-		return err
-	}
-	if !srcAuthenticated {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     SourceIdentityTokenNotAuthorized,
-			Status:   True,
-			Reason:   NotAuthorized,
-			Category: Error,
-			Message:  SourceIdentityTokenNotAuthorizedMessage,
-		})
-		return errors.New("source identity token not authorized")
-	}
-	if !destAuthenticated {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     DestinationIdentityTokenNotAuthorized,
-			Status:   True,
-			Reason:   NotAuthorized,
-			Category: Error,
-			Message:  DestinationIdentityTokenNotAuthorizedMessage,
-		})
-		return errors.New("destination identity token not authorized")
-	}
-	return nil
-}
-
-// Validate Identity Tokens
-// Returns bools based on src+dest authentication
-// If an error is returned, we should assume the identity secret is
-// misconfigured
-func (r ReconcileMigPlan) ValidateIdentityTokens(plan *migapi.MigPlan) (srcAuthenticated, destAuthenticated bool, err error) {
-	// Get identity structs
-	srcIdentity, err := plan.GetSourceIdentity(r.Client)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	destIdentity, err := plan.GetDestinationIdentity(r.Client)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	// Get source cluster client
-	srcCluster, err := plan.GetSourceCluster(r)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	if srcCluster == nil {
-		return false, false, errors.New("source cluster not found")
-	}
-
-	srcClient, err := srcCluster.GetClient(r)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	// Get destination cluster client
-	destCluster, err := plan.GetDestinationCluster(r)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	if destCluster == nil {
-		return false, false, errors.New("destination cluster not found")
-	}
-
-	destClient, err := destCluster.GetClient(r)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	// Authenticate against both clusters
-	srcAuth, err := srcIdentity.Authenticates(srcClient)
-	if err != nil {
-		log.Trace(err)
-		return false, false, err
-	}
-
-	destAuth, err := destIdentity.Authenticates(destClient)
-	if err != nil {
-		log.Trace(err)
-		return srcAuth, false, err
-	}
-	return srcAuth, destAuth, nil
-}
-
 // Validate Namespace Authorization
 func (r ReconcileMigPlan) validateNamespaceAuthorization(plan *migapi.MigPlan) error {
 	unauthorizedNamespaces := make([]string, 0)
@@ -738,12 +732,15 @@ func (r ReconcileMigPlan) validateNamespaceAuthorization(plan *migapi.MigPlan) e
 		return nil
 	}
 
-	srcIdentity, err := plan.GetSourceIdentity(r.Client)
+	srcToken, err := plan.GetSourceToken(r.Client)
 	if err != nil {
 		return err
 	}
+	if srcToken == nil {
+		return nil
+	}
 
-	authorized, err := srcIdentity.HasRead(plan.Spec.Namespaces)
+	authorized, err := srcToken.HasReadPermission(r.Client, plan.Spec.Namespaces)
 	if err != nil {
 		// This error comes when the given source identity token failed to
 		// authenticate with the source cluster
@@ -775,20 +772,6 @@ func (r ReconcileMigPlan) validateNamespaceAuthorization(plan *migapi.MigPlan) e
 		return errors.New("selected namespaces are not authorized")
 	}
 
-	return nil
-}
-
-// Validate Identity secret integrity
-// Returns an error if secret is somehow misconfigured
-func (r *ReconcileMigPlan) ValidateIdentitySecret(plan *migapi.MigPlan) error {
-	_, err := plan.GetSourceIdentityToken(r.Client)
-	if err != nil {
-		return err
-	}
-	_, err = plan.GetDestinationIdentityToken(r.Client)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 

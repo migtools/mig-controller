@@ -161,3 +161,26 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 
 	return &object, err
 }
+
+func GetToken(client k8sclient.Client, ref *kapi.ObjectReference) (*MigToken, error) {
+	if ref == nil {
+		return nil, nil
+	}
+	object := MigToken{}
+	err := client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		},
+		&object)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	return &object, err
+}

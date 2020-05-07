@@ -147,6 +147,20 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	if secret == nil {
 		return nil, errors.Errorf("Service Account Secret not found for %v", m.Name)
 	}
+
+	return m.BuildRestConfigWithToken(string(secret.Data[SaToken]))
+}
+
+func (m *MigCluster) BuildRestConfigWithToken(token string) (*rest.Config, error) {
+	if m.Spec.IsHostCluster {
+		restConfig, err := config.GetConfig()
+		if err != nil {
+			return nil, err
+		}
+		restConfig.BearerToken = token
+		return restConfig, nil
+	}
+
 	var tlsClientConfig rest.TLSClientConfig
 	if m.Spec.Insecure {
 		tlsClientConfig = rest.TLSClientConfig{Insecure: true}
@@ -155,12 +169,11 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	}
 	restConfig := &rest.Config{
 		Host:            m.Spec.URL,
-		BearerToken:     string(secret.Data[SaToken]),
+		BearerToken:     token,
 		TLSClientConfig: tlsClientConfig,
 		Burst:           1000,
 		QPS:             100,
 	}
-
 	return restConfig, nil
 }
 
