@@ -2,6 +2,8 @@ package gvk
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes/fake"
 	"reflect"
 	"testing"
 )
@@ -128,6 +130,48 @@ func Test_compareResources(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := compareResources(tt.args.src, tt.args.dst); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("compareResources() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_collectResources(t *testing.T) {
+	fakeKubeClient := fake.NewSimpleClientset()
+	serverGroups, err := fakeKubeClient.Discovery().ServerGroups()
+	var preferredDeployment metav1.GroupVersionForDiscovery
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, group := range serverGroups.Groups {
+		if group.Kind == "deployments" {
+			preferredDeployment = group.PreferredVersion
+		}
+	}
+	type args struct {
+		discovery discovery.DiscoveryInterface
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "client has multiple deployment versions",
+			args:    args{fakeKubeClient.Discovery()},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := collectResources(tt.args.discovery)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("collectResources() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for _, resources := range got {
+				if resources.Kind == "deployments" && resources.GroupVersion != preferredDeployment.GroupVersion {
+					t.Fail()
+				}
 			}
 		})
 	}
