@@ -135,7 +135,7 @@ func Test_compareResources(t *testing.T) {
 	}
 }
 
-func Test_collectResources(t *testing.T) {
+func Test_collectPreferredResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	serverGroups, err := fakeKubeClient.Discovery().ServerGroups()
 	var preferredDeployment metav1.GroupVersionForDiscovery
@@ -163,7 +163,7 @@ func Test_collectResources(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := collectResources(tt.args.discovery)
+			got, err := collectPreferredResources(tt.args.discovery)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("collectResources() error = %v, wantErr %v", err, tt.wantErr)
 				return
