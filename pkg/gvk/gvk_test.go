@@ -77,6 +77,22 @@ func Test_compareResources(t *testing.T) {
 							},
 						},
 					},
+				},
+				dst: []*metav1.APIResourceList{
+					{
+						GroupVersion: "apps/v1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "apps",
+								Version:    "v1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
 					{
 						GroupVersion: "apps/v1beta1",
 						APIResources: []metav1.APIResource{
@@ -93,22 +109,6 @@ func Test_compareResources(t *testing.T) {
 					},
 					{
 						GroupVersion: "apps/v1beta2",
-						APIResources: []metav1.APIResource{
-							{
-								Name:       "deployments",
-								Namespaced: true,
-								Group:      "apps",
-								Version:    "v1",
-								Kind:       "Deployment",
-								ShortNames: []string{"deploy"},
-								Verbs:      []string{"create", "update", "list", "delete"},
-							},
-						},
-					},
-				},
-				dst: []*metav1.APIResourceList{
-					{
-						GroupVersion: "apps/v1",
 						APIResources: []metav1.APIResource{
 							{
 								Name:       "deployments",
