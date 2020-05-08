@@ -88,6 +88,7 @@ const (
 	Done          = "Done"
 	Conflict      = "Conflict"
 	NotHealthy    = "NotHealthy"
+	Incorrect     = "Incorrect"
 )
 
 // Statuses

@@ -8,11 +8,10 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type PvMap map[types.NamespacedName]core.PersistentVolume
+type PvMap map[k8sclient.ObjectKey]core.PersistentVolume
 type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
@@ -75,14 +74,13 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		log.Trace(err)
 		return err
 	}
-	namespaces := plan.GetSourceNamespaces()
-	claims, err := r.getClaims(client, namespaces)
+	claims, err := r.getClaims(client, plan)
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
 	for _, claim := range claims {
-		key := types.NamespacedName{
+		key := k8sclient.ObjectKey{
 			Namespace: claim.Namespace,
 			Name:      claim.Name,
 		}
@@ -101,7 +99,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 				Capacity:     pv.Spec.Capacity[core.ResourceStorage],
 				StorageClass: getStorageClassName(pv),
 				Supported: migapi.Supported{
-					Actions:     r.getSupportedActions(pv),
+					Actions:     r.getSupportedActions(pv, claim),
 					CopyMethods: r.getSupportedCopyMethods(pv),
 				},
 				Selection: selection,
@@ -170,7 +168,7 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 		}
 		claim := pv.Spec.ClaimRef
 		if migref.RefSet(claim) {
-			key := types.NamespacedName{
+			key := k8sclient.ObjectKey{
 				Namespace: claim.Namespace,
 				Name:      claim.Name,
 			}
@@ -181,64 +179,77 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 	return pvMap, nil
 }
 
-// Get a list of PVCs found on pods with the specified namespaces.
-func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, namespaces []string) (Claims, error) {
+// Get a list of PVCs found within the specified namespaces.
+func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPlan) (Claims, error) {
 	claims := Claims{}
-	for _, ns := range namespaces {
-		list := &core.PodList{}
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, list)
-		if err != nil {
-			log.Trace(err)
-			return nil, err
-		}
-		for _, pod := range list.Items {
-			for _, volume := range pod.Spec.Volumes {
-				claimRef := volume.VolumeSource.PersistentVolumeClaim
-				if claimRef == nil {
-					continue
-				}
-				pvc := core.PersistentVolumeClaim{}
-				// Get PVC
-				ref := types.NamespacedName{
-					Namespace: pod.Namespace,
-					Name:      claimRef.ClaimName,
-				}
-				err := client.Get(context.TODO(), ref, &pvc)
-				if err != nil {
-					log.Trace(err)
-					return nil, err
-				}
+	list := &core.PersistentVolumeClaimList{}
+	err := client.List(context.TODO(), &k8sclient.ListOptions{}, list)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
 
-				claims = append(
-					claims, migapi.PVC{
-						Namespace:   pod.Namespace,
-						Name:        claimRef.ClaimName,
-						AccessModes: pvc.Spec.AccessModes,
-					})
+	podList, err := plan.ListTemplatePods(client)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	runningPods := &core.PodList{}
+	err = client.List(context.TODO(), &k8sclient.ListOptions{}, runningPods)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+
+	inNamespaces := func(objNamespace string, namespaces []string) bool {
+		for _, ns := range namespaces {
+			if ns == objNamespace {
+				return true
 			}
 		}
+		return false
+	}
+
+	for _, pod := range runningPods.Items {
+		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
+			podList = append(podList, pod)
+		}
+	}
+
+	for _, pvc := range list.Items {
+		if !inNamespaces(pvc.Namespace, plan.GetSourceNamespaces()) {
+			continue
+		}
+		claims = append(
+			claims, migapi.PVC{
+				Namespace:    pvc.Namespace,
+				Name:         pvc.Name,
+				AccessModes:  pvc.Spec.AccessModes,
+				HasReference: pvcInPodVolumes(pvc, podList),
+			})
 	}
 
 	return claims, nil
 }
 
 // Determine the supported PV actions.
-func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume) []string {
+func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim migapi.PVC) []string {
+	suportedActions := []string{}
+	if !claim.HasReference {
+		suportedActions = append(suportedActions, migapi.PvSkipAction)
+	}
 	if pv.Spec.HostPath != nil {
-		return []string{}
+		return suportedActions
 	}
 	if pv.Spec.NFS != nil ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
-		return []string{
+		return append(suportedActions,
 			migapi.PvCopyAction,
-			migapi.PvMoveAction,
-		}
+			migapi.PvMoveAction)
 	}
-	return []string{
-		migapi.PvCopyAction,
-	}
+	return append(suportedActions, migapi.PvCopyAction)
 }
 
 // Determine the supported PV copy methods.
@@ -270,7 +281,7 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 	if err != nil {
 		return migapi.Selection{}, err
 	}
-	actions := r.getSupportedActions(pv)
+	actions := r.getSupportedActions(pv, claim)
 	selectedAction := ""
 	// if there's only one action, make that the default, otherwise select "copy" (if available)
 	if len(actions) == 1 {
@@ -407,5 +418,17 @@ func isRWO(accessModes []core.PersistentVolumeAccessMode) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func pvcInPodVolumes(pvc core.PersistentVolumeClaim, pods []core.Pod) bool {
+	for _, pod := range pods {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name {
+				return true
+			}
+		}
+	}
+
 	return false
 }
