@@ -4,7 +4,6 @@ import (
 	"context"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -151,7 +150,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 
 // Ensure the deploymentconfig for the migration registry on the specified cluster has been created
 func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage, secret *kapi.Secret) error {
-	name := migref.TruncateName(secret.GetName())
+	name := secret.GetName()
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
 
 	// Get Proxy Env Vars for DC
