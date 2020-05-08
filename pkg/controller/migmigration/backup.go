@@ -267,11 +267,11 @@ func (t *Task) updateBackup(backup *velero.Backup) error {
 	backup.Spec = velero.BackupSpec{
 		StorageLocation:         backupLocation.Name,
 		VolumeSnapshotLocations: []string{snapshotLocation.Name},
-		TTL:                     metav1.Duration{Duration: 720 * time.Hour},
-		IncludedNamespaces:      t.sourceNamespaces(),
-		ExcludedNamespaces:      []string{},
-		IncludedResources:       t.BackupResources,
-		ExcludedResources:       []string{},
+		TTL:                metav1.Duration{Duration: 720 * time.Hour},
+		IncludedNamespaces: t.sourceNamespaces(),
+		ExcludedNamespaces: []string{},
+		IncludedResources:  t.BackupResources,
+		ExcludedResources:  Settings.Migration.ClusterScopedBlacklist,
 		Hooks: velero.BackupHooks{
 			Resources: []velero.BackupResourceHookSpec{},
 		},

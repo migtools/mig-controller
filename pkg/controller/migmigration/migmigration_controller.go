@@ -24,6 +24,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+var Settings = &settings.Settings
 
 var log = logging.WithName("migration")
 

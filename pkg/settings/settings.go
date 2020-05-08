@@ -17,6 +17,7 @@ type _Settings struct {
 	Plan
 	Proxy
 	Role
+	Migration
 }
 
 // Load settings.
@@ -38,6 +39,10 @@ func (r *_Settings) Load() error {
 		return err
 	}
 	err = r.Role.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Migration.Load()
 	if err != nil {
 		return err
 	}
