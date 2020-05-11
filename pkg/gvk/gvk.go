@@ -30,7 +30,7 @@ type Compare struct {
 // Compare GVKs on both clusters, find incompatible GVKs
 // and check each plan source namespace for existence of incompatible GVKs
 func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
-	srcResourceList, err := collectResources(r.SrcDiscovery)
+	preferredSrcResourceList, err := collectPreferredResources(r.SrcDiscovery)
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +40,12 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
-	srcResourceList, err = r.excludeCRDs(srcResourceList)
+	preferredSrcResourceList, err = r.excludeCRDs(preferredSrcResourceList)
 	if err != nil {
 		return nil, err
 	}
 
-	resourcesDiff := compareResources(srcResourceList, dstResourceList)
+	resourcesDiff := compareResources(preferredSrcResourceList, dstResourceList)
 	incompatibleGVKs, err := convertToGVRList(resourcesDiff)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	return r.collectIncompatibleMapping(incompatibleGVKs)
 }
 
-// CollectResources collects all namespaced scoped apiResources from the cluster
+// collectResources collects all namespaced scoped apiResources from the cluster
 func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	resources, err := discovery.ServerResources()
 	if err != nil {
@@ -63,6 +63,22 @@ func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIReso
 
 	for _, res := range resources {
 		res.APIResources = namespaced(res.APIResources)
+		res.APIResources = excludeSubresources(res.APIResources)
+		// Some resources appear not to have permissions to list, need to exclude those.
+		res.APIResources = listAllowed(res.APIResources)
+	}
+
+	return resources, nil
+}
+
+// collectPreferredResources collects all preferred namespaced scoped apiResources from the cluster
+func collectPreferredResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+	resources, err := discovery.ServerPreferredNamespacedResources()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, res := range resources {
 		res.APIResources = excludeSubresources(res.APIResources)
 		// Some resources appear not to have permissions to list, need to exclude those.
 		res.APIResources = listAllowed(res.APIResources)
