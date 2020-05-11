@@ -60,10 +60,11 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, err
 	}
 
 	return &gvk.Compare{
-		Plan:         plan,
-		SrcClient:    dynamicClient,
-		DstDiscovery: dstClient,
-		SrcDiscovery: srcClient,
+		Plan:                  plan,
+		SrcClient:             dynamicClient,
+		DstDiscovery:          dstClient,
+		SrcDiscovery:          srcClient,
+		CohabitatingResources: gvk.NewCohabitatingResources(),
 	}, nil
 }
 
