@@ -1,6 +1,7 @@
 package gvk
 
 import (
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,12 +20,39 @@ var crdGVR = schema.GroupVersionResource{
 	Resource: "customresourcedefinitions",
 }
 
+type cohabitatingResource struct {
+	resource       string
+	groupResource1 schema.GroupResource
+	groupResource2 schema.GroupResource
+	seen           bool
+}
+
+func newCohabitatingResource(resource, group1, group2 string) *cohabitatingResource {
+	return &cohabitatingResource{
+		resource:       resource,
+		groupResource1: schema.GroupResource{Group: group1, Resource: resource},
+		groupResource2: schema.GroupResource{Group: group2, Resource: resource},
+		seen:           false,
+	}
+}
+
+func NewCohabitatingResources() map[string]*cohabitatingResource {
+	return map[string]*cohabitatingResource{
+		"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
+		"daemonsets":      newCohabitatingResource("daemonsets", "extensions", "apps"),
+		"replicasets":     newCohabitatingResource("replicasets", "extensions", "apps"),
+		"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
+		"events":          newCohabitatingResource("events", "", "events.k8s.io"),
+	}
+}
+
 // Compare is a store for discovery and dynamic clients to do GVK compare
 type Compare struct {
-	Plan         *migapi.MigPlan
-	SrcDiscovery discovery.DiscoveryInterface
-	DstDiscovery discovery.DiscoveryInterface
-	SrcClient    dynamic.Interface
+	Plan                  *migapi.MigPlan
+	SrcDiscovery          discovery.DiscoveryInterface
+	DstDiscovery          discovery.DiscoveryInterface
+	SrcClient             dynamic.Interface
+	CohabitatingResources map[string]*cohabitatingResource
 }
 
 // Compare GVKs on both clusters, find incompatible GVKs
@@ -45,7 +73,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
-	resourcesDiff := compareResources(preferredSrcResourceList, dstResourceList)
+	resourcesDiff := r.compareResources(preferredSrcResourceList, dstResourceList)
 	incompatibleGVKs, err := convertToGVRList(resourcesDiff)
 	if err != nil {
 		return nil, err
@@ -229,22 +257,19 @@ func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.AP
 	return updatedLists, nil
 }
 
-func resourceExist(resource metav1.APIResource, resources []metav1.APIResource) bool {
-	for _, resourceItem := range resources {
-		if resource.Name == resourceItem.Name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func compareResources(src []*metav1.APIResourceList, dst []*metav1.APIResourceList) []*metav1.APIResourceList {
+func (r *Compare) compareResources(src []*metav1.APIResourceList, dst []*metav1.APIResourceList) []*metav1.APIResourceList {
 	missingResources := []*metav1.APIResourceList{}
+	sortResources(src)
 	for _, srcList := range src {
 		missing := []metav1.APIResource{}
 		for _, resource := range srcList.APIResources {
-			if !resourceExist(resource, fingResourceList(srcList.GroupVersion, dst)) {
+			if cohabitator, found := r.CohabitatingResources[resource.Name]; found {
+				if cohabitator.seen {
+					continue
+				}
+				cohabitator.seen = true
+			}
+			if !resourceExist(resource, findResourceList(srcList.GroupVersion, dst)) {
 				missing = append(missing, resource)
 			}
 		}
@@ -261,7 +286,17 @@ func compareResources(src []*metav1.APIResourceList, dst []*metav1.APIResourceLi
 	return missingResources
 }
 
-func fingResourceList(groupVersion string, list []*metav1.APIResourceList) []metav1.APIResource {
+func resourceExist(resource metav1.APIResource, resources []metav1.APIResource) bool {
+	for _, resourceItem := range resources {
+		if resource.Name == resourceItem.Name {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findResourceList(groupVersion string, list []*metav1.APIResourceList) []metav1.APIResource {
 	for _, l := range list {
 		if l.GroupVersion == groupVersion {
 			return l.APIResources
@@ -289,4 +324,30 @@ func isCRDGroup(group string, crdGroups []string) bool {
 	}
 
 	return false
+}
+
+// sortResources sources resources by moving extensions to the end of the slice. The order of all
+// the other resources is preserved.
+func sortResources(resources []*metav1.APIResourceList) {
+	sort.SliceStable(resources, func(i, j int) bool {
+		left := resources[i]
+		leftGV, _ := schema.ParseGroupVersion(left.GroupVersion)
+		// not checking error because it should be impossible to fail to parse data coming from the
+		// apiserver
+		if leftGV.Group == "extensions" {
+			// always sort extensions at the bottom by saying left is "greater"
+			return false
+		}
+
+		right := resources[j]
+		rightGV, _ := schema.ParseGroupVersion(right.GroupVersion)
+		// not checking error because it should be impossible to fail to parse data coming from the
+		// apiserver
+		if rightGV.Group == "extensions" {
+			// always sort extensions at the bottom by saying left is "less"
+			return true
+		}
+
+		return i < j
+	})
 }
