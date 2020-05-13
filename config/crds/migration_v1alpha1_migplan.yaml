@@ -32,6 +32,8 @@ spec:
               type: boolean
             destMigClusterRef:
               type: object
+            destMigTokenRef:
+              type: object
             hooks:
               items:
                 properties:
@@ -50,8 +52,6 @@ spec:
                 - serviceAccount
                 type: object
               type: array
-            identitySecretRef:
-              type: object
             migStorageRef:
               type: object
             namespaces:
@@ -113,6 +113,8 @@ spec:
                 type: object
               type: array
             srcMigClusterRef:
+              type: object
+            srcMigTokenRef:
               type: object
           type: object
         status:

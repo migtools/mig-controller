@@ -25,12 +25,16 @@ func (t *Task) ensureNamespacesCreated() error {
 	if err != nil {
 		return err
 	}
-	id, err := t.PlanResources.MigPlan.GetDestinationIdentity(client)
+	token, err := t.PlanResources.MigPlan.GetDestinationToken(client)
 	if err != nil {
 		return err
 	}
 	for _, ns := range namespaces {
-		err := id.Client.Get(context.TODO(), k8sclient.ObjectKey{Name: ns}, &v1.Namespace{})
+		client, err := token.GetClient(t.Client)
+		if err != nil {
+			return err
+		}
+		err = client.Get(context.TODO(), k8sclient.ObjectKey{Name: ns}, &v1.Namespace{})
 		if err != nil {
 			// if the namespace doesn't exist on the destination cluster, then create it.
 			if k8serror.IsNotFound(err) {

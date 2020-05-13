@@ -155,6 +155,48 @@ func (r *MigStorage) InPrivileged() bool {
 	return r.GetNamespace() == settings.Settings.Namespace.Privileged
 }
 
+// Token
+func (r *MigToken) GetCorrelationLabels() map[string]string {
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		PartOfLabel: Application,
+		key:         value,
+	}
+}
+
+func (r *MigToken) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
+}
+
+func (r *MigToken) GetNamespace() string {
+	return r.Namespace
+}
+
+func (r *MigToken) GetName() string {
+	return r.Name
+}
+
+func (r *MigToken) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
+	r.Status.ObservedDigest = digest(r.Spec)
+}
+
+func (r *MigToken) HasReconciled() bool {
+	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
+func (r *MigToken) InSandbox() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+}
+
+func (r *MigToken) InPrivileged() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Privileged
+}
+
 // Cluster
 func (r *MigCluster) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()

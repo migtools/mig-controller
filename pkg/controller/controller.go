@@ -22,6 +22,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	"github.com/konveyor/mig-controller/pkg/controller/migplan"
 	"github.com/konveyor/mig-controller/pkg/controller/migstorage"
+	"github.com/konveyor/mig-controller/pkg/controller/migtoken"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -37,6 +38,7 @@ var Controllers = map[string]AddFunction{
 	settings.MigrationRole: migmigration.Add,
 	settings.PlanRole:      migplan.Add,
 	settings.StorageRole:   migstorage.Add,
+	settings.TokenRole:     migtoken.Add,
 	// TODO: probably need to add mighook
 }
 
