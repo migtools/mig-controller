@@ -29,15 +29,15 @@ func (t *Task) EnsureAuthorized() ([]string, error) {
 func (t *Task) sourceNamespacesAuthorized() (map[string]bool, error) {
 	var authorized map[string]bool
 	sourceNamespaces := t.PlanResources.MigPlan.GetSourceNamespaces()
-	identity, err := t.PlanResources.MigPlan.GetSourceIdentity(t.Client)
+	token, err := t.PlanResources.MigPlan.GetSourceToken(t.Client)
 	if err != nil {
 		return authorized, err
 	}
-	authorized, err = identity.HasRead(sourceNamespaces)
+	authorized, err = token.HasReadPermission(t.Client, sourceNamespaces)
 	if err != nil {
 		return authorized, err
 	}
-	migrateAuthorized, err := identity.HasMigrate(sourceNamespaces)
+	migrateAuthorized, err := token.HasMigratePermission(t.Client, sourceNamespaces)
 	if err != nil {
 		return authorized, err
 	}
@@ -51,11 +51,11 @@ func (t *Task) sourceNamespacesAuthorized() (map[string]bool, error) {
 func (t *Task) destinationNamespacesAuthorized() (map[string]bool, error) {
 	var authorized map[string]bool
 	destinationNamespaces := t.PlanResources.MigPlan.GetDestinationNamespaces()
-	identity, err := t.PlanResources.MigPlan.GetDestinationIdentity(t.Client)
+	token, err := t.PlanResources.MigPlan.GetDestinationToken(t.Client)
 	if err != nil {
 		return authorized, err
 	}
-	authorized, err = identity.HasMigrate(destinationNamespaces)
+	authorized, err = token.HasMigratePermission(t.Client, destinationNamespaces)
 	if err != nil {
 		return authorized, err
 	}

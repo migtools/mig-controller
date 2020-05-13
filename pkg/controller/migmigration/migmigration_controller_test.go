@@ -86,7 +86,7 @@ func TestReconcile(t *testing.T) {
 // but for not they are expected to be the identical.
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	start := 5 // Start with AnnotateResources
+	start := 6 // Start with AnnotateResources
 	stage := StageItinerary[start : len(StageItinerary)-1]
 
 	begin := 0

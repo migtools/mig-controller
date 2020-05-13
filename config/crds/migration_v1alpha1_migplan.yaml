@@ -32,7 +32,7 @@ spec:
               type: boolean
             destMigClusterRef:
               type: object
-            identitySecretRef:
+            destMigTokenRef:
               type: object
             migStorageRef:
               type: object
@@ -93,6 +93,8 @@ spec:
                 type: object
               type: array
             srcMigClusterRef:
+              type: object
+            srcMigTokenRef:
               type: object
           type: object
         status:
