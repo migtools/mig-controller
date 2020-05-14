@@ -78,7 +78,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	err = task.Run()
 	if err != nil {
 		log.Trace(err)
-		task.fail(MigrationFailed, err.Error())
+		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}
 

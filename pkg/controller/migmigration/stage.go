@@ -3,12 +3,14 @@ package migmigration
 import (
 	"context"
 	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
+	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +48,11 @@ func BuildStagePods(labels map[string]string, pvcMapping map[k8sclient.ObjectKey
 		if len(volumes) == 0 {
 			continue
 		}
-		stagePod := buildStagePodFromPod(migref.ObjectKey(&pod), labels, &pod, volumes)
+		podKey := k8sclient.ObjectKey{
+			Name:      pod.GetName(),
+			Namespace: pod.GetNamespace(),
+		}
+		stagePod := buildStagePodFromPod(podKey, labels, &pod, volumes)
 		if stagePod != nil {
 			stagePods.merge(*stagePod)
 		}
@@ -163,7 +169,10 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			if pvc.Status.Phase != corev1.ClaimBound {
 				continue
 			}
-			claimKey := migref.ObjectKey(&pvc)
+			claimKey := k8sclient.ObjectKey{
+				Name:      pvc.GetName(),
+				Namespace: pvc.GetNamespace(),
+			}
 			pv, found := pvcMapping[claimKey]
 			if !found ||
 				pv.Selection.Action != migapi.PvCopyAction ||
@@ -206,7 +215,7 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return err
 	}
 
-	podTemplates, err := t.PlanResources.MigPlan.ListTemplatePods(client)
+	podTemplates, err := migpods.ListTemplatePods(client, t.PlanResources.MigPlan.GetSourceNamespaces())
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -368,6 +377,16 @@ func (t *Task) stagePodLabels() map[string]string {
 	return labels
 }
 
+func truncateName(name string) string {
+	r := regexp.MustCompile(`(-+)`)
+	name = r.ReplaceAllString(name, "-")
+	name = strings.TrimRight(name, "-")
+	if len(name) > 57 {
+		name = name[:57]
+	}
+	return name
+}
+
 // Build a stage pod based on existing pod.
 func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod *corev1.Pod, pvcVolumes []corev1.Volume) *StagePod {
 	// Base pod.
@@ -375,7 +394,7 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey, labels map[string]string, pod
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ref.Namespace,
-				GenerateName: migref.TruncateName("stage-"+ref.Name) + "-",
+				GenerateName: truncateName("stage-"+ref.Name) + "-",
 				Labels:       labels,
 			},
 			Spec: corev1.PodSpec{
@@ -426,7 +445,7 @@ func buildStagePod(pvc corev1.PersistentVolumeClaim, labels map[string]string) *
 		Pod: corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    pvc.Namespace,
-				GenerateName: migref.TruncateName("stage-"+pvc.Name) + "-",
+				GenerateName: truncateName("stage-"+pvc.Name) + "-",
 				Labels:       labels,
 			},
 			Spec: corev1.PodSpec{

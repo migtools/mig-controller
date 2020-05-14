@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -189,7 +190,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return nil, err
 	}
 
-	podList, err := plan.ListTemplatePods(client)
+	podList, err := migpods.ListTemplatePods(client, plan.GetSourceNamespaces())
 	if err != nil {
 		log.Trace(err)
 		return nil, err

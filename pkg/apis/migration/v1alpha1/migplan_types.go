@@ -29,13 +29,10 @@ import (
 	appsv1 "github.com/openshift/api/apps/v1"
 	imagev1 "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -219,55 +216,6 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 
 	list := append(stage, final...)
 	return list, nil
-}
-
-// ListTemplatePods - get list of pod templates, associated with a plan resource
-func (r *MigPlan) ListTemplatePods(client k8sclient.Client) ([]corev1.Pod, error) {
-	pods := []corev1.Pod{}
-	for _, template := range DefaultTemplates {
-		// Get resources
-		list := unstructured.UnstructuredList{}
-		templateGVK := template.GroupKind().WithVersion("")
-		list.SetGroupVersionKind(templateGVK)
-		err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
-		if err != nil {
-			return nil, err
-		}
-		resources := []unstructured.Unstructured{}
-		for _, resource := range list.Items {
-			for _, ns := range r.GetSourceNamespaces() {
-				if resource.GetNamespace() == ns {
-					resources = append(resources, resource)
-					break
-				}
-			}
-		}
-
-		for _, resource := range resources {
-			podTemplate := corev1.PodTemplateSpec{}
-			unstructuredTemplate, found, err := unstructured.NestedMap(resource.Object, template.Path()...)
-			if err != nil {
-				return nil, err
-			}
-			if !found {
-				return nil, fmt.Errorf("Template path %s was not found on resource: %s", template.TemplatePath, template.Resource)
-			}
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredTemplate, &podTemplate)
-			if err != nil {
-				return nil, fmt.Errorf("Unable to convert resource filed '%s' to 'PodTemplateSpec': %v", template.TemplatePath, err)
-			}
-			pod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      resource.GetName(),
-					Namespace: resource.GetNamespace(),
-				},
-				Spec: podTemplate.Spec,
-			}
-			pods = append(pods, pod)
-		}
-	}
-
-	return pods, nil
 }
 
 //

@@ -278,7 +278,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PreBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
-			t.fail(PreBackupHooksFailed, err.Error())
+			t.fail(PreBackupHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -306,7 +306,7 @@ func (t *Task) Run() error {
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(InitialBackupFailed, reasons...)
+				t.fail(InitialBackupFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -419,7 +419,7 @@ func (t *Task) Run() error {
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(StageBackupFailed, reasons...)
+				t.fail(StageBackupFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -449,7 +449,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
 			log.Trace(err)
-			t.fail(PostBackupHooksFailed, err.Error())
+			t.fail(PostBackupHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -461,7 +461,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
-			t.fail(PreRestoreHooksFailed, err.Error())
+			t.fail(PreRestoreHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -490,7 +490,7 @@ func (t *Task) Run() error {
 		if completed {
 			t.setResticConditions(restore)
 			if len(reasons) > 0 {
-				t.fail(StageRestoreFailed, reasons...)
+				t.fail(StageRestoreFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -580,7 +580,7 @@ func (t *Task) Run() error {
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(FinalRestoreFailed, reasons...)
+				t.fail(FinalRestoreFailed, reasons)
 			} else {
 				t.next()
 			}
@@ -591,7 +591,7 @@ func (t *Task) Run() error {
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
 			log.Trace(err)
-			t.fail(PostRestoreHooksFailed, err.Error())
+			t.fail(PostRestoreHooksFailed, []string{err.Error()})
 			return err
 		}
 		if status {
@@ -767,7 +767,7 @@ func (t *Task) anyFlags(step Step) bool {
 }
 
 // Phase fail.
-func (t *Task) fail(nextPhase string, reasons ...string) {
+func (t *Task) fail(nextPhase string, reasons []string) {
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{
