@@ -170,8 +170,8 @@ func (t *Task) configMapTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook
 			GenerateName: strings.ToLower(t.PlanResources.MigPlan.Name + "-" + hook.Phase + "-"),
 			Labels:       labels,
 		},
-		BinaryData: map[string][]byte{
-			"playbook.yml": []byte(playbookData),
+		Data: map[string]string{
+			"playbook.yml": string(playbookData),
 		},
 	}, nil
 }
