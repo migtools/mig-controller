@@ -131,8 +131,6 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 			dpn.discovered = m
 		}
 	}
-	model.Mutex.RLock()
-	defer model.Mutex.RUnlock()
 	tx, err := r.Db.Begin()
 	if err != nil {
 		Log.Trace(err)

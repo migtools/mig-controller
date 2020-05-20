@@ -41,8 +41,8 @@ func WithName(name string) Logger {
 // Updates the generated correlation suffix in the name and
 // clears the reported error history.
 func (l *Logger) Reset() {
-	mutex.RLock()
-	defer mutex.RUnlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	name := fmt.Sprintf("%s|", l.name)
 	name = names.SimpleNameGenerator.GenerateName(name)
 	l.Real = logf.Log.WithName(name)
@@ -66,8 +66,8 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
 		return
 	}
-	mutex.RLock()
-	defer mutex.RUnlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	_, found := l.history[err]
 	if found || errors.IsConflict(err) {
 		return

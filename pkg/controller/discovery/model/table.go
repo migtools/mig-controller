@@ -250,8 +250,8 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 // Insert the model in the DB.
 // Expects the primary key (PK) to be set.
 func (t Table) Insert(model interface{}) error {
-	Mutex.RLock()
-	defer Mutex.RUnlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	fields, err := t.Fields(model)
 	if err != nil {
 		Log.Trace(err)
@@ -297,8 +297,8 @@ func (t Table) Insert(model interface{}) error {
 // Update the model in the DB.
 // Expects the primary key (PK) or natural keys to be set.
 func (t Table) Update(model interface{}) error {
-	Mutex.RLock()
-	defer Mutex.RUnlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	fields, err := t.Fields(model)
 	if err != nil {
 		Log.Trace(err)
@@ -339,8 +339,8 @@ func (t Table) Update(model interface{}) error {
 // Delete the model in the DB.
 // Expects the primary key (PK) or natural keys to be set.
 func (t Table) Delete(model interface{}) error {
-	Mutex.RLock()
-	defer Mutex.RUnlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	fields, err := t.Fields(model)
 	if err != nil {
 		Log.Trace(err)

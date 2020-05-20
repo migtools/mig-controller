@@ -61,8 +61,8 @@ func Create() (*sql.DB, error) {
 		}
 		statements = append(statements, ddl...)
 	}
-	Mutex.RLock()
-	defer Mutex.RUnlock()
+	Mutex.Lock()
+	defer Mutex.Unlock()
 	for _, ddl := range statements {
 		_, err = db.Exec(ddl)
 		if err != nil {
