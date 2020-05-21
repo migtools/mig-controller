@@ -52,13 +52,16 @@ func init() {
 	SchemeBuilder.Register(&MigToken{}, &MigTokenList{})
 }
 
-func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb string) (bool, error) {
+// Function to determine if a user can *verb* on *resource*
+// If name is "" then it means all resources
+func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
 				Resource:  resource,
 				Namespace: namespace,
 				Verb:      verb,
+				Name:      name,
 			},
 		},
 	}
@@ -76,34 +79,15 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb strin
 }
 
 // Check if the user has `use` verb on the associated MigCluster
-func (r *MigToken) HasUseVerb(client k8sclient.Client) (bool, error) {
-	sar := authapi.SelfSubjectAccessReview{
-		Spec: authapi.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: &authapi.ResourceAttributes{
-				Resource:     "migclusters",
-				Namespace:    r.Spec.MigClusterRef.Namespace,
-				ResourceName: r.Spec.MigClusterRef.Name,
-				Verb:         "use",
-			},
-		},
-	}
-
-	tokenClient, err := r.GetClient(client)
-	if err != nil {
-		return false, err
-	}
-
-	err = tokenClient.Create(context.TODO(), &sar)
-	if err != nil {
-		return false, err
-	}
-	return sar.Status.Allowed, nil
+func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
+	allowed, err := r.CanI(client, r.Spec.MigClusterRef.Namespace, "migclusters", "use", r.Spec.MigClusterRef.Name)
+	return allowed, err
 }
 
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, namespace, "namespaces", "get")
+		allowed, err := r.CanI(client, namespace, "namespaces", "get", "")
 		if err != nil {
 			return authorized, err
 		}
@@ -123,7 +107,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	loop:
 		for _, resource := range resources {
 			for _, verb := range verbs {
-				allowed, err := r.CanI(client, namespace, resource, verb)
+				allowed, err := r.CanI(client, namespace, resource, verb, "")
 				if err != nil {
 					return nil, err
 				}
