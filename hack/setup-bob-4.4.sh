@@ -17,6 +17,7 @@ else
 fi
 
 htpasswd -c -B -b users.htpasswd bob bob
+htpasswd -B -b users.htpasswd alice alice
 oc create secret generic htpass-secret --from-file=htpasswd=./users.htpasswd -n openshift-config
 oc patch oauth cluster --type='json' -p '[ { "op": "replace", "path": "/spec", "value": {"identityProviders": [{"htpasswd": {"fileData": {"name": "htpass-secret"}}, "mappingMethod": "claim", "name": "bob_httpassd_provider", "type": "HTPasswd"}]}}]'
 sleep 2
@@ -35,5 +36,20 @@ spec:
   olm_managed: true
   version: 1.0 (OLM)
 EOF
+
+cat <<EOF | oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: openshift-migration
+  name: use-host-cluster
+rules:
+- apiGroups: ["migration.openshift.io"]
+  resources: ["migclusters"]
+  verbs: ["use"]
+  resourceNames: ["host"]
+EOF
+
+oc create rolebinding bob-use-host --role use-cluster --user bob   --namespace openshift-migration
 
 rm users.htpasswd
