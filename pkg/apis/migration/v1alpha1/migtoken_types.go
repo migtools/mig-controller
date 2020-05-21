@@ -54,6 +54,7 @@ func init() {
 
 // Function to determine if a user can *verb* on *resource*
 // If name is "" then it means all resources
+// If group is "*" then it means all API Groups
 func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, verb, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
