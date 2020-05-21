@@ -75,6 +75,31 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb strin
 	return sar.Status.Allowed, nil
 }
 
+// Check if the user has `use` verb on the associated MigCluster
+func (r *MigToken) HasUseVerb(client k8sclient.Client) (bool, error) {
+	sar := authapi.SelfSubjectAccessReview{
+		Spec: authapi.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &authapi.ResourceAttributes{
+				Resource:     "migclusters",
+				Namespace:    r.Spec.MigClusterRef.Namespace,
+				ResourceName: r.Spec.MigClusterRef.Name,
+				Verb:         "use",
+			},
+		},
+	}
+
+	tokenClient, err := r.GetClient(client)
+	if err != nil {
+		return false, err
+	}
+
+	err = tokenClient.Create(context.TODO(), &sar)
+	if err != nil {
+		return false, err
+	}
+	return sar.Status.Allowed, nil
+}
+
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
