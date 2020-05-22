@@ -36,8 +36,8 @@ type MigResource interface {
 	MarkReconciled()
 	// Get whether the resource has been reconciled.
 	HasReconciled() bool
-	// Get whether the resource lives in the sandbox namespace.
-	InSandbox() bool
+	// Get whether the resource lives in the tenant namespace.
+	InTenant() bool
 	// Get whether the resource lives in the privileged namespace.
 	InPrivileged() bool
 }
@@ -76,8 +76,8 @@ func (r *MigPlan) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigPlan) InSandbox() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+func (r *MigPlan) InTenant() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Tenant
 }
 
 func (r *MigPlan) InPrivileged() bool {
@@ -147,8 +147,8 @@ func (r *MigHook) HasReconciled() bool {
 	return r.Status.ObservedGeneration == r.Generation
 }
 
-func (r *MigStorage) InSandbox() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+func (r *MigStorage) InTenant() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Tenant
 }
 
 func (r *MigStorage) InPrivileged() bool {
@@ -189,8 +189,8 @@ func (r *MigToken) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigToken) InSandbox() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+func (r *MigToken) InTenant() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Tenant
 }
 
 func (r *MigToken) InPrivileged() bool {
@@ -231,8 +231,8 @@ func (r *MigCluster) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigCluster) InSandbox() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+func (r *MigCluster) InTenant() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Tenant
 }
 
 func (r *MigCluster) InPrivileged() bool {
@@ -273,8 +273,8 @@ func (r *MigMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigMigration) InSandbox() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Sandbox
+func (r *MigMigration) InTenant() bool {
+	return r.GetNamespace() == settings.Settings.Namespace.Tenant
 }
 
 func (r *MigMigration) InPrivileged() bool {

@@ -16,7 +16,7 @@ type PlanPredicate struct {
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
-		if !plan.InSandbox() {
+		if !plan.InTenant() {
 			return false
 		}
 		r.mapRefs(plan)
@@ -33,7 +33,7 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	if !old.InSandbox() {
+	if !old.InTenant() {
 		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
@@ -48,7 +48,7 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
-		if !plan.InSandbox() {
+		if !plan.InTenant() {
 			return false
 		}
 		r.unmapRefs(plan)
@@ -59,7 +59,7 @@ func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
 func (r PlanPredicate) Generic(e event.GenericEvent) bool {
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
-		if !plan.InSandbox() {
+		if !plan.InTenant() {
 			return false
 		}
 		r.mapRefs(plan)
@@ -184,7 +184,7 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
-	if cast && new.InSandbox() {
+	if cast && new.InTenant() {
 		// Reconciled by the controller.
 		return new.HasReconciled()
 	}
@@ -193,12 +193,12 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
 	storage, cast := e.Object.(*migapi.MigStorage)
-	return cast && storage.InSandbox()
+	return cast && storage.InTenant()
 }
 
 func (r StoragePredicate) Generic(e event.GenericEvent) bool {
 	storage, cast := e.Object.(*migapi.MigStorage)
-	return cast && storage.InSandbox()
+	return cast && storage.InTenant()
 }
 
 type MigrationPredicate struct {
@@ -218,7 +218,7 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	if !old.InSandbox() {
+	if !old.InTenant() {
 		return false
 	}
 	started := !old.Status.HasCondition(migctl.Running) &&
@@ -234,10 +234,10 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
 	migration, cast := e.Object.(*migapi.MigMigration)
-	return cast && migration.InSandbox()
+	return cast && migration.InTenant()
 }
 
 func (r MigrationPredicate) Generic(e event.GenericEvent) bool {
 	migration, cast := e.Object.(*migapi.MigMigration)
-	return cast && migration.InSandbox()
+	return cast && migration.InTenant()
 }
