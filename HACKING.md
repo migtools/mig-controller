@@ -4,12 +4,12 @@
 
 __1. Install prerequisites__
 
- - golang compiler (tested @ 1.11.5)
+ - golang compiler (tested @ 1.13.8)
  - kubebuilder (tested @ 1.0.7)
  - dep (tested @ v0.5.0)
- - velero (tested @ v0.11.0) installed on both clusters involved in migration
+ - mig-operator (tested @ latest) installed on both clusters involved in migration
 
-__2. Clone the project to your `$GOPATH`__
+__2. Clone mig-controller project to your `$GOPATH`__
 
 Clone mig-controller to your $GOPATH so that dependencies in `vendor` will be found at build time.
 
@@ -25,21 +25,34 @@ go get -d github.com/konveyor/mig-controller
 ls -al $GOPATH/src/github.com/konveyor/mig-controller
 ```
 
-__3. Create required CRDs (MigMigration, MigPlan, MigCluster, Cluster...)__
+__3. Install migration components__
 
-Do this on the cluster where you'll be running the controller.
+Follow [mig-operator](https://github.com/konveyor/mig-operator) instructions to install migration components. 
 
+__4. Stop any running instances of mig-controller connected to the active cluster__
+
+After installing migration components, make sure mig-controller is stopped so that we can connect a locally built copy to the cluster. 
+
+```bash
+# Open the `MigrationController` CR for editing
+oc edit migrationcontroller -n openshift-migration
 ```
-# Create 'Mig' CRDs
-oc apply -f config/crds
 
-# Create 'Cluster' CRD
-oc apply -f https://raw.githubusercontent.com/kubernetes/cluster-registry/master/cluster-registry-crd.yaml
+```yaml
+# Set `migration_controller: false`
+kind: MigrationController
+metadata:
+  name: migration-controller
+  namespace: openshift-migration
+spec:
+[...]
+  migration_controller: false
+[...]
 ```
 
----
+After making this edit, wait for mig-operator to remove the mig-controller Pod.
 
-__4.  Use `make run` to run the controller from your terminal.__
+__5.  Use `make run` to run the controller from your terminal.__
 
 The controller will connect to OpenShift using your currently active kubeconfig. You may need to run `oc login` first.
 
@@ -57,6 +70,8 @@ go run ./cmd/manager/main.go
 [...]
 ```
 
+---
+
 ## Familiarizing with `make` targets
 
 There are several useful Makefile targets for mig-controller that developers should be aware of.
@@ -69,3 +84,13 @@ There are several useful Makefile targets for mig-controller that developers sho
 | `make manifests` | Generate updated CRDs from types.go files, RBAC from annotations in controller, deploy manifest YAML |
 | `make samples` | Copy annotated sample CR contents from config/samples to migsamples, which is .gitignored and safe to keep data in |
 | `make docker-build` | Build the controller-manager into a container image. Requires support for multi-stage builds, which may require moby-engine |
+
+---
+## Invoking CI on pull requests
+
+You can invoke CI via webhook with an appropriate pull request comment command. CI will run a stateless migration and return results as a comment on the relevant PR where CI was requested.
+
+| Command | Description |
+| --- | --- |
+| `\test` | Run  OCP 3 => 4 migration using the master branch of mig-operator   |
+| `\test-with-operator <PR_number>` | Run  OCP 3 => 4 migration using a specified PR from mig-operator  |
