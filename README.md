@@ -105,7 +105,6 @@ oc apply -f sa-secret-remote.yaml
 oc apply -f mig-cluster-remote.yaml
 
 # Describes where to store data during Migration, storage auth details
-# Note: the contents of mig-storage-creds.yaml will be used to overwrite Velero cloud-credentials
 oc apply -f mig-storage-creds.yaml
 oc apply -f mig-storage.yaml
 
@@ -118,21 +117,15 @@ oc apply -f mig-migration.yaml
 
 ---
 
-### Creating a Service Account (SA) token
+### Getting a migration-controller Service Account (SA) token
 
 For mig-controller to perform migration actions on a remote cluster, you'll need to provide a valid Service Account (SA) token granting 'cluster-admin' access to the remote cluster.
 
 
-To configure the SA token, run the following on the remote cluster:
+To get the SA token created by mig-operator, run the following on the remote cluster:
 ```bash
-# Create a new service account in the mig ns
-oc create namespace openshift-migration
-oc create namespace openshift-migration
-oc create sa -n openshift-migration mig
-# Grant the 'mig' service account cluster-admin (cluster level root privileges, use with caution!)
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:mig:mig
 # Get the ServiceAccount token in a base64-encoded format to put in the remote MigCluster spec
-oc sa get-token -n openshift-migration mig|base64 -w 0
-
+# If you are providing this token to mig-ui, skip the base64 encoding step
+oc sa get-token -n openshift-migration migration-controller | base64 -w 0
 ```
 Use the base64-encoded SA token from the last command output to fill in `migsamples/sa-secret-remote.yaml`
