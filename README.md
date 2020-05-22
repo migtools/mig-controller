@@ -50,13 +50,12 @@ Before mig-controller can run a Migration, you'll need to provide it with:
  - A list of namespaces to be migrated
  - Storage to use for the migration
 
- These items can be specified by "Mig" CRs. For the source of truth on what will be accepted in CR fields, see the appropriate _types.go_ file.
+ These details are specified by "Mig" CRs. For the source of truth on what will be accepted in CR fields, see the appropriate _types.go_ file.
 
 - [MigPlan](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migplan_types.go)
 - [MigCluster](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migcluster_types.go)
 - [MigStorage](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migstorage_types.go)
 - [MigMigration](https://github.com/konveyor/mig-controller/blob/master/pkg/apis/migration/v1alpha1/migmigration_types.go)
-- [Cluster](https://github.com/kubernetes/cluster-registry/blob/master/pkg/apis/clusterregistry/v1alpha1/types.go)
 
 ---
 

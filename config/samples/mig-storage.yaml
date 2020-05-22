@@ -15,7 +15,7 @@ spec:
     # [!] Change awsRegion to contain the region name (e.g. 'us-east-1') where the S3 bucket presides
     awsRegion: foo
     credsSecretRef:
-      namespace: openshift-migration
+      namespace: openshift-config
       name: migstorage-creds
 
     # Optional backupStorageConfig parameters
@@ -27,6 +27,6 @@ spec:
     # [!] Change awsRegion to contain the region name (e.g. 'us-east-1') where Volume Snapshots should take place
     awsRegion: foo
     credsSecretRef:
-      namespace: openshift-migration
+      namespace: openshift-config
       name: migstorage-creds
 
