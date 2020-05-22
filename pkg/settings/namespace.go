@@ -4,7 +4,7 @@ import "os"
 
 const (
 	Privileged = "PRIVILEGED_NAMESPACE"
-	Sandbox    = "SANDBOX_NAMESPACE"
+	Sandbox    = "TENANT_NAMESPACE"
 )
 
 // Namespace settings.
