@@ -3,7 +3,7 @@ if [[ -z "$KUBECONFIG" ]]; then
   exit 1
 fi
 
-export KUBEADMIN_KUBECONFIG=$KUBECONFIG-admin
+export KUBEADMIN_KUBECONFIG="$KUBECONFIG-admin"
 cp $KUBECONFIG $KUBEADMIN_KUBECONFIG
 
 ## check if it is a 4.x cluster
@@ -29,7 +29,10 @@ oc login -u alice -p alice
 oc new-project alice-destination
 
 ## create MigrationTenant CR for bob and alice
-export $KUBEADMIN_KUBECONFIG
+export KUBECONFIG=$KUBEADMIN_KUBECONFIG
+
+# back to system admin
+oc login -u system:admin
 cat <<EOF | oc create -f -
 apiVersion: migration.openshift.io/v1alpha1
 kind: MigrationTenant
