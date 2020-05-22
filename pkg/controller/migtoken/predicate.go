@@ -31,7 +31,7 @@ func (r TokenPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	if !old.InPrivileged() {
+	if !old.InTenant() {
 		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
