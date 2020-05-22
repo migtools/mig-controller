@@ -52,13 +52,18 @@ func init() {
 	SchemeBuilder.Register(&MigToken{}, &MigTokenList{})
 }
 
-func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb string) (bool, error) {
+// Function to determine if a user can *verb* on *resource*
+// If name is "" then it means all resources
+// If group is "*" then it means all API Groups
+func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, verb, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
 				Resource:  resource,
+				Group:     group,
 				Namespace: namespace,
 				Verb:      verb,
+				Name:      name,
 			},
 		},
 	}
@@ -75,10 +80,16 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, verb strin
 	return sar.Status.Allowed, nil
 }
 
+// Check if the user has `use` verb on the associated MigCluster
+func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
+	allowed, err := r.CanI(client, r.Spec.MigClusterRef.Namespace, "migclusters", "migration.openshift.io", "use", r.Spec.MigClusterRef.Name)
+	return allowed, err
+}
+
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, namespace, "namespaces", "get")
+		allowed, err := r.CanI(client, namespace, "namespaces", "*", "get", "")
 		if err != nil {
 			return authorized, err
 		}
@@ -98,7 +109,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	loop:
 		for _, resource := range resources {
 			for _, verb := range verbs {
-				allowed, err := r.CanI(client, namespace, resource, verb)
+				allowed, err := r.CanI(client, namespace, resource, "*", verb, "")
 				if err != nil {
 					return nil, err
 				}

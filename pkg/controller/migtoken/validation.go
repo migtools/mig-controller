@@ -11,7 +11,9 @@ const (
 
 // Reasons
 const (
+	NotAuthorized    = "NotAuthorized"
 	NotAuthenticated = "NotAuthenticated"
+	UseNotGranted    = "UseNotGranted"
 )
 
 // Statuses
@@ -19,10 +21,11 @@ const (
 	True = migapi.True
 )
 
-// Nessages
+// Messages
 const (
 	ReadyMessage            = "The token is ready."
 	NotAuthenticatedMessage = "The token is not authenticated"
+	UseNotGrantedMessage    = "The token is not granted use on the associated MigCluster. Please contact your administrator."
 )
 
 func (r ReconcileMigToken) validate(token *migapi.MigToken) error {
@@ -39,6 +42,19 @@ func (r ReconcileMigToken) validate(token *migapi.MigToken) error {
 			Message:  NotAuthenticatedMessage,
 		})
 	}
+	allowed, err := r.validateMigClusterRef(token)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		token.Status.SetCondition(migapi.Condition{
+			Type:     NotAuthorized,
+			Status:   True,
+			Reason:   UseNotGranted,
+			Category: Critical,
+			Message:  UseNotGrantedMessage,
+		})
+	}
 	return nil
 }
 
@@ -48,4 +64,9 @@ func (r ReconcileMigToken) validateAuthentication(token *migapi.MigToken) (bool,
 		return false, err
 	}
 	return auth, nil
+}
+
+func (r ReconcileMigToken) validateMigClusterRef(token *migapi.MigToken) (bool, error) {
+	auth, err := token.HasUsePermission(r.Client)
+	return auth, err
 }
