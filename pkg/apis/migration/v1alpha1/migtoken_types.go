@@ -98,7 +98,7 @@ func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, "", "namespaces", "", "get", namespace)
+		allowed, err := r.CanI(client, namespace, "namespaces", "", "get", namespace)
 		if err != nil {
 			return authorized, err
 		}
