@@ -81,7 +81,7 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, ver
 	return sar.Status.Allowed, nil
 }
 
-// Check if the user has `use` verb on the associated MigCluster
+// Check if the user has `use` verb on the associated MigrationController resource
 func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 	migControllerName := "migration-controller"
 	migControllerNamespace := "openshift-migration"
