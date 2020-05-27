@@ -56,6 +56,7 @@ func init() {
 // Function to determine if a user can *verb* on *resource*
 // If name is "" then it means all resources
 // If group is "*" then it means all API Groups
+// if namespace is "" then it means all cluster scoped resources
 func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, verb, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
@@ -96,7 +97,7 @@ func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, namespace, "namespaces", "*", "get", "")
+		allowed, err := r.CanI(client, "", "namespaces", "", "get", namespace)
 		if err != nil {
 			return authorized, err
 		}
