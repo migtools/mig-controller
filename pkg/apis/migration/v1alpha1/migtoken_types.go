@@ -14,8 +14,9 @@ import (
 
 // MigTokenSpec defines the desired state of MigToken
 type MigTokenSpec struct {
-	SecretRef     *kapi.ObjectReference `json:"secretRef"`
-	MigClusterRef *kapi.ObjectReference `json:"migClusterRef"`
+	SecretRef              *kapi.ObjectReference `json:"secretRef"`
+	MigClusterRef          *kapi.ObjectReference `json:"migClusterRef"`
+	MigrationControllerRef *kapi.ObjectReference `json:"migrationControllerRef,omitempty"`
 }
 
 // MigTokenStatus defines the observed state of MigToken
@@ -82,7 +83,13 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, ver
 
 // Check if the user has `use` verb on the associated MigCluster
 func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
-	allowed, err := r.CanI(client, r.Spec.MigClusterRef.Namespace, "migclusters", "migration.openshift.io", "use", r.Spec.MigClusterRef.Name)
+	migControllerName := "migration-controller"
+	migControllerNamespace := "openshift-migration"
+	if r.Spec.MigrationControllerRef != nil {
+		migControllerName = r.Spec.MigrationControllerRef.Name
+		migControllerNamespace = r.Spec.MigrationControllerRef.Namespace
+	}
+	allowed, err := r.CanI(client, migControllerNamespace, "migrationcontrollers", "migration.openshift.io", "use", migControllerName)
 	return allowed, err
 }
 

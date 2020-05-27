@@ -30,6 +30,8 @@ spec:
           properties:
             migClusterRef:
               type: object
+            migrationControllerRef:
+              type: object
             secretRef:
               type: object
           required:
