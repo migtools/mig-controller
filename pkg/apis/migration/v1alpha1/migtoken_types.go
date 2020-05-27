@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"k8s.io/api/authentication/v1beta1"
+	"strings"
 
 	authapi "k8s.io/api/authorization/v1"
 	kapi "k8s.io/api/core/v1"
@@ -108,7 +109,14 @@ func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []strin
 }
 
 func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
-	resources := []string{"pods", "deployments", "deploymentconfigs", "daemonsets", "replicasets", "statefulsets", "pvcs"}
+	resources := []string{
+		"/pods",
+		"apps/deployments",
+		"apps.openshift.io/deploymentconfigs",
+		"apps/daemonsets",
+		"apps/replicasets",
+		"apps/statefulsets",
+		"/pvcs"}
 	verbs := []string{"get", "create", "update", "delete"}
 
 	authorized := Authorized{}
@@ -117,7 +125,10 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	loop:
 		for _, resource := range resources {
 			for _, verb := range verbs {
-				allowed, err := r.CanI(client, namespace, resource, "*", verb, "")
+				groupResource := strings.Split(resource, "/")
+				group := groupResource[0]
+				resource := groupResource[1]
+				allowed, err := r.CanI(client, namespace, resource, group, verb, "")
 				if err != nil {
 					return nil, err
 				}
