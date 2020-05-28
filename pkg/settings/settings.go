@@ -33,6 +33,7 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
+	Migration
 	Roles     map[string]bool
 	ProxyVars map[string]string
 }

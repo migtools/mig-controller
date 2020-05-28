@@ -3,6 +3,8 @@ package migmigration
 import (
 	"context"
 
+	"github.com/konveyor/mig-controller/pkg/settings"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -16,7 +18,6 @@ import (
 
 // Delete the running restic pods.
 // Restarted to get around mount propagation requirements.
-// Skip this phase for OCP 3.10+
 func (t *Task) restartResticPods() error {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -24,8 +25,15 @@ func (t *Task) restartResticPods() error {
 		return err
 	}
 
-	// Skip restic restart on OCP 3.7-3.9, k8s 1.7-1.9
-	if client.MajorVersion() == 1 && client.MinorVersion() < 10 {
+	// Always run restic restart on 3.7, only run on 3.9+ when flag set
+	runRestart := false
+	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
+		runRestart = true
+	}
+	if settings.Settings.Migration.RestartRestic {
+		runRestart = true
+	}
+	if !runRestart {
 		return nil
 	}
 
@@ -70,9 +78,16 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 
-	// Skip restic restart on OCP 3.7-3.9
-	if client.MajorVersion() == 1 && client.MinorVersion() < 10 {
-		return true, nil
+	// Always run restic restart on 3.7, only run on 3.9+ when flag set
+	runRestart := false
+	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
+		runRestart = true
+	}
+	if settings.Settings.Migration.RestartRestic {
+		runRestart = true
+	}
+	if !runRestart {
+		return false, nil
 	}
 
 	list := corev1.PodList{}
