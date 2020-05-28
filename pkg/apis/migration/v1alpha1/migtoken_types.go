@@ -116,7 +116,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 		"apps/daemonsets",
 		"apps/replicasets",
 		"apps/statefulsets",
-		"/pvcs"}
+		"/persistentvolumeclaims"}
 	verbs := []string{"get", "create", "update", "delete"}
 
 	authorized := Authorized{}
