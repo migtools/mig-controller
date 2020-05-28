@@ -16,12 +16,19 @@ import (
 
 // Delete the running restic pods.
 // Restarted to get around mount propagation requirements.
+// Skip this phase for OCP 3.10+
 func (t *Task) restartResticPods() error {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
+
+	// Skip restic restart on OCP 3.7-3.9, k8s 1.7-1.9
+	if client.MajorVersion() == 1 && client.MinorVersion() < 10 {
+		return nil
+	}
+
 	list := corev1.PodList{}
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
@@ -55,12 +62,19 @@ func (t *Task) restartResticPods() error {
 }
 
 // Determine if restic pod is running.
+// Skip this phase for OCP 3.10+
 func (t *Task) haveResticPodsStarted() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return false, err
 	}
+
+	// Skip restic restart on OCP 3.7-3.9
+	if client.MajorVersion() == 1 && client.MinorVersion() < 10 {
+		return true, nil
+	}
+
 	list := corev1.PodList{}
 	ds := appsv1.DaemonSet{}
 	selector := labels.SelectorFromSet(map[string]string{

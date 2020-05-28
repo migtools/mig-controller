@@ -24,6 +24,8 @@ type Client interface {
 	k8sclient.Client
 	dapi.DiscoveryInterface
 	RestConfig() *rest.Config
+	MajorVersion() int
+	MinorVersion() int
 }
 
 type client struct {
@@ -76,6 +78,14 @@ func NewClient(restCfg *rest.Config) (Client, error) {
 
 func (c client) RestConfig() *rest.Config {
 	return c.Config
+}
+
+func (c client) MajorVersion() int {
+	return c.Major
+}
+
+func (c client) MinorVersion() int {
+	return c.Minor
 }
 
 //
