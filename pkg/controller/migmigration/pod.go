@@ -3,8 +3,6 @@ package migmigration
 import (
 	"context"
 
-	"github.com/konveyor/mig-controller/pkg/settings"
-
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -16,25 +14,48 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Delete the running restic pods.
-// Restarted to get around mount propagation requirements.
-func (t *Task) restartResticPods() error {
+// Determine if restic should restart
+func (t *Task) shouldResticRestart() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
-		return err
+		return false, err
 	}
 
-	// Always run restic restart on 3.7, only run on 3.9+ when flag set
+	// Default to running ResticRestart on 3.7, 3.9.
+	// ResticRestart not needed for default feature gates settings
+	// on 3.10, 3.11, 4.x+. Could be needed if gates re-configured.
 	runRestart := false
 	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
 		runRestart = true
 	}
-	if settings.Settings.Migration.RestartRestic {
+	if client.MajorVersion() == 1 && client.MinorVersion() == 9 {
 		runRestart = true
+	}
+	// User can override default by setting MigCluster.Spec.RestartRestic.
+	if t.PlanResources.SrcMigCluster.Spec.RestartRestic != nil {
+		runRestart = *t.PlanResources.SrcMigCluster.Spec.RestartRestic
+	}
+	return runRestart, nil
+}
+
+// Delete the running restic pods.
+// Restarted to get around mount propagation requirements.
+func (t *Task) restartResticPods() error {
+	// Verify restic restart is needed before proceeding
+	runRestart, err := t.shouldResticRestart()
+	if err != nil {
+		log.Trace(err)
+		return err
 	}
 	if !runRestart {
 		return nil
+	}
+
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return err
 	}
 
 	list := corev1.PodList{}
@@ -70,24 +91,21 @@ func (t *Task) restartResticPods() error {
 }
 
 // Determine if restic pod is running.
-// Skip this phase for OCP 3.10+
 func (t *Task) haveResticPodsStarted() (bool, error) {
-	client, err := t.getSourceClient()
+	// Verify restic restart is needed before proceeding
+	runRestart, err := t.shouldResticRestart()
 	if err != nil {
 		log.Trace(err)
 		return false, err
 	}
-
-	// Always run restic restart on 3.7, only run on 3.9+ when flag set
-	runRestart := false
-	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
-		runRestart = true
-	}
-	if settings.Settings.Migration.RestartRestic {
-		runRestart = true
-	}
 	if !runRestart {
 		return false, nil
+	}
+
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return false, err
 	}
 
 	list := corev1.PodList{}
