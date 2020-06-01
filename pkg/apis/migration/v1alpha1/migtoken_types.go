@@ -59,7 +59,7 @@ func init() {
 // If name is "" then it means all resources
 // If group is "*" then it means all API Groups
 // if namespace is "" then it means all cluster scoped resources
-func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, verb, name string) (bool, error) {
+func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespace, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
@@ -92,14 +92,14 @@ func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 		migControllerName = r.Spec.MigrationControllerRef.Name
 		migControllerNamespace = r.Spec.MigrationControllerRef.Namespace
 	}
-	allowed, err := r.CanI(client, migControllerNamespace, "migrationcontrollers", "migration.openshift.io", "use", migControllerName)
+	allowed, err := r.CanI(client, "use", "migration.openshift.io", "migrationcontrollers", migControllerNamespace, migControllerName)
 	return allowed, err
 }
 
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, namespace, "namespaces", "", "get", namespace)
+		allowed, err := r.CanI(client, "get", "", "namespaces", namespace, namespace)
 		if err != nil {
 			return authorized, err
 		}
@@ -129,7 +129,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 				groupResource := strings.Split(resource, "/")
 				group := groupResource[0]
 				resource := groupResource[1]
-				allowed, err := r.CanI(client, namespace, resource, group, verb, "")
+				allowed, err := r.CanI(client, verb, group, resource, namespace, "")
 				if err != nil {
 					return nil, err
 				}
