@@ -19,6 +19,7 @@ required = [
     "github.com/openshift/api/build/v1",
     "github.com/openshift/api/route/v1",
     "github.com/openshift/api/network/v1",
+    "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
@@ -51,6 +52,10 @@ required = [
 
 [[constraint]]
   name = "github.com/openshift/api"
+  branch = "release-3.11"
+
+[[constraint]]
+  name = "github.com/openshift/client-go"
   branch = "release-3.11"
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.

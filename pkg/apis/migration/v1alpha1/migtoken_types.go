@@ -6,6 +6,7 @@ import (
 	"k8s.io/api/authentication/v1beta1"
 	"strings"
 
+	projectv1 "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
 	authapi "k8s.io/api/authorization/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -187,6 +188,9 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	if err != nil {
 		return nil, err
 	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
+	}
 	token, err := r.GetToken(client)
 	if err != nil {
 		return nil, err
@@ -197,4 +201,20 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	}
 
 	return k8sclient.New(restCfg, k8sclient.Options{Scheme: scheme.Scheme})
+}
+
+func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.ProjectV1Client, error) {
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	restCfg, err := cluster.BuildRestConfigWithToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return projectv1.NewForConfig(restCfg)
 }
