@@ -25,7 +25,7 @@ const (
 const (
 	ReadyMessage            = "The token is ready."
 	NotAuthenticatedMessage = "The token is not authenticated"
-	UseNotGrantedMessage    = "The token is not granted use on the associated MigCluster. Please contact your administrator."
+	UseNotGrantedMessage    = "The token is not granted use on the associated MigrationController. Please contact your administrator."
 )
 
 func (r ReconcileMigToken) validate(token *migapi.MigToken) error {
