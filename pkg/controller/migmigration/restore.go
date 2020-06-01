@@ -51,7 +51,10 @@ func (t *Task) ensureNamespacesCreated() error {
 		}
 	}
 
-	return errorutil.NewAggregate(errs)
+	if len(errs) > 0 {
+		return errorutil.NewAggregate(errs)
+	}
+	return nil
 }
 
 // Ensure the final restore on the destination cluster has been
