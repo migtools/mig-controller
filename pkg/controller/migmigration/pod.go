@@ -99,7 +99,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, err
 	}
 	if !runRestart {
-		return false, nil
+		return true, nil
 	}
 
 	client, err := t.getSourceClient()
