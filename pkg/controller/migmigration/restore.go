@@ -38,6 +38,8 @@ func (t *Task) ensureNamespacesCreated() error {
 				ObjectMeta: metav1.ObjectMeta{Name: ns, Namespace: ns},
 			},
 		)
+		// TODO: Verify that this error check actually works. I'm not sure what
+		// ProjectRequest call returns if the project already exists
 		if !k8serror.IsAlreadyExists(err) {
 			return err
 		}

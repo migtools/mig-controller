@@ -208,6 +208,9 @@ func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.Project
 	if err != nil {
 		return nil, err
 	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
+	}
 	token, err := r.GetToken(client)
 	if err != nil {
 		return nil, err
