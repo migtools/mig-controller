@@ -486,6 +486,17 @@
   revision = "8741ff068a473be041d7bafb4502c12e4f10aab5"
 
 [[projects]]
+  branch = "release-3.11"
+  digest = "1:9f4ad6a16a8cebfee0b72cf14d55413a256d608f1cbaf7227d730cd6f338c86c"
+  name = "github.com/openshift/client-go"
+  packages = [
+    "project/clientset/versioned/scheme",
+    "project/clientset/versioned/typed/project/v1",
+  ]
+  pruneopts = "T"
+  revision = "431ec9a26e5021f35fa41ee9a89842db9bfdb370"
+
+[[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -1347,6 +1358,7 @@
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/project/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1",
     "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",

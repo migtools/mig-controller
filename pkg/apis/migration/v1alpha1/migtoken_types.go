@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"k8s.io/api/authentication/v1beta1"
+	"strings"
 
+	projectv1 "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
 	authapi "k8s.io/api/authorization/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,8 +16,9 @@ import (
 
 // MigTokenSpec defines the desired state of MigToken
 type MigTokenSpec struct {
-	SecretRef     *kapi.ObjectReference `json:"secretRef"`
-	MigClusterRef *kapi.ObjectReference `json:"migClusterRef"`
+	SecretRef              *kapi.ObjectReference `json:"secretRef"`
+	MigClusterRef          *kapi.ObjectReference `json:"migClusterRef"`
+	MigrationControllerRef *kapi.ObjectReference `json:"migrationControllerRef,omitempty"`
 }
 
 // MigTokenStatus defines the observed state of MigToken
@@ -55,7 +58,8 @@ func init() {
 // Function to determine if a user can *verb* on *resource*
 // If name is "" then it means all resources
 // If group is "*" then it means all API Groups
-func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, verb, name string) (bool, error) {
+// if namespace is "" then it means all cluster scoped resources
+func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespace, name string) (bool, error) {
 	sar := authapi.SelfSubjectAccessReview{
 		Spec: authapi.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
@@ -80,16 +84,22 @@ func (r *MigToken) CanI(client k8sclient.Client, namespace, resource, group, ver
 	return sar.Status.Allowed, nil
 }
 
-// Check if the user has `use` verb on the associated MigCluster
+// Check if the user has `use` verb on the associated MigrationController resource
 func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
-	allowed, err := r.CanI(client, r.Spec.MigClusterRef.Namespace, "migclusters", "migration.openshift.io", "use", r.Spec.MigClusterRef.Name)
+	migControllerName := "migration-controller"
+	migControllerNamespace := "openshift-migration"
+	if r.Spec.MigrationControllerRef != nil {
+		migControllerName = r.Spec.MigrationControllerRef.Name
+		migControllerNamespace = r.Spec.MigrationControllerRef.Namespace
+	}
+	allowed, err := r.CanI(client, "use", "migration.openshift.io", "migrationcontrollers", migControllerNamespace, migControllerName)
 	return allowed, err
 }
 
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
 	for _, namespace := range namespaces {
-		allowed, err := r.CanI(client, namespace, "namespaces", "*", "get", "")
+		allowed, err := r.CanI(client, "get", "", "namespaces", namespace, namespace)
 		if err != nil {
 			return authorized, err
 		}
@@ -100,7 +110,14 @@ func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []strin
 }
 
 func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
-	resources := []string{"pods", "deployments", "deploymentconfigs", "daemonsets", "replicasets", "statefulsets", "pvcs"}
+	resources := []string{
+		"/pods",
+		"apps/deployments",
+		"apps.openshift.io/deploymentconfigs",
+		"apps/daemonsets",
+		"apps/replicasets",
+		"apps/statefulsets",
+		"/persistentvolumeclaims"}
 	verbs := []string{"get", "create", "update", "delete"}
 
 	authorized := Authorized{}
@@ -109,7 +126,10 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	loop:
 		for _, resource := range resources {
 			for _, verb := range verbs {
-				allowed, err := r.CanI(client, namespace, resource, "*", verb, "")
+				groupResource := strings.Split(resource, "/")
+				group := groupResource[0]
+				resource := groupResource[1]
+				allowed, err := r.CanI(client, verb, group, resource, namespace, "")
 				if err != nil {
 					return nil, err
 				}
@@ -168,6 +188,9 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	if err != nil {
 		return nil, err
 	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
+	}
 	token, err := r.GetToken(client)
 	if err != nil {
 		return nil, err
@@ -178,4 +201,23 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	}
 
 	return k8sclient.New(restCfg, k8sclient.Options{Scheme: scheme.Scheme})
+}
+
+func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.ProjectV1Client, error) {
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
+	}
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	restCfg, err := cluster.BuildRestConfigWithToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return projectv1.NewForConfig(restCfg)
 }

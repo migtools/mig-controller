@@ -821,6 +821,11 @@ func (in *MigTokenSpec) DeepCopyInto(out *MigTokenSpec) {
 		*out = new(v1.ObjectReference)
 		**out = **in
 	}
+	if in.MigrationControllerRef != nil {
+		in, out := &in.MigrationControllerRef, &out.MigrationControllerRef
+		*out = new(v1.ObjectReference)
+		**out = **in
+	}
 	return
 }
 

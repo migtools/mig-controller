@@ -114,7 +114,7 @@ func (r *MigPlan) GetSourceToken(client k8sclient.Client) (*MigToken, error) {
 }
 
 func (r *MigPlan) GetDestinationToken(client k8sclient.Client) (*MigToken, error) {
-	return GetToken(client, r.Spec.SrcMigTokenRef)
+	return GetToken(client, r.Spec.DestMigTokenRef)
 }
 
 // GetDestinationCluster - Get the referenced destination cluster.

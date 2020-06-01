@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	v1 "github.com/openshift/api/project/v1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -30,23 +30,19 @@ func (t *Task) ensureNamespacesCreated() error {
 		return err
 	}
 	for _, ns := range namespaces {
-		client, err := token.GetClient(t.Client)
+		client, err := token.GetProjectClient(t.Client)
 		if err != nil {
 			return err
 		}
-		err = client.Get(context.TODO(), k8sclient.ObjectKey{Name: ns}, &v1.Namespace{})
-		if err != nil {
-			// if the namespace doesn't exist on the destination cluster, then create it.
-			if k8serror.IsNotFound(err) {
-				err := client.Create(context.TODO(), &v1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: ns}},
-				)
-				if err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
+		_, err = client.ProjectRequests().Create(
+			&v1.ProjectRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: ns, Namespace: ns},
+			},
+		)
+		// TODO: Verify that this error check actually works. I'm not sure what
+		// ProjectRequest call returns if the project already exists
+		if !k8serror.IsAlreadyExists(err) {
+			return err
 		}
 	}
 
