@@ -11,6 +11,7 @@ import (
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	errorutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -28,6 +29,7 @@ func (t *Task) ensureNamespacesCreated() error {
 	if err != nil {
 		return err
 	}
+	errs := []error{}
 	for _, ns := range namespaces {
 		client, err := token.GetProjectClient(t.Client)
 		if err != nil {
@@ -38,14 +40,17 @@ func (t *Task) ensureNamespacesCreated() error {
 				ObjectMeta: metav1.ObjectMeta{Name: ns, Namespace: ns},
 			},
 		)
-		// TODO: Verify that this error check actually works. I'm not sure what
-		// ProjectRequest call returns if the project already exists
-		if !k8serror.IsAlreadyExists(err) {
-			return err
+		switch {
+		case k8serror.IsAlreadyExists(err):
+			continue
+		case err != nil:
+			errs = append(errs, err)
+		default:
+			// no error, fall through to continue
 		}
 	}
 
-	return nil
+	return errorutil.NewAggregate(errs)
 }
 
 // Ensure the final restore on the destination cluster has been
