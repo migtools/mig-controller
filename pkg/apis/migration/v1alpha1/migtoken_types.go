@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	oauthv1client "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	projectv1client "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
@@ -25,8 +26,8 @@ type MigTokenSpec struct {
 // MigTokenStatus defines the observed state of MigToken
 type MigTokenStatus struct {
 	Conditions
-	ExpiresIn      int64  `json:"expiresIn,omitempty"`
-	ObservedDigest string `json:"observedDigest,omitempty"`
+	ExpiresIn      time.Time `json:"expiresIn,omitempty"`
+	ObservedDigest string    `json:"observedDigest,omitempty"`
 }
 
 // +genclient
@@ -247,7 +248,7 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 		return err
 	}
 
-	r.Status.ExpiresIn = o.ExpiresIn
+	r.Status.ExpiresIn = o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second)
 
 	return nil
 }
