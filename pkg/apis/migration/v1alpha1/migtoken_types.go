@@ -26,8 +26,8 @@ type MigTokenSpec struct {
 // MigTokenStatus defines the observed state of MigToken
 type MigTokenStatus struct {
 	Conditions
-	ExpiresIn      time.Time `json:"expiresIn,omitempty"`
-	ObservedDigest string    `json:"observedDigest,omitempty"`
+	ExpiresAt      metav1.Time `json:"expiresAt,omitempty"`
+	ObservedDigest string      `json:"observedDigest,omitempty"`
 }
 
 // +genclient
@@ -248,7 +248,7 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 		return err
 	}
 
-	r.Status.ExpiresIn = o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second)
+	r.Status.ExpiresAt = metav1.NewTime(o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second))
 
 	return nil
 }
