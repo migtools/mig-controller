@@ -3,10 +3,11 @@ package v1alpha1
 import (
 	"context"
 	"errors"
-	"k8s.io/api/authentication/v1beta1"
 	"strings"
 
-	projectv1 "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
+	oauthv1client "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	projectv1client "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
+	"k8s.io/api/authentication/v1beta1"
 	authapi "k8s.io/api/authorization/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +25,7 @@ type MigTokenSpec struct {
 // MigTokenStatus defines the observed state of MigToken
 type MigTokenStatus struct {
 	Conditions
+	ExpiresIn      int64  `json:"expiresIn,omitempty"`
 	ObservedDigest string `json:"observedDigest,omitempty"`
 }
 
@@ -203,7 +205,7 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	return k8sclient.New(restCfg, k8sclient.Options{Scheme: scheme.Scheme})
 }
 
-func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.ProjectV1Client, error) {
+func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1client.ProjectV1Client, error) {
 	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
 	if err != nil {
 		return nil, err
@@ -219,5 +221,33 @@ func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.Project
 	if err != nil {
 		return nil, err
 	}
-	return projectv1.NewForConfig(restCfg)
+	return projectv1client.NewForConfig(restCfg)
+}
+
+func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
+	token, err := r.GetToken(client)
+	if err != nil {
+		return err
+	}
+	// get cluster for token ref
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return err
+	}
+	restCfg, err := cluster.BuildRestConfig(client)
+	if err != nil {
+		return err
+	}
+	oauthClient, err := oauthv1client.NewForConfig(restCfg)
+	if err != nil {
+		return err
+	}
+	o, err := oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	r.Status.ExpiresIn = o.ExpiresIn
+
+	return nil
 }

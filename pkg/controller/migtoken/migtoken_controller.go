@@ -114,6 +114,13 @@ func (r *ReconcileMigToken) Reconcile(request reconcile.Request) (reconcile.Resu
 		!token.Status.HasBlockerCondition(),
 		ReadyMessage)
 
+	// Get expiration
+	err = token.SetExpirationTime(r.Client)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// End staging conditions.
 	token.Status.EndStagingConditions()
 
