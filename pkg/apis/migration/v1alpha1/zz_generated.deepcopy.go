@@ -236,6 +236,11 @@ func (in *MigClusterSpec) DeepCopyInto(out *MigClusterSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.RestartRestic != nil {
+		in, out := &in.RestartRestic, &out.RestartRestic
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

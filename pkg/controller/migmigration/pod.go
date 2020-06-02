@@ -14,14 +14,50 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Determine if restic should restart
+func (t *Task) shouldResticRestart() (bool, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	// Default to running ResticRestart on 3.7, 3.9.
+	// ResticRestart not needed for default feature gates settings
+	// on 3.10, 3.11, 4.x+. Could be needed if gates re-configured.
+	runRestart := false
+	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
+		runRestart = true
+	}
+	if client.MajorVersion() == 1 && client.MinorVersion() == 9 {
+		runRestart = true
+	}
+	// User can override default by setting MigCluster.Spec.RestartRestic.
+	if t.PlanResources.SrcMigCluster.Spec.RestartRestic != nil {
+		runRestart = *t.PlanResources.SrcMigCluster.Spec.RestartRestic
+	}
+	return runRestart, nil
+}
+
 // Delete the running restic pods.
 // Restarted to get around mount propagation requirements.
 func (t *Task) restartResticPods() error {
+	// Verify restic restart is needed before proceeding
+	runRestart, err := t.shouldResticRestart()
+	if err != nil {
+		log.Trace(err)
+		return err
+	}
+	if !runRestart {
+		return nil
+	}
+
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return err
 	}
+
 	list := corev1.PodList{}
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
@@ -56,11 +92,22 @@ func (t *Task) restartResticPods() error {
 
 // Determine if restic pod is running.
 func (t *Task) haveResticPodsStarted() (bool, error) {
+	// Verify restic restart is needed before proceeding
+	runRestart, err := t.shouldResticRestart()
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+	if !runRestart {
+		return true, nil
+	}
+
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
 		return false, err
 	}
+
 	list := corev1.PodList{}
 	ds := appsv1.DaemonSet{}
 	selector := labels.SelectorFromSet(map[string]string{
