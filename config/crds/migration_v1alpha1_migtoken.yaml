@@ -40,7 +40,18 @@ spec:
           type: object
         status:
           properties:
+            expiresAt:
+              format: date-time
+              type: string
             observedDigest:
+              type: string
+            scope:
+              items:
+                type: string
+              type: array
+            uid:
+              type: string
+            user:
               type: string
           type: object
   version: v1alpha1

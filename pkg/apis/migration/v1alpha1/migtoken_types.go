@@ -28,6 +28,9 @@ type MigTokenStatus struct {
 	Conditions
 	ExpiresAt      *metav1.Time `json:"expiresAt,omitempty"`
 	ObservedDigest string       `json:"observedDigest,omitempty"`
+	User           string       `json:"user,omitempty"`
+	UID            string       `json:"uid,omitempty"`
+	Scopes         []string     `json:"scope,omitempty"`
 }
 
 // +genclient
@@ -63,8 +66,13 @@ func init() {
 // If group is "*" then it means all API Groups
 // if namespace is "" then it means all cluster scoped resources
 func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespace, name string) (bool, error) {
-	sar := authapi.SelfSubjectAccessReview{
-		Spec: authapi.SelfSubjectAccessReviewSpec{
+	scopes := authapi.ExtraValue(r.Status.Scopes)
+	// TODO: add sanity check for r.status fields used in SAR checks
+	if r.Status.User == "" || r.Status.UID == "" {
+		return false, nil
+	}
+	sar := authapi.SubjectAccessReview{
+		Spec: authapi.SubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
 				Resource:  resource,
 				Group:     group,
@@ -72,15 +80,26 @@ func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespac
 				Verb:      verb,
 				Name:      name,
 			},
+			User:  r.Status.User,
+			Extra: map[string]authapi.ExtraValue{"scopes": scopes},
+			UID:   r.Status.UID,
 		},
 	}
 
-	tokenClient, err := r.GetClient(client)
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return false, err
+	}
+	if cluster == nil {
+		return false, errors.New("migcluster not found")
+	}
+
+	clusterClient, err := cluster.GetClient(client)
 	if err != nil {
 		return false, err
 	}
 
-	err = tokenClient.Create(context.TODO(), &sar)
+	err = clusterClient.Create(context.TODO(), &sar)
 	if err != nil {
 		return false, err
 	}
@@ -250,6 +269,9 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 
 	t := metav1.NewTime(o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second))
 	r.Status.ExpiresAt = &t
+	r.Status.User = o.UserName
+	r.Status.UID = o.UserUID
+	r.Status.Scopes = o.Scopes
 
 	return nil
 }
