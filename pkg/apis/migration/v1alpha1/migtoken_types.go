@@ -258,20 +258,50 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 	if err != nil {
 		return err
 	}
-	oauthClient, err := oauthv1client.NewForConfig(restCfg)
+	clusterClient, err := cluster.GetClient(client)
 	if err != nil {
 		return err
 	}
-	o, err := oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
+	tokenReview := v1beta1.TokenReview{
+		Spec: v1beta1.TokenReviewSpec{
+			Token: token,
+		},
+	}
+	err = clusterClient.Create(context.TODO(), &tokenReview)
 	if err != nil {
 		return err
 	}
 
-	t := metav1.NewTime(o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second))
-	r.Status.ExpiresAt = &t
-	r.Status.User = o.UserName
-	r.Status.UID = o.UserUID
-	r.Status.Scopes = o.Scopes
+	var isOauthToken bool
+	switch {
+	case !tokenReview.Status.Authenticated:
+		// token is nolonger valid
+		return errors.New("invalid token")
+	case strings.Contains(tokenReview.Status.User.Username, "serviceaccount"):
+		// service account token
+		isOauthToken = false
+	default:
+		isOauthToken = true
+	}
 
+	if isOauthToken {
+		oauthClient, err := oauthv1client.NewForConfig(restCfg)
+		if err != nil {
+			return err
+		}
+		o, err := oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		t := metav1.NewTime(o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second))
+		r.Status.ExpiresAt = &t
+		r.Status.User = o.UserName
+		r.Status.UID = o.UserUID
+		r.Status.Scopes = o.Scopes
+		return nil
+	}
+	r.Status.User = tokenReview.Status.User.Username
+	r.Status.UID = tokenReview.Status.User.UID
 	return nil
 }
