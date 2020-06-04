@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	oauthv1 "github.com/openshift/api/oauth/v1"
 	oauthv1client "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
 	projectv1client "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
 	"k8s.io/api/authentication/v1beta1"
@@ -28,9 +29,9 @@ type MigTokenStatus struct {
 	Conditions
 	ExpiresAt      *metav1.Time `json:"expiresAt,omitempty"`
 	ObservedDigest string       `json:"observedDigest,omitempty"`
-	User           string       `json:"user,omitempty"`
-	UID            string       `json:"uid,omitempty"`
-	Scopes         []string     `json:"scope,omitempty"`
+	User           string       `json:"-"`
+	UID            string       `json:"-"`
+	Scopes         []string     `json:"-"`
 }
 
 // +genclient
@@ -167,24 +168,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 }
 
 func (r *MigToken) Authenticate(client k8sclient.Client) (bool, error) {
-	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
-	if err != nil {
-		return false, err
-	}
-	clusterClient, err := cluster.GetClient(client)
-	if err != nil {
-		return false, err
-	}
-	token, err := r.GetToken(client)
-	if err != nil {
-		return false, err
-	}
-	tokenReview := v1beta1.TokenReview{
-		Spec: v1beta1.TokenReviewSpec{
-			Token: token,
-		},
-	}
-	err = clusterClient.Create(context.TODO(), &tokenReview)
+	tokenReview, err := r.GetTokenReview(client)
 	if err != nil {
 		return false, err
 	}
@@ -244,30 +228,8 @@ func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1client.P
 	return projectv1client.NewForConfig(restCfg)
 }
 
-func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
-	token, err := r.GetToken(client)
-	if err != nil {
-		return err
-	}
-	// get cluster for token ref
-	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
-	if err != nil {
-		return err
-	}
-	restCfg, err := cluster.BuildRestConfig(client)
-	if err != nil {
-		return err
-	}
-	clusterClient, err := cluster.GetClient(client)
-	if err != nil {
-		return err
-	}
-	tokenReview := v1beta1.TokenReview{
-		Spec: v1beta1.TokenReviewSpec{
-			Token: token,
-		},
-	}
-	err = clusterClient.Create(context.TODO(), &tokenReview)
+func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
+	tokenReview, err := r.GetTokenReview(client)
 	if err != nil {
 		return err
 	}
@@ -277,6 +239,8 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 	case !tokenReview.Status.Authenticated:
 		// token is nolonger valid
 		return errors.New("invalid token")
+	// TODO: explore if the UI needs distinction between serviceaccount token
+	//   and oauth token, if so add a status field for it
 	case strings.Contains(tokenReview.Status.User.Username, "serviceaccount"):
 		// service account token
 		isOauthToken = false
@@ -284,24 +248,72 @@ func (r *MigToken) SetExpirationTime(client k8sclient.Client) error {
 		isOauthToken = true
 	}
 
-	if isOauthToken {
-		oauthClient, err := oauthv1client.NewForConfig(restCfg)
-		if err != nil {
-			return err
-		}
-		o, err := oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		t := metav1.NewTime(o.GetObjectMeta().GetCreationTimestamp().Add(time.Duration(o.ExpiresIn) * time.Second))
-		r.Status.ExpiresAt = &t
-		r.Status.User = o.UserName
-		r.Status.UID = o.UserUID
-		r.Status.Scopes = o.Scopes
-		return nil
-	}
+	// TODO: explore adding r.Status.Authenticated field to reduce the
+	//   number of GetTokenReview calls to one per reconciliation loop.
 	r.Status.User = tokenReview.Status.User.Username
 	r.Status.UID = tokenReview.Status.User.UID
+	if scopes, ok := tokenReview.Status.User.Extra["scopes"]; ok {
+		r.Status.Scopes = scopes
+	}
+
+	// for oauth token set expiration date
+	if isOauthToken {
+		oauthAccessToken, err := r.GetOauthAccessToken(client)
+		if err != nil {
+			return err
+		}
+		t := metav1.NewTime(oauthAccessToken.GetObjectMeta().GetCreationTimestamp().
+			Add(time.Duration(oauthAccessToken.ExpiresIn) * time.Second))
+		r.Status.ExpiresAt = &t
+	}
+
 	return nil
+}
+
+func (r *MigToken) GetTokenReview(client k8sclient.Client) (*v1beta1.TokenReview, error) {
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	// get cluster for token ref
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	clusterClient, err := cluster.GetClient(client)
+	if err != nil {
+		return nil, err
+	}
+	tokenReview := &v1beta1.TokenReview{
+		Spec: v1beta1.TokenReviewSpec{
+			Token: token,
+		},
+	}
+	err = clusterClient.Create(context.TODO(), tokenReview)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenReview, nil
+}
+
+func (r *MigToken) GetOauthAccessToken(client k8sclient.Client) (*oauthv1.OAuthAccessToken, error) {
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	// get cluster for token ref
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	restCfg, err := cluster.BuildRestConfig(client)
+	if err != nil {
+		return nil, err
+	}
+	oauthClient, err := oauthv1client.NewForConfig(restCfg)
+	if err != nil {
+		return nil, err
+	}
+	return oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
 }
