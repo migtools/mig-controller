@@ -10,6 +10,11 @@ mig-controller is installed by [mig-operator](https://github.com/konveyor/mig-op
  - Running mig-controller locally
  - Invoking CI on pull requests
 
+ [DEVGUIDE.md](./docs/devguide.md) has guidelines for:
+ - Design patterns
+ - Conventions
+ - Dev practices
+
 ## Quick-start: CLI based migration
 
 __1. Identify a pair of running OpenShift clusters to migrate workloads between__
