@@ -120,12 +120,20 @@ func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 		migControllerName = r.Spec.MigrationControllerRef.Name
 		migControllerNamespace = r.Spec.MigrationControllerRef.Namespace
 	}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return false, err
+	}
 	allowed, err := r.CanI(client, "use", "migration.openshift.io", "migrationcontrollers", migControllerNamespace, migControllerName)
 	return allowed, err
 }
 
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return authorized, err
+	}
 	for _, namespace := range namespaces {
 		allowed, err := r.CanI(client, "get", "", "namespaces", namespace, namespace)
 		if err != nil {
@@ -149,6 +157,10 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	verbs := []string{"get", "create", "update", "delete"}
 
 	authorized := Authorized{}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return authorized, err
+	}
 	for _, namespace := range namespaces {
 		authorized[namespace] = true
 	loop:
