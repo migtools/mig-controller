@@ -31,6 +31,8 @@ Packages should have a narrowly focused concern and be placed in the heirarchy a
 
 Top level infrastructure packages:
 
+---
+
 #### [`pkg/apis`](https://github.com/konveyor/mig-controller/tree/master/pkg/apis)
 
 Provides Kubernetes API types.
@@ -45,9 +47,13 @@ which defines common behavior.
 The `labels.go` provides support for _correlation_ labels which are used to correlate resources created by
 a controller to one of our CRs.
 
+---
+
 #### [`pkg/controller`](https://github.com/konveyor/mig-controller/tree/master/pkg/controller)
 
 Provides controllers.
+
+---
 
 #### [`pkg/logging`](https://github.com/konveyor/mig-controller/tree/master/pkg/logging)
 
@@ -68,6 +74,8 @@ if err != nil {
 
 The `Logger.Reset()` must be called at the beginning of each call chain. This is usually the `Reconciler.Reconcile()`.
 
+---
+
 #### [`pkg/compat`](https://github.com/konveyor/mig-controller/tree/master/pkg/compat)
 
 Provides k8s compatability. This includes a custom `Client` which performs automatic type
@@ -80,6 +88,8 @@ Example:
 dClient := client.(dapi.DiscoveryInterface)
 ```
 
+---
+
 #### [`pkg/settings`](https://github.com/konveyor/mig-controller/tree/master/pkg/settings)
 
 Provides application settings. The global `Settings` object loads and includes
@@ -89,12 +99,16 @@ settings primarily from environment variables.  All settings are scoped by conce
 - **Plan** - Plan controller settings
 - **Migration** - Migration controller settings
 
+---
+
 #### [`pkg/reference`](https://github.com/konveyor/mig-controller/tree/master/pkg/reference)
 
 Provides support for CR references. The global `Map` correlates resources referenced by
 `ObjectReference` fields on the CR to the CR itself.  When watched using the provided
 watch event `Handler`, a reconcile event is queued for the _owner CR_ instead of an event
 for the watched (target) resource.
+
+---
 
 #### [`pkg/remote`](https://github.com/konveyor/mig-controller/tree/master/pkg/remote)
 
@@ -104,10 +118,13 @@ a specific `Cluster`. When a watch event is received, a reconcile event is queue
 to the `Cluster` controller reconciler.  The `Map` is managed by the `Cluster`
 controller. 
  
+---
 
 #### [`pkg/pods`](https://github.com/konveyor/mig-controller/tree/master/pkg/pods)
 
 Provides support for Pod actions such as: `PodExec`.
+
+---
 
 ## Reconciler
 
