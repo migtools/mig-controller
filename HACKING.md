@@ -94,3 +94,8 @@ You can invoke CI via webhook with an appropriate pull request comment command. 
 | --- | --- |
 | `\test` | Run  OCP 3 => 4 migration using the master branch of mig-operator   |
 | `\test-with-operator <PR_number>` | Run  OCP 3 => 4 migration using a specified PR from mig-operator  |
+
+---
+## Design patterns, conventions, and practices
+
+See [devguide.md](https://github.com/konveyor/mig-controller/blob/master/docs/devguide.md)
