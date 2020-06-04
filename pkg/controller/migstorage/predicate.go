@@ -16,9 +16,6 @@ type StoragePredicate struct {
 func (r StoragePredicate) Create(e event.CreateEvent) bool {
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
-		if !storage.InTenant() {
-			return false
-		}
 		r.mapRefs(storage)
 	}
 	return true
@@ -33,9 +30,6 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	if !old.InTenant() {
-		return false
-	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec)
 	if changed {
 		r.unmapRefs(old)
@@ -47,9 +41,6 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
-		if !storage.InTenant() {
-			return false
-		}
 		r.unmapRefs(storage)
 	}
 	return true
@@ -58,9 +49,6 @@ func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
 func (r StoragePredicate) Generic(e event.GenericEvent) bool {
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
-		if !storage.InTenant() {
-			return false
-		}
 		r.mapRefs(storage)
 	}
 	return true

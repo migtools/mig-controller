@@ -15,7 +15,7 @@ type TokenPredicate struct {
 
 func (r TokenPredicate) Create(e event.CreateEvent) bool {
 	token, cast := e.Object.(*migapi.MigToken)
-	if cast && token.InTenant() {
+	if cast {
 		r.mapRefs(token)
 		return true
 	}
@@ -31,9 +31,6 @@ func (r TokenPredicate) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	if !old.InTenant() {
-		return false
-	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
 		!reflect.DeepEqual(old.DeletionTimestamp, new.DeletionTimestamp)
 	if changed {
@@ -45,7 +42,7 @@ func (r TokenPredicate) Update(e event.UpdateEvent) bool {
 
 func (r TokenPredicate) Delete(e event.DeleteEvent) bool {
 	token, cast := e.Object.(*migapi.MigToken)
-	if cast && token.InTenant() {
+	if cast {
 		r.unmapRefs(token)
 		return true
 	}
@@ -54,7 +51,7 @@ func (r TokenPredicate) Delete(e event.DeleteEvent) bool {
 
 func (r TokenPredicate) Generic(e event.GenericEvent) bool {
 	token, cast := e.Object.(*migapi.MigToken)
-	if cast && token.InTenant() {
+	if cast {
 		r.mapRefs(token)
 		return true
 	}
