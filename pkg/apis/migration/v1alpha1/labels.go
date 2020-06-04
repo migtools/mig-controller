@@ -13,7 +13,7 @@ const (
 )
 
 // Build label (key, value) used to correlate CRs.
-// Format: <kind>: <uid>.  The <uid> should be the ObjectMeta.uid
+// Format: <kind>: <uid>.  The <uid> should be the ObjectMeta.UID
 func CorrelationLabel(r interface{}, uid types.UID) (key, value string) {
 	return labelKey(r), string(uid)
 }
