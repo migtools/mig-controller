@@ -29,9 +29,11 @@ type MigTokenStatus struct {
 	Conditions
 	ExpiresAt      *metav1.Time `json:"expiresAt,omitempty"`
 	ObservedDigest string       `json:"observedDigest,omitempty"`
-	User           string       `json:"-"`
-	UID            string       `json:"-"`
-	Scopes         []string     `json:"-"`
+
+	// the following field are not stored in kube Objects.
+	user   string
+	uid    string
+	scopes []string
 }
 
 // +genclient
@@ -67,10 +69,13 @@ func init() {
 // If group is "*" then it means all API Groups
 // if namespace is "" then it means all cluster scoped resources
 func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespace, name string) (bool, error) {
-	scopes := authapi.ExtraValue(r.Status.Scopes)
-	// TODO: add sanity check for r.status fields used in SAR checks
-	if r.Status.User == "" || r.Status.UID == "" {
-		return false, nil
+	// sanity check if this token is validated
+	if r.Status.user == "" || r.Status.uid == "" {
+		return false, errors.New(".Status.user or .Status.uid empty")
+	}
+	extras := map[string]authapi.ExtraValue{}
+	if r.Status.scopes != nil {
+		extras["scopes"] = r.Status.scopes
 	}
 	sar := authapi.SubjectAccessReview{
 		Spec: authapi.SubjectAccessReviewSpec{
@@ -81,9 +86,9 @@ func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespac
 				Verb:      verb,
 				Name:      name,
 			},
-			User:  r.Status.User,
-			Extra: map[string]authapi.ExtraValue{"scopes": scopes},
-			UID:   r.Status.UID,
+			User:  r.Status.user,
+			Extra: extras,
+			UID:   r.Status.uid,
 		},
 	}
 
@@ -250,10 +255,10 @@ func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
 
 	// TODO: explore adding r.Status.Authenticated field to reduce the
 	//   number of GetTokenReview calls to one per reconciliation loop.
-	r.Status.User = tokenReview.Status.User.Username
-	r.Status.UID = tokenReview.Status.User.UID
+	r.Status.user = tokenReview.Status.User.Username
+	r.Status.uid = tokenReview.Status.User.UID
 	if scopes, ok := tokenReview.Status.User.Extra["scopes"]; ok {
-		r.Status.Scopes = scopes
+		r.Status.scopes = scopes
 	}
 
 	// for oauth token set expiration date

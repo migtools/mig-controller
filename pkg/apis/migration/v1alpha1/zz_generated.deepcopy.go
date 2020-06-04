@@ -720,8 +720,8 @@ func (in *MigTokenStatus) DeepCopyInto(out *MigTokenStatus) {
 		in, out := &in.ExpiresAt, &out.ExpiresAt
 		*out = (*in).DeepCopy()
 	}
-	if in.Scopes != nil {
-		in, out := &in.Scopes, &out.Scopes
+	if in.scopes != nil {
+		in, out := &in.scopes, &out.scopes
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
