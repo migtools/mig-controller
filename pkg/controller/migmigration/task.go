@@ -6,9 +6,13 @@ import (
 	"github.com/go-logr/logr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// Application settings.
+var Settings = &settings.Settings
 
 // Requeue
 var FastReQ = time.Duration(time.Millisecond * 100)
@@ -679,7 +683,7 @@ func (t *Task) Run() error {
 // Initialize.
 func (t *Task) init() {
 	t.Requeue = FastReQ
-	if t.failed() {
+	if t.failed() && Settings.Migration.FailureRollback {
 		t.Itinerary = FailedItinerary
 	} else if t.canceled() {
 		t.Itinerary = CancelItinerary
