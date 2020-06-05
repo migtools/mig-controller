@@ -17,6 +17,8 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const ScopeKey = "scopes.authorization.openshift.io"
+
 // MigTokenSpec defines the desired state of MigToken
 type MigTokenSpec struct {
 	SecretRef              *kapi.ObjectReference `json:"secretRef"`
@@ -75,7 +77,7 @@ func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespac
 	}
 	extras := map[string]authapi.ExtraValue{}
 	if r.Status.scopes != nil {
-		extras["scopes"] = r.Status.scopes
+		extras[ScopeKey] = r.Status.scopes
 	}
 	sar := authapi.SubjectAccessReview{
 		Spec: authapi.SubjectAccessReviewSpec{
@@ -269,7 +271,7 @@ func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
 	//   number of GetTokenReview calls to one per reconciliation loop.
 	r.Status.user = tokenReview.Status.User.Username
 	r.Status.uid = tokenReview.Status.User.UID
-	if scopes, ok := tokenReview.Status.User.Extra["scopes"]; ok {
+	if scopes, ok := tokenReview.Status.User.Extra[ScopeKey]; ok {
 		r.Status.scopes = scopes
 	}
 
