@@ -624,6 +624,14 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next()
+
+	case MigrationFailed:
+		if Settings.Migration.FailureRollback {
+			t.next()
+		} else {
+			t.Phase = Completed
+		}
+
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
@@ -666,7 +674,7 @@ func (t *Task) Run() error {
 		})
 		t.next()
 	// Out of tree states - needs to be triggered manually with t.fail(...)
-	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed, MigrationFailed:
+	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
 		t.Requeue = NoReQ
 		t.next()
 	case Completed:
@@ -683,7 +691,7 @@ func (t *Task) Run() error {
 // Initialize.
 func (t *Task) init() {
 	t.Requeue = FastReQ
-	if t.failed() && Settings.Migration.FailureRollback {
+	if t.failed() {
 		t.Itinerary = FailedItinerary
 	} else if t.canceled() {
 		t.Itinerary = CancelItinerary
