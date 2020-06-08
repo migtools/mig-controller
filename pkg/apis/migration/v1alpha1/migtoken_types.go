@@ -3,16 +3,21 @@ package v1alpha1
 import (
 	"context"
 	"errors"
-	"k8s.io/api/authentication/v1beta1"
 	"strings"
+	"time"
 
-	projectv1 "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	oauthv1client "github.com/openshift/client-go/oauth/clientset/versioned/typed/oauth/v1"
+	projectv1client "github.com/openshift/client-go/project/clientset/versioned/typed/project/v1"
+	"k8s.io/api/authentication/v1beta1"
 	authapi "k8s.io/api/authorization/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const ScopeKey = "scopes.authorization.openshift.io"
 
 // MigTokenSpec defines the desired state of MigToken
 type MigTokenSpec struct {
@@ -24,7 +29,13 @@ type MigTokenSpec struct {
 // MigTokenStatus defines the observed state of MigToken
 type MigTokenStatus struct {
 	Conditions
-	ObservedDigest string `json:"observedDigest,omitempty"`
+	ExpiresAt      *metav1.Time `json:"expiresAt,omitempty"`
+	ObservedDigest string       `json:"observedDigest,omitempty"`
+
+	// the following field are not stored in kube Objects.
+	user   string
+	uid    string
+	scopes []string
 }
 
 // +genclient
@@ -60,8 +71,16 @@ func init() {
 // If group is "*" then it means all API Groups
 // if namespace is "" then it means all cluster scoped resources
 func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespace, name string) (bool, error) {
-	sar := authapi.SelfSubjectAccessReview{
-		Spec: authapi.SelfSubjectAccessReviewSpec{
+	// sanity check if this token is validated
+	if r.Status.user == "" || r.Status.uid == "" {
+		return false, errors.New(".Status.user or .Status.uid empty")
+	}
+	extras := map[string]authapi.ExtraValue{}
+	if r.Status.scopes != nil {
+		extras[ScopeKey] = r.Status.scopes
+	}
+	sar := authapi.SubjectAccessReview{
+		Spec: authapi.SubjectAccessReviewSpec{
 			ResourceAttributes: &authapi.ResourceAttributes{
 				Resource:  resource,
 				Group:     group,
@@ -69,15 +88,26 @@ func (r *MigToken) CanI(client k8sclient.Client, verb, group, resource, namespac
 				Verb:      verb,
 				Name:      name,
 			},
+			User:  r.Status.user,
+			Extra: extras,
+			UID:   r.Status.uid,
 		},
 	}
 
-	tokenClient, err := r.GetClient(client)
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return false, err
+	}
+	if cluster == nil {
+		return false, errors.New("migcluster not found")
+	}
+
+	clusterClient, err := cluster.GetClient(client)
 	if err != nil {
 		return false, err
 	}
 
-	err = tokenClient.Create(context.TODO(), &sar)
+	err = clusterClient.Create(context.TODO(), &sar)
 	if err != nil {
 		return false, err
 	}
@@ -92,12 +122,20 @@ func (r *MigToken) HasUsePermission(client k8sclient.Client) (bool, error) {
 		migControllerName = r.Spec.MigrationControllerRef.Name
 		migControllerNamespace = r.Spec.MigrationControllerRef.Namespace
 	}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return false, err
+	}
 	allowed, err := r.CanI(client, "use", "migration.openshift.io", "migrationcontrollers", migControllerNamespace, migControllerName)
 	return allowed, err
 }
 
 func (r *MigToken) HasReadPermission(client k8sclient.Client, namespaces []string) (Authorized, error) {
 	authorized := Authorized{}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return authorized, err
+	}
 	for _, namespace := range namespaces {
 		allowed, err := r.CanI(client, "get", "", "namespaces", namespace, namespace)
 		if err != nil {
@@ -121,6 +159,10 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 	verbs := []string{"get", "create", "update", "delete"}
 
 	authorized := Authorized{}
+	err := r.SetTokenStatusFields(client)
+	if err != nil {
+		return authorized, err
+	}
 	for _, namespace := range namespaces {
 		authorized[namespace] = true
 	loop:
@@ -145,24 +187,7 @@ func (r *MigToken) HasMigratePermission(client k8sclient.Client, namespaces []st
 }
 
 func (r *MigToken) Authenticate(client k8sclient.Client) (bool, error) {
-	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
-	if err != nil {
-		return false, err
-	}
-	clusterClient, err := cluster.GetClient(client)
-	if err != nil {
-		return false, err
-	}
-	token, err := r.GetToken(client)
-	if err != nil {
-		return false, err
-	}
-	tokenReview := v1beta1.TokenReview{
-		Spec: v1beta1.TokenReviewSpec{
-			Token: token,
-		},
-	}
-	err = clusterClient.Create(context.TODO(), &tokenReview)
+	tokenReview, err := r.GetTokenReview(client)
 	if err != nil {
 		return false, err
 	}
@@ -203,7 +228,7 @@ func (r *MigToken) GetClient(client k8sclient.Client) (k8sclient.Client, error) 
 	return k8sclient.New(restCfg, k8sclient.Options{Scheme: scheme.Scheme})
 }
 
-func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.ProjectV1Client, error) {
+func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1client.ProjectV1Client, error) {
 	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
 	if err != nil {
 		return nil, err
@@ -219,5 +244,95 @@ func (r *MigToken) GetProjectClient(client k8sclient.Client) (*projectv1.Project
 	if err != nil {
 		return nil, err
 	}
-	return projectv1.NewForConfig(restCfg)
+	return projectv1client.NewForConfig(restCfg)
+}
+
+func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
+	tokenReview, err := r.GetTokenReview(client)
+	if err != nil {
+		return err
+	}
+
+	var isOauthToken bool
+	switch {
+	case !tokenReview.Status.Authenticated:
+		// token is nolonger valid
+		return errors.New("invalid token")
+	// TODO: explore if the UI needs distinction between serviceaccount token
+	//   and oauth token, if so add a status field for it
+	case strings.Contains(tokenReview.Status.User.Username, "serviceaccount"):
+		// service account token
+		isOauthToken = false
+	default:
+		isOauthToken = true
+	}
+
+	// TODO: explore adding r.Status.Authenticated field to reduce the
+	//   number of GetTokenReview calls to one per reconciliation loop.
+	r.Status.user = tokenReview.Status.User.Username
+	r.Status.uid = tokenReview.Status.User.UID
+	if scopes, ok := tokenReview.Status.User.Extra[ScopeKey]; ok {
+		r.Status.scopes = scopes
+	}
+
+	// for oauth token set expiration date
+	if isOauthToken {
+		oauthAccessToken, err := r.GetOauthAccessToken(client)
+		if err != nil {
+			return err
+		}
+		t := metav1.NewTime(oauthAccessToken.GetObjectMeta().GetCreationTimestamp().
+			Add(time.Duration(oauthAccessToken.ExpiresIn) * time.Second))
+		r.Status.ExpiresAt = &t
+	}
+
+	return nil
+}
+
+func (r *MigToken) GetTokenReview(client k8sclient.Client) (*v1beta1.TokenReview, error) {
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	// get cluster for token ref
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	clusterClient, err := cluster.GetClient(client)
+	if err != nil {
+		return nil, err
+	}
+	tokenReview := &v1beta1.TokenReview{
+		Spec: v1beta1.TokenReviewSpec{
+			Token: token,
+		},
+	}
+	err = clusterClient.Create(context.TODO(), tokenReview)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenReview, nil
+}
+
+func (r *MigToken) GetOauthAccessToken(client k8sclient.Client) (*oauthv1.OAuthAccessToken, error) {
+	token, err := r.GetToken(client)
+	if err != nil {
+		return nil, err
+	}
+	// get cluster for token ref
+	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
+	if err != nil {
+		return nil, err
+	}
+	restCfg, err := cluster.BuildRestConfig(client)
+	if err != nil {
+		return nil, err
+	}
+	oauthClient, err := oauthv1client.NewForConfig(restCfg)
+	if err != nil {
+		return nil, err
+	}
+	return oauthClient.OAuthAccessTokens().Get(token, metav1.GetOptions{})
 }
