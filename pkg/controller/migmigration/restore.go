@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	v1 "github.com/openshift/api/project/v1"
+	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -37,7 +37,7 @@ func (t *Task) ensureNamespacesCreated() error {
 			return err
 		}
 		_, err = client.ProjectRequests().Create(
-			&v1.ProjectRequest{
+			&projectv1.ProjectRequest{
 				ObjectMeta: metav1.ObjectMeta{Name: ns, Namespace: ns},
 			},
 		)

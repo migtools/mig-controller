@@ -102,6 +102,12 @@ func (r *ReconcileMigToken) Reconcile(request reconcile.Request) (reconcile.Resu
 	// Begin staging conditions.
 	token.Status.BeginStagingConditions()
 
+	err = token.SetTokenStatusFields(r.Client)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Validations.
 	err = r.validate(token)
 	if err != nil {

@@ -40,6 +40,9 @@ spec:
           type: object
         status:
           properties:
+            expiresAt:
+              format: date-time
+              type: string
             observedDigest:
               type: string
           type: object
