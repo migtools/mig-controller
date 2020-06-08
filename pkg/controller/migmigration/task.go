@@ -6,9 +6,13 @@ import (
 	"github.com/go-logr/logr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// Application settings.
+var Settings = &settings.Settings
 
 // Requeue
 var FastReQ = time.Duration(time.Millisecond * 100)
@@ -620,6 +624,14 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next()
+
+	case MigrationFailed:
+		if Settings.Migration.FailureRollback {
+			t.next()
+		} else {
+			t.Phase = Completed
+		}
+
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
@@ -662,7 +674,7 @@ func (t *Task) Run() error {
 		})
 		t.next()
 	// Out of tree states - needs to be triggered manually with t.fail(...)
-	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed, MigrationFailed:
+	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
 		t.Requeue = NoReQ
 		t.next()
 	case Completed:

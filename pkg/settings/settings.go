@@ -33,6 +33,7 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
+	Migration
 	Roles     map[string]bool
 	ProxyVars map[string]string
 }
@@ -44,6 +45,10 @@ func (r *_Settings) Load() error {
 		return err
 	}
 	err = r.Discovery.Load()
+	if err != nil {
+		return err
+	}
+	err = r.Migration.Load()
 	if err != nil {
 		return err
 	}
