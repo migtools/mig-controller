@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/google/uuid"
-	"github.com/konveyor/mig-controller/pkg/settings"
 )
 
 const (
@@ -36,10 +35,6 @@ type MigResource interface {
 	MarkReconciled()
 	// Get whether the resource has been reconciled.
 	HasReconciled() bool
-	// Get whether the resource lives in the tenant namespace.
-	InTenant() bool
-	// Get whether the resource lives in the privileged namespace.
-	InPrivileged() bool
 }
 
 // Plan
@@ -74,14 +69,6 @@ func (r *MigPlan) MarkReconciled() {
 
 func (r *MigPlan) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
-}
-
-func (r *MigPlan) InTenant() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Tenant
-}
-
-func (r *MigPlan) InPrivileged() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Privileged
 }
 
 // Storage
@@ -189,14 +176,6 @@ func (r *MigToken) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigToken) InTenant() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Tenant
-}
-
-func (r *MigToken) InPrivileged() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Privileged
-}
-
 // Cluster
 func (r *MigCluster) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
@@ -231,14 +210,6 @@ func (r *MigCluster) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-func (r *MigCluster) InTenant() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Tenant
-}
-
-func (r *MigCluster) InPrivileged() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Privileged
-}
-
 // Migration
 func (r *MigMigration) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
@@ -271,14 +242,6 @@ func (r *MigMigration) MarkReconciled() {
 
 func (r *MigMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
-}
-
-func (r *MigMigration) InTenant() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Tenant
-}
-
-func (r *MigMigration) InPrivileged() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Privileged
 }
 
 //
