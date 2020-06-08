@@ -17,7 +17,13 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const ScopeKey = "scopes.authorization.openshift.io"
+type MigTokenType string
+
+const (
+	ScopeKey                   = "scopes.authorization.openshift.io"
+	MigTokenTypeOauth          = "Oauth"
+	MigTokenTypeServiceAccount = "ServiceAccount"
+)
 
 // MigTokenSpec defines the desired state of MigToken
 type MigTokenSpec struct {
@@ -29,8 +35,10 @@ type MigTokenSpec struct {
 // MigTokenStatus defines the observed state of MigToken
 type MigTokenStatus struct {
 	Conditions
+	// ExpiresAt will only be set if this is an Oauth token
 	ExpiresAt      *metav1.Time `json:"expiresAt,omitempty"`
 	ObservedDigest string       `json:"observedDigest,omitempty"`
+	Type           MigTokenType `json:"type,omitempty"`
 
 	// the following field are not stored in kube Objects.
 	user   string
@@ -253,20 +261,6 @@ func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
 		return err
 	}
 
-	var isOauthToken bool
-	switch {
-	case !tokenReview.Status.Authenticated:
-		// token is nolonger valid
-		return errors.New("invalid token")
-	// TODO: explore if the UI needs distinction between serviceaccount token
-	//   and oauth token, if so add a status field for it
-	case strings.Contains(tokenReview.Status.User.Username, "serviceaccount"):
-		// service account token
-		isOauthToken = false
-	default:
-		isOauthToken = true
-	}
-
 	// TODO: explore adding r.Status.Authenticated field to reduce the
 	//   number of GetTokenReview calls to one per reconciliation loop.
 	r.Status.user = tokenReview.Status.User.Username
@@ -275,8 +269,21 @@ func (r *MigToken) SetTokenStatusFields(client k8sclient.Client) error {
 		r.Status.scopes = scopes
 	}
 
+	switch {
+	case !tokenReview.Status.Authenticated:
+		// token is nolonger valid
+		return errors.New("invalid token")
+	case strings.Contains(tokenReview.Status.User.Username, "serviceaccount"):
+		r.Status.Type = MigTokenTypeServiceAccount
+		// clear the field in case a user is converting the token from oauth to SA
+		r.Status.ExpiresAt = nil
+		return nil
+	default:
+		r.Status.Type = MigTokenTypeOauth
+	}
+
 	// for oauth token set expiration date
-	if isOauthToken {
+	if r.Status.Type == MigTokenTypeOauth {
 		oauthAccessToken, err := r.GetOauthAccessToken(client)
 		if err != nil {
 			return err
