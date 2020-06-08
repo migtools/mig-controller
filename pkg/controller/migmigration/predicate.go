@@ -15,9 +15,6 @@ type MigrationPredicate struct {
 func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
-		if !migration.InTenant() {
-			return false
-		}
 		r.mapRefs(migration)
 	}
 	return true
@@ -30,9 +27,6 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 	}
 	new, cast := e.ObjectNew.(*migapi.MigMigration)
 	if !cast {
-		return false
-	}
-	if !old.InTenant() {
 		return false
 	}
 	changed := !reflect.DeepEqual(old.Spec, new.Spec) ||
@@ -48,9 +42,6 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
 	migration, cast := e.Object.(*migapi.MigMigration)
 	if cast {
-		if !migration.InTenant() {
-			return false
-		}
 		r.unmapRefs(migration)
 	}
 	return true
@@ -106,7 +97,7 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 	new, cast := e.ObjectNew.(*migapi.MigPlan)
-	if cast && new.InTenant() {
+	if cast {
 		// Reconciled by the controller.
 		return new.HasReconciled()
 	}
@@ -114,11 +105,11 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
-	plan, cast := e.Object.(*migapi.MigPlan)
-	return cast && plan.InTenant()
+	_, cast := e.Object.(*migapi.MigPlan)
+	return cast
 }
 
 func (r PlanPredicate) Generic(e event.GenericEvent) bool {
-	plan, cast := e.Object.(*migapi.MigPlan)
-	return cast && plan.InTenant()
+	_, cast := e.Object.(*migapi.MigPlan)
+	return cast
 }
