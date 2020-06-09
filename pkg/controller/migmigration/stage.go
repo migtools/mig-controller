@@ -74,6 +74,9 @@ func BuildStagePods(labels map[string]string,
 }
 
 func (p StagePod) volumesContained(pod StagePod) bool {
+	if p.Namespace != pod.Namespace {
+		return false
+	}
 	for _, volume := range p.Spec.Volumes {
 		found := false
 		for _, targetVolume := range pod.Spec.Volumes {
