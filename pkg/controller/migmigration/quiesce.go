@@ -339,6 +339,10 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 			return err
 		}
 		for _, set := range list.Items {
+			if len(set.OwnerReferences) > 0 {
+				t.Log.Info("Quiesce skipping ReplicaSet, has OwnerReferences", "name", set.Name)
+				continue
+			}
 			if set.Annotations == nil {
 				set.Annotations = make(map[string]string)
 			}
@@ -371,6 +375,10 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
 			return err
 		}
 		for _, set := range list.Items {
+			if len(set.OwnerReferences) > 0 {
+				t.Log.Info("Unquiesce skipping ReplicaSet, has OwnerReferences", "name", set.Name)
+				continue
+			}
 			if set.Annotations == nil {
 				continue
 			}
