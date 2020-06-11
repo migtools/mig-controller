@@ -2,6 +2,8 @@ package compat
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -57,13 +59,14 @@ func NewClient(restCfg *rest.Config) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	major, err := strconv.Atoi(version.Major)
-	if err != nil {
-		return nil, err
-	}
-	minor, err := strconv.Atoi(strings.Trim(version.Minor, "+"))
-	if err != nil {
-		return nil, err
+	// Attempt parsing version.Major/Minor first, fall back to parsing gitVersion
+	major, err1 := strconv.Atoi(version.Major)
+	minor, err2 := strconv.Atoi(strings.Trim(version.Minor, "+"))
+	if err1 != nil || err2 != nil {
+		major, minor, err = parseGitVersion(version.GitVersion)
+		if err != nil {
+			return nil, err
+		}
 	}
 	nClient := &client{
 		Config:             restCfg,
@@ -218,4 +221,32 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 		return err
 	}
 	return c.Client.Update(ctx, obj)
+}
+
+//
+// Parses gitVersion ("v1.11.0+d4cacc0"), returns major, minor, err
+func parseGitVersion(gitVersion string) (int, int, error) {
+	r, _ := regexp.Compile(`v[0-9]+\.[0-9]+`)
+	valid := r.MatchString(gitVersion)
+	if !valid {
+		return 0, 0, errors.New("gitVersion does not match expected format")
+	}
+	versionArr := strings.Split(gitVersion, "v")
+	if len(versionArr) < 2 {
+		return 0, 0, errors.New("gitVersion missing leading 'v'")
+	}
+	majorMinorArr := strings.Split(versionArr[1], ".")
+	if len(majorMinorArr) < 2 {
+		return 0, 0, errors.New("gitVersion major + minor parse failed")
+	}
+
+	major, err := strconv.Atoi(majorMinorArr[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	minor, err := strconv.Atoi(majorMinorArr[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return major, minor, nil
 }
