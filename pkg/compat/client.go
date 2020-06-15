@@ -2,6 +2,8 @@ package compat
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -57,14 +59,30 @@ func NewClient(restCfg *rest.Config) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	major, err := strconv.Atoi(version.Major)
-	if err != nil {
-		return nil, err
+
+	// Attempt parsing version.Major/Minor first, fall back to parsing gitVersion
+	major, err1 := strconv.Atoi(version.Major)
+	minor, err2 := strconv.Atoi(strings.Trim(version.Minor, "+"))
+
+	if err1 != nil || err2 != nil {
+		// gitVersion format ("v1.11.0+d4cacc0")
+		r, _ := regexp.Compile(`v[0-9]+\.[0-9]+\.`)
+		valid := r.MatchString(version.GitVersion)
+		if !valid {
+			return nil, errors.New("gitVersion does not match expected format")
+		}
+		majorMinorArr := strings.Split(strings.Split(version.GitVersion, "v")[1], ".")
+
+		major, err = strconv.Atoi(majorMinorArr[0])
+		if err != nil {
+			return nil, err
+		}
+		minor, err = strconv.Atoi(majorMinorArr[1])
+		if err != nil {
+			return nil, err
+		}
 	}
-	minor, err := strconv.Atoi(strings.Trim(version.Minor, "+"))
-	if err != nil {
-		return nil, err
-	}
+
 	nClient := &client{
 		Config:             restCfg,
 		Client:             rClient,
