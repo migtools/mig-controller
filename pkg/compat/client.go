@@ -66,7 +66,7 @@ func NewClient(restCfg *rest.Config) (Client, error) {
 
 	if err1 != nil || err2 != nil {
 		// gitVersion format ("v1.11.0+d4cacc0")
-		r, _ := regexp.Compile(`v[0-9]+\.[0-9]+`)
+		r, _ := regexp.Compile(`v[0-9]+\.[0-9]+\.`)
 		valid := r.MatchString(version.GitVersion)
 		if !valid {
 			return nil, errors.New("gitVersion does not match expected format")
