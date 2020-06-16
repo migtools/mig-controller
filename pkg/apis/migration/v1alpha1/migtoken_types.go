@@ -306,6 +306,9 @@ func (r *MigToken) GetTokenReview(client k8sclient.Client) (*v1beta1.TokenReview
 	if err != nil {
 		return nil, err
 	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
+	}
 	clusterClient, err := cluster.GetClient(client)
 	if err != nil {
 		return nil, err
@@ -332,6 +335,9 @@ func (r *MigToken) GetOauthAccessToken(client k8sclient.Client) (*oauthv1.OAuthA
 	cluster, err := GetCluster(client, r.Spec.MigClusterRef)
 	if err != nil {
 		return nil, err
+	}
+	if cluster == nil {
+		return nil, errors.New("migcluster not found")
 	}
 	restCfg, err := cluster.BuildRestConfig(client)
 	if err != nil {
