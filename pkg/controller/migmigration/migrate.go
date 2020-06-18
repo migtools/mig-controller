@@ -21,6 +21,7 @@ import (
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -76,6 +77,9 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	}
 	err = task.Run()
 	if err != nil {
+		if errors.IsConflict(err) {
+			return FastReQ, nil
+		}
 		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
