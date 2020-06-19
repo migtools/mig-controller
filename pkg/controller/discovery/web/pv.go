@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
 	"net/http"
@@ -17,7 +18,7 @@ const (
 // PV (route) handler.
 type PvHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -26,6 +27,40 @@ func (h PvHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvsRoot, h.List)
 	r.GET(PvsRoot+"/", h.List)
 	r.GET(PvRoot, h.Get)
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *PvHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *PvHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Review{
+		Resource: auth.PV,
+		Verb:     auth.GET,
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //
@@ -58,6 +93,7 @@ func (h PvHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := PvList{
+		Items: []PV{},
 		Count: count,
 	}
 	for _, pv := range list {

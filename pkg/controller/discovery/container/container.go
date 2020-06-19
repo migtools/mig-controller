@@ -6,7 +6,6 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"github.com/konveyor/mig-controller/pkg/logging"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
@@ -64,7 +63,7 @@ func (r *Container) GetDs(cluster *model.Cluster) (*DataSource, bool) {
 //
 // Add a cluster to the container.
 // Build/update a DataSource for the cluster as needed.
-func (r *Container) Add(cluster *migapi.MigCluster) error {
+func (r *Container) Add(cluster *migapi.MigCluster, collections Collections) error {
 	build := func() *DataSource {
 		r.mutex.RLock()
 		defer r.mutex.RUnlock()
@@ -76,14 +75,8 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 			ds.Stop(false)
 		}
 		ds := &DataSource{
-			Container: r,
-			Collections: Collections{
-				&Namespace{},
-				&Service{},
-				&PVC{},
-				&Pod{},
-				&PV{},
-			},
+			Collections: collections,
+			Container:   r,
 		}
 		r.sources[key] = ds
 		return ds
@@ -137,6 +130,9 @@ func (r *Container) Prune() error {
 		wanted[string(cluster.UID)] = true
 	}
 	for _, cluster := range stored {
+		if cluster.Namespace == "" {
+			continue
+		}
 		if _, found := wanted[cluster.UID]; !found {
 			cluster.Delete(r.Db)
 		}
@@ -145,27 +141,4 @@ func (r *Container) Prune() error {
 	r.pruned = true
 
 	return nil
-}
-
-//
-// Determine of a MigCluster actually exists.
-func (r *Container) HasCluster(cluster *model.Cluster) (bool, error) {
-	found := migapi.MigCluster{}
-	err := r.Client.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
-		},
-		&found)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		} else {
-			Log.Trace(err)
-			return false, err
-		}
-	}
-
-	return true, nil
 }

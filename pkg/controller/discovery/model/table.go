@@ -793,6 +793,19 @@ func (t Table) listSQL(table string, fields []*Field, options ListOptions) (stri
 //
 // Scan the fetch row into the model.
 // The model fields are updated.
+func (t Table) Scan(row Row, model interface{}) error {
+	fields, err := t.Fields(model)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+
+	return t.scan(row, fields)
+}
+
+//
+// Scan the fetch row into the model.
+// The model fields are updated.
 func (t Table) scan(row Row, fields []*Field) error {
 	list := []interface{}{}
 	for _, f := range fields {

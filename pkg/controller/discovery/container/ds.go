@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 	"time"
 )
 
@@ -46,6 +47,12 @@ type DataSource struct {
 	// lower than the threshold is redundant to changes made
 	// during collection reconciliation.
 	versionThreshold uint64
+}
+
+//
+// The DataSource name.
+func (r *DataSource) Name() string {
+	return strings.Join([]string{r.Cluster.Namespace, r.Cluster.Name}, "/")
 }
 
 //
@@ -99,7 +106,7 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	}
 	connectDuration := time.Since(mark)
 	mark = time.Now()
-	err = r.buildManager(cluster.Name)
+	err = r.buildManager()
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -118,10 +125,8 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 
 	Log.Info(
 		"DataSource Started.",
-		"ns",
-		r.Cluster.Namespace,
 		"name",
-		r.Cluster.Name,
+		r.Name(),
 		"connected",
 		connectDuration,
 		"reconciled",
@@ -172,6 +177,7 @@ func (r *DataSource) Create(m model.Model) {
 			Log.Info("channel send failed")
 		}
 	}()
+
 	r.eventChannel <- ModelEvent{}.Create(m)
 }
 
@@ -185,6 +191,7 @@ func (r *DataSource) Update(m model.Model) {
 			Log.Info("channel send failed")
 		}
 	}()
+
 	r.eventChannel <- ModelEvent{}.Update(m)
 }
 
@@ -198,6 +205,7 @@ func (r *DataSource) Delete(m model.Model) {
 			Log.Info("channel send failed")
 		}
 	}()
+
 	r.eventChannel <- ModelEvent{}.Delete(m)
 }
 
@@ -210,6 +218,8 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 		Log.Trace(err)
 		return err
 	}
+	r.RestCfg.Burst = 1000
+	r.RestCfg.QPS = 100
 	r.Client, err = client.New(
 		r.RestCfg,
 		client.Options{
@@ -225,7 +235,7 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 
 //
 // Build the k8s manager.
-func (r *DataSource) buildManager(name string) error {
+func (r *DataSource) buildManager() error {
 	var err error
 	r.manager, err = manager.New(r.RestCfg, manager.Options{})
 	if err != nil {
@@ -233,7 +243,7 @@ func (r *DataSource) buildManager(name string) error {
 		return err
 	}
 	dsController, err := controller.New(
-		name,
+		"DataSource",
 		r.manager,
 		controller.Options{
 			Reconciler: r,
