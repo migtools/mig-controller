@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"io"
 	"k8s.io/api/core/v1"
@@ -25,7 +26,7 @@ const (
 // Pod (route) handler.
 type PodHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -34,6 +35,41 @@ func (h PodHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PodsRoot, h.List)
 	r.GET(PodsRoot+"/", h.List)
 	r.GET(PodRoot, h.Get)
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *PodHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *PodHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Review{
+		Namespace: ctx.Param("ns2"),
+		Resource:  auth.Pod,
+		Verb:      auth.GET,
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //
@@ -105,6 +141,7 @@ func (h PodHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := PodList{
+		Items: []Pod{},
 		Count: count,
 	}
 	for _, m := range list {
@@ -123,12 +160,47 @@ func (h PodHandler) List(ctx *gin.Context) {
 // Pod-log (route) handler.
 type LogHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 // Add routes.
 func (h LogHandler) AddRoutes(r *gin.Engine) {
 	r.GET(LogRoot, h.List)
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *LogHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *LogHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Review{
+		Namespace: ctx.Param("ns2"),
+		Resource:  auth.PodLog,
+		Verb:      auth.GET,
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //

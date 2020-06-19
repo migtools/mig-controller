@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
 	"net/http"
@@ -17,7 +18,7 @@ const (
 // Service (route) handler.
 type ServiceHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
@@ -26,6 +27,41 @@ func (h ServiceHandler) AddRoutes(r *gin.Engine) {
 	r.GET(ServicesRoot, h.List)
 	r.GET(ServicesRoot+"/", h.List)
 	r.GET(ServiceRoot, h.Get)
+}
+
+//
+// Prepare the handler to fulfil the request.
+// Perform RBAC authorization.
+func (h *ServiceHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.allow(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// RBAC authorization.
+func (h *ServiceHandler) allow(ctx *gin.Context) int {
+	allowed, err := h.rbac.Allow(&auth.Review{
+		Namespace: ctx.Param("ns2"),
+		Resource:  auth.Service,
+		Verb:      auth.GET,
+	})
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !allowed {
+		return http.StatusForbidden
+	}
+
+	return http.StatusOK
 }
 
 //
@@ -39,7 +75,8 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 	db := h.container.Db
 	collection := model.Service{
 		Base: model.Base{
-			Cluster: h.cluster.PK,
+			Cluster:   h.cluster.PK,
+			Namespace: ctx.Param("ns2"),
 		},
 	}
 	count, err := collection.Count(db, model.ListOptions{})
@@ -58,6 +95,7 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 		return
 	}
 	content := ServiceList{
+		Items: []Service{},
 		Count: count,
 	}
 	for _, service := range list {
