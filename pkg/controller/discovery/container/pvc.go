@@ -45,10 +45,8 @@ func (r *PVC) Reconcile() error {
 	r.hasReconciled = true
 	Log.Info(
 		"PVC (collection) reconciled.",
-		"ns",
-		r.ds.Cluster.Namespace,
-		"name",
-		r.ds.Cluster.Name,
+		"cluster",
+		r.ds.Name(),
 		"duration",
 		time.Since(mark))
 

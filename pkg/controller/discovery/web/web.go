@@ -3,18 +3,13 @@ package web
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/konveyor/mig-controller/pkg/controller/discovery/auth"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/container"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"github.com/konveyor/mig-controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/settings"
-	auth "k8s.io/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/kubernetes/scheme"
 	"net/http"
 	"regexp"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -86,58 +81,49 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 		SchemaHandler{
 			router: r,
 		},
-		RootNsHandler{
+		ClusterHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
 			},
 		},
-		ClusterHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+		WellKnownHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
+		UserHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		NsHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		PodHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		LogHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		PvHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		PvcHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		ServiceHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		PlanHandler{
@@ -185,6 +171,12 @@ type BaseHandler struct {
 	token string
 	// The `page` parameter passed in the request.
 	page model.Page
+	// The cluster specified in the request.
+	cluster model.Cluster
+	// The DataSource.
+	ds *container.DataSource
+	// Auth provider.
+	rbac auth.Provider
 }
 
 //
@@ -192,13 +184,108 @@ type BaseHandler struct {
 // Set the `token` and `page` fields using passed parameters.
 func (h *BaseHandler) Prepare(ctx *gin.Context) int {
 	Log.Reset()
-	status := h.setToken(ctx)
+	status := h.setCluster(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.setToken(ctx)
 	if status != http.StatusOK {
 		return status
 	}
 	status = h.setPage(ctx)
 	if status != http.StatusOK {
 		return status
+	}
+	status = h.setDs()
+	if status != http.StatusOK {
+		return status
+	}
+	status = h.authenticate()
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// Create the RBAC object and authenticate the token.
+func (h *BaseHandler) authenticate() int {
+	if h.token == "" && Settings.Discovery.AuthOptional {
+		h.rbac = &NopAuth{}
+		return http.StatusOK
+	}
+	h.rbac = &auth.RBAC{
+		Client:  h.ds.Client,
+		Cluster: h.cluster.DecodeObject(),
+		Token:   h.token,
+	}
+	authenticated, err := h.rbac.Authenticate()
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	if !authenticated {
+		return http.StatusUnauthorized
+	}
+
+	return http.StatusOK
+}
+
+//
+// Find and set the `DataSource`.
+func (h *BaseHandler) setDs() int {
+	wait := time.Second * 30
+	poll := time.Microsecond * 100
+	for {
+		mark := time.Now()
+		if ds, found := h.container.GetDs(&h.cluster); found {
+			if ds.IsReady() {
+				h.ds = ds
+				return http.StatusOK
+			}
+		}
+		if wait > 0 {
+			time.Sleep(poll)
+			wait -= time.Since(mark)
+		} else {
+			break
+		}
+	}
+
+	return http.StatusPartialContent
+}
+
+//
+// Set the cluster.
+// Fetched from the DB.
+func (h *BaseHandler) setCluster(ctx *gin.Context) int {
+	namespace := ctx.Param("ns1")
+	cluster := ctx.Param("cluster")
+	if cluster == "" {
+		h.cluster = model.Cluster{
+			CR: model.CR{
+				Namespace: "",
+				Name:      "",
+			},
+		}
+	} else {
+		h.cluster = model.Cluster{
+			CR: model.CR{
+				Namespace: namespace,
+				Name:      cluster,
+			},
+		}
+	}
+	err := h.cluster.Get(h.container.Db)
+	switch err {
+	case nil:
+		// Found
+	case model.NotFound:
+		return http.StatusNotFound
+	default:
+		Log.Trace(err)
+		return http.StatusInternalServerError
 	}
 
 	return http.StatusOK
@@ -214,14 +301,12 @@ func (h *BaseHandler) setToken(ctx *gin.Context) int {
 		return http.StatusOK
 	}
 	if Settings.Discovery.AuthOptional {
-		restCfg, _ := config.GetConfig()
-		h.token = restCfg.BearerToken
 		return http.StatusOK
 	}
 
 	Log.Info("`Authorization: Bearer <token>` header required but not found.")
 
-	return http.StatusBadRequest
+	return http.StatusUnauthorized
 }
 
 //
@@ -254,40 +339,27 @@ func (h *BaseHandler) setPage(ctx *gin.Context) int {
 }
 
 //
-// Perform SAR.
-func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
-	restCfg, _ := config.GetConfig()
-	restCfg.BearerToken = h.token
-	codec := serializer.NewCodecFactory(scheme.Scheme)
-	gvk, err := apiutil.GVKForObject(&sar, scheme.Scheme)
-	if err != nil {
-		Log.Trace(err)
-		return http.StatusInternalServerError
-	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, restCfg, codec)
-	if err != nil {
-		Log.Trace(err)
-		return http.StatusInternalServerError
-	}
-	var status int
-	post := restClient.Post()
-	post.Resource("selfsubjectaccessreviews")
-	post.Body(&sar)
-	reply := post.Do()
-	reply.StatusCode(&status)
-	switch status {
-	case http.StatusForbidden, http.StatusUnauthorized:
-		return status
-	case http.StatusCreated:
-		reply.Into(&sar)
-		if sar.Status.Allowed {
-			return http.StatusOK
-		}
-	default:
-		Log.Info("Unexpected SAR reply", "status", status)
-	}
+// A no-op (all all) authorization provider.
+type NopAuth struct {
+}
 
-	return http.StatusForbidden
+func (p *NopAuth) Authenticate() (bool, error) {
+	return true, nil
+}
+
+func (p *NopAuth) Authenticated() bool {
+	return true
+}
+
+func (p *NopAuth) Allow(*auth.Review) (bool, error) {
+	return true, nil
+}
+func (p *NopAuth) AllowMatrix(*auth.Matrix) (bool, error) {
+	return true, nil
+}
+
+func (p *NopAuth) User() string {
+	return ""
 }
 
 //
@@ -324,72 +396,5 @@ func (h SchemaHandler) List(ctx *gin.Context) {
 //
 // Not supported.
 func (h SchemaHandler) Get(ctx *gin.Context) {
-	ctx.Status(http.StatusMethodNotAllowed)
-}
-
-//
-// Root namespace (route) handler.
-type RootNsHandler struct {
-	// Base
-	BaseHandler
-}
-
-func (h RootNsHandler) AddRoutes(r *gin.Engine) {
-	r.GET(strings.Split(Root, "/")[1], h.List)
-	r.GET(strings.Split(Root, "/")[1]+"/", h.List)
-}
-
-//
-// List all root level namespaces.
-func (h RootNsHandler) List(ctx *gin.Context) {
-	status := h.Prepare(ctx)
-	if status != http.StatusOK {
-		ctx.Status(status)
-		return
-	}
-	list := []string{}
-	set := map[string]bool{}
-	// Cluster
-	clusters, err := model.Cluster{}.List(
-		h.container.Db,
-		model.ListOptions{
-			Page: &h.page,
-		})
-	if err != nil {
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	for _, m := range clusters {
-		if _, found := set[m.Namespace]; !found {
-			list = append(list, m.Namespace)
-			set[m.Namespace] = true
-		}
-
-	}
-	// Plan
-	plans, err := model.Plan{}.List(
-		h.container.Db,
-		model.ListOptions{
-			Page: &h.page,
-		})
-	if err != nil {
-		ctx.Status(http.StatusInternalServerError)
-		return
-	}
-	for _, m := range plans {
-		if _, found := set[m.Namespace]; !found {
-			list = append(list, m.Namespace)
-			set[m.Namespace] = true
-		}
-
-	}
-	sort.Strings(list)
-	h.page.Slice(&list)
-	ctx.JSON(http.StatusOK, list)
-}
-
-//
-// Not supported.
-func (h RootNsHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)
 }

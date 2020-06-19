@@ -44,10 +44,8 @@ func (r *Pod) Reconcile() error {
 	r.hasReconciled = true
 	Log.Info(
 		"Pod (collection) reconciled.",
-		"ns",
-		r.ds.Cluster.Namespace,
-		"name",
-		r.ds.Cluster.Name,
+		"cluster",
+		r.ds.Name(),
 		"duration",
 		time.Since(mark))
 
