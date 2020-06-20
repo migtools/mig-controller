@@ -220,16 +220,17 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log             logr.Logger
-	Client          k8sclient.Client
-	Owner           *migapi.MigMigration
-	PlanResources   *migapi.PlanResources
-	Annotations     map[string]string
-	BackupResources []string
-	Phase           string
-	Requeue         time.Duration
-	Itinerary       Itinerary
-	Errors          []string
+	Log               logr.Logger
+	Client            k8sclient.Client
+	Owner             *migapi.MigMigration
+	PlanResources     *migapi.PlanResources
+	Annotations       map[string]string
+	BackupResources   []string
+	ExcludedResources []string
+	Phase             string
+	Requeue           time.Duration
+	Itinerary         Itinerary
+	Errors            []string
 }
 
 // Run the task.

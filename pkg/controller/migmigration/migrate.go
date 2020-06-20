@@ -30,8 +30,6 @@ var stagingResources = []string{
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"namespaces",
-	"imagestreams",
-	"imagestreamtags",
 	"secrets",
 	"configmaps",
 	"pods",
@@ -67,13 +65,14 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Run
 	task := Task{
-		Log:             log,
-		Client:          r,
-		Owner:           migration,
-		PlanResources:   planResources,
-		Phase:           migration.Status.Phase,
-		Annotations:     r.getAnnotations(migration),
-		BackupResources: r.getBackupResources(migration),
+		Log:               log,
+		Client:            r,
+		Owner:             migration,
+		PlanResources:     planResources,
+		Phase:             migration.Status.Phase,
+		Annotations:       r.getAnnotations(migration),
+		BackupResources:   r.getBackupResources(migration),
+		ExcludedResources: r.getExcludedResources(migration),
 	}
 	err = task.Run()
 	if err != nil {
@@ -135,8 +134,21 @@ func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) m
 // Get the resources (kinds) to be included in the backup.
 func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigration) []string {
 	if migration.Spec.Stage {
-		return stagingResources
+		backupResources := stagingResources
+		if !Settings.Migration.DisableImageMigration {
+			backupResources = append(backupResources, "imagestreams", "imagestreamtags")
+		}
+
+		return backupResources
 	}
 
+	return []string{}
+}
+
+// Get the resources to be excluded from backup
+func (r *ReconcileMigMigration) getExcludedResources(migration *migapi.MigMigration) []string {
+	if Settings.Migration.DisableImageMigration {
+		return []string{"imagestreams"}
+	}
 	return []string{}
 }
