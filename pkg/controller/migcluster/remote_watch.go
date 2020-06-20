@@ -63,7 +63,8 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 
 	sigStopChan := make(chan struct{})
 	log.Info("[rWatch] Starting manager")
-	log.Info("[HF] HotFix #1")
+	log.Info("[HF] HotFix #2")
+	log.Info("[HF] Added imagestreamtags to backup exclusion list")
 	go mgr.Start(sigStopChan)
 
 	log.Info("[rWatch] Manager started")
