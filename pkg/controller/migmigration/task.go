@@ -71,7 +71,7 @@ const (
 	DeleteRestores                  = "DeleteRestores"
 	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
-	Cancelled                       = "Cancelled"
+	Canceled                        = "Canceled"
 	Completed                       = "Completed"
 )
 
@@ -95,7 +95,6 @@ var StageItinerary = Itinerary{
 		{phase: Started},
 		{phase: Prepare},
 		{phase: Authorization},
-		{phase: EnsureNamespacesCreated},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
@@ -106,6 +105,7 @@ var StageItinerary = Itinerary{
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureNamespacesCreated},
 		{phase: EnsureStageBackup, all: HasPVs},
 		{phase: StageBackupCreated, all: HasPVs},
 		{phase: EnsureStageBackupReplicated, all: HasPVs},
@@ -274,7 +274,7 @@ func (t *Task) Run() error {
 			return err
 		}
 		if len(unauthorized) > 0 {
-			t.failed(NotAuthorized, unauthorized)
+			t.failed()
 		} else {
 			t.next()
 		}
@@ -688,14 +688,14 @@ func (t *Task) Run() error {
 			return err
 		}
 		t.next()
-	case Cancelled:
+	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceled,
 			Status:   True,
 			Reason:   Cancel,
 			Category: Advisory,
-			Message:  CancelledMessage,
+			Message:  CanceledMessage,
 			Durable:  true,
 		})
 		t.next()

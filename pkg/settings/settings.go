@@ -13,7 +13,7 @@ var Settings = _Settings{}
 //   Plan: Plan settings.
 type _Settings struct {
 	Discovery
-	// TODO: is Migration needed here
+	Migration
 	Plan
 	Proxy
 	Role

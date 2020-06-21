@@ -134,14 +134,6 @@ func (r *MigHook) HasReconciled() bool {
 	return r.Status.ObservedGeneration == r.Generation
 }
 
-func (r *MigStorage) InTenant() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Tenant
-}
-
-func (r *MigStorage) InPrivileged() bool {
-	return r.GetNamespace() == settings.Settings.Namespace.Privileged
-}
-
 // Token
 func (r *MigToken) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
