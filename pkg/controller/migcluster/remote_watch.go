@@ -63,8 +63,9 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 
 	sigStopChan := make(chan struct{})
 	log.Info("[rWatch] Starting manager")
-	log.Info("[HF] HotFix #2")
-	log.Info("[HF] Added imagestreamtags to backup exclusion list")
+	log.Info("[HF] HotFix #3")
+	log.Info("[HF] HF#2: Added imagestreamtags to backup exclusion list")
+	log.Info("[HF] HF#3: Added templateinstances to backup exclusion list, prevents templateinstance set username privilege error")
 	go mgr.Start(sigStopChan)
 
 	log.Info("[rWatch] Manager started")
