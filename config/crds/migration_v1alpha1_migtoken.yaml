@@ -41,9 +41,12 @@ spec:
         status:
           properties:
             expiresAt:
+              description: ExpiresAt will only be set if this is an Oauth token
               format: date-time
               type: string
             observedDigest:
+              type: string
+            type:
               type: string
           type: object
   version: v1alpha1
