@@ -13,7 +13,6 @@ var Settings = _Settings{}
 //   Plan: Plan settings.
 type _Settings struct {
 	Discovery
-	Namespace
 	// TODO: is Migration needed here
 	Plan
 	Proxy
@@ -23,10 +22,6 @@ type _Settings struct {
 // Load settings.
 func (r *_Settings) Load() error {
 	err := r.Discovery.Load()
-	if err != nil {
-		return err
-	}
-	err = r.Namespace.Load()
 	if err != nil {
 		return err
 	}
