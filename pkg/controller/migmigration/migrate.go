@@ -154,5 +154,5 @@ func (r *ReconcileMigMigration) getExcludedResources(migration *migapi.MigMigrat
 	if Settings.Migration.DisableImageMigration {
 		return []string{"imagestreams", "imagestreamtags", "templateinstances", "clusterserviceversions"}
 	}
-	return []string{"templateinstances"}
+	return []string{"templateinstances", "clusterserviceversions"}
 }
