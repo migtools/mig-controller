@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
+	projectv1 "github.com/openshift/api/project/v1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
