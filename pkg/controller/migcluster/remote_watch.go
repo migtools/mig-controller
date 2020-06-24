@@ -67,7 +67,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	log.Info("[HF] HF#2: Added imagestreamtags to backup exclusion list")
 	log.Info("[HF] HF#3: Added templateinstances to backup exclusion list, prevents templateinstance set username privilege error")
 	log.Info("[HF] HF#4: Requeue rather than fail if error is resource conflict")
-	log.Info("[HF] HF#5: Added clusterserviceversions to backup exclusion list")
+	log.Info("[HF] HF#5: Added OLM resources to backup exclusion list")
 	go mgr.Start(sigStopChan)
 
 	log.Info("[rWatch] Manager started")

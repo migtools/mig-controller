@@ -152,7 +152,7 @@ func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigratio
 // Get the resources to be excluded from backup
 func (r *ReconcileMigMigration) getExcludedResources(migration *migapi.MigMigration) []string {
 	if Settings.Migration.DisableImageMigration {
-		return []string{"imagestreams", "imagestreamtags", "templateinstances", "clusterserviceversions"}
+		return []string{"imagestreams", "imagestreamtags", "templateinstances", "clusterserviceversions", "subscriptions"}
 	}
-	return []string{"templateinstances", "clusterserviceversions"}
+	return []string{"templateinstances", "clusterserviceversions", "subscriptions"}
 }
