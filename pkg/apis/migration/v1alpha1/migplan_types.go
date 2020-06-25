@@ -48,6 +48,11 @@ const (
 	ClosedIndexField = "closed"
 )
 
+// Skip/Migrate PV Annotations
+const (
+	MigratePVsAnnotation = "migration.openshift.io/migratePVsInFinal" // (true|false)
+)
+
 // MigPlanHook hold a referene to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
 	Reference          *kapi.ObjectReference `json:"reference"`
@@ -170,6 +175,18 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 // Set the MigPlan Status to closed
 func (r *MigPlan) SetClosed() {
 	r.Spec.Closed = true
+}
+
+// Whether to Migrate PVs in Final itinerary
+func (r *MigPlan) MigratePVsInFinal() bool {
+	if r.Annotations == nil {
+		return false
+	}
+	if r.Annotations[MigratePVsAnnotation] == "true" {
+		return true
+	} else {
+		return false
+	}
 }
 
 // Get list of migrations associated with the plan.

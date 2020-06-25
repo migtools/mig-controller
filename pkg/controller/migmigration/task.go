@@ -124,6 +124,45 @@ var FinalItinerary = Itinerary{
 		{phase: PreBackupHooks},
 		{phase: EnsureInitialBackup},
 		{phase: InitialBackupCreated},
+		{phase: EnsureStagePodsFromRunning, all: HasPVs},
+		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
+		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
+		{phase: StagePodsCreated, all: HasStagePods},
+		{phase: AnnotateResources, all: HasPVs},
+		{phase: RestartRestic, all: HasStagePods},
+		{phase: ResticRestarted, all: HasStagePods},
+		{phase: QuiesceApplications, all: Quiesce},
+		{phase: EnsureQuiesced, all: Quiesce},
+		{phase: EnsureStageBackup, all: HasPVs},
+		{phase: StageBackupCreated, all: HasPVs},
+		{phase: EnsureStageBackupReplicated, all: HasPVs},
+		{phase: EnsureStageRestore, all: HasPVs},
+		{phase: StageRestoreCreated, all: HasPVs},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureStagePodsTerminated, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureInitialBackupReplicated},
+		{phase: PostBackupHooks},
+		{phase: PreRestoreHooks},
+		{phase: EnsureFinalRestore},
+		{phase: FinalRestoreCreated},
+		{phase: EnsureLabelsDeleted},
+		{phase: PostRestoreHooks},
+		{phase: Verification, all: HasVerify},
+		{phase: Completed},
+	},
+}
+
+var FinalItineraryNoPVs = Itinerary{
+	Name: "FinalNoPVs",
+	Steps: []Step{
+		{phase: Created},
+		{phase: Started},
+		{phase: Prepare},
+		{phase: EnsureCloudSecretPropagated},
+		{phase: PreBackupHooks},
+		{phase: EnsureInitialBackup},
+		{phase: InitialBackupCreated},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
 		{phase: EnsureInitialBackupReplicated},
@@ -683,8 +722,10 @@ func (t *Task) init() {
 		t.Itinerary = CancelItinerary
 	} else if t.stage() {
 		t.Itinerary = StageItinerary
-	} else {
+	} else if t.PlanResources.MigPlan.MigratePVsInFinal() {
 		t.Itinerary = FinalItinerary
+	} else {
+		t.Itinerary = FinalItineraryNoPVs
 	}
 	if t.Owner.Status.Itenerary != t.Itinerary.Name {
 		t.Phase = t.Itinerary.Steps[0].phase
