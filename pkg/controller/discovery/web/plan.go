@@ -150,6 +150,17 @@ func (h PlanHandler) Pods(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
+	err := h.plan.Get(h.container.Db)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		} else {
+			ctx.Status(http.StatusNotFound)
+			return
+		}
+	}
 	content := PlanPods{}
 	content.With(ctx, &h)
 
