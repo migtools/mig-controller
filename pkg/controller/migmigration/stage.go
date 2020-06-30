@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -32,6 +33,17 @@ const (
 	defaultMemory = "128Mi"
 	defaultCPU    = "100m"
 )
+
+// Stage pod start report.
+type PodStartReport struct {
+	// failed detected.
+	failed bool
+	// pod failed reasons.
+	reasons []string
+	// all pods started.
+	started bool
+
+}
 
 // BuildStagePods - creates a list of stage pods from a list of pods
 func BuildStagePods(labels map[string]string,
@@ -375,26 +387,77 @@ func (t *Task) ensureStagePodsFromRunning() error {
 }
 
 // Ensure the stage pods are Running.
-func (t *Task) ensureStagePodsStarted() (bool, error) {
+func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
-		return false, err
+		return
 	}
-
+	hasHealthyClaims := func(pod *corev1.Pod) (healthy bool) {
+		healthy = true
+		for _, vol := range pod.Spec.Volumes {
+			claim := vol.PersistentVolumeClaim
+			if claim == nil {
+				continue
+			}
+			pvc := corev1.PersistentVolumeClaim{}
+			key := k8sclient.ObjectKey{
+				Namespace: pod.Namespace,
+				Name:      claim.ClaimName,
+			}
+			err = client.Get(context.TODO(), key, &pvc)
+			if err != nil {
+				healthy = false
+				if !errors.IsNotFound(err) {
+					log.Trace(err)
+					return
+				}
+				report.reasons = append(
+					report.reasons,
+					fmt.Sprintf(
+						"PVC: %s, not-found.",
+						key))
+				err = nil
+				break
+			}
+			if pvc.DeletionTimestamp != nil {
+				report.reasons = append(
+					report.reasons,
+					fmt.Sprintf(
+						"PVC: %s, deleted.",
+						key))
+				healthy = false
+				break
+			}
+			if pvc.Status.Phase != corev1.ClaimBound {
+				report.reasons = append(
+					report.reasons,
+					fmt.Sprintf(
+						"PVC: %s, not bound.",
+						key))
+				healthy = false
+				break
+			}
+		}
+		return
+	}
 	podList := corev1.PodList{}
 	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
-		return false, err
+		return
 	}
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != corev1.PodRunning {
-			return false, nil
+			if !hasHealthyClaims(&pod) {
+				report.failed = true
+			}
+			return
 		}
 	}
 
-	return true, nil
+	report.started = true
+	return
 }
 
 // Ensure the stage pods have been deleted.
