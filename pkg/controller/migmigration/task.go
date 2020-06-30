@@ -41,6 +41,7 @@ const (
 	EnsureStagePodsFromTemplates    = "EnsureStagePodsFromTemplates"
 	EnsureStagePodsFromOrphanedPVCs = "EnsureStagePodsFromOrphanedPVCs"
 	StagePodsCreated                = "StagePodsCreated"
+	StagePodsFailed                 = "StagePodsFailed"
 	RestartRestic                   = "RestartRestic"
 	ResticRestarted                 = "ResticRestarted"
 	QuiesceApplications             = "QuiesceApplications"
@@ -349,12 +350,16 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		t.next()
 	case StagePodsCreated:
-		started, err := t.ensureStagePodsStarted()
+		report, err := t.ensureStagePodsStarted()
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
-		if started {
+		if report.failed {
+			t.fail(StagePodsFailed, report.reasons)
+			break
+		}
+		if report.started {
 			t.next()
 		} else {
 			t.Requeue = NoReQ
@@ -673,11 +678,10 @@ func (t *Task) Run() error {
 			Durable:  true,
 		})
 		t.next()
-	// Out of tree states - needs to be triggered manually with t.fail(...)
-	case InitialBackupFailed, FinalRestoreFailed, StageBackupFailed, StageRestoreFailed:
+	case Completed:
+	default:
 		t.Requeue = NoReQ
 		t.next()
-	case Completed:
 	}
 
 	if t.Phase == Completed {
