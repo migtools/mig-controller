@@ -20,13 +20,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/deckarep/golang-set"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Backup resources.
-var stagingResources = []string{
+var includedInitialResources = mapset.NewSetFromSlice([]interface{}{})
+var includedStageResources = mapset.NewSetFromSlice([]interface{}{
 	"serviceaccount",
 	"persistentvolumes",
 	"persistentvolumeclaims",
@@ -36,11 +38,13 @@ var stagingResources = []string{
 	"secrets",
 	"configmaps",
 	"pods",
-}
-var excludedInitialResources = []string{
+})
+
+var excludedInitialResources = mapset.NewSetFromSlice([]interface{}{
 	"persistentvolumes",
 	"persistentvolumeclaims",
-}
+})
+var excludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 
 // Perform the migration.
 func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Duration, error) {
@@ -137,10 +141,9 @@ func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) m
 }
 
 // Get the resources (kinds) to be included in the backup.
-func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigration) []string {
+func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigration) mapset.Set {
 	if migration.Spec.Stage {
-		return stagingResources
+		return includedStageResources
 	}
-
-	return []string{}
+	return excludedStageResources
 }

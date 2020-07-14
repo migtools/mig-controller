@@ -606,6 +606,11 @@ func (in *MigPlanStatus) DeepCopyInto(out *MigPlanStatus) {
 	*out = *in
 	in.Conditions.DeepCopyInto(&out.Conditions)
 	in.Incompatible.DeepCopyInto(&out.Incompatible)
+	if in.ExcludedResources != nil {
+		in, out := &in.ExcludedResources, &out.ExcludedResources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

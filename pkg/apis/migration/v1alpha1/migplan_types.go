@@ -71,8 +71,9 @@ type MigPlanSpec struct {
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
 	Conditions
-	Incompatible   `json:",inline"`
-	ObservedDigest string `json:"observedDigest,omitempty"`
+	Incompatible      `json:",inline"`
+	ObservedDigest    string   `json:"observedDigest,omitempty"`
+	ExcludedResources []string `json:"excludedResources,omitempty"`
 }
 
 // +genclient
@@ -688,6 +689,16 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 		}
 	}
 
+	return false
+}
+
+// GetDestinationNamespaces get destination namespaces without mapping
+func (r *MigPlan) IsResourceExcluded(resource string) bool {
+	for _, excludedResource := range r.Status.ExcludedResources {
+		if resource == excludedResource {
+			return true
+		}
+	}
 	return false
 }
 

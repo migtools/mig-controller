@@ -3,6 +3,7 @@ package migmigration
 import (
 	"time"
 
+	"github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
@@ -226,7 +227,7 @@ type Task struct {
 	Owner           *migapi.MigMigration
 	PlanResources   *migapi.PlanResources
 	Annotations     map[string]string
-	BackupResources []string
+	BackupResources mapset.Set
 	Phase           string
 	Requeue         time.Duration
 	Itinerary       Itinerary

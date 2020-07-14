@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/deckarep/golang-set"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -38,7 +39,8 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, err
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
-	newBackup.Spec.ExcludedResources = excludedInitialResources
+	newBackup.Spec.IncludedResources = toStringSlice(includedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.ExcludedResources = toStringSlice(excludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	delete(newBackup.Annotations, QuiesceAnnotation)
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
@@ -46,6 +48,22 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, err
 	}
 	return newBackup, nil
+}
+
+func toStringSlice(set mapset.Set) []string {
+	interfaceSlice := set.ToSlice()
+	var strSlice []string = make([]string, len(interfaceSlice))
+	for i, s := range interfaceSlice {
+		strSlice[i] = s.(string)
+	}
+	return strSlice
+}
+func toSet(strSlice []string) mapset.Set {
+	var interfaceSlice []interface{} = make([]interface{}, len(strSlice))
+	for i, s := range strSlice {
+		interfaceSlice[i] = s
+	}
+	return mapset.NewSetFromSlice(interfaceSlice)
 }
 
 // Get the initial backup on the source cluster.
@@ -82,7 +100,8 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		},
 	}
 	newBackup.Labels[StageBackupLabel] = t.UID()
-	newBackup.Spec.IncludedResources = stagingResources
+	newBackup.Spec.IncludedResources = toStringSlice(includedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.ExcludedResources = toStringSlice(excludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
@@ -223,7 +242,6 @@ func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
 			VolumeSnapshotLocations: []string{snapshotLocation.Name},
 			TTL:                     metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces:      t.sourceNamespaces(),
-			IncludedResources:       t.BackupResources,
 			Hooks: velero.BackupHooks{
 				Resources: []velero.BackupResourceHookSpec{},
 			},
