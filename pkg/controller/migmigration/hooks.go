@@ -235,6 +235,16 @@ func (t *Task) baseJobTemplate(hook migapi.MigPlanHook, migHook migapi.MigHook) 
 						{
 							Name:  strings.ToLower(t.PlanResources.MigPlan.Name + "-" + hook.Phase),
 							Image: migHook.Spec.Image,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MIGRATION_NAMESPACES",
+									Value: strings.Join(t.PlanResources.MigPlan.Spec.Namespaces, ","),
+								},
+								{
+									Name:  "MIGRATION_PLAN_NAME",
+									Value: t.PlanResources.MigPlan.Name,
+								},
+							},
 						},
 					},
 					RestartPolicy:         "OnFailure",
