@@ -18,6 +18,8 @@ package migmigration
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -68,13 +70,14 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Run
 	task := Task{
-		Log:             log,
-		Client:          r,
-		Owner:           migration,
-		PlanResources:   planResources,
-		Phase:           migration.Status.Phase,
-		Annotations:     r.getAnnotations(migration),
-		BackupResources: r.getBackupResources(migration),
+		Log:               log,
+		Client:            r,
+		Owner:             migration,
+		PlanResources:     planResources,
+		Phase:             migration.Status.Phase,
+		Annotations:       r.getAnnotations(migration),
+		BackupResources:   r.getBackupResources(migration),
+		ExcludedResources: r.getExcludedResources(migration),
 	}
 	err = task.Run()
 	if err != nil {
@@ -143,4 +146,9 @@ func (r *ReconcileMigMigration) getBackupResources(migration *migapi.MigMigratio
 	}
 
 	return []string{}
+}
+
+// Get the resources to be excluded from backup
+func (r *ReconcileMigMigration) getExcludedResources(migration *migapi.MigMigration) []string {
+	return strings.Split(os.Getenv("VELERO_EXCLUDE_RESOURCES"), ",")
 }

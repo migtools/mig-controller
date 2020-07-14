@@ -42,7 +42,6 @@ type PodStartReport struct {
 	reasons []string
 	// all pods started.
 	started bool
-
 }
 
 // BuildStagePods - creates a list of stage pods from a list of pods

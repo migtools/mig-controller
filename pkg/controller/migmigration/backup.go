@@ -38,7 +38,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, err
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
-	newBackup.Spec.ExcludedResources = excludedInitialResources
+	newBackup.Spec.ExcludedResources = append(newBackup.Spec.ExcludedResources, excludedInitialResources...)
 	delete(newBackup.Annotations, QuiesceAnnotation)
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
@@ -224,6 +224,7 @@ func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
 			TTL:                     metav1.Duration{Duration: 720 * time.Hour},
 			IncludedNamespaces:      t.sourceNamespaces(),
 			IncludedResources:       t.BackupResources,
+			ExcludedResources:       t.ExcludedResources,
 			Hooks: velero.BackupHooks{
 				Resources: []velero.BackupResourceHookSpec{},
 			},

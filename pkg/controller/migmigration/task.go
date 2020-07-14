@@ -215,22 +215,24 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 // PlanResources - A PlanRefResources.
 // Annotations - Map of annotations to applied to the backup & restore
 // BackupResources - Resource types to be included in the backup.
+// ExcludedResources - Resources type to excluded in the backup
 // Phase - The task phase.
 // Requeue - The requeueAfter duration. 0 indicates no requeue.
 // Itinerary - The phase itinerary.
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log             logr.Logger
-	Client          k8sclient.Client
-	Owner           *migapi.MigMigration
-	PlanResources   *migapi.PlanResources
-	Annotations     map[string]string
-	BackupResources []string
-	Phase           string
-	Requeue         time.Duration
-	Itinerary       Itinerary
-	Errors          []string
+	Log               logr.Logger
+	Client            k8sclient.Client
+	Owner             *migapi.MigMigration
+	PlanResources     *migapi.PlanResources
+	Annotations       map[string]string
+	BackupResources   []string
+	ExcludedResources []string
+	Phase             string
+	Requeue           time.Duration
+	Itinerary         Itinerary
+	Errors            []string
 }
 
 // Run the task.
