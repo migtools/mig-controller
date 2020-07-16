@@ -18,14 +18,14 @@ package migplan
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/settings"
-	kapi "k8s.io/api/core/v1"
 	"strconv"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/konveyor/mig-controller/pkg/settings"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -218,6 +218,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Set excluded resources on Status.
+	err = r.setExcludedResourceList(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// PV discovery
 	err = r.updatePvs(plan)
 	if err != nil {
@@ -360,5 +367,12 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 		})
 	}
 
+	return nil
+}
+
+// Update Status.ExcludedResources based on settings
+func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
+	excludedResources := Settings.Plan.ExcludedResources
+	plan.Status.ExcludedResources = excludedResources
 	return nil
 }
