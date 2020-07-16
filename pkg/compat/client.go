@@ -189,6 +189,8 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 		return err
 	}
 
+	Metrics.Get(c, in)
+
 	return c.upConvert(ctx, obj, in)
 }
 
@@ -205,6 +207,8 @@ func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 		return err
 	}
 
+	Metrics.List(c, in)
+
 	return c.upConvert(ctx, obj, in)
 }
 
@@ -215,6 +219,9 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 	if err != nil {
 		return err
 	}
+
+	Metrics.Create(c, in)
+
 	return c.Client.Create(ctx, obj)
 }
 
@@ -225,6 +232,9 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 	if err != nil {
 		return err
 	}
+
+	Metrics.Delete(c, in)
+
 	return c.Client.Delete(ctx, obj, opt...)
 }
 
@@ -235,5 +245,8 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 	if err != nil {
 		return err
 	}
+
+	Metrics.Update(c, in)
+
 	return c.Client.Update(ctx, obj)
 }
