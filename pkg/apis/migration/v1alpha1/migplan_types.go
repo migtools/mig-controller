@@ -885,6 +885,13 @@ func (r *PersistentVolumes) DeletePv(names ...string) {
 	}
 }
 
+// Reset PVs collection.
+func (r *PersistentVolumes) ResetPvs() {
+	r.init()
+	r.List = []PV{}
+	r.buildIndex()
+}
+
 // Convert name to a DNS_LABEL-compliant string
 // DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
 //     to the definition of a "label" in RFCs 1035 and 1123. This is captured
