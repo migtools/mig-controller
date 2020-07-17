@@ -68,7 +68,18 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	destStorageClasses := destMigCluster.Spec.StorageClasses
 
 	plan.Spec.BeginPvStaging()
-
+	if plan.IsResourceExcluded("persistentvolumeclaims") {
+		plan.Spec.ResetPvs()
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvsDiscovered,
+			Status:   True,
+			Reason:   Done,
+			Category: migapi.Required,
+			Message:  PvsDiscoveredMessage,
+		})
+		plan.Spec.PersistentVolumes.EndPvStaging()
+		return nil
+	}
 	// Build PV map.
 	pvMap, err := r.getPvMap(client)
 	if err != nil {
