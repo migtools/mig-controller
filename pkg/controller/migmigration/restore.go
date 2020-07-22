@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
@@ -20,8 +21,7 @@ import (
 func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	backup, err := t.getInitialBackup()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if backup == nil {
 		return nil, errors.New("Backup not found")
@@ -29,8 +29,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 
 	restore, err := t.getFinalRestore()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if restore != nil {
 		return restore, nil
@@ -42,14 +41,12 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	}
 	newRestore, err := t.buildRestore(client, backup.Name)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	return newRestore, nil
 }
@@ -66,8 +63,7 @@ func (t *Task) getFinalRestore() (*velero.Restore, error) {
 func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	backup, err := t.getStageBackup()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if backup == nil {
 		return nil, errors.New("Backup not found")
@@ -75,8 +71,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 
 	restore, err := t.getStageRestore()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if restore != nil {
 		return restore, nil
@@ -88,14 +83,12 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	}
 	newRestore, err := t.buildRestore(client, backup.Name)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	newRestore.Labels[StageRestoreLabel] = t.UID()
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	return newRestore, nil
 }
@@ -193,8 +186,7 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 func (t *Task) buildRestore(client k8sclient.Client, backupName string) (*velero.Restore, error) {
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
@@ -242,8 +234,7 @@ func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
 func (t *Task) deleteRestores() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	list := velero.RestoreList{}
@@ -252,14 +243,12 @@ func (t *Task) deleteRestores() error {
 		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
 		&list)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -269,8 +258,7 @@ func (t *Task) deleteRestores() error {
 func (t *Task) deleteMigrated() error {
 	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
@@ -284,13 +272,11 @@ func (t *Task) deleteMigrated() error {
 				continue
 			}
 			if !k8serror.IsMethodNotSupported(err) && !k8serror.IsNotFound(err) {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			for _, r := range list.Items {
 				err = client.Resource(gvr).Namespace(ns).Delete(r.GetName(), nil)
@@ -313,8 +299,7 @@ func (t *Task) deleteMigrated() error {
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
@@ -324,8 +309,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 		for _, ns := range t.destinationNamespaces() {
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
-				log.Trace(err)
-				return false, err
+				return false, liberr.Wrap(err)
 			}
 			// Wait for resources with deletion timestamps
 			if len(list.Items) > 0 {

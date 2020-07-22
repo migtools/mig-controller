@@ -20,6 +20,7 @@ import (
 	"context"
 	"strconv"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	"github.com/konveyor/mig-controller/pkg/logging"
@@ -57,8 +58,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigPlan
@@ -68,8 +68,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&PlanPredicate{},
 	)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigClusters referenced by MigPlans
@@ -83,8 +82,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&ClusterPredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigStorage referenced by MigPlans
@@ -98,8 +96,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&StoragePredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigMigrations.
@@ -110,8 +107,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&MigrationPredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Indexes
@@ -131,8 +127,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	// Pod
 	err = indexer.IndexField(
@@ -148,8 +143,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -174,8 +168,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, liberr.Wrap(err)
 	}
 
 	// Report reconcile error.
@@ -186,7 +179,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		plan.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), plan)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 	}()
@@ -194,7 +187,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if closed {
@@ -207,28 +200,28 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Plan Suspended
 	err = r.planSuspended(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// PV discovery
 	err = r.updatePvs(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -236,28 +229,28 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	nfsValidation := NfsValidation{Plan: plan}
 	err = nfsValidation.Run(r.Client)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validate PV actions.
 	err = r.validatePvSelections(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Storage
 	err = r.ensureStorage(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Migration Registry
 	err = r.ensureMigRegistries(plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -274,7 +267,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -305,8 +298,7 @@ func (r *ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	clusters, err := migapi.ListClusters(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, cluster := range clusters {
 		if !cluster.Status.IsReady() {
@@ -314,8 +306,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		}
 		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 	plan.Status.DeleteCondition(StorageEnsured, RegistriesEnsured, Suspended)
@@ -329,8 +320,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -344,8 +334,7 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	suspended := false
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, m := range migrations {
 		if m.Status.HasCondition(migctl.Running) {

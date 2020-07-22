@@ -3,8 +3,9 @@ package migmigration
 import (
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -252,13 +253,11 @@ func (t *Task) Run() error {
 	case Prepare:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		err = t.deleteAnnotations()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureCloudSecretPropagated:
@@ -266,8 +265,7 @@ func (t *Task) Run() error {
 		for _, cluster := range t.getBothClusters() {
 			propagated, err := t.veleroPodCredSecretPropagated(cluster)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			if propagated {
 				count++
@@ -283,9 +281,8 @@ func (t *Task) Run() error {
 	case PreBackupHooks:
 		status, err := t.runHooks(migapi.PreBackupHookPhase)
 		if err != nil {
-			log.Trace(err)
 			t.fail(PreBackupHooksFailed, []string{err.Error()})
-			return err
+			return liberr.Wrap(err)
 		}
 		if status {
 			t.next()
@@ -295,16 +292,14 @@ func (t *Task) Run() error {
 	case EnsureInitialBackup:
 		_, err := t.ensureInitialBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case InitialBackupCreated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if backup == nil {
 			return errors.New("Backup not found")
@@ -322,39 +317,34 @@ func (t *Task) Run() error {
 	case AnnotateResources:
 		err := t.annotateStageResources()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case EnsureStagePodsFromOrphanedPVCs:
 		err := t.ensureStagePodsFromOrphanedPVCs()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case StagePodsCreated:
 		report, err := t.ensureStagePodsStarted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if report.failed {
 			t.fail(StagePodsFailed, report.reasons)
@@ -368,16 +358,14 @@ func (t *Task) Run() error {
 	case RestartRestic:
 		err := t.restartResticPods()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = PollReQ
 		t.next()
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if started {
 			t.next()
@@ -387,15 +375,13 @@ func (t *Task) Run() error {
 	case QuiesceApplications:
 		err := t.quiesceApplications()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if quiesced {
 			t.next()
@@ -405,23 +391,20 @@ func (t *Task) Run() error {
 	case UnQuiesceApplications:
 		err := t.unQuiesceApplications()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if backup == nil {
 			return errors.New("Backup not found")
@@ -439,16 +422,14 @@ func (t *Task) Run() error {
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if backup == nil {
 			return errors.New("Backup not found")
 		}
 		replicated, err := t.isBackupReplicated(backup)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if replicated {
 			t.next()
@@ -458,9 +439,8 @@ func (t *Task) Run() error {
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
-			log.Trace(err)
 			t.fail(PostBackupHooksFailed, []string{err.Error()})
-			return err
+			return liberr.Wrap(err)
 		}
 		if status {
 			t.next()
@@ -470,9 +450,8 @@ func (t *Task) Run() error {
 	case PreRestoreHooks:
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
-			log.Trace(err)
 			t.fail(PreRestoreHooksFailed, []string{err.Error()})
-			return err
+			return liberr.Wrap(err)
 		}
 		if status {
 			t.next()
@@ -482,16 +461,14 @@ func (t *Task) Run() error {
 	case EnsureStageRestore:
 		_, err := t.ensureStageRestore()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case StageRestoreCreated:
 		restore, err := t.getStageRestore()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if restore == nil {
 			return errors.New("Restore not found")
@@ -510,15 +487,13 @@ func (t *Task) Run() error {
 	case EnsureStagePodsDeleted:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if terminated {
 			t.next()
@@ -529,8 +504,7 @@ func (t *Task) Run() error {
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 		t.next()
@@ -538,24 +512,21 @@ func (t *Task) Run() error {
 		if !t.keepAnnotations() {
 			err := t.deleteLabels()
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 		t.next()
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if backup == nil {
 			return errors.New("Backup not found")
 		}
 		replicated, err := t.isBackupReplicated(backup)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if replicated {
 			t.next()
@@ -565,24 +536,21 @@ func (t *Task) Run() error {
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if backup == nil {
 			return errors.New("Backup not found")
 		}
 		_, err = t.ensureFinalRestore()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		t.next()
 	case FinalRestoreCreated:
 		restore, err := t.getFinalRestore()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if restore == nil {
 			return errors.New("Restore not found")
@@ -600,9 +568,8 @@ func (t *Task) Run() error {
 	case PostRestoreHooks:
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
-			log.Trace(err)
 			t.fail(PostRestoreHooksFailed, []string{err.Error()})
-			return err
+			return liberr.Wrap(err)
 		}
 		if status {
 			t.next()
@@ -612,8 +579,7 @@ func (t *Task) Run() error {
 	case Verification:
 		completed, err := t.VerificationCompleted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if completed {
 			t.next()
@@ -641,15 +607,13 @@ func (t *Task) Run() error {
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case EnsureMigratedDeleted:
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		if deleted {
 			t.next()
@@ -658,14 +622,12 @@ func (t *Task) Run() error {
 		}
 	case DeleteBackups:
 		if err := t.deleteBackups(); err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case DeleteRestores:
 		if err := t.deleteRestores(); err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		t.next()
 	case Canceled:
@@ -914,8 +876,7 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 	for _, cluster := range t.getBothClusters() {
 		client, err := cluster.GetClient(t.Client)
 		if err != nil {
-			log.Trace(err)
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 		list = append(list, client)
 	}
@@ -927,8 +888,7 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
 	clientList, err := t.getBothClients()
 	if err != nil {
-		log.Trace(err)
-		return nil, nil, err
+		return nil, nil, liberr.Wrap(err)
 	}
 	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
 

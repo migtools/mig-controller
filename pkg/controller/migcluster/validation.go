@@ -3,10 +3,12 @@ package migcluster
 import (
 	"context"
 	"fmt"
-	auth "k8s.io/api/authorization/v1"
 	"net/url"
 	"time"
 
+	auth "k8s.io/api/authorization/v1"
+
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
@@ -59,28 +61,24 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 	// General settings
 	err := r.validateURL(cluster)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// SA secret
 	err = r.validateSaSecret(cluster)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Test Connection
 	err = r.testConnection(cluster)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	err = r.validateSaTokenPrivileges(cluster)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -148,8 +146,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 
 	secret, err := migapi.GetSecret(r, ref)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// NotFound
@@ -252,18 +249,15 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 
 	client, err := cluster.GetClient(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = client.Create(context.TODO(), &migrationSar)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = client.Create(context.TODO(), &veleroSar)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if !migrationSar.Status.Allowed || !veleroSar.Status.Allowed {
 		cluster.Status.SetCondition(migapi.Condition{

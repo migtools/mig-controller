@@ -8,6 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,14 +41,12 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 			},
 			&migHook)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		client, err = t.getHookClient(migHook)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		svc := corev1.ServiceAccount{}
@@ -57,20 +56,17 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 		}
 		err = client.Get(context.TODO(), ref, &svc)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		job, err := t.prepareJob(hook, migHook, client)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		result, err := t.ensureJob(job, hook, migHook, client)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		return result, nil
@@ -142,13 +138,11 @@ func (t *Task) getHookClient(migHook migapi.MigHook) (k8sclient.Client, error) {
 	case "source":
 		client, err = t.getSourceClient()
 		if err != nil {
-			log.Trace(err)
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 	default:
 		err := fmt.Errorf("targetCluster must be 'source' or 'destination'. %s unknown", migHook.Spec.TargetCluster)
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	return client, nil
 }

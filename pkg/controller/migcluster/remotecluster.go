@@ -1,13 +1,14 @@
 package migcluster
 
 import (
+	"time"
+
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 )
 
 // RemoteClusterSource is a `watch` source used to
@@ -42,7 +43,7 @@ func (r *RemoteClusterSource) run() {
 		time.Sleep(r.Interval)
 		list, err := v1alpha1.ListClusters(r.Client)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 

@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,18 +52,17 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {
-		return 0, err
+		return 0, liberr.Wrap(err)
 	}
 	if !plan.Status.IsReady() {
 		log.Info("Plan not ready.", "name", migration.Name)
-		return 0, err
+		return 0, liberr.Wrap(err)
 	}
 
 	// Resources
 	planResources, err := plan.GetRefResources(r)
 	if err != nil {
-		log.Trace(err)
-		return 0, err
+		return 0, liberr.Wrap(err)
 	}
 
 	// Started
@@ -85,7 +85,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		if errors.IsConflict(err) {
 			return FastReQ, nil
 		}
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}

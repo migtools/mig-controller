@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -18,43 +19,35 @@ import (
 func (t *Task) quiesceApplications() error {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceCronJobs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceDeploymentConfigs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceDeployments(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceStatefulSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceReplicaSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceDaemonSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.quiesceJobs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -64,43 +57,35 @@ func (t *Task) quiesceApplications() error {
 func (t *Task) unQuiesceApplications() error {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceCronJobs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceDeploymentConfigs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceDeployments(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceStatefulSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceReplicaSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceDaemonSets(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceJobs(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -116,8 +101,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
 			if dc.Annotations == nil {
@@ -130,8 +114,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 			dc.Spec.Replicas = 0
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -149,8 +132,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
 			if dc.Annotations == nil {
@@ -162,15 +144,13 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client) error {
 			}
 			number, err := strconv.Atoi(replicas)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(dc.Annotations, ReplicasAnnotation)
 			dc.Spec.Replicas = int32(number)
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -189,8 +169,7 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
 			if deployment.Annotations == nil {
@@ -203,8 +182,7 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 			deployment.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -222,8 +200,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
 			if deployment.Annotations == nil {
@@ -235,16 +212,14 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client) error {
 			}
 			number, err := strconv.Atoi(replicas)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(deployment.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			deployment.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -263,8 +238,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
@@ -277,8 +251,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -295,8 +268,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
@@ -308,16 +280,14 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client) error {
 			}
 			number, err := strconv.Atoi(replicas)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			set.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -335,8 +305,7 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if len(set.OwnerReferences) > 0 {
@@ -353,8 +322,7 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -371,8 +339,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if len(set.OwnerReferences) > 0 {
@@ -388,16 +355,14 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
 			}
 			number, err := strconv.Atoi(replicas)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			set.Spec.Replicas = &restoredReplicas
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -414,8 +379,7 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
@@ -428,15 +392,13 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 			}
 			selector, err := json.Marshal(set.Spec.Template.Spec.NodeSelector)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			set.Annotations[NodeSelectorAnnotation] = string(selector)
 			set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector] = "true"
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -453,8 +415,7 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
 			if set.Annotations == nil {
@@ -467,15 +428,13 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client) error {
 			nodeSelector := map[string]string{}
 			err := json.Unmarshal([]byte(selector), &nodeSelector)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(set.Annotations, NodeSelectorAnnotation)
 			set.Spec.Template.Spec.NodeSelector = nodeSelector
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -489,8 +448,7 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, &list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, r := range list.Items {
 			if r.Annotations == nil {
@@ -503,8 +461,7 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 			r.Spec.Suspend = pointer.BoolPtr(true)
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -519,8 +476,7 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, &list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, r := range list.Items {
 			if r.Annotations == nil {
@@ -533,8 +489,7 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client) error {
 			r.Spec.Suspend = pointer.BoolPtr(false)
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -553,8 +508,7 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
 			if job.Annotations == nil {
@@ -567,8 +521,7 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 			job.Spec.Parallelism = &zero
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -586,8 +539,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client) error {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
 			if job.Annotations == nil {
@@ -599,16 +551,14 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client) error {
 			}
 			number, err := strconv.Atoi(replicas)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			delete(job.Annotations, ReplicasAnnotation)
 			parallelReplicas := int32(number)
 			job.Spec.Parallelism = &parallelReplicas
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 		}
 	}
@@ -633,8 +583,7 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 	}
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 	for _, ns := range t.sourceNamespaces() {
 		list := v1.PodList{}
@@ -644,8 +593,7 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			options,
 			&list)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 		for _, pod := range list.Items {
 			if pod.Annotations == nil {

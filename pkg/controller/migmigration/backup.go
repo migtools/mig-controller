@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -21,8 +22,7 @@ import (
 func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	backup, err := t.getInitialBackup()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if backup != nil {
 		return backup, nil
@@ -30,13 +30,11 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	newBackup, err := t.buildBackup(client)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
 	newBackup.Spec.IncludedResources = toStringSlice(includedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
@@ -44,8 +42,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	delete(newBackup.Annotations, QuiesceAnnotation)
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	return newBackup, nil
 }
@@ -78,8 +75,7 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	backup, err := t.getStageBackup()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	if backup != nil {
 		return backup, nil
@@ -87,12 +83,11 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	newBackup, err := t.buildBackup(client)
 	if err != nil {
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	labelSelector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -216,18 +211,15 @@ func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
 	var includeClusterResources *bool = nil
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	backupLocation, err := t.getBSL()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	snapshotLocation, err := t.getVSL()
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	backup := &velero.Backup{
 		ObjectMeta: metav1.ObjectMeta{
@@ -253,8 +245,7 @@ func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
 func (t *Task) deleteBackups() error {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	list := velero.BackupList{}
@@ -263,8 +254,7 @@ func (t *Task) deleteBackups() error {
 		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
 		&list)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	for _, backup := range list.Items {
@@ -278,8 +268,7 @@ func (t *Task) deleteBackups() error {
 			},
 		}
 		if err := client.Create(context.TODO(), request); err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 

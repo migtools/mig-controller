@@ -1,6 +1,7 @@
 package migplan
 
 import (
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,14 +17,12 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 
 	gvkCompare, err := r.newGVKCompare(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		err = liberr.Wrap(err)
 	}
 
 	incompatibleMapping, err := gvkCompare.Compare()
 	if err != nil {
-		log.Trace(err)
-		return err
+		err = liberr.Wrap(err)
 	}
 
 	reportGVK(plan, incompatibleMapping)
@@ -34,29 +33,24 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, error) {
 	srcCluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	dstCluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	srcClient, err := srcCluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	dstClient, err := dstCluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	dynamicClient, err := dynamic.NewForConfig(srcClient.RestConfig())
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	return &gvk.Compare{

@@ -19,9 +19,9 @@ package mighook
 import (
 	"context"
 
-	"github.com/konveyor/mig-controller/pkg/logging"
-
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,8 +50,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("mighook-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigHook
@@ -60,8 +59,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&HookPredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -86,7 +84,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -98,7 +96,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 		hook.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), hook)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 	}()
@@ -109,7 +107,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Validations.
 	err = r.validate(hook)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -125,7 +123,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	hook.MarkReconciled()
 	err = r.Update(context.TODO(), hook)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 

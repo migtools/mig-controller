@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -151,78 +152,67 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	// Source cluster
 	err := r.validateSourceCluster(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Destination cluster
 	err = r.validateDestinationCluster(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Storage
 	err = r.validateStorage(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Migrated namespaces.
 	err = r.validateNamespaces(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Pod limit within each namespace.
 	err = r.validatePodLimit(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Required namespaces.
 	err = r.validateRequiredNamespaces(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Conflict
 	err = r.validateConflict(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Registry proxy secret
 	err = r.validateRegistryProxySecrets(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Pods
 	err = r.validatePods(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Hooks
 	err = r.validateHooks(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// GVK
 	err = r.compareGVK(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -246,8 +236,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 
 	storage, err := migapi.GetStorage(r, ref)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// NotFound
@@ -312,16 +301,14 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 	}
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if cluster == nil || !cluster.Status.IsReady() {
 		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	count := 0
 	limit := Settings.Plan.PodLimit
@@ -336,8 +323,7 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 		}
 		err := client.List(context.TODO(), &options, &list)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		count += len(list.Items)
 	}
@@ -373,8 +359,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// NotFound
@@ -433,8 +418,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 
 	cluster, err := migapi.GetCluster(r, ref)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// NotFound
@@ -467,13 +451,11 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error {
 	err := r.validateSourceNamespaces(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = r.validateDestinationNamespaces(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -492,16 +474,14 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	}
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if cluster == nil || !cluster.Status.IsReady() {
 		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
@@ -516,8 +496,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 		if k8serror.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 	if len(notFound) > 0 {
@@ -544,16 +523,14 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 	}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if cluster == nil || !cluster.Status.IsReady() {
 		return nil
 	}
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
@@ -566,8 +543,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 		if k8serror.IsNotFound(err) {
 			notFound = append(notFound, name)
 		} else {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 	if len(notFound) > 0 {
@@ -589,8 +565,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 	plans, err := migapi.ListPlans(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	list := []string{}
 	for _, p := range plans {
@@ -634,8 +609,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 	}
 	destMigCluster, err := plan.GetDestinationCluster(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if destMigCluster == nil {
 		return nil
@@ -832,8 +806,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 	// Source cluster proxy secret validation
 	srcCluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if srcCluster == nil {
@@ -842,8 +815,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 
 	srcClient, err := srcCluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = srcClient.List(
 		context.TODO(),
@@ -854,8 +826,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 		&list,
 	)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if len(list.Items) == 0 {
 		// No proxy secret is valid configuration
@@ -897,8 +868,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 	// Destination cluster proxy secret validation
 	destCluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if destCluster == nil {
@@ -907,8 +877,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 
 	destClient, err := destCluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = destClient.List(
 		context.TODO(),
@@ -919,8 +888,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 		&list,
 	)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if len(list.Items) == 0 {
 		// No proxy secret is valid configuration
@@ -957,8 +925,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if cluster == nil || !cluster.Status.IsReady() {
@@ -967,8 +934,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	unhealthyResources := migapi.UnhealthyResources{}
@@ -977,8 +943,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			Namespace: ns,
 		})
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		workload := migapi.Workload{
@@ -988,8 +953,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			pod := &kapi.Pod{}
 			err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstrucredPod.UnstructuredContent(), pod)
 			if err != nil {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 
 			workload.Resources = append(workload.Resources, pod.Name)
@@ -1042,8 +1006,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 			})
 			return nil
 		} else if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// InvalidHookSA
@@ -1158,14 +1121,12 @@ func (r *NfsValidation) Run(client k8sclient.Client) error {
 	}
 	err := r.init(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if !r.Plan.Status.HasCondition(NfsAccessCannotBeValidated) {
 		err = r.validate()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -1177,24 +1138,20 @@ func (r *NfsValidation) init(client k8sclient.Client) error {
 	var err error
 	r.cluster, err = r.Plan.GetDestinationCluster(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if !r.cluster.Spec.IsHostCluster {
 		r.client, err = r.cluster.GetClient(client)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		r.restCfg, err = r.cluster.BuildRestConfig(client)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		err = r.findPod()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -1228,8 +1185,7 @@ func (r *NfsValidation) validate() error {
 				if cast {
 					passed = false
 				} else {
-					log.Trace(err)
-					return err
+					return liberr.Wrap(err)
 				}
 			}
 		} else {
@@ -1275,8 +1231,7 @@ func (r *NfsValidation) findPod() error {
 		options,
 		&list)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for i := range list.Items {
 		r.pod = &list.Items[i]

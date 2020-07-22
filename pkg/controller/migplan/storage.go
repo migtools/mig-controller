@@ -3,6 +3,8 @@ package migplan
 import (
 	"context"
 	"errors"
+
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
@@ -22,16 +24,14 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	}
 	storage, err := plan.GetStorage(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if storage == nil || !storage.Status.IsReady() {
 		return nil
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	for _, cluster := range clusters {
@@ -40,8 +40,7 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		pl := PlanStorage{
 			Client:        r,
@@ -54,29 +53,25 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 		// BSL
 		err := pl.ensureBSL()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// VSL
 		err = pl.ensureVSL()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// BSL Cloud Secret
 		err = pl.ensureBSLCloudSecret()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// VSL Cloud Secret
 		err = pl.ensureVSLCloudSecret()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		nEnsured++
@@ -139,14 +134,12 @@ func (r PlanStorage) ensureBSL() error {
 	newBSL.Labels = r.plan.GetCorrelationLabels()
 	foundBSL, err := r.plan.GetBSL(r.targetClient)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundBSL == nil {
 		err = r.targetClient.Create(context.TODO(), newBSL)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -156,8 +149,7 @@ func (r PlanStorage) ensureBSL() error {
 	r.UpdateBSL(foundBSL)
 	err = r.targetClient.Update(context.TODO(), foundBSL)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -169,14 +161,12 @@ func (r PlanStorage) ensureVSL() error {
 	newVSL.Labels = r.plan.GetCorrelationLabels()
 	foundVSL, err := r.plan.GetVSL(r.targetClient)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundVSL == nil {
 		err = r.targetClient.Create(context.TODO(), newVSL)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -186,8 +176,7 @@ func (r PlanStorage) ensureVSL() error {
 	r.UpdateVSL(foundVSL)
 	err = r.targetClient.Update(context.TODO(), foundVSL)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -197,20 +186,17 @@ func (r PlanStorage) ensureVSL() error {
 func (r PlanStorage) ensureBSLCloudSecret() error {
 	newSecret, err := r.BuildBSLCloudSecret()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	newSecret.Labels = r.plan.GetCorrelationLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetBackupStorageProvider())
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundSecret == nil {
 		err = r.targetClient.Create(context.TODO(), newSecret)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -220,8 +206,7 @@ func (r PlanStorage) ensureBSLCloudSecret() error {
 	r.UpdateBSLCloudSecret(foundSecret)
 	err = r.targetClient.Update(context.TODO(), foundSecret)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -237,20 +222,17 @@ func (r PlanStorage) ensureVSLCloudSecret() error {
 	}
 	newSecret, err := r.BuildVSLCloudSecret()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	newSecret.Labels = r.plan.GetCorrelationLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetVolumeSnapshotProvider())
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundSecret == nil {
 		err = r.targetClient.Create(context.TODO(), newSecret)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -260,8 +242,7 @@ func (r PlanStorage) ensureVSLCloudSecret() error {
 	r.UpdateVSLCloudSecret(foundSecret)
 	err = r.targetClient.Update(context.TODO(), foundSecret)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -300,8 +281,7 @@ func (r *PlanStorage) BuildBSLCloudSecret() (*kapi.Secret, error) {
 	secret := r.storage.BuildBSLCloudSecret()
 	err := r.UpdateBSLCloudSecret(secret)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	return secret, nil
@@ -311,8 +291,7 @@ func (r *PlanStorage) BuildBSLCloudSecret() (*kapi.Secret, error) {
 func (r *PlanStorage) UpdateBSLCloudSecret(cloudSecret *kapi.Secret) error {
 	secret, err := r.storage.GetBackupStorageCredSecret(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if secret == nil {
 		return errors.New("Credentials secret not found.")
@@ -328,8 +307,7 @@ func (r *PlanStorage) BuildVSLCloudSecret() (*kapi.Secret, error) {
 	secret := r.storage.BuildVSLCloudSecret()
 	err := r.UpdateVSLCloudSecret(secret)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	return secret, nil
@@ -339,8 +317,7 @@ func (r *PlanStorage) BuildVSLCloudSecret() (*kapi.Secret, error) {
 func (r *PlanStorage) UpdateVSLCloudSecret(cloudSecret *kapi.Secret) error {
 	secret, err := r.storage.GetVolumeSnapshotCredSecret(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if secret == nil {
 		return errors.New("Credentials secret not found.")

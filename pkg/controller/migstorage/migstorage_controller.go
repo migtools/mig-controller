@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/logging"
-
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,8 +53,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migstorage-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to MigStorage
@@ -63,8 +62,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to Secrets referenced by MigStorage.
@@ -77,8 +75,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to cloud providers.
@@ -88,8 +85,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Interval: time.Second * 30},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -114,7 +110,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -126,7 +122,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		storage.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), storage)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 	}()
@@ -137,7 +133,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(storage)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -153,7 +149,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	storage.MarkReconciled()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 

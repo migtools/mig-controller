@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -57,8 +58,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Add reference to controller on ReconcileMigCluster object to be used
@@ -71,8 +71,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch remote clusters for connection problems
@@ -82,8 +81,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 			Interval: time.Second * 60},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Watch for changes to Secrets referenced by MigClusters
@@ -96,8 +94,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 				}),
 		})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -123,7 +120,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -135,7 +132,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		cluster.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), cluster)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 	}()
@@ -146,7 +143,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(cluster)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -154,14 +151,14 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		// Remote Watch.
 		err = r.setupRemoteWatch(cluster)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return reconcile.Result{Requeue: true}, nil
 		}
 
 		// Storage Classes
 		err = r.setStorageClasses(cluster)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return reconcile.Result{Requeue: true}, nil
 		}
 	} else {
@@ -180,7 +177,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	cluster.MarkReconciled()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
-		log.Trace(err)
+		log.Trace(err) // TODO - handle with liberr
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -207,14 +204,12 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	if cluster.Spec.IsHostCluster {
 		restCfg, err = config.GetConfig()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	} else {
 		restCfg, err = cluster.BuildRestConfig(r.Client)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 

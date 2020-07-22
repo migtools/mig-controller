@@ -1,13 +1,14 @@
 package migstorage
 
 import (
+	"time"
+
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	event2 "sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 )
 
 // A cloud provider `watch` source used to routinely run provider tests.
@@ -41,7 +42,7 @@ func (p *ProviderSource) run() {
 		time.Sleep(p.Interval)
 		list, err := v1alpha1.ListStorage(p.Client)
 		if err != nil {
-			log.Trace(err)
+			log.Trace(err) // TODO - handle with liberr
 			return
 		}
 		for _, storage := range list {
@@ -57,7 +58,7 @@ func (p *ProviderSource) run() {
 			// Storage Provider
 			secret, err := storage.GetBackupStorageCredSecret(p.Client)
 			if err != nil {
-				log.Trace(err)
+				log.Trace(err) // TODO - handle with liberr
 				return
 			}
 			provider := storage.GetBackupStorageProvider()
@@ -70,7 +71,7 @@ func (p *ProviderSource) run() {
 			// Snapshot Provider
 			secret, err = storage.GetVolumeSnapshotCredSecret(p.Client)
 			if err != nil {
-				log.Trace(err)
+				log.Trace(err) // TODO - handle with liberr
 				return
 			}
 			provider = storage.GetVolumeSnapshotProvider()

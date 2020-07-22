@@ -17,6 +17,7 @@ limitations under the License.
 package migcluster
 
 import (
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/controller/remotewatcher"
 	"github.com/konveyor/mig-controller/pkg/remote"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,8 +46,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	log.Info("[rWatch] Starting watch on forwardChannel")
 	err = r.Controller.Watch(&source.Channel{Source: forwardChannel}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Add remoteWatcher to remote MGR
