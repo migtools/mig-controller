@@ -23,6 +23,7 @@ required = [
     "github.com/prometheus/client_golang/prometheus/promauto",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/vmware-tanzu/velero/pkg/apis/velero/v1",
+    "github.com/konveyor/controller/pkg/error",
     ]
 
 [prune]
