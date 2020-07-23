@@ -18,11 +18,11 @@ package discovery
 
 import (
 	"context"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/container"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/web"
-	"github.com/konveyor/mig-controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

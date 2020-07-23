@@ -21,9 +21,9 @@ import (
 	"strconv"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
-	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"

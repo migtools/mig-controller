@@ -15,7 +15,7 @@ package remotewatcher
 
 import (
 	liberr "github.com/konveyor/controller/pkg/error"
-	"github.com/konveyor/mig-controller/pkg/logging"
+	"github.com/konveyor/controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
