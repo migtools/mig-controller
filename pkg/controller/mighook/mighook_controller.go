@@ -84,7 +84,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -96,7 +96,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 		hook.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), hook)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return
 		}
 	}()
@@ -107,7 +107,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Validations.
 	err = r.validate(hook)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -123,7 +123,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	hook.MarkReconciled()
 	err = r.Update(context.TODO(), hook)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

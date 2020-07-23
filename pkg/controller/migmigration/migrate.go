@@ -85,7 +85,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		if errors.IsConflict(err) {
 			return FastReQ, nil
 		}
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}

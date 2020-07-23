@@ -110,7 +110,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -122,7 +122,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 		storage.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), storage)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return
 		}
 	}()
@@ -133,7 +133,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(storage)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -149,7 +149,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	storage.MarkReconciled()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

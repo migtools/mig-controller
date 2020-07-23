@@ -131,7 +131,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if errors.IsNotFound(err) {
 			err = r.deleted()
 		}
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -146,7 +146,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		migration.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), migration)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return
 		}
 	}()
@@ -171,7 +171,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Validate
 	err = r.validate(migration)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -189,7 +189,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(migration)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -207,7 +207,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.MarkReconciled()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
-		// TODO - handle with liberr
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}

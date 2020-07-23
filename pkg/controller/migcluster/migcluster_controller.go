@@ -120,7 +120,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -132,7 +132,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		cluster.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), cluster)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return
 		}
 	}()
@@ -143,7 +143,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Validations.
 	err = r.validate(cluster)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -151,14 +151,14 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		// Remote Watch.
 		err = r.setupRemoteWatch(cluster)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 
 		// Storage Classes
 		err = r.setStorageClasses(cluster)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	} else {
@@ -177,7 +177,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	cluster.MarkReconciled()
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

@@ -179,7 +179,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		plan.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), plan)
 		if err != nil {
-			log.Trace(err) // TODO - handle with liberr
+			log.Trace(err)
 			return
 		}
 	}()
@@ -187,7 +187,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if closed {
@@ -200,28 +200,28 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Plan Suspended
 	err = r.planSuspended(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validations.
 	err = r.validate(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// PV discovery
 	err = r.updatePvs(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -229,28 +229,28 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	nfsValidation := NfsValidation{Plan: plan}
 	err = nfsValidation.Run(r.Client)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validate PV actions.
 	err = r.validatePvSelections(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Storage
 	err = r.ensureStorage(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Migration Registry
 	err = r.ensureMigRegistries(plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -267,7 +267,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err) // TODO - handle with liberr
+		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
