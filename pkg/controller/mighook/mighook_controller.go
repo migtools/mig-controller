@@ -19,7 +19,6 @@ package mighook
 import (
 	"context"
 
-	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,7 +49,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("mighook-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigHook
@@ -59,7 +58,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&HookPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil

@@ -58,7 +58,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigPlan
@@ -68,7 +68,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&PlanPredicate{},
 	)
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigClusters referenced by MigPlans
@@ -82,7 +82,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&ClusterPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigStorage referenced by MigPlans
@@ -96,7 +96,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&StoragePredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigMigrations.
@@ -107,7 +107,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&MigrationPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Indexes
@@ -127,7 +127,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 	// Pod
 	err = indexer.IndexField(
@@ -143,7 +143,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil
@@ -168,7 +168,8 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		return reconcile.Result{}, liberr.Wrap(err)
+		log.Trace(err)
+		return reconcile.Result{}, err
 	}
 
 	// Report reconcile error.

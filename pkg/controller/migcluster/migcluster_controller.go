@@ -58,7 +58,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Add reference to controller on ReconcileMigCluster object to be used
@@ -71,7 +71,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch remote clusters for connection problems
@@ -81,7 +81,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 			Interval: time.Second * 60},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to Secrets referenced by MigClusters
@@ -94,7 +94,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 				}),
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil

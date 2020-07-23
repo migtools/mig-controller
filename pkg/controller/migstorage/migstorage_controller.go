@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -53,7 +52,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migstorage-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigStorage
@@ -62,7 +61,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to Secrets referenced by MigStorage.
@@ -75,7 +74,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to cloud providers.
@@ -85,7 +84,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Interval: time.Second * 30},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil

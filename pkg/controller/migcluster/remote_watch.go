@@ -35,8 +35,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
-		log.Error(err, "[rWatch] Unable to set up remote watcher controller manager")
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Parent controller watches for events from forwardChannel.
@@ -57,8 +56,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	}
 	err = remotewatcher.Add(mgr, forwardChannel, forwardEvent)
 	if err != nil {
-		log.Error(err, "Error adding RemoteWatcher controller to manager")
-		return err
+		return liberr.Wrap(err)
 	}
 
 	sigStopChan := make(chan struct{})

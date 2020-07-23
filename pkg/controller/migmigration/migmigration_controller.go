@@ -55,7 +55,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migmigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigMigration
@@ -64,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Watch for changes to MigPlans referenced by MigMigrations
@@ -78,7 +78,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&PlanPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Indexes
@@ -102,7 +102,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Gather migration metrics every 10 seconds
@@ -159,7 +159,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Owner Reference
 	err = r.setOwnerReference(migration)
 	if err != nil {
-		return reconcile.Result{}, liberr.Wrap(err)
+		log.Trace(err)
+		return reconcile.Result{}, err
 	}
 
 	// Re-queue (after) in seconds.
@@ -181,7 +182,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
-			return reconcile.Result{}, liberr.Wrap(err)
+			log.Trace(err)
+			return reconcile.Result{}, err
 		}
 	}
 

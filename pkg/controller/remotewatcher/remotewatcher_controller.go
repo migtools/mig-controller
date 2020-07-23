@@ -14,7 +14,6 @@ limitations under the License.
 package remotewatcher
 
 import (
-	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -54,7 +53,7 @@ func newReconciler(
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Backup
@@ -65,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BackupPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Restore
@@ -76,7 +75,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&RestorePredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// BSL
@@ -87,7 +86,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BSLPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// VSL
@@ -98,7 +97,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&VSLPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Secret
@@ -109,7 +108,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&SecretPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Pod
@@ -120,7 +119,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&PodPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// PV
@@ -130,7 +129,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// PVC
@@ -140,7 +139,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Namespaces
@@ -150,7 +149,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// StorageClass
@@ -160,7 +159,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	// Job
@@ -171,7 +170,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&JobPredicate{})
 	if err != nil {
-		return liberr.Wrap(err)
+		return err
 	}
 
 	return nil
