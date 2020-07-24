@@ -151,7 +151,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 // Ensure the deploymentconfig for the migration registry on the specified cluster has been created
 func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage, secret *kapi.Secret) error {
 	name := secret.GetName()
-	dirName := plan.GetName() + "-registry-" + string(plan.UID)
+	dirName := storage.GetName() + "-registry-" + string(storage.UID)
 
 	// Get Proxy Env Vars for DC
 	proxySecret, err := plan.GetRegistryProxySecret(client)
