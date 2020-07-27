@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -18,8 +19,7 @@ import (
 func (t *Task) shouldResticRestart() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	// Default to running ResticRestart on 3.7, 3.9.
@@ -45,8 +45,7 @@ func (t *Task) restartResticPods() error {
 	// Verify restic restart is needed before proceeding
 	runRestart, err := t.shouldResticRestart()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if !runRestart {
 		return nil
@@ -54,8 +53,7 @@ func (t *Task) restartResticPods() error {
 
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	list := corev1.PodList{}
@@ -70,8 +68,7 @@ func (t *Task) restartResticPods() error {
 		},
 		&list)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	for _, pod := range list.Items {
@@ -82,8 +79,7 @@ func (t *Task) restartResticPods() error {
 			context.TODO(),
 			&pod)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -95,8 +91,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 	// Verify restic restart is needed before proceeding
 	runRestart, err := t.shouldResticRestart()
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 	if !runRestart {
 		return true, nil
@@ -104,8 +99,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	list := corev1.PodList{}
@@ -121,8 +115,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		},
 		&list)
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	err = client.Get(
@@ -133,8 +126,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		},
 		&ds)
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	for _, pod := range list.Items {
@@ -156,8 +148,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) {
 	client, err := cluster.GetClient(t.Client)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	list := &corev1.PodList{}
 	selector := labels.SelectorFromSet(
@@ -172,8 +163,7 @@ func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) 
 		},
 		list)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	return list.Items, nil
@@ -184,8 +174,7 @@ func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) 
 func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, error) {
 	list, err := t.findVeleroPods(cluster)
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 	if len(list) == 0 {
 		log.Info("No velero pods found.")
@@ -193,14 +182,12 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 	}
 	restCfg, err := cluster.BuildRestConfig(t.Client)
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 	for _, pod := range list {
 		storage, err := t.PlanResources.MigPlan.GetStorage(t.Client)
 		if err != nil {
-			log.Trace(err)
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 
 		bslProvider := storage.GetBackupStorageProvider()
@@ -223,19 +210,16 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 						cmd.Args)
 					return true, nil
 				} else {
-					log.Trace(err)
-					return false, err
+					return false, liberr.Wrap(err)
 				}
 			}
 			client, err := cluster.GetClient(t.Client)
 			if err != nil {
-				log.Trace(err)
-				return false, err
+				return false, liberr.Wrap(err)
 			}
 			secret, err := t.PlanResources.MigPlan.GetCloudSecret(client, provider)
 			if err != nil {
-				log.Trace(err)
-				return false, err
+				return false, liberr.Wrap(err)
 			}
 			if body, found := secret.Data["cloud"]; found {
 				a := string(body)

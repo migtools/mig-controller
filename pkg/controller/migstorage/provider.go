@@ -1,13 +1,14 @@
 package migstorage
 
 import (
+	"time"
+
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	event2 "sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 )
 
 // A cloud provider `watch` source used to routinely run provider tests.

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -14,13 +15,11 @@ func (r *ReconcileMigCluster) setStorageClasses(cluster *migapi.MigCluster) erro
 	var client k8sclient.Client
 	client, err := cluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	clusterStorageClasses, err := cluster.GetStorageClasses(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	var storageClasses []migapi.StorageClass
 	for _, clusterStorageClass := range clusterStorageClasses {

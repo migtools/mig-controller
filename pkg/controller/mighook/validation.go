@@ -3,6 +3,7 @@ package mighook
 import (
 	"encoding/base64"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
@@ -50,23 +51,19 @@ const (
 func (r ReconcileMigHook) validate(hook *migapi.MigHook) error {
 	err := r.validateImage(hook)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = r.validateTargetCluster(hook)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = r.validatePlaybookData(hook)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = r.validateCustom(hook)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	return nil
 }

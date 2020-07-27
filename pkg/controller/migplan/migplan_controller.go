@@ -20,9 +20,10 @@ import (
 	"context"
 	"strconv"
 
+	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
-	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
@@ -57,7 +58,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -68,7 +68,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&PlanPredicate{},
 	)
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -83,7 +82,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&ClusterPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -98,7 +96,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&StoragePredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -110,7 +107,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&MigrationPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -131,7 +127,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 	// Pod
@@ -148,7 +143,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -305,8 +299,7 @@ func (r *ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	clusters, err := migapi.ListClusters(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, cluster := range clusters {
 		if !cluster.Status.IsReady() {
@@ -314,8 +307,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		}
 		err = cluster.DeleteResources(r, plan.GetCorrelationLabels())
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 	plan.Status.DeleteCondition(StorageEnsured, RegistriesEnsured, Suspended)
@@ -329,8 +321,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -344,8 +335,7 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	suspended := false
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, m := range migrations {
 		if m.Status.HasCondition(migctl.Running) {

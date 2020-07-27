@@ -3,6 +3,7 @@ package migplan
 import (
 	"context"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,16 +20,14 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	}
 	storage, err := plan.GetStorage(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if storage == nil || !storage.Status.IsReady() {
 		return nil
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	for _, cluster := range clusters {
@@ -37,36 +36,31 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 		}
 		client, err = cluster.GetClient(r)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// Migration Registry Secret
 		secret, err := r.ensureRegistrySecret(client, plan, storage)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// Migration Registry ImageStream
 		err = r.ensureRegistryImageStream(client, plan, secret)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// Migration Registry DeploymentConfig
 		err = r.ensureRegistryDC(client, plan, storage, secret)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		// Migration Registry Service
 		err = r.ensureRegistryService(client, plan, secret)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 
 		nEnsured++
@@ -119,19 +113,16 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
 	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName())
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	foundImageStream, err := plan.GetRegistryImageStream(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundImageStream == nil {
 		err = client.Create(context.TODO(), newImageStream)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -141,8 +132,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 	plan.UpdateRegistryImageStream(foundImageStream)
 	err = client.Update(context.TODO(), foundImageStream)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -156,26 +146,22 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	// Get Proxy Env Vars for DC
 	proxySecret, err := plan.GetRegistryProxySecret(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	//Construct Registry DC
 	newDC, err := plan.BuildRegistryDC(storage, proxySecret, name, dirName)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	foundDC, err := plan.GetRegistryDC(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundDC == nil {
 		err = client.Create(context.TODO(), newDC)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -185,8 +171,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	plan.UpdateRegistryDC(storage, foundDC, proxySecret, name, dirName)
 	err = client.Update(context.TODO(), foundDC)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -197,19 +182,16 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 	name := secret.GetName()
 	newService, err := plan.BuildRegistryService(name)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	foundService, err := plan.GetRegistryService(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if foundService == nil {
 		err = client.Create(context.TODO(), newService)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		return nil
 	}
@@ -219,8 +201,7 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 	plan.UpdateRegistryService(foundService, name)
 	err = client.Update(context.TODO(), foundService)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil

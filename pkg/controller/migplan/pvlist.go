@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -41,8 +42,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if srcMigCluster == nil || !srcMigCluster.Status.IsReady() {
 		return nil
@@ -50,15 +50,13 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 
 	client, err := srcMigCluster.GetClient(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Get destMigCluster
 	destMigCluster, err := plan.GetDestinationCluster(r.Client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if destMigCluster == nil || !destMigCluster.Status.IsReady() {
 		return nil
@@ -83,13 +81,11 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	// Build PV map.
 	pvMap, err := r.getPvMap(client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	claims, err := r.getClaims(client, plan)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, claim := range claims {
 		key := k8sclient.ObjectKey{
@@ -102,8 +98,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		}
 		selection, err := r.getDefaultSelection(pv, claim, plan, srcStorageClasses, destStorageClasses)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		plan.Spec.AddPv(
 			migapi.PV{
@@ -197,21 +192,18 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 	list := &core.PersistentVolumeClaimList{}
 	err := client.List(context.TODO(), &k8sclient.ListOptions{}, list)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	podList, err := migpods.ListTemplatePods(client, plan.GetSourceNamespaces())
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	runningPods := &core.PodList{}
 	err = client.List(context.TODO(), &k8sclient.ListOptions{}, runningPods)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	inNamespaces := func(objNamespace string, namespaces []string) bool {

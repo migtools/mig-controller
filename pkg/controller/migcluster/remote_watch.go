@@ -17,6 +17,7 @@ limitations under the License.
 package migcluster
 
 import (
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/controller/remotewatcher"
 	"github.com/konveyor/mig-controller/pkg/remote"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,8 +35,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 
 	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{})
 	if err != nil {
-		log.Error(err, "[rWatch] Unable to set up remote watcher controller manager")
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Parent controller watches for events from forwardChannel.
@@ -45,8 +45,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	log.Info("[rWatch] Starting watch on forwardChannel")
 	err = r.Controller.Watch(&source.Channel{Source: forwardChannel}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Add remoteWatcher to remote MGR
@@ -57,8 +56,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 	}
 	err = remotewatcher.Add(mgr, forwardChannel, forwardEvent)
 	if err != nil {
-		log.Error(err, "Error adding RemoteWatcher controller to manager")
-		return err
+		return liberr.Wrap(err)
 	}
 
 	sigStopChan := make(chan struct{})

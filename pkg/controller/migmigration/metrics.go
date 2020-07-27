@@ -62,7 +62,6 @@ func recordMetrics(client client.Client) {
 
 			// if error occurs, retry 10 seconds later
 			if err != nil {
-				log.Trace(err)
 				continue
 			}
 

@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,7 +55,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migmigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -64,7 +64,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -79,7 +78,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&PlanPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -104,7 +102,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -234,13 +231,11 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.Duration, error) {
 	plan, err := migration.GetPlan(r)
 	if err != nil {
-		log.Trace(err)
-		return 0, err
+		return 0, liberr.Wrap(err)
 	}
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
-		log.Trace(err)
-		return 0, err
+		return 0, liberr.Wrap(err)
 	}
 	// Pending migrations.
 	pending := []types.UID{}
@@ -278,8 +273,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.D
 func (r *ReconcileMigMigration) deleted() error {
 	migrations, err := migapi.ListMigrations(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, m := range migrations {
 		if m.Status.Phase == Completed || !m.Status.HasCondition(HasFinalMigration) {
@@ -288,8 +282,7 @@ func (r *ReconcileMigMigration) deleted() error {
 		m.Status.DeleteCondition(HasFinalMigration)
 		err := r.Update(context.TODO(), &m)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -300,8 +293,7 @@ func (r *ReconcileMigMigration) deleted() error {
 func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration) error {
 	plan, err := migapi.GetPlan(r, migration.Spec.MigPlanRef)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	if plan == nil {
 		return nil

@@ -10,6 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
@@ -125,8 +126,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 	counter := 0
 	existingPods, err := t.listStagePods(client)
 	if err != nil {
-		log.Trace(err)
-		return counter, err
+		return counter, liberr.Wrap(err)
 	}
 
 	for _, stagePod := range stagePods {
@@ -135,7 +135,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 		}
 		err := client.Create(context.TODO(), &stagePod.Pod)
 		if err != nil && !errors.IsAlreadyExists(err) {
-			return 0, err
+			return 0, liberr.Wrap(err)
 		}
 		counter++
 	}
@@ -148,13 +148,11 @@ func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	options := k8sclient.MatchingLabels(t.stagePodLabels())
 	err := client.List(context.TODO(), options, &podList)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
-		log.Trace(err)
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 	return BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, resourceLimitMapping), nil
 }
@@ -163,8 +161,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	stagePods := StagePodList{}
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	existingStagePods, err := t.listStagePods(client)
@@ -191,8 +188,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	pvcMapping := t.getPVCs()
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, ns := range t.sourceNamespaces() {
 		list := &corev1.PersistentVolumeClaimList{}
@@ -225,8 +221,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if created > 0 {
@@ -248,27 +243,23 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 func (t *Task) ensureStagePodsFromTemplates() error {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	podTemplates, err := migpods.ListTemplatePods(client, t.sourceNamespaces())
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, resourceLimitMapping)
 
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if created > 0 {
@@ -292,18 +283,15 @@ func buildResourceLimitMapping(namespaces []string, client k8sclient.Client) (ma
 		limitRangeList := corev1.LimitRangeList{}
 		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &limitRangeList)
 		if err != nil {
-			log.Trace(err)
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 		memVal, err := resource.ParseQuantity(defaultMemory)
 		if err != nil {
-			log.Trace(err)
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 		cpuVal, err := resource.ParseQuantity(defaultCPU)
 		if err != nil {
-			log.Trace(err)
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 		for _, limitRange := range limitRangeList.Items {
 			for _, limit := range limitRange.Spec.Limits {
@@ -345,29 +333,25 @@ func parseResourceLimitMapping(ns string, mapping map[string]map[string]resource
 func (t *Task) ensureStagePodsFromRunning() error {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	stagePods := StagePodList{}
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	for _, ns := range t.sourceNamespaces() {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &podList)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, resourceLimitMapping)...)
 	}
 
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if created > 0 {
@@ -389,7 +373,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
+		err = liberr.Wrap(err)
 		return
 	}
 	hasHealthyClaims := func(pod *corev1.Pod) (healthy bool) {
@@ -408,7 +392,7 @@ func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 			if err != nil {
 				healthy = false
 				if !errors.IsNotFound(err) {
-					log.Trace(err)
+					err = liberr.Wrap(err)
 					return
 				}
 				report.reasons = append(
@@ -463,8 +447,7 @@ func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 func (t *Task) ensureStagePodsDeleted() error {
 	clients, err := t.getBothClients()
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
 	for _, client := range clients {
@@ -477,8 +460,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 			// Delete
 			err := client.Delete(context.TODO(), &pod)
 			if err != nil && !errors.IsNotFound(err) {
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			log.Info(
 				"Stage pod deleted.",
@@ -496,8 +478,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 func (t *Task) ensureStagePodsTerminated() (bool, error) {
 	clients, err := t.getBothClients()
 	if err != nil {
-		log.Trace(err)
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	terminatedPhases := map[corev1.PodPhase]bool{

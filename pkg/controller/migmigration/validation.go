@@ -1,6 +1,7 @@
 package migmigration
 
 import (
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
@@ -66,15 +67,13 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 	// Plan
 	plan, err := r.validatePlan(migration)
 	if err != nil {
-		log.Trace(err)
-		return err
+		err = liberr.Wrap(err)
 	}
 
 	// Final migration.
 	err = r.validateFinalMigration(plan, migration)
 	if err != nil {
-		log.Trace(err)
-		return err
+		err = liberr.Wrap(err)
 	}
 
 	return nil

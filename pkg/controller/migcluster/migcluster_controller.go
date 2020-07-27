@@ -20,8 +20,9 @@ import (
 	"context"
 	"time"
 
+	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/logging"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/remote"
 	kapi "k8s.io/api/core/v1"
@@ -57,7 +58,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -71,7 +71,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -82,7 +81,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 			Interval: time.Second * 60},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -96,7 +94,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 				}),
 		})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -207,14 +204,12 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 	if cluster.Spec.IsHostCluster {
 		restCfg, err = config.GetConfig()
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	} else {
 		restCfg, err = cluster.BuildRestConfig(r.Client)
 		if err != nil {
-			log.Trace(err)
-			return err
+			return liberr.Wrap(err)
 		}
 	}
 

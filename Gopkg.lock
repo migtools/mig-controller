@@ -379,6 +379,14 @@
   version = "v1.1.6"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3b46c4f287d692dc266644e2dbdc0fa688b7a8e7d954c9127b71650a5e8a08cc"
+  name = "github.com/konveyor/controller"
+  packages = ["pkg/error"]
+  pruneopts = "T"
+  revision = "8b02d7a5c9194f3417985a91a09f2654561a97e3"
+
+[[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
   name = "github.com/markbates/inflect"
   packages = ["."]
@@ -1345,6 +1353,7 @@
     "github.com/go-logr/logr",
     "github.com/google/uuid",
     "github.com/joho/godotenv",
+    "github.com/konveyor/controller/pkg/error",
     "github.com/mattn/go-sqlite3",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",

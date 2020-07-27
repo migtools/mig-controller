@@ -20,8 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/logging"
-
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
@@ -53,7 +52,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migstorage-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -63,7 +61,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -77,7 +74,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				}),
 		})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -88,7 +84,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			Interval: time.Second * 30},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package migstorage
 
 import (
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 )
@@ -59,13 +60,11 @@ const (
 func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
 	err := r.validateBackupStorage(storage)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 	err = r.validateVolumeSnapshotStorage(storage)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	return nil
@@ -114,8 +113,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 	// Secret
 	secret, err := storage.GetBackupStorageCredSecret(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// NotFound
@@ -170,8 +168,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 	// Secret
 	secret, err := storage.GetVolumeSnapshotCredSecret(r)
 	if err != nil {
-		log.Trace(err)
-		return err
+		return liberr.Wrap(err)
 	}
 
 	if storage.Spec.VolumeSnapshotProvider != "" {

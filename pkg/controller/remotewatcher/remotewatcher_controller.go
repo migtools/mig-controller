@@ -14,7 +14,7 @@ limitations under the License.
 package remotewatcher
 
 import (
-	"github.com/konveyor/mig-controller/pkg/logging"
+	"github.com/konveyor/controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	kapi "k8s.io/api/core/v1"
@@ -53,7 +53,6 @@ func newReconciler(
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -65,7 +64,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BackupPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -77,7 +75,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&RestorePredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -89,7 +86,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&BSLPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -101,7 +97,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&VSLPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -113,7 +108,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&SecretPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -125,7 +119,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&PodPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -136,7 +129,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -147,7 +139,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -158,7 +149,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -169,7 +159,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
@@ -181,7 +170,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&JobPredicate{})
 	if err != nil {
-		log.Trace(err)
 		return err
 	}
 
