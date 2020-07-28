@@ -1163,7 +1163,8 @@ func (r *NfsValidation) validate() error {
 	server := map[string]bool{}
 	for i := range r.Plan.Spec.PersistentVolumes.List {
 		pv := &r.Plan.Spec.PersistentVolumes.List[i]
-		if pv.NFS == nil {
+		// Skip non-NFS PVs and PVs which data should be copied
+		if pv.NFS == nil || pv.Selection.Action == "copy" {
 			continue
 		}
 		if passed, found := server[pv.NFS.Server]; found {
