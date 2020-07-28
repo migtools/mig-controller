@@ -26,29 +26,29 @@ var crdGVR = schema.GroupVersionResource{
 	Resource: "customresourcedefinitions",
 }
 
-type cohabitatingResource struct {
+type CohabitatingResource struct {
 	resource       string
 	groupResource1 schema.GroupResource
 	groupResource2 schema.GroupResource
-	seen           bool
+	Seen           bool
 }
 
-func newCohabitatingResource(resource, group1, group2 string) *cohabitatingResource {
-	return &cohabitatingResource{
+func NewCohabitatingResource(resource, group1, group2 string) *CohabitatingResource {
+	return &CohabitatingResource{
 		resource:       resource,
 		groupResource1: schema.GroupResource{Group: group1, Resource: resource},
 		groupResource2: schema.GroupResource{Group: group2, Resource: resource},
-		seen:           false,
+		Seen:           false,
 	}
 }
 
-func NewCohabitatingResources() map[string]*cohabitatingResource {
-	return map[string]*cohabitatingResource{
-		"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
-		"daemonsets":      newCohabitatingResource("daemonsets", "extensions", "apps"),
-		"replicasets":     newCohabitatingResource("replicasets", "extensions", "apps"),
-		"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
-		"events":          newCohabitatingResource("events", "", "events.k8s.io"),
+func NewCohabitatingResources() map[string]*CohabitatingResource {
+	return map[string]*CohabitatingResource{
+		"deployments":     NewCohabitatingResource("deployments", "extensions", "apps"),
+		"daemonsets":      NewCohabitatingResource("daemonsets", "extensions", "apps"),
+		"replicasets":     NewCohabitatingResource("replicasets", "extensions", "apps"),
+		"networkpolicies": NewCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
+		"events":          NewCohabitatingResource("events", "", "events.k8s.io"),
 	}
 }
 
@@ -58,7 +58,7 @@ type Compare struct {
 	SrcDiscovery          discovery.DiscoveryInterface
 	DstDiscovery          discovery.DiscoveryInterface
 	SrcClient             dynamic.Interface
-	CohabitatingResources map[string]*cohabitatingResource
+	CohabitatingResources map[string]*CohabitatingResource
 }
 
 // Compare GVKs on both clusters, find incompatible GVKs
@@ -296,15 +296,15 @@ func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.AP
 
 func (r *Compare) compareResources(src []*metav1.APIResourceList, dst []*metav1.APIResourceList) []*metav1.APIResourceList {
 	missingResources := []*metav1.APIResourceList{}
-	sortResources(src)
+	SortResources(src)
 	for _, srcList := range src {
 		missing := []metav1.APIResource{}
 		for _, resource := range srcList.APIResources {
 			if cohabitator, found := r.CohabitatingResources[resource.Name]; found {
-				if cohabitator.seen {
+				if cohabitator.Seen {
 					continue
 				}
-				cohabitator.seen = true
+				cohabitator.Seen = true
 			}
 			if !resourceExist(resource, findResourceList(srcList.GroupVersion, dst)) {
 				missing = append(missing, resource)
@@ -363,9 +363,9 @@ func isCRDGroup(group string, crdGroups []string) bool {
 	return false
 }
 
-// sortResources sources resources by moving extensions to the end of the slice. The order of all
+// SortResources sources resources by moving extensions to the end of the slice. The order of all
 // the other resources is preserved.
-func sortResources(resources []*metav1.APIResourceList) {
+func SortResources(resources []*metav1.APIResourceList) {
 	sort.SliceStable(resources, func(i, j int) bool {
 		left := resources[i]
 		leftGV, _ := schema.ParseGroupVersion(left.GroupVersion)
