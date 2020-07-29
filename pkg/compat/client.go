@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -184,12 +185,15 @@ func (c client) upConvert(ctx context.Context, src runtime.Object, dst runtime.O
 // The resource will be converted to a compatible version as needed.
 func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Object) error {
 	obj := c.supportedVersion(in)
+	start := time.Now()
 	err := c.Client.Get(ctx, key, obj)
 	if err != nil {
 		return err
 	}
+	elapsed := float64(time.Since(start).Milliseconds())
 
-	Metrics.Get(c, in)
+	RequestRTTMetrics.Get(c, in, elapsed)
+	RequestCountMetrics.Get(c, in, One)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -202,12 +206,16 @@ func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 	if err != nil {
 		return err
 	}
+
+	start := time.Now()
 	err = c.Client.List(ctx, opt, obj)
 	if err != nil {
 		return err
 	}
+	elapsed := float64(time.Since(start).Milliseconds())
 
-	Metrics.List(c, in)
+	RequestCountMetrics.List(c, in, One)
+	RequestRTTMetrics.List(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -220,9 +228,14 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 		return err
 	}
 
-	Metrics.Create(c, in)
+	start := time.Now()
+	res := c.Client.Create(ctx, obj)
+	elapsed := float64(time.Since(start).Milliseconds())
 
-	return c.Client.Create(ctx, obj)
+	RequestCountMetrics.Create(c, in, One)
+	RequestRTTMetrics.Create(c, in, elapsed)
+
+	return res
 }
 
 // Delete the specified resource.
@@ -233,9 +246,14 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 		return err
 	}
 
-	Metrics.Delete(c, in)
+	start := time.Now()
+	res := c.Client.Delete(ctx, obj, opt...)
+	elapsed := float64(time.Since(start).Milliseconds())
 
-	return c.Client.Delete(ctx, obj, opt...)
+	RequestCountMetrics.Delete(c, in, One)
+	RequestRTTMetrics.Delete(c, in, elapsed)
+
+	return res
 }
 
 // Update the specified resource.
@@ -246,7 +264,12 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 		return err
 	}
 
-	Metrics.Update(c, in)
+	start := time.Now()
+	res := c.Client.Update(ctx, obj)
+	elapsed := float64(time.Since(start).Milliseconds())
 
-	return c.Client.Update(ctx, obj)
+	RequestCountMetrics.Update(c, in, One)
+	RequestRTTMetrics.Update(c, in, elapsed)
+
+	return res
 }

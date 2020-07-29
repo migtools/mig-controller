@@ -1,12 +1,13 @@
 package compat
 
 import (
+	"runtime"
+	"strings"
+
 	ref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	api "k8s.io/apimachinery/pkg/runtime"
-	"runtime"
-	"strings"
 )
 
 //
@@ -22,18 +23,35 @@ const (
 	Function  = "function"
 	Kind      = "kind"
 	Method    = "method"
+	One       = 1.0
 )
 
 //
-// Global reporter.
-var Metrics *Reporter
+// Global reporters.
+var RequestCountMetrics *Reporter
+var RequestRTTMetrics *Reporter
 
 func init() {
-	Metrics = &Reporter{
+	RequestCountMetrics = &Reporter{
 		counter: promauto.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: "mtc_client",
-				Help: "MTC client API metrics.",
+				Name: "mtc_client_count",
+				Help: "MTC client API request counts.",
+			},
+			[]string{
+				Cluster,
+				Component,
+				Function,
+				Kind,
+				Method,
+			}),
+	}
+
+	RequestRTTMetrics = &Reporter{
+		counter: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "mtc_client_rtt",
+				Help: "MTC client API request round trip time.",
 			},
 			[]string{
 				Cluster,
@@ -53,32 +71,32 @@ type Reporter struct {
 
 //
 // Report `get` API call.
-func (m *Reporter) Get(client Client, object api.Object) {
-	m.report(client, Get, object)
+func (m *Reporter) Get(client Client, object api.Object, count float64) {
+	m.report(client, Get, object, count)
 }
 
 //
 // Report `list` API call.
-func (m *Reporter) List(client Client, object api.Object) {
-	m.report(client, List, object)
+func (m *Reporter) List(client Client, object api.Object, count float64) {
+	m.report(client, List, object, count)
 }
 
 //
 // Report `create` API call.
-func (m *Reporter) Create(client Client, object api.Object) {
-	m.report(client, Create, object)
+func (m *Reporter) Create(client Client, object api.Object, count float64) {
+	m.report(client, Create, object, count)
 }
 
 //
 // Report `update` API call.
-func (m *Reporter) Update(client Client, object api.Object) {
-	m.report(client, Update, object)
+func (m *Reporter) Update(client Client, object api.Object, count float64) {
+	m.report(client, Update, object, count)
 }
 
 //
 // Report `delete` API call.
-func (m *Reporter) Delete(client Client, object api.Object) {
-	m.report(client, Delete, object)
+func (m *Reporter) Delete(client Client, object api.Object, count float64) {
+	m.report(client, Delete, object, count)
 }
 
 //
@@ -113,7 +131,7 @@ func (m *Reporter) context() (component, function string) {
 
 //
 // Report the API call.
-func (m *Reporter) report(client Client, method string, object api.Object) {
+func (m *Reporter) report(client Client, method string, object api.Object, count float64) {
 	component, function := m.context()
 	m.counter.With(
 		prometheus.Labels{
@@ -122,5 +140,5 @@ func (m *Reporter) report(client Client, method string, object api.Object) {
 			Function:  function,
 			Kind:      ref.ToKind(object),
 			Method:    method,
-		}).Inc()
+		}).Add(count)
 }
