@@ -190,10 +190,10 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 	if err != nil {
 		return err
 	}
-	elapsed := float64(time.Since(start).Milliseconds())
+	elapsed := float64(time.Since(start) / nanoToMilli)
 
 	RequestRTTMetrics.Get(c, in, elapsed)
-	RequestCountMetrics.Get(c, in, One)
+	RequestCountMetrics.Get(c, in, one)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -212,9 +212,9 @@ func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 	if err != nil {
 		return err
 	}
-	elapsed := float64(time.Since(start).Milliseconds())
+	elapsed := float64(time.Since(start) / nanoToMilli)
 
-	RequestCountMetrics.List(c, in, One)
+	RequestCountMetrics.List(c, in, one)
 	RequestRTTMetrics.List(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
@@ -229,13 +229,13 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 	}
 
 	start := time.Now()
-	res := c.Client.Create(ctx, obj)
-	elapsed := float64(time.Since(start).Milliseconds())
+	err = c.Client.Create(ctx, obj)
+	elapsed := float64(time.Since(start) / nanoToMilli)
 
-	RequestCountMetrics.Create(c, in, One)
+	RequestCountMetrics.Create(c, in, one)
 	RequestRTTMetrics.Create(c, in, elapsed)
 
-	return res
+	return err
 }
 
 // Delete the specified resource.
@@ -247,13 +247,13 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 	}
 
 	start := time.Now()
-	res := c.Client.Delete(ctx, obj, opt...)
-	elapsed := float64(time.Since(start).Milliseconds())
+	err = c.Client.Delete(ctx, obj, opt...)
+	elapsed := float64(time.Since(start) / nanoToMilli)
 
-	RequestCountMetrics.Delete(c, in, One)
+	RequestCountMetrics.Delete(c, in, one)
 	RequestRTTMetrics.Delete(c, in, elapsed)
 
-	return res
+	return err
 }
 
 // Update the specified resource.
@@ -265,11 +265,11 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 	}
 
 	start := time.Now()
-	res := c.Client.Update(ctx, obj)
-	elapsed := float64(time.Since(start).Milliseconds())
+	err = c.Client.Update(ctx, obj)
+	elapsed := float64(time.Since(start) / nanoToMilli)
 
-	RequestCountMetrics.Update(c, in, One)
+	RequestCountMetrics.Update(c, in, one)
 	RequestRTTMetrics.Update(c, in, elapsed)
 
-	return res
+	return err
 }

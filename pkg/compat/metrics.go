@@ -23,7 +23,13 @@ const (
 	Function  = "function"
 	Kind      = "kind"
 	Method    = "method"
-	One       = 1.0
+)
+
+//
+// Numeric metrics consts
+const (
+	one         = 1
+	nanoToMilli = 1e6
 )
 
 //
@@ -140,5 +146,5 @@ func (m *Reporter) report(client Client, method string, object api.Object, count
 			Function:  function,
 			Kind:      ref.ToKind(object),
 			Method:    method,
-		}).Add(count)
+		}).Add(float64(count))
 }
