@@ -80,6 +80,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	// Remove GVKs from list that are already excluded manually
+	// Where do I get the list of GVKs that has been excluded manually?
 
 	return r.collectIncompatibleMapping(incompatibleGVKs)
 }
