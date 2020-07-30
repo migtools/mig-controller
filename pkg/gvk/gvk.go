@@ -79,6 +79,8 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
+	// Remove GVKs from list that are already excluded manually
+
 	return r.collectIncompatibleMapping(incompatibleGVKs)
 }
 
