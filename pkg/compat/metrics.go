@@ -77,32 +77,32 @@ type Reporter struct {
 
 //
 // Report `get` API call.
-func (m *Reporter) Get(client Client, object api.Object, count float64) {
-	m.report(client, Get, object, count)
+func (m *Reporter) Get(client Client, object api.Object, increment float64) {
+	m.report(client, Get, object, increment)
 }
 
 //
 // Report `list` API call.
-func (m *Reporter) List(client Client, object api.Object, count float64) {
-	m.report(client, List, object, count)
+func (m *Reporter) List(client Client, object api.Object, increment float64) {
+	m.report(client, List, object, increment)
 }
 
 //
 // Report `create` API call.
-func (m *Reporter) Create(client Client, object api.Object, count float64) {
-	m.report(client, Create, object, count)
+func (m *Reporter) Create(client Client, object api.Object, increment float64) {
+	m.report(client, Create, object, increment)
 }
 
 //
 // Report `update` API call.
-func (m *Reporter) Update(client Client, object api.Object, count float64) {
-	m.report(client, Update, object, count)
+func (m *Reporter) Update(client Client, object api.Object, increment float64) {
+	m.report(client, Update, object, increment)
 }
 
 //
 // Report `delete` API call.
-func (m *Reporter) Delete(client Client, object api.Object, count float64) {
-	m.report(client, Delete, object, count)
+func (m *Reporter) Delete(client Client, object api.Object, increment float64) {
+	m.report(client, Delete, object, increment)
 }
 
 //
@@ -137,7 +137,7 @@ func (m *Reporter) context() (component, function string) {
 
 //
 // Report the API call.
-func (m *Reporter) report(client Client, method string, object api.Object, count float64) {
+func (m *Reporter) report(client Client, method string, object api.Object, increment float64) {
 	component, function := m.context()
 	m.counter.With(
 		prometheus.Labels{
@@ -146,5 +146,5 @@ func (m *Reporter) report(client Client, method string, object api.Object, count
 			Function:  function,
 			Kind:      ref.ToKind(object),
 			Method:    method,
-		}).Add(float64(count))
+		}).Add(increment)
 }
