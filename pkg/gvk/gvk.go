@@ -1,18 +1,25 @@
 package gvk
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/konveyor/controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	mapset "github.com/deckarep/golang-set"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+var log = logging.WithName("gvk")
 
 var crdGVR = schema.GroupVersionResource{
 	Group:    "apiextensions.k8s.io",
@@ -79,10 +86,43 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
-	// Remove GVKs from list that are already excluded manually
-	// Where do I get the list of GVKs that has been excluded manually?
+	// Don't report an incompatibleGVK if user settings will skip resource anyways
+	log.Info(fmt.Sprintf("Pre-filter GVK list: %v", incompatibleGVKs))
+	excludedResources := toStringSlice(settings.ExcludedInitialResources.Union(toSet(r.Plan.Status.ExcludedResources)))
+	log.Info(fmt.Sprintf("Found excludedResources: %v", excludedResources))
 
-	return r.collectIncompatibleMapping(incompatibleGVKs)
+	filteredGVKs := []schema.GroupVersionResource{}
+	for _, gvr := range incompatibleGVKs {
+		skip := false
+		for _, resource := range excludedResources {
+			if strings.EqualFold(gvr.Resource, resource) {
+				skip = true
+			}
+		}
+		if !skip {
+			filteredGVKs = append(filteredGVKs, gvr)
+		}
+	}
+
+	log.Info(fmt.Sprintf("Post-filter GVK list: %v", filteredGVKs))
+
+	return r.collectIncompatibleMapping(filteredGVKs)
+}
+
+func toStringSlice(set mapset.Set) []string {
+	interfaceSlice := set.ToSlice()
+	var strSlice []string = make([]string, len(interfaceSlice))
+	for i, s := range interfaceSlice {
+		strSlice[i] = s.(string)
+	}
+	return strSlice
+}
+func toSet(strSlice []string) mapset.Set {
+	var interfaceSlice []interface{} = make([]interface{}, len(strSlice))
+	for i, s := range strSlice {
+		interfaceSlice[i] = s
+	}
+	return mapset.NewSetFromSlice(interfaceSlice)
 }
 
 // collectResources collects all namespaced scoped apiResources from the cluster
