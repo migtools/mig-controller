@@ -1,7 +1,6 @@
 package gvk
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -87,10 +86,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	// Don't report an incompatibleGVK if user settings will skip resource anyways
-	log.Info(fmt.Sprintf("Pre-filter GVK list: %v", incompatibleGVKs))
 	excludedResources := toStringSlice(settings.ExcludedInitialResources.Union(toSet(r.Plan.Status.ExcludedResources)))
-	log.Info(fmt.Sprintf("Found excludedResources: %v", excludedResources))
-
 	filteredGVKs := []schema.GroupVersionResource{}
 	for _, gvr := range incompatibleGVKs {
 		skip := false
@@ -103,8 +99,6 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 			filteredGVKs = append(filteredGVKs, gvr)
 		}
 	}
-
-	log.Info(fmt.Sprintf("Post-filter GVK list: %v", filteredGVKs))
 
 	return r.collectIncompatibleMapping(filteredGVKs)
 }
