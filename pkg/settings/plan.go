@@ -3,6 +3,8 @@ package settings
 import (
 	"os"
 	"strings"
+
+	mapset "github.com/deckarep/golang-set"
 )
 
 // Environment variables.
@@ -12,6 +14,27 @@ const (
 	PvLimit           = "PV_LIMIT"
 	ExcludedResources = "EXCLUDED_RESOURCES"
 )
+
+// Included resource defaults
+var IncludedInitialResources = mapset.NewSetFromSlice([]interface{}{})
+var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
+	"serviceaccount",
+	"persistentvolumes",
+	"persistentvolumeclaims",
+	"namespaces",
+	"imagestreams",
+	"imagestreamtags",
+	"secrets",
+	"configmaps",
+	"pods",
+})
+
+// Excluded resource defaults
+var ExcludedInitialResources = mapset.NewSetFromSlice([]interface{}{
+	"persistentvolumes",
+	"persistentvolumeclaims",
+})
+var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 
 // Plan settings.
 //   NsLimit: Maximum number of namespaces on a Plan.

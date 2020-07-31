@@ -7,6 +7,7 @@ import (
 
 	"github.com/deckarep/golang-set"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,8 +40,8 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, err
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
-	newBackup.Spec.IncludedResources = toStringSlice(includedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
-	newBackup.Spec.ExcludedResources = toStringSlice(excludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	delete(newBackup.Annotations, QuiesceAnnotation)
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
@@ -100,8 +101,8 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		},
 	}
 	newBackup.Labels[StageBackupLabel] = t.UID()
-	newBackup.Spec.IncludedResources = toStringSlice(includedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
-	newBackup.Spec.ExcludedResources = toStringSlice(excludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
