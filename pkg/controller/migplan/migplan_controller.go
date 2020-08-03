@@ -205,15 +205,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Validations.
-	err = r.validate(plan)
+	// Set excluded resources on Status.
+	err = r.setExcludedResourceList(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Set excluded resources on Status.
-	err = r.setExcludedResourceList(plan)
+	// Validations.
+	err = r.validate(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
