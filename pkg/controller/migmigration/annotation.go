@@ -6,11 +6,8 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/gvk"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -442,44 +439,6 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []st
 			return liberr.Wrap(err)
 		}
 	}
-	return nil
-}
-
-// deleteLabels will delete all migration.openshift.io/migrated-by labels
-// from the application upon successful completion
-func (t *Task) deleteLabels() error {
-	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
-	}).AsListOptions()
-
-	for _, gvr := range GVRs {
-		for _, ns := range t.destinationNamespaces() {
-			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			for _, r := range list.Items {
-				labels := r.GetLabels()
-				delete(labels, MigratedByLabel)
-				r.SetLabels(labels)
-				_, err = client.Resource(gvr).Namespace(ns).Update(&r, metav1.UpdateOptions{})
-				if err != nil {
-					// The part touches the application on the destination side, fail safe to ensure
-					// this won't block the migration
-					if k8serror.IsMethodNotSupported(err) {
-						continue
-					}
-					return liberr.Wrap(err)
-				}
-			}
-		}
-	}
-
 	return nil
 }
 
