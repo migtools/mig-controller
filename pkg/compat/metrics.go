@@ -1,12 +1,13 @@
 package compat
 
 import (
+	"runtime"
+	"strings"
+
 	ref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	api "k8s.io/apimachinery/pkg/runtime"
-	"runtime"
-	"strings"
 )
 
 //
@@ -25,15 +26,34 @@ const (
 )
 
 //
+// Numeric metrics consts
+const (
+	one         = 1
+	nanoToMilli = 1e6
+)
+
+//
 // Global reporter.
 var Metrics *Reporter
 
 func init() {
 	Metrics = &Reporter{
-		counter: promauto.NewCounterVec(
+		callCounter: promauto.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: "mtc_client",
-				Help: "MTC client API metrics.",
+				Name: "mtc_client_request_count",
+				Help: "MTC client API request counts.",
+			},
+			[]string{
+				Cluster,
+				Component,
+				Function,
+				Kind,
+				Method,
+			}),
+		elapsedCounter: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "mtc_client_request_elapsed",
+				Help: "MTC client API request cumulative elapsed time.",
 			},
 			[]string{
 				Cluster,
@@ -48,37 +68,38 @@ func init() {
 //
 // Metric reporter.
 type Reporter struct {
-	counter *prometheus.CounterVec
+	callCounter    *prometheus.CounterVec
+	elapsedCounter *prometheus.CounterVec
 }
 
 //
 // Report `get` API call.
-func (m *Reporter) Get(client Client, object api.Object) {
-	m.report(client, Get, object)
+func (m *Reporter) Get(client Client, object api.Object, elapsed float64) {
+	m.report(client, Get, object, elapsed)
 }
 
 //
 // Report `list` API call.
-func (m *Reporter) List(client Client, object api.Object) {
-	m.report(client, List, object)
+func (m *Reporter) List(client Client, object api.Object, elapsed float64) {
+	m.report(client, List, object, elapsed)
 }
 
 //
 // Report `create` API call.
-func (m *Reporter) Create(client Client, object api.Object) {
-	m.report(client, Create, object)
+func (m *Reporter) Create(client Client, object api.Object, elapsed float64) {
+	m.report(client, Create, object, elapsed)
 }
 
 //
 // Report `update` API call.
-func (m *Reporter) Update(client Client, object api.Object) {
-	m.report(client, Update, object)
+func (m *Reporter) Update(client Client, object api.Object, elapsed float64) {
+	m.report(client, Update, object, elapsed)
 }
 
 //
 // Report `delete` API call.
-func (m *Reporter) Delete(client Client, object api.Object) {
-	m.report(client, Delete, object)
+func (m *Reporter) Delete(client Client, object api.Object, elapsed float64) {
+	m.report(client, Delete, object, elapsed)
 }
 
 //
@@ -113,14 +134,24 @@ func (m *Reporter) context() (component, function string) {
 
 //
 // Report the API call.
-func (m *Reporter) report(client Client, method string, object api.Object) {
+func (m *Reporter) report(client Client, method string, object api.Object, elapsed float64) {
 	component, function := m.context()
-	m.counter.With(
+
+	m.callCounter.With(
 		prometheus.Labels{
 			Cluster:   client.RestConfig().Host,
 			Component: component,
 			Function:  function,
 			Kind:      ref.ToKind(object),
 			Method:    method,
-		}).Inc()
+		}).Add(one)
+
+	m.elapsedCounter.With(
+		prometheus.Labels{
+			Cluster:   client.RestConfig().Host,
+			Component: component,
+			Function:  function,
+			Kind:      ref.ToKind(object),
+			Method:    method,
+		}).Add(elapsed)
 }

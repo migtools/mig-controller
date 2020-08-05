@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -184,12 +185,13 @@ func (c client) upConvert(ctx context.Context, src runtime.Object, dst runtime.O
 // The resource will be converted to a compatible version as needed.
 func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Object) error {
 	obj := c.supportedVersion(in)
+	start := time.Now()
 	err := c.Client.Get(ctx, key, obj)
 	if err != nil {
 		return err
 	}
-
-	Metrics.Get(c, in)
+	elapsed := float64(time.Since(start) / nanoToMilli)
+	Metrics.Get(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -202,12 +204,14 @@ func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 	if err != nil {
 		return err
 	}
+
+	start := time.Now()
 	err = c.Client.List(ctx, opt, obj)
 	if err != nil {
 		return err
 	}
-
-	Metrics.List(c, in)
+	elapsed := float64(time.Since(start) / nanoToMilli)
+	Metrics.List(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -220,9 +224,12 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 		return err
 	}
 
-	Metrics.Create(c, in)
+	start := time.Now()
+	err = c.Client.Create(ctx, obj)
+	elapsed := float64(time.Since(start) / nanoToMilli)
+	Metrics.Create(c, in, elapsed)
 
-	return c.Client.Create(ctx, obj)
+	return err
 }
 
 // Delete the specified resource.
@@ -233,9 +240,12 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 		return err
 	}
 
-	Metrics.Delete(c, in)
+	start := time.Now()
+	err = c.Client.Delete(ctx, obj, opt...)
+	elapsed := float64(time.Since(start) / nanoToMilli)
+	Metrics.Delete(c, in, elapsed)
 
-	return c.Client.Delete(ctx, obj, opt...)
+	return err
 }
 
 // Update the specified resource.
@@ -246,7 +256,10 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 		return err
 	}
 
-	Metrics.Update(c, in)
+	start := time.Now()
+	err = c.Client.Update(ctx, obj)
+	elapsed := float64(time.Since(start) / nanoToMilli)
+	Metrics.Update(c, in, elapsed)
 
-	return c.Client.Update(ctx, obj)
+	return err
 }
