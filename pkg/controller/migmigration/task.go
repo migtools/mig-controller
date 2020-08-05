@@ -64,7 +64,6 @@ const (
 	EnsureStagePodsDeleted          = "EnsureStagePodsDeleted"
 	EnsureStagePodsTerminated       = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted        = "EnsureAnnotationsDeleted"
-	EnsureLabelsDeleted             = "EnsureLabelsDeleted"
 	EnsureMigratedDeleted           = "EnsureMigratedDeleted"
 	DeleteMigrated                  = "DeleteMigrated"
 	DeleteBackups                   = "DeleteBackups"
@@ -112,7 +111,6 @@ var StageItinerary = Itinerary{
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureStagePodsTerminated, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, all: HasPVs},
-		{phase: EnsureLabelsDeleted},
 		{phase: Completed},
 	},
 }
@@ -149,7 +147,6 @@ var FinalItinerary = Itinerary{
 		{phase: PreRestoreHooks},
 		{phase: EnsureFinalRestore},
 		{phase: FinalRestoreCreated},
-		{phase: EnsureLabelsDeleted},
 		{phase: PostRestoreHooks},
 		{phase: Verification, all: HasVerify},
 		{phase: Completed},
@@ -503,14 +500,6 @@ func (t *Task) Run() error {
 	case EnsureAnnotationsDeleted:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-		}
-		t.next()
-	case EnsureLabelsDeleted:
-		if !t.keepAnnotations() {
-			err := t.deleteLabels()
 			if err != nil {
 				return liberr.Wrap(err)
 			}
