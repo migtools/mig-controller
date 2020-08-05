@@ -191,9 +191,7 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 		return err
 	}
 	elapsed := float64(time.Since(start) / nanoToMilli)
-
-	RequestRTTMetrics.Get(c, in, elapsed)
-	RequestCountMetrics.Get(c, in, one)
+	Metrics.Get(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -213,9 +211,7 @@ func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime
 		return err
 	}
 	elapsed := float64(time.Since(start) / nanoToMilli)
-
-	RequestCountMetrics.List(c, in, one)
-	RequestRTTMetrics.List(c, in, elapsed)
+	Metrics.List(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -231,9 +227,7 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 	start := time.Now()
 	err = c.Client.Create(ctx, obj)
 	elapsed := float64(time.Since(start) / nanoToMilli)
-
-	RequestCountMetrics.Create(c, in, one)
-	RequestRTTMetrics.Create(c, in, elapsed)
+	Metrics.Create(c, in, elapsed)
 
 	return err
 }
@@ -249,9 +243,7 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 	start := time.Now()
 	err = c.Client.Delete(ctx, obj, opt...)
 	elapsed := float64(time.Since(start) / nanoToMilli)
-
-	RequestCountMetrics.Delete(c, in, one)
-	RequestRTTMetrics.Delete(c, in, elapsed)
+	Metrics.Delete(c, in, elapsed)
 
 	return err
 }
@@ -267,9 +259,7 @@ func (c client) Update(ctx context.Context, in runtime.Object) error {
 	start := time.Now()
 	err = c.Client.Update(ctx, obj)
 	elapsed := float64(time.Since(start) / nanoToMilli)
-
-	RequestCountMetrics.Update(c, in, one)
-	RequestRTTMetrics.Update(c, in, elapsed)
+	Metrics.Update(c, in, elapsed)
 
 	return err
 }
