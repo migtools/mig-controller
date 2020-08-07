@@ -82,6 +82,7 @@ const (
 	HasStagePods = 0x02 // Only when stage pods created.
 	HasPVs       = 0x04 // Only when PVs migrated.
 	HasVerify    = 0x08 // Only when the plan has enabled verification
+	HasISs       = 0x10 // Only when ISs migrated
 )
 
 type Itinerary struct {
@@ -100,19 +101,19 @@ var StageItinerary = Itinerary{
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, all: HasPVs},
+		{phase: AnnotateResources, any: HasPVs | HasISs},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, all: HasPVs},
-		{phase: StageBackupCreated, all: HasPVs},
-		{phase: EnsureStageBackupReplicated, all: HasPVs},
-		{phase: EnsureStageRestore, all: HasPVs},
-		{phase: StageRestoreCreated, all: HasPVs},
+		{phase: EnsureStageBackup, any: HasPVs | HasISs},
+		{phase: StageBackupCreated, any: HasPVs | HasISs},
+		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
+		{phase: EnsureStageRestore, any: HasPVs | HasISs},
+		{phase: StageRestoreCreated, any: HasPVs | HasISs},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: Completed},
 	},
 }
@@ -131,19 +132,19 @@ var FinalItinerary = Itinerary{
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
 		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
 		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, all: HasPVs},
+		{phase: AnnotateResources, any: HasPVs | HasISs},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, all: HasPVs},
-		{phase: StageBackupCreated, all: HasPVs},
-		{phase: EnsureStageBackupReplicated, all: HasPVs},
-		{phase: EnsureStageRestore, all: HasPVs},
-		{phase: StageRestoreCreated, all: HasPVs},
+		{phase: EnsureStageBackup, any: HasPVs | HasISs},
+		{phase: StageBackupCreated, any: HasPVs | HasISs},
+		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
+		{phase: EnsureStageRestore, any: HasPVs | HasISs},
+		{phase: StageRestoreCreated, any: HasPVs | HasISs},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: EnsureInitialBackupReplicated},
 		{phase: PostBackupHooks},
 		{phase: PreRestoreHooks},
@@ -162,7 +163,7 @@ var CancelItinerary = Itinerary{
 		{phase: DeleteBackups},
 		{phase: DeleteRestores},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
 		{phase: UnQuiesceApplications, all: Quiesce},
@@ -176,7 +177,7 @@ var FailedItinerary = Itinerary{
 	Steps: []Step{
 		{phase: MigrationFailed},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, all: HasPVs},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
 		{phase: UnQuiesceApplications, all: Quiesce},
@@ -724,6 +725,14 @@ func (t *Task) allFlags(step Step) bool {
 	if step.all&HasVerify != 0 && !t.hasVerify() {
 		return false
 	}
+	hasImageStream, err := t.hasImageStreams()
+	if err != nil {
+		// TODO: handle this panic better
+		panic(err)
+	}
+	if step.any&HasISs != 0 && hasImageStream {
+		return false
+	}
 
 	return true
 }
@@ -742,7 +751,14 @@ func (t *Task) anyFlags(step Step) bool {
 	if step.any&HasVerify != 0 && t.hasVerify() {
 		return true
 	}
-
+	hasImageStream, err := t.hasImageStreams()
+	if err != nil {
+		// TODO: handle this panic better
+		panic(err)
+	}
+	if step.any&HasISs != 0 && hasImageStream {
+		return true
+	}
 	return step.any == uint8(0)
 }
 

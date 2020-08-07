@@ -96,6 +96,9 @@ func (t *Task) annotateStageResources() error {
 	}
 
 	err = t.labelImageStreams(sourceClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	return nil
 }
@@ -354,6 +357,7 @@ func (t *Task) labelImageStreams(client compat.Client) error {
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.Background(), &is)
 			if err != nil {
+				// TODO: confirm with the team if we want to collect errors
 				return liberr.Wrap(err)
 			}
 			log.Info(
@@ -393,6 +397,10 @@ func (t *Task) deleteAnnotations() error {
 			return liberr.Wrap(err)
 		}
 		err = t.deleteServiceAccountLabels(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.deleteImageStreamLabels(client, namespaceList[i])
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -583,5 +591,33 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 			sa.Name)
 	}
 
+	return nil
+}
+
+// Delete ImageStream labels
+func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []string) error {
+	for _, ns := range namespaceList {
+		imageStreamList := imagev1.ImageStreamList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(context.TODO(), options, &imageStreamList)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, is := range imageStreamList.Items {
+			delete(is.Labels, IncludedInStageBackupLabel)
+			err = client.Update(context.Background(), &is)
+			if err != nil {
+				// TODO: confirm with the team if we want to collect errors
+				return liberr.Wrap(err)
+			}
+			log.Info(
+				"ImageStream labels removed.",
+				"ns",
+				is.Namespace,
+				"name",
+				is.Name)
+		}
+	}
 	return nil
 }
