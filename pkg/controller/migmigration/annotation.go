@@ -2,12 +2,12 @@ package migmigration
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/compat"
-	imagev1 "github.com/openshift/api/image/v1"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
+	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -354,9 +354,7 @@ func (t *Task) labelImageStreams(client compat.Client) error {
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.Background(), &is)
 			if err != nil {
-				// TODO: verify with Derek/Jeff if errors should be aggregated
-				log.Trace(err)
-				return err
+				return liberr.Wrap(err)
 			}
 			log.Info(
 				"ImageStream labels added.",

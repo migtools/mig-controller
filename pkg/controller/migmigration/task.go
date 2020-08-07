@@ -243,7 +243,10 @@ type Task struct {
 func (t *Task) Run() error {
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
-	t.init()
+	err := t.init()
+	if err != nil {
+		return err
+	}
 
 	// Run the current phase.
 	switch t.Phase {
@@ -647,7 +650,7 @@ func (t *Task) Run() error {
 }
 
 // Initialize.
-func (t *Task) init() {
+func (t *Task) init() error {
 	t.Requeue = FastReQ
 	if t.failed() {
 		t.Itinerary = FailedItinerary
@@ -661,7 +664,13 @@ func (t *Task) init() {
 	if t.Owner.Status.Itenerary != t.Itinerary.Name {
 		t.Phase = t.Itinerary.Steps[0].phase
 	}
-	if t.stage() && (!t.hasPVs() && !t.hasImageStreams()) {
+
+	hasImageStreams, err := t.hasImageStreams()
+	if err != nil {
+		return err
+	}
+
+	if t.stage() && (!t.hasPVs() && !hasImageStreams) {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StageNoOp,
 			Status:   True,
@@ -670,6 +679,7 @@ func (t *Task) init() {
 			Durable:  true,
 		})
 	}
+	return nil
 }
 
 // Advance the task to the next phase.
@@ -850,24 +860,24 @@ func (t *Task) hasPVs() bool {
 }
 
 // Get whether the associated plan has imagestreams to be migrated
-func (t *Task) hasImageStreams() bool {
+func (t *Task) hasImageStreams() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
-		// TODO: handle this error properly
-		panic(err)
+		log.Trace(err)
+		return false, err
 	}
 	for _, ns := range t.sourceNamespaces() {
 		imageStreamList := imagev1.ImageStreamList{}
 		err := client.List(context.Background(), &k8sclient.ListOptions{Namespace: ns}, &imageStreamList)
 		if err != nil {
-			// TODO:
-			panic(err)
+			log.Trace(err)
+			return false, err
 		}
 		if len(imageStreamList.Items) > 0 {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // Get whether the verification is desired
