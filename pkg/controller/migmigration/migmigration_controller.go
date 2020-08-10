@@ -18,6 +18,7 @@ package migmigration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -128,7 +129,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration := &migapi.MigMigration{}
 	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
-		if k8serr.IsNotFound(err) {
+		if k8serr.IsNotFound(errors.Unwrap(err)) {
 			err = r.deleted()
 		}
 		log.Trace(err)
@@ -140,7 +141,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Report reconcile error.
 	defer func() {
-		if err == nil || k8serr.IsConflict(err) || k8serr.IsNotFound(err) {
+		if err == nil || k8serr.IsConflict(errors.Unwrap(err)) || k8serr.IsNotFound(errors.Unwrap(err)) {
 			return
 		}
 		migration.Status.SetReconcileFailed(err)
