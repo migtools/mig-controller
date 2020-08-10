@@ -116,10 +116,10 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	if m.Spec.IsHostCluster {
 		cachedClient = &c
 	} else {
-		remoteWatchMap := remote.GetWatchMap()
-		remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
-		if remoteWatchCluster != nil {
-			remoteClient := remoteWatchCluster.RemoteManager.GetClient()
+		rwm := remote.GetWatchMap()
+		remoteCluster := rwm.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
+		if remoteCluster != nil {
+			remoteClient := remoteCluster.RemoteManager.GetClient()
 			cachedClient = &remoteClient
 		} else {
 			return nil, liberr.Wrap(errors.New("Failed to retrieve cached client"))
