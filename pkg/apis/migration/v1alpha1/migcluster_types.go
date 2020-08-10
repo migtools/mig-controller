@@ -20,8 +20,10 @@ import (
 	"context"
 	"time"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/remote"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -34,6 +36,7 @@ import (
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -107,11 +110,31 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
+	// Cached client is required for compat client
+	var cachedClient *k8sclient.Client
+
+	if m.Spec.IsHostCluster {
+		// Get client for host cluster
+		cachedClient = &c
+	} else {
+		// Get client from remoteWatchMap
+		remoteWatchMap := remote.GetWatchMap()
+		remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
+		if remoteWatchCluster != nil {
+			remoteClient := remoteWatchCluster.RemoteManager.GetClient()
+			cachedClient = &remoteClient
+		} else {
+			return nil, liberr.Wrap(errors.New("Failed to retrieve cached client"))
+		}
+	}
+
+	// RestConfig is required to build compat client
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
-	client, err := compat.NewClient(restConfig)
+
+	client, err := compat.NewClient(restConfig, cachedClient)
 	if err != nil {
 		return nil, err
 	}
