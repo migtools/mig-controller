@@ -110,14 +110,12 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
-	// Cached client is required for compat client
+	// Building a compat client requires both restConfig and a k8s client
 	var cachedClient *k8sclient.Client
 
 	if m.Spec.IsHostCluster {
-		// Get client for host cluster
 		cachedClient = &c
 	} else {
-		// Get client from remoteWatchMap
 		remoteWatchMap := remote.GetWatchMap()
 		remoteWatchCluster := remoteWatchMap.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
 		if remoteWatchCluster != nil {
@@ -128,12 +126,10 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 		}
 	}
 
-	// RestConfig is required to build compat client
 	restConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
-
 	client, err := compat.NewClient(restConfig, cachedClient)
 	if err != nil {
 		return nil, err
