@@ -173,6 +173,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Indexes
+	indexer := mgr.GetFieldIndexer()
+
+	// Pod
+	err = indexer.IndexField(
+		&kapi.Pod{},
+		"status.phase",
+		func(rawObj runtime.Object) []string {
+			p, cast := rawObj.(*kapi.Pod)
+			if !cast {
+				return nil
+			}
+			return []string{
+				string(p.Status.Phase),
+			}
+		})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

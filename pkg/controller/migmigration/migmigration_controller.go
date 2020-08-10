@@ -25,7 +25,7 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -128,7 +128,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration := &migapi.MigMigration{}
 	err = r.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serr.IsNotFound(err) {
 			err = r.deleted()
 		}
 		log.Trace(err)
@@ -140,7 +140,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Report reconcile error.
 	defer func() {
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || k8serr.IsConflict(err) || k8serr.IsNotFound(err) {
 			return
 		}
 		migration.Status.SetReconcileFailed(err)
