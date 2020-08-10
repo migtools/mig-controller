@@ -43,7 +43,7 @@ type client struct {
 
 //
 // Create a new client.
-func NewClient(restCfg *rest.Config, rClient k8sclient.Client) (Client, error) {
+func NewClient(restCfg *rest.Config, rClient *k8sclient.Client) (Client, error) {
 	dClient, err := dapi.NewDiscoveryClientForConfig(restCfg)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func NewClient(restCfg *rest.Config, rClient k8sclient.Client) (Client, error) {
 
 	nClient := &client{
 		Config:             restCfg,
-		Client:             rClient,
+		Client:             *rClient,
 		DiscoveryInterface: dClient,
 		Major:              major,
 		Minor:              minor,

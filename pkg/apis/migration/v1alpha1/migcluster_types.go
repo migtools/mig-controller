@@ -20,11 +20,12 @@ import (
 	"context"
 	"time"
 
-	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/controller/pkg/logging"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/remote"
 	"github.com/pkg/errors"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -98,6 +99,8 @@ type StorageClass struct {
 	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 }
 
+var Log *logging.Logger
+
 func init() {
 	SchemeBuilder.Register(&MigCluster{}, &MigClusterList{})
 }
@@ -111,17 +114,17 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	// Building a compat client requires both restConfig and a k8s client
-	var cachedClient k8sclient.Client
+	var rClient *k8sclient.Client
 
+	// Retrieve cached client if it exists
 	if m.Spec.IsHostCluster {
-		cachedClient = c
+		rClient = &c
 	} else {
 		rwm := remote.GetWatchMap()
 		remoteCluster := rwm.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
 		if remoteCluster != nil {
-			cachedClient = remoteCluster.RemoteManager.GetClient()
-		} else {
-			return nil, liberr.Wrap(errors.New("Failed to retrieve cached client"))
+			cachedClient := remoteCluster.RemoteManager.GetClient()
+			rClient = &cachedClient
 		}
 	}
 
@@ -129,12 +132,26 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := compat.NewClient(restConfig, cachedClient)
+
+	// Build client without cache if remote watch hasn't been started yet
+	if rClient == nil {
+		uncachedClient, err := k8sclient.New(
+			restConfig,
+			k8sclient.Options{
+				Scheme: scheme.Scheme,
+			})
+		if err != nil {
+			return nil, err
+		}
+		rClient = &uncachedClient
+	}
+
+	compatClient, err := compat.NewClient(restConfig, rClient)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	return compatClient, nil
 }
 
 // Test the connection settings by building a client.
