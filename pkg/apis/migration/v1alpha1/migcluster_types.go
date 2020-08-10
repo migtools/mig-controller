@@ -111,16 +111,15 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 // GetClient get a local or remote client using a MigCluster and an existing client
 func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	// Building a compat client requires both restConfig and a k8s client
-	var cachedClient *k8sclient.Client
+	var cachedClient k8sclient.Client
 
 	if m.Spec.IsHostCluster {
-		cachedClient = &c
+		cachedClient = c
 	} else {
 		rwm := remote.GetWatchMap()
 		remoteCluster := rwm.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
 		if remoteCluster != nil {
-			remoteClient := remoteCluster.RemoteManager.GetClient()
-			cachedClient = &remoteClient
+			cachedClient = remoteCluster.RemoteManager.GetClient()
 		} else {
 			return nil, liberr.Wrap(errors.New("Failed to retrieve cached client"))
 		}
