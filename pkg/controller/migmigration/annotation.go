@@ -357,7 +357,6 @@ func (t *Task) labelImageStreams(client compat.Client) error {
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.Background(), &is)
 			if err != nil {
-				// TODO: confirm with the team if we want to collect errors
 				return liberr.Wrap(err)
 			}
 			log.Info(
@@ -608,7 +607,6 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 			delete(is.Labels, IncludedInStageBackupLabel)
 			err = client.Update(context.Background(), &is)
 			if err != nil {
-				// TODO: confirm with the team if we want to collect errors
 				return liberr.Wrap(err)
 			}
 			log.Info(

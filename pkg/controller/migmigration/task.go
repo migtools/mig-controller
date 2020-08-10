@@ -252,7 +252,9 @@ func (t *Task) Run() error {
 	// Run the current phase.
 	switch t.Phase {
 	case Created, Started:
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case Prepare:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
@@ -262,7 +264,9 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -277,7 +281,9 @@ func (t *Task) Run() error {
 			}
 		}
 		if count == 2 {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -288,7 +294,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if status {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -298,7 +306,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case InitialBackupCreated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -312,7 +322,9 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(InitialBackupFailed, reasons)
 			} else {
-				t.next()
+				if err = t.next(); err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -322,28 +334,36 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureStagePodsFromOrphanedPVCs:
 		err := t.ensureStagePodsFromOrphanedPVCs()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case StagePodsCreated:
 		report, err := t.ensureStagePodsStarted()
 		if err != nil {
@@ -354,7 +374,9 @@ func (t *Task) Run() error {
 			break
 		}
 		if report.started {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -364,14 +386,18 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = PollReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case ResticRestarted:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if started {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -380,14 +406,18 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if quiesced {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -396,14 +426,18 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
 		if err != nil {
@@ -417,7 +451,9 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageBackupFailed, reasons)
 			} else {
-				t.next()
+				if err = t.next(); err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -435,7 +471,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if replicated {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -446,7 +484,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if status {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -457,7 +497,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if status {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -467,7 +509,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case StageRestoreCreated:
 		restore, err := t.getStageRestore()
 		if err != nil {
@@ -482,7 +526,9 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(StageRestoreFailed, reasons)
 			} else {
-				t.next()
+				if err = t.next(); err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -492,14 +538,18 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if terminated {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -510,7 +560,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
@@ -524,7 +576,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if replicated {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -541,7 +595,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case FinalRestoreCreated:
 		restore, err := t.getFinalRestore()
 		if err != nil {
@@ -555,7 +611,9 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(FinalRestoreFailed, reasons)
 			} else {
-				t.next()
+				if err = t.next(); err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		} else {
 			t.Requeue = NoReQ
@@ -567,7 +625,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if status {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = NoReQ
 		}
@@ -577,7 +637,9 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if completed {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -590,11 +652,15 @@ func (t *Task) Run() error {
 			Message:  CancelInProgressMessage,
 			Durable:  true,
 		})
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 
 	case MigrationFailed:
 		if Settings.Migration.FailureRollback {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Phase = Completed
 		}
@@ -604,14 +670,18 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureMigratedDeleted:
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if deleted {
-			t.next()
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		} else {
 			t.Requeue = PollReQ
 		}
@@ -619,12 +689,16 @@ func (t *Task) Run() error {
 		if err := t.deleteBackups(); err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case DeleteRestores:
 		if err := t.deleteRestores(); err != nil {
 			return liberr.Wrap(err)
 		}
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
 		t.Owner.Status.SetCondition(migapi.Condition{
@@ -635,11 +709,15 @@ func (t *Task) Run() error {
 			Message:  CanceledMessage,
 			Durable:  true,
 		})
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case Completed:
 	default:
 		t.Requeue = NoReQ
-		t.next()
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	if t.Phase == Completed {
@@ -684,7 +762,7 @@ func (t *Task) init() error {
 }
 
 // Advance the task to the next phase.
-func (t *Task) next() {
+func (t *Task) next() error {
 	current := -1
 	for i, step := range t.Itinerary.Steps {
 		if step.phase != t.Phase {
@@ -695,71 +773,78 @@ func (t *Task) next() {
 	}
 	if current == -1 {
 		t.Phase = Completed
-		return
+		return nil
 	}
 	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
 		next := t.Itinerary.Steps[n]
-		if !t.allFlags(next) {
+		flag, err := t.allFlags(next)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if !flag {
 			continue
 		}
-		if !t.anyFlags(next) {
+		flag, err = t.anyFlags(next)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if !flag {
 			continue
 		}
 		t.Phase = next.phase
-		return
+		return nil
 	}
 	t.Phase = Completed
+	return nil
 }
 
 // Evaluate `all` flags.
-func (t *Task) allFlags(step Step) bool {
+func (t *Task) allFlags(step Step) (bool, error) {
 	if step.all&HasPVs != 0 && !t.hasPVs() {
-		return false
+		return false, nil
 	}
 	if step.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
-		return false
+		return false, nil
 	}
 	if step.all&Quiesce != 0 && !t.quiesce() {
-		return false
+		return false, nil
 	}
 	if step.all&HasVerify != 0 && !t.hasVerify() {
-		return false
+		return false, nil
 	}
 	hasImageStream, err := t.hasImageStreams()
 	if err != nil {
-		// TODO: handle this panic better
-		panic(err)
+		return false, liberr.Wrap(err)
 	}
-	if step.any&HasISs != 0 && hasImageStream {
-		return false
+	if step.all&HasISs != 0 && hasImageStream {
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
 
 // Evaluate `any` flags.
-func (t *Task) anyFlags(step Step) bool {
+func (t *Task) anyFlags(step Step) (bool, error) {
 	if step.any&HasPVs != 0 && t.hasPVs() {
-		return true
+		return true, nil
 	}
 	if step.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
-		return true
+		return true, nil
 	}
 	if step.any&Quiesce != 0 && t.quiesce() {
-		return true
+		return true, nil
 	}
 	if step.any&HasVerify != 0 && t.hasVerify() {
-		return true
+		return true, nil
 	}
 	hasImageStream, err := t.hasImageStreams()
 	if err != nil {
-		// TODO: handle this panic better
-		panic(err)
+		return false, liberr.Wrap(err)
 	}
 	if step.any&HasISs != 0 && hasImageStream {
-		return true
+		return true, nil
 	}
-	return step.any == uint8(0)
+	return step.any == uint8(0), nil
 }
 
 // Phase fail.
