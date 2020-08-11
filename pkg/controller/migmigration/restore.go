@@ -44,6 +44,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 		return nil, liberr.Wrap(err)
 	}
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
+	newRestore.Labels[migapi.ParentLabel] = t.Owner.Name
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -86,13 +87,12 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 		return nil, liberr.Wrap(err)
 	}
 	newRestore.Labels[StageRestoreLabel] = t.UID()
-
+	newRestore.Labels[migapi.ParentLabel] = t.Owner.Name
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	newRestore.Annotations[StagePodImageAnnotation] = stagePodImage
-
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)

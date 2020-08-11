@@ -38,6 +38,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, liberr.Wrap(err)
 	}
 	newBackup.Labels[InitialBackupLabel] = t.UID()
+	newBackup.Labels[migapi.ParentLabel] = t.Owner.Name
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	delete(newBackup.Annotations, QuiesceAnnotation)
@@ -96,6 +97,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		},
 	}
 	newBackup.Labels[StageBackupLabel] = t.UID()
+	newBackup.Labels[migapi.ParentLabel] = t.Owner.Name
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
