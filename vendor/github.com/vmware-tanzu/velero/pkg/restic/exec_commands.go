@@ -47,11 +47,12 @@ type backupStatusLine struct {
 // GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
 // in the specified repo matching the set of provided tags, or an error if a
 // unique snapshot cannot be identified.
-func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string, env []string, insecureSkipTLSVerify bool) (string, error) {
+func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string, env []string, caCertFile string, insecureSkipTLSVerify bool) (string, error) {
 	cmd := GetSnapshotCommand(repoIdentifier, passwordFile, tags)
 	if len(env) > 0 {
 		cmd.Env = env
 	}
+	cmd.CACertFile = caCertFile
 	cmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 
 	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
@@ -185,7 +186,7 @@ func getSummaryLine(b []byte) ([]byte, error) {
 // RunRestore runs a `restic restore` command and monitors the volume size to
 // provide progress updates to the caller.
 func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
-	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.Args[0], restoreCmd.Env, restoreCmd.InsecureSkipTLSVerify)
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.CACertFile, restoreCmd.Args[0], restoreCmd.Env, restoreCmd.InsecureSkipTLSVerify)
 	if err != nil {
 		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}
@@ -231,9 +232,10 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 	return stdout, stderr, err
 }
 
-func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string, env []string, insecureSkipTLSVerify bool) (int64, error) {
+func getSnapshotSize(repoIdentifier, passwordFile, caCertFile, snapshotID string, env []string, insecureSkipTLSVerify bool) (int64, error) {
 	cmd := StatsCommand(repoIdentifier, passwordFile, snapshotID)
 	cmd.Env = env
+	cmd.CACertFile = caCertFile
 	cmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 
 	stdout, stderr, err := exec.RunCommand(cmd.Cmd())

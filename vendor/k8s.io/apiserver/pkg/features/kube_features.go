@@ -86,14 +86,23 @@ const (
 	// committing.
 	DryRun featuregate.Feature = "DryRun"
 
+	// owner: @caesarxuchao
+	// alpha: v1.15
+	//
+	// Allow apiservers to show a count of remaining items in the response
+	// to a chunking list request.
+	RemainingItemCount featuregate.Feature = "RemainingItemCount"
+
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Server-side apply. Merging happens on the server.
 	ServerSideApply featuregate.Feature = "ServerSideApply"
 
 	// owner: @caesarxuchao
 	// alpha: v1.14
+	// beta: v1.15
 	//
 	// Allow apiservers to expose the storage version hash in the discovery
 	// document.
@@ -113,6 +122,8 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.15
+	// beta: v1.16
+	// GA: v1.17
 	//
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
@@ -122,7 +133,13 @@ const (
 	//
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server
-	RequestManagement featuregate.Feature = "RequestManagement"
+	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
+
+	// owner: @wojtek-t
+	// alpha: v1.16
+	//
+	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
+	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
 )
 
 func init() {
@@ -137,13 +154,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
 	DynamicAuditing:         {Default: false, PreRelease: featuregate.Alpha},
-	APIResponseCompression:  {Default: false, PreRelease: featuregate.Alpha},
+	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
-	StorageVersionHash:      {Default: false, PreRelease: featuregate.Alpha},
+	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
+	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
-	WatchBookmark:           {Default: false, PreRelease: featuregate.Alpha},
-	RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
+	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
+	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
 }

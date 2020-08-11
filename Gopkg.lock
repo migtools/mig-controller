@@ -382,7 +382,10 @@
   branch = "master"
   digest = "1:3b46c4f287d692dc266644e2dbdc0fa688b7a8e7d954c9127b71650a5e8a08cc"
   name = "github.com/konveyor/controller"
-  packages = ["pkg/error"]
+  packages = [
+    "pkg/error",
+    "pkg/logging",
+  ]
   pruneopts = "T"
   revision = "8b02d7a5c9194f3417985a91a09f2654561a97e3"
 
@@ -631,11 +634,11 @@
 
 [[projects]]
   branch = "konveyor-dev"
-  digest = "1:60f9595616a7fe035a916b04e16bf41f46e611ffd5c976f6854b5353ffa78734"
+  digest = "1:1d8d8778cc735dd4275f6d73f134e3d0d7b6fb8223da4db702dc7d4f164b42e2"
   name = "github.com/vmware-tanzu/velero"
   packages = ["pkg/apis/velero/v1"]
   pruneopts = "T"
-  revision = "342f398f168a0bd3714c7eb5d242724c05bb3e83"
+  revision = "d2b7e756cba85db42b91628f2dd1d43a7d22e7cb"
   source = "github.com/konveyor/velero.git"
 
 [[projects]]
@@ -1059,12 +1062,12 @@
   version = "kubernetes-1.13.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:29f9d9e064d80ae5a39c7d403b0371e9e38bf29c9d606a50917188b30b39c784"
+  digest = "1:0389711bf3ac5aade823940c6e16b58213ac2da3f48768b6ace94289be410ad1"
   name = "k8s.io/apiserver"
   packages = ["pkg/storage/names"]
   pruneopts = "T"
-  revision = "32059931b4c930e5c9bab8f663101f0c4d6a75f1"
+  revision = "1d7742e34fad810c62a5ab2986b6f38dc101cf07"
+  version = "v0.17.9"
 
 [[projects]]
   digest = "1:c43437141e0905409008e6a82e3574eff11d10af3db49d7ac9932cbbaab5035b"
@@ -1354,6 +1357,7 @@
     "github.com/google/uuid",
     "github.com/joho/godotenv",
     "github.com/konveyor/controller/pkg/error",
+    "github.com/konveyor/controller/pkg/logging",
     "github.com/mattn/go-sqlite3",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
@@ -1396,7 +1400,6 @@
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/intstr",
     "k8s.io/apimachinery/pkg/util/validation",
-    "k8s.io/apiserver/pkg/storage/names",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/dynamic",
     "k8s.io/client-go/kubernetes",

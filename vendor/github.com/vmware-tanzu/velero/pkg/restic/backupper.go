@@ -158,11 +158,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier, pvc)
-		numVolumeSnapshots++
 		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		numVolumeSnapshots++
 	}
 
 ForEachVolume:
@@ -174,9 +174,6 @@ ForEachVolume:
 		case res := <-resultsChan:
 			switch res.Status.Phase {
 			case velerov1api.PodVolumeBackupPhaseCompleted:
-				if res.Status.SnapshotID == "" { // when the volume is empty there is no restic snapshot, so best to exclude it
-					break
-				}
 				podVolumeBackups = append(podVolumeBackups, res)
 			case velerov1api.PodVolumeBackupPhaseFailed:
 				errs = append(errs, errors.Errorf("pod volume backup failed: %s", res.Status.Message))

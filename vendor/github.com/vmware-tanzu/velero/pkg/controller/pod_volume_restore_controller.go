@@ -294,8 +294,23 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	// ignore error since there's nothing we can do and it's a temp file.
 	defer os.Remove(credsFile)
 
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	caCert, err := restic.GetCACert(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+	if err != nil {
+		log.WithError(err).Error("Error getting caCert")
+	}
+	var caCertFile string
+	if caCert != nil {
+		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
+		if err != nil {
+			log.WithError(err).Error("Error creating temp cacert file")
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
+
 	// execute the restore process
-	if err := c.restorePodVolume(req, credsFile, volumeDir, log, restic.GetVolumesToVerifyIncludes(pod, req.Spec.Volume)); err != nil {
+	if err := c.restorePodVolume(req, credsFile, caCertFile, volumeDir, log, restic.GetVolumesToVerifyIncludes(pod, req.Spec.Volume)); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -314,7 +329,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger, verify bool) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger, verify bool) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -329,6 +344,7 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 		volumePath,
 		verify,
 	)
+	resticCmd.CACertFile = caCertFile
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
@@ -344,18 +360,6 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
-	}
-	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
-		if err != nil {
-			log.WithError(err).Errorf("Error getting BackupStorageLocation %s", req.Spec.BackupStorageLocation)
-			return errors.WithStack(err)
-		}
-		insecureSkipTLSVerify, err := strconv.ParseBool(bsl.Spec.Config["insecureSkipTLSVerify"])
-		if err != nil {
-			insecureSkipTLSVerify = false
-		}
-		resticCmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
 	}
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
 		bsl, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
