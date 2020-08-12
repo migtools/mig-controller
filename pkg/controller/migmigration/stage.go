@@ -228,6 +228,11 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	stagePodImage, err := t.getSrcStagePodImage()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	for _, ns := range t.sourceNamespaces() {
 		list := &corev1.PersistentVolumeClaimList{}
 		err = client.List(context.TODO(), k8sclient.InNamespace(ns), list)
@@ -253,7 +258,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			if pvcMounted(existingStagePods, claimKey) {
 				continue
 			}
-			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels(), resourceLimitMapping))
+			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels(), stagePodImage, resourceLimitMapping))
 		}
 	}
 
