@@ -11,7 +11,6 @@ import (
 const (
 	PartOfLabel = "app.kubernetes.io/part-of" // = Application
 	Application = "openshift-migration"
-	ParentLabel = "migration.openshift.io/parent-name"
 )
 
 // Build label (key, value) used to correlate CRs.

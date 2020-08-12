@@ -135,8 +135,8 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Ensure parent labels are present on migmigration
-	err = r.ensureParentLabels(migration)
+	// Ensure debugging labels are present on migmigration
+	err = r.ensureDebugLabels(migration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
@@ -327,16 +327,17 @@ func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration
 }
 
 // Ensures that the labels required to assist debugging are present on migmigration
-func (r *ReconcileMigMigration) ensureParentLabels(migration *migapi.MigMigration) error {
+func (r *ReconcileMigMigration) ensureDebugLabels(migration *migapi.MigMigration) error {
 	if migration.Labels == nil {
 		migration.Labels = make(map[string]string)
-	}
-	if value, exists := migration.Labels[migapi.ParentLabel]; exists {
-		if value == migration.Spec.MigPlanRef.Name {
-			return nil
+	} else {
+		if value, exists := migration.Labels[MigPlanDebugLabel]; exists {
+			if value == migration.Spec.MigPlanRef.Name {
+				return nil
+			}
 		}
 	}
-	migration.Labels[migapi.ParentLabel] = migration.Spec.MigPlanRef.Name
+	migration.Labels[MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
 	err := r.Update(context.TODO(), migration)
 	if err != nil {
 		return liberr.Wrap(err)

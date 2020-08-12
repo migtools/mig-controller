@@ -54,6 +54,14 @@ const (
 	// for easy search or application rollback.
 	// The value is the Task.UID().
 	MigratedByLabel = "migration.openshift.io/migrated-by" // (migmigration UID)
+	// Identifies associated migmigration
+	// to assist manual debugging
+	// The value is Task.Owner.Name
+	MigMigrationDebugLabel = "migmigration-name"
+	// Identifies associated migplan
+	// to assist manual debugging
+	// The value is Task.Owner.Spec.migPlanRef.Name
+	MigPlanDebugLabel = "migplan-name"
 )
 
 // Set of Service Accounts.
