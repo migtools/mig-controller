@@ -91,7 +91,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	newRestore.Annotations[StageRestorePodImage] = stagePodImage
+	newRestore.Annotations[StagePodImageAnnotation] = stagePodImage
 
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
