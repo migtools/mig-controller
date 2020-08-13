@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"regexp"
 	"sort"
@@ -231,13 +230,13 @@ const (
 )
 
 // Return the image reference for the migration registry (defaults to "registry:2")
-func migRegistryImageRef() string {
-	envImage := os.Getenv(MigrationRegistryImageEnvVar)
-	if envImage == "" {
-		return MigrationRegistryDefaultImage
-	}
-	return envImage
-}
+// func migRegistryImageRef() string {
+// 	envImage := os.Getenv(MigrationRegistryImageEnvVar)
+// 	if envImage == "" {
+// 		return MigrationRegistryDefaultImage
+// 	}
+// 	return envImage
+// }
 
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
@@ -293,7 +292,7 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 }
 
 // Build a Registry ImageStream as desired for the source cluster.
-func (r *MigPlan) BuildRegistryImageStream(name string) (*imagev1.ImageStream, error) {
+func (r *MigPlan) BuildRegistryImageStream(name string, registryImage string) (*imagev1.ImageStream, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -304,23 +303,23 @@ func (r *MigPlan) BuildRegistryImageStream(name string) (*imagev1.ImageStream, e
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryImageStream(imagestream)
+	err := r.UpdateRegistryImageStream(imagestream, registryImage)
 	return imagestream, err
 }
 
 // Update a Registry ImageStream as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryImageStream(imagestream *imagev1.ImageStream) error {
+func (r *MigPlan) UpdateRegistryImageStream(imagestream *imagev1.ImageStream, registryImage string) error {
 	imagestream.Spec = imagev1.ImageStreamSpec{
 		LookupPolicy: imagev1.ImageLookupPolicy{Local: false},
 		Tags: []imagev1.TagReference{
 			imagev1.TagReference{
 				Name: "2",
 				Annotations: map[string]string{
-					"openshift.io/imported-from": migRegistryImageRef(),
+					"openshift.io/imported-from": registryImage,
 				},
 				From: &kapi.ObjectReference{
 					Kind: "DockerImage",
-					Name: migRegistryImageRef(),
+					Name: registryImage,
 				},
 				Generation:      nil,
 				ImportPolicy:    imagev1.TagImportPolicy{},
@@ -365,8 +364,8 @@ func (r *MigPlan) EqualsRegistryImageStream(a, b *imagev1.ImageStream) bool {
 	return true
 }
 
-// Build a Registry DeploymentConfig as desired for the source cluster.
-func (r *MigPlan) BuildRegistryDC(storage *MigStorage, proxySecret *kapi.Secret, name, dirName string) (*appsv1.DeploymentConfig, error) {
+// Build a Registry DeploymentConfig.
+func (r *MigPlan) BuildRegistryDC(storage *MigStorage, proxySecret *kapi.Secret, name, dirName string, registryImage string) (*appsv1.DeploymentConfig, error) {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -377,7 +376,7 @@ func (r *MigPlan) BuildRegistryDC(storage *MigStorage, proxySecret *kapi.Secret,
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryDC(storage, deploymentconfig, proxySecret, name, dirName)
+	err := r.UpdateRegistryDC(storage, deploymentconfig, proxySecret, name, dirName, registryImage)
 	return deploymentconfig, err
 }
 
@@ -413,7 +412,9 @@ func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret,
 }
 
 // Update a Registry DeploymentConfig as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig, proxySecret *kapi.Secret, name, dirName string) error {
+func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig,
+	proxySecret *kapi.Secret, name, dirName string, registryImage string) error {
+
 	envFrom := []kapi.EnvFromSource{}
 	// If Proxy secret exists, set env from it
 	if proxySecret != nil {
@@ -445,7 +446,7 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 				Containers: []kapi.Container{
 					kapi.Container{
 						EnvFrom: envFrom,
-						Image:   migRegistryImageRef(),
+						Image:   registryImage,
 						Name:    "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
