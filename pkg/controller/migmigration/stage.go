@@ -37,10 +37,9 @@ const (
 	defaultCPU    = "100m"
 )
 
-// migration-cluster-config configmap
+// migration-cluster-config configmap key
 const (
-	ClusterConfigMapName = "migration-cluster-config"
-	StagePodImageKey     = "STAGE_IMAGE"
+	StagePodImageKey = "STAGE_IMAGE"
 )
 
 // Stage pod start report.
@@ -187,7 +186,7 @@ func (t *Task) getDestStagePodImage() (string, error) {
 
 func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
 	clusterConfig := &corev1.ConfigMap{}
-	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: migapi.VeleroNamespace}
+	clusterConfigRef := types.NamespacedName{Name: migapi.ClusterConfigMapName, Namespace: migapi.VeleroNamespace}
 	err := client.Get(context.TODO(), clusterConfigRef, clusterConfig)
 	if err != nil {
 		return "", liberr.Wrap(err)
