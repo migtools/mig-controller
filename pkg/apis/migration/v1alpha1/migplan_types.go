@@ -229,15 +229,6 @@ const (
 	MigrationRegistryImageEnvVar  = "MIGRATION_REGISTRY_IMAGE"
 )
 
-// Return the image reference for the migration registry (defaults to "registry:2")
-// func migRegistryImageRef() string {
-// 	envImage := os.Getenv(MigrationRegistryImageEnvVar)
-// 	if envImage == "" {
-// 		return MigrationRegistryDefaultImage
-// 	}
-// 	return envImage
-// }
-
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
 	labels := r.GetCorrelationLabels()
