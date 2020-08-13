@@ -57,11 +57,11 @@ const (
 	// Identifies associated migmigration
 	// to assist manual debugging
 	// The value is Task.Owner.Name
-	MigMigrationDebugLabel = "migmigration-name"
+	MigMigrationDebugLabel = "migration.openshift.io/migmigration-name"
 	// Identifies associated migplan
 	// to assist manual debugging
 	// The value is Task.Owner.Spec.migPlanRef.Name
-	MigPlanDebugLabel = "migplan-name"
+	MigPlanDebugLabel = "migration.openshift.io/migplan-name"
 )
 
 // Set of Service Accounts.
