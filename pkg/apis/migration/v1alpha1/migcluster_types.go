@@ -138,7 +138,7 @@ func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
 	}
 	registryImage, ok := clusterConfig.Data[RegistryImageKey]
 	if !ok {
-		return "", liberr.Wrap(errors.New("configmap key not found"))
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", RegistryImageKey))
 	}
 	return registryImage, nil
 }

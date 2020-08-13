@@ -194,7 +194,7 @@ func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
 	}
 	stagePodImage, ok := clusterConfig.Data[StagePodImageKey]
 	if !ok {
-		return "", liberr.Wrap(errors.New("configmap key not found"))
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", StagePodImageKey))
 	}
 	return stagePodImage, nil
 }
