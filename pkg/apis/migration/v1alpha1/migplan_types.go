@@ -224,9 +224,7 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 
 // Registry label for controller-created migration registry resources
 const (
-	MigrationRegistryLabel        = "migration-registry"
-	MigrationRegistryDefaultImage = "registry:2"
-	MigrationRegistryImageEnvVar  = "MIGRATION_REGISTRY_IMAGE"
+	MigrationRegistryLabel = "migration-registry"
 )
 
 // Build a credentials Secret as desired for the source cluster.
