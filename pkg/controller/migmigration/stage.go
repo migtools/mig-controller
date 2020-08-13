@@ -37,6 +37,12 @@ const (
 	defaultCPU    = "100m"
 )
 
+// migration-cluster-config configmap
+const (
+	ClusterConfigMapName = "migration-cluster-config"
+	StagePodImageKey     = "STAGE_IMAGE"
+)
+
 // Stage pod start report.
 type PodStartReport struct {
 	// failed detected.
@@ -182,14 +188,14 @@ func (t *Task) getDestStagePodImage() (string, error) {
 
 func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
 	clusterConfig := &corev1.ConfigMap{}
-	clusterConfigRef := types.NamespacedName{Name: "migration-cluster-config", Namespace: "openshift-migration"}
+	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: migapi.VeleroNamespace}
 	err := client.Get(context.TODO(), clusterConfigRef, clusterConfig)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
-	stagePodImage, ok := clusterConfig.Data["STAGE_IMAGE"]
+	stagePodImage, ok := clusterConfig.Data[StagePodImageKey]
 	if !ok {
-		return "", liberr.Wrap(errors.New("STAGE_IMAGE configmap key not found"))
+		return "", liberr.Wrap(errors.New("configmap key not found"))
 	}
 	return stagePodImage, nil
 }
