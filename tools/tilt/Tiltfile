@@ -6,6 +6,8 @@ settings.update(read_json(
     default={},
 ))
 
+docker_prune_settings(max_age_mins=1440)
+
 allow_k8s_contexts(k8s_context())
 img = settings.get('image', os.environ.get('IMG'))
 template = settings.get('migration_controller', os.environ.get('TEMPLATE'))
