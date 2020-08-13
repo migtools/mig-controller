@@ -50,6 +50,7 @@ const (
 const (
 	ClusterConfigMapName = "migration-cluster-config"
 	RegistryImageKey     = "REGISTRY_IMAGE"
+	StagePodImageKey     = "STAGE_IMAGE"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
