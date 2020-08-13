@@ -87,7 +87,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	}
 	newRestore.Labels[StageRestoreLabel] = t.UID()
 
-	stagePodImage, err := t.getDestStagePodImage()
+	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}

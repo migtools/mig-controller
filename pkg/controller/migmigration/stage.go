@@ -161,27 +161,11 @@ func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	stagePodImage, err := t.getSrcStagePodImage()
+	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	return BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping), nil
-}
-
-func (t *Task) getSrcStagePodImage() (string, error) {
-	client, err := t.getSourceClient()
-	if err != nil {
-		return "", liberr.Wrap(err)
-	}
-	return t.getStagePodImage(client)
-}
-
-func (t *Task) getDestStagePodImage() (string, error) {
-	client, err := t.getDestinationClient()
-	if err != nil {
-		return "", liberr.Wrap(err)
-	}
-	return t.getStagePodImage(client)
 }
 
 func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
@@ -232,7 +216,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	stagePodImage, err := t.getSrcStagePodImage()
+	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -302,7 +286,7 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	stagePodImage, err := t.getSrcStagePodImage()
+	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -391,7 +375,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	stagePodImage, err := t.getSrcStagePodImage()
+	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
