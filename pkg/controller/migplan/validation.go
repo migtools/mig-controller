@@ -164,6 +164,10 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	// Storage
 	err = r.validateStorage(plan)
 	if err != nil {
+		deleteErr := r.deleteImageRegistryResources(plan)
+		if deleteErr != nil {
+			return liberr.Wrap(deleteErr)
+		}
 		return liberr.Wrap(err)
 	}
 
