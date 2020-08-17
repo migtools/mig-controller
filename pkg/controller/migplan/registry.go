@@ -2,9 +2,11 @@ package migplan
 
 import (
 	"context"
+	"fmt"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	kapi "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -23,8 +25,14 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if storage == nil || !storage.Status.IsReady() {
+	if storage == nil {
 		return nil
+	}
+	if !storage.Status.IsReady() {
+		err = r.deleteImageRegistryResources(plan)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
@@ -213,5 +221,79 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 		return liberr.Wrap(err)
 	}
 
+	return nil
+}
+
+func (r ReconcileMigPlan) getBothClients(plan *migapi.MigPlan) ([]compat.Client, error) {
+	sourceCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return []compat.Client{}, liberr.Wrap(err)
+	}
+	if sourceCluster == nil || !sourceCluster.Status.IsReady() {
+		return []compat.Client{}, liberr.Wrap(fmt.Errorf("either source cluster is nil or not ready"))
+	}
+	sourceClient, err := sourceCluster.GetClient(r)
+	if err != nil {
+		return []compat.Client{}, liberr.Wrap(err)
+	}
+
+	destinationCluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return []compat.Client{}, liberr.Wrap(err)
+	}
+	if destinationCluster == nil || !destinationCluster.Status.IsReady() {
+		return []compat.Client{}, liberr.Wrap(fmt.Errorf("either destination cluster is nil or not ready"))
+	}
+	destinationClient, err := destinationCluster.GetClient(r)
+	if err != nil {
+		return []compat.Client{}, liberr.Wrap(err)
+	}
+
+	return []compat.Client{sourceClient, destinationClient}, nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) error {
+	clients, err := r.getBothClients(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, client := range clients {
+		secret, err := plan.GetRegistrySecret(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if secret != nil {
+			if err := liberr.Wrap(client.Delete(context.Background(), secret)); err != nil {
+				return err
+			}
+		}
+		foundImageStream, err := plan.GetRegistryImageStream(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if foundImageStream != nil {
+			if err := liberr.Wrap(client.Delete(context.Background(), foundImageStream)); err != nil {
+				return err
+			}
+		}
+		foundDC, err := plan.GetRegistryDC(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if foundDC != nil {
+			if err := liberr.Wrap(client.Delete(context.Background(), foundDC)); err != nil {
+				return err
+			}
+		}
+		foundService, err := plan.GetRegistryService(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if foundService != nil {
+			if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
