@@ -30,10 +30,12 @@ import (
 	imgapi "github.com/openshift/api/image/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,6 +43,13 @@ import (
 // SA secret keys.
 const (
 	SaToken = "saToken"
+)
+
+// migration-cluster-config configmap
+const (
+	ClusterConfigMapName = "migration-cluster-config"
+	RegistryImageKey     = "REGISTRY_IMAGE"
+	StagePodImageKey     = "STAGE_IMAGE"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -117,6 +126,22 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	}
 
 	return client, nil
+}
+
+// GetRegistryImage gets a MigCluster specific registry image from ConfigMap
+func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
+	clusterConfig := &corev1.ConfigMap{}
+	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
+	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	if err != nil {
+		return "", err
+	}
+	registryImage, ok := clusterConfig.Data[RegistryImageKey]
+	if !ok {
+		err := errors.Errorf("configmap key not found: %v", RegistryImageKey)
+		return "", err
+	}
+	return registryImage, nil
 }
 
 // Test the connection settings by building a client.

@@ -41,6 +41,13 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 			return err
 		}
 
+		// Get cluster specific registry image
+		registryImage, err := cluster.GetRegistryImage(client)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+
 		// Migration Registry Secret
 		secret, err := r.ensureRegistrySecret(client, plan, storage)
 		if err != nil {
@@ -49,14 +56,14 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 		}
 
 		// Migration Registry ImageStream
-		err = r.ensureRegistryImageStream(client, plan, secret)
+		err = r.ensureRegistryImageStream(client, plan, secret, registryImage)
 		if err != nil {
 			log.Trace(err)
 			return err
 		}
 
 		// Migration Registry DeploymentConfig
-		err = r.ensureRegistryDC(client, plan, storage, secret)
+		err = r.ensureRegistryDC(client, plan, storage, secret, registryImage)
 		if err != nil {
 			log.Trace(err)
 			return err
@@ -116,8 +123,8 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 }
 
 // Ensure the imagestream for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
-	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName())
+func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret, registryImage string) error {
+	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName(), registryImage)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -138,7 +145,7 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 	if plan.EqualsRegistryImageStream(newImageStream, foundImageStream) {
 		return nil
 	}
-	plan.UpdateRegistryImageStream(foundImageStream)
+	plan.UpdateRegistryImageStream(foundImageStream, registryImage)
 	err = client.Update(context.TODO(), foundImageStream)
 	if err != nil {
 		log.Trace(err)
@@ -149,7 +156,9 @@ func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, pla
 }
 
 // Ensure the deploymentconfig for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage, secret *kapi.Secret) error {
+func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan,
+	storage *migapi.MigStorage, secret *kapi.Secret, registryImage string) error {
+
 	name := secret.GetName()
 	dirName := plan.GetName() + "-registry-" + string(plan.UID)
 
@@ -161,7 +170,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	}
 
 	//Construct Registry DC
-	newDC, err := plan.BuildRegistryDC(storage, proxySecret, name, dirName)
+	newDC, err := plan.BuildRegistryDC(storage, proxySecret, name, dirName, registryImage)
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -182,7 +191,7 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	if plan.EqualsRegistryDC(newDC, foundDC) {
 		return nil
 	}
-	plan.UpdateRegistryDC(storage, foundDC, proxySecret, name, dirName)
+	plan.UpdateRegistryDC(storage, foundDC, proxySecret, name, dirName, registryImage)
 	err = client.Update(context.TODO(), foundDC)
 	if err != nil {
 		log.Trace(err)

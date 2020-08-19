@@ -92,6 +92,14 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 		return nil, err
 	}
 	newRestore.Labels[StageRestoreLabel] = t.UID()
+
+	stagePodImage, err := t.getStagePodImage(client)
+	if err != nil {
+		log.Trace(err)
+		return nil, err
+	}
+	newRestore.Annotations[StagePodImageAnnotation] = stagePodImage
+
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		log.Trace(err)
