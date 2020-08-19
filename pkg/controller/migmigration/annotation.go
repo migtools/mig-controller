@@ -6,6 +6,8 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
+	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,32 +66,37 @@ type ServiceAccounts map[string]map[string]bool
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
 // The ResticPvVerifyAnnotation is added to Pods as needed by Restic.
-// The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs and is referenced
-// by the velero.Backup label selector.
+// The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs, ImageStreams and
+// is referenced by the velero.Backup label selector.
 // The IncludedInStageBackupLabel label is added to Namespaces to prevent the
 // velero.Backup from being empty which causes the Restore to fail.
 func (t *Task) annotateStageResources() error {
-	client, err := t.getSourceClient()
+	sourceClient, err := t.getSourceClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	// Namespaces
-	err = t.labelNamespaces(client)
+	err = t.labelNamespaces(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	// Pods
-	serviceAccounts, err := t.annotatePods(client)
+	serviceAccounts, err := t.annotatePods(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	// PV & PVCs
-	err = t.annotatePVs(client)
+	err = t.annotatePVs(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	// Service accounts used by stage pods.
-	err = t.labelServiceAccounts(client, serviceAccounts)
+	err = t.labelServiceAccounts(sourceClient, serviceAccounts)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	err = t.labelImageStreams(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -334,6 +341,37 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 	return nil
 }
 
+// Add label to ImageStreeams
+func (t *Task) labelImageStreams(client compat.Client) error {
+	for _, ns := range t.sourceNamespaces() {
+		imageStreamList := imagev1.ImageStreamList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(context.TODO(), options, &imageStreamList)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, is := range imageStreamList.Items {
+			if is.Labels == nil {
+				is.Labels = map[string]string{}
+			}
+			is.Labels[IncludedInStageBackupLabel] = t.UID()
+			err = client.Update(context.Background(), &is)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			log.Info(
+				"ImageStream labels added.",
+				"ns",
+				is.Namespace,
+				"name",
+				is.Name)
+		}
+	}
+
+	return nil
+}
+
 // Delete temporary annotations and labels added.
 func (t *Task) deleteAnnotations() error {
 	clients, namespaceList, err := t.getBothClientsWithNamespaces()
@@ -359,6 +397,10 @@ func (t *Task) deleteAnnotations() error {
 			return liberr.Wrap(err)
 		}
 		err = t.deleteServiceAccountLabels(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.deleteImageStreamLabels(client, namespaceList[i])
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -549,5 +591,32 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 			sa.Name)
 	}
 
+	return nil
+}
+
+// Delete ImageStream labels
+func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []string) error {
+	for _, ns := range namespaceList {
+		imageStreamList := imagev1.ImageStreamList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(context.TODO(), options, &imageStreamList)
+		if err != nil {
+			log.Trace(err)
+			return err
+		}
+		for _, is := range imageStreamList.Items {
+			delete(is.Labels, IncludedInStageBackupLabel)
+			err = client.Update(context.Background(), &is)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			log.Info(
+				"ImageStream labels removed.",
+				"ns",
+				is.Namespace,
+				"name",
+				is.Name)
+		}
+	}
 	return nil
 }
