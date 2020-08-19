@@ -22,6 +22,7 @@ const (
 	SuspendAnnotation        = "migration.openshift.io/preQuiesceSuspend"
 	ReplicasAnnotation       = "migration.openshift.io/preQuiesceReplicas"
 	NodeSelectorAnnotation   = "migration.openshift.io/preQuiesceNodeSelector"
+	StagePodImageAnnotation  = "migration.openshift.io/stage-pod-image"
 )
 
 // Restic Annotations

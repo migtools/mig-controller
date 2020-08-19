@@ -8,11 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +50,7 @@ type PodStartReport struct {
 // BuildStagePods - creates a list of stage pods from a list of pods
 func BuildStagePods(labels map[string]string,
 	pvcMapping map[k8sclient.ObjectKey]migapi.PV,
-	list *[]corev1.Pod,
+	list *[]corev1.Pod, stagePodImage string,
 	resourceLimitMapping map[string]map[string]resource.Quantity) StagePodList {
 
 	stagePods := StagePodList{}
@@ -77,7 +79,7 @@ func BuildStagePods(labels map[string]string,
 			Name:      pod.GetName(),
 			Namespace: pod.GetNamespace(),
 		}
-		stagePod := buildStagePodFromPod(podKey, labels, &pod, volumes, resourceLimitMapping)
+		stagePod := buildStagePodFromPod(podKey, labels, &pod, volumes, stagePodImage, resourceLimitMapping)
 		if stagePod != nil {
 			stagePods.merge(*stagePod)
 		}
@@ -134,7 +136,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 			continue
 		}
 		err := client.Create(context.TODO(), &stagePod.Pod)
-		if err != nil && !errors.IsAlreadyExists(err) {
+		if err != nil && !k8serr.IsAlreadyExists(err) {
 			return 0, liberr.Wrap(err)
 		}
 		counter++
@@ -154,7 +156,25 @@ func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	return BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, resourceLimitMapping), nil
+	stagePodImage, err := t.getStagePodImage(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping), nil
+}
+
+func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
+	clusterConfig := &corev1.ConfigMap{}
+	clusterConfigRef := types.NamespacedName{Name: migapi.ClusterConfigMapName, Namespace: migapi.VeleroNamespace}
+	err := client.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	stagePodImage, ok := clusterConfig.Data[migapi.StagePodImageKey]
+	if !ok {
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", migapi.StagePodImageKey))
+	}
+	return stagePodImage, nil
 }
 
 func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
@@ -186,10 +206,16 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	}
 
 	pvcMapping := t.getPVCs()
+
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	stagePodImage, err := t.getStagePodImage(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	for _, ns := range t.sourceNamespaces() {
 		list := &corev1.PersistentVolumeClaimList{}
 		err = client.List(context.TODO(), k8sclient.InNamespace(ns), list)
@@ -215,7 +241,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			if pvcMounted(existingStagePods, claimKey) {
 				continue
 			}
-			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels(), resourceLimitMapping))
+			stagePods.merge(*buildStagePod(pvc, t.stagePodLabels(), stagePodImage, resourceLimitMapping))
 		}
 	}
 
@@ -255,7 +281,11 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, resourceLimitMapping)
+	stagePodImage, err := t.getStagePodImage(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, stagePodImage, resourceLimitMapping)
 
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
@@ -340,13 +370,17 @@ func (t *Task) ensureStagePodsFromRunning() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	stagePodImage, err := t.getStagePodImage(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	for _, ns := range t.sourceNamespaces() {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &podList)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, resourceLimitMapping)...)
+		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping)...)
 	}
 
 	created, err := t.createStagePods(client, stagePods)
@@ -391,7 +425,7 @@ func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 			err = client.Get(context.TODO(), key, &pvc)
 			if err != nil {
 				healthy = false
-				if !errors.IsNotFound(err) {
+				if !k8serr.IsNotFound(err) {
 					err = liberr.Wrap(err)
 					return
 				}
@@ -459,7 +493,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 		for _, pod := range podList.Items {
 			// Delete
 			err := client.Delete(context.TODO(), &pod)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
 			log.Info(
@@ -526,7 +560,7 @@ func truncateName(name string) string {
 func buildStagePodFromPod(ref k8sclient.ObjectKey,
 	labels map[string]string,
 	pod *corev1.Pod,
-	pvcVolumes []corev1.Volume,
+	pvcVolumes []corev1.Volume, stagePodImage string,
 	resourceLimitMapping map[string]map[string]resource.Quantity) *StagePod {
 
 	podMemory, podCPU := parseResourceLimitMapping(ref.Namespace, resourceLimitMapping)
@@ -568,7 +602,7 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey,
 		}
 		stageContainer := corev1.Container{
 			Name:         "sleep-" + strconv.Itoa(i),
-			Image:        "registry.access.redhat.com/rhel7",
+			Image:        stagePodImage,
 			Command:      []string{"sleep"},
 			Args:         []string{"infinity"},
 			VolumeMounts: volumeMounts,
@@ -592,7 +626,7 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey,
 
 // Build a generic stage pod for PVC, where no pod template could be used.
 func buildStagePod(pvc corev1.PersistentVolumeClaim,
-	labels map[string]string,
+	labels map[string]string, stagePodImage string,
 	resourceLimitMapping map[string]map[string]resource.Quantity) *StagePod {
 
 	podMemory, podCPU := parseResourceLimitMapping(pvc.Namespace, resourceLimitMapping)
@@ -607,7 +641,7 @@ func buildStagePod(pvc corev1.PersistentVolumeClaim,
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name:    "sleep",
-					Image:   "registry.access.redhat.com/rhel7",
+					Image:   stagePodImage,
 					Command: []string{"sleep"},
 					Args:    []string{"infinity"},
 					VolumeMounts: []corev1.VolumeMount{{
