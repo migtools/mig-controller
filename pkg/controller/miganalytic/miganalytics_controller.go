@@ -212,10 +212,8 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 	}
 
 	analytic.Status.Analytics.Plan = plan.Name
-	log.Info("Beginning analysis of plan.", "migplan", plan.Name)
 
 	for i, namespace := range plan.Spec.Namespaces {
-		log.Info("Beginning analysis of namespace.", "namespace", namespace)
 		ns := migapi.MigAnalyticNamespace{
 			Namespace: namespace,
 		}
@@ -256,9 +254,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info("Completed analysis of namespace.", "namespace", namespace)
 	}
-	log.Info("Completed analysis of plan.", "plan", plan.Name)
 	return nil
 }
 
