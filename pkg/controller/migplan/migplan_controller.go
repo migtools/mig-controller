@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -364,5 +365,45 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
 	excludedResources := Settings.Plan.ExcludedResources
 	plan.Status.ExcludedResources = excludedResources
+	return nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	secret, err := plan.GetRegistrySecret(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if secret != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), secret)); err != nil {
+			return err
+		}
+	}
+	foundImageStream, err := plan.GetRegistryImageStream(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundImageStream != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundImageStream)); err != nil {
+			return err
+		}
+	}
+	foundDC, err := plan.GetRegistryDC(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundDC != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundDC)); err != nil {
+			return err
+		}
+	}
+	foundService, err := plan.GetRegistryService(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundService != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
