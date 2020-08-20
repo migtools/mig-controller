@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -228,7 +229,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			}
 		}
 		if analytic.Spec.AnalyzeImageCount {
-			err := r.analyzeImages(client, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
+			err := r.analyzeImages(client, discovery, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -334,11 +335,18 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
 }
 
 func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client,
+	discovery discovery.DiscoveryInterface,
 	namespace *migapi.MigAnalyticNamespace,
 	listImages bool,
 	listImagesLimit int) error {
 	imageStreamList := imagev1.ImageStreamList{}
-	internalRegistry, err := GetRegistryInfo(4, 4, client)
+
+	major, minor, err := GetServerVersion(discovery)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	internalRegistry, err := GetRegistryInfo(major, minor, client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -581,6 +589,38 @@ func getImageDetails(tagItemImageName string,
 	size = resource.MustParse((strconv.Itoa(int(dockerImageMetadata.Size)/MiB) + MiBSuffix))
 
 	return image, size, nil
+}
+
+func GetServerVersion(client discovery.DiscoveryInterface) (int, int, error) {
+	version, err := client.ServerVersion()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Attempt parsing version.Major/Minor first, fall back to parsing gitVersion
+	major, err1 := strconv.Atoi(version.Major)
+	minor, err2 := strconv.Atoi(strings.Trim(version.Minor, "+"))
+
+	if err1 != nil || err2 != nil {
+		// gitVersion format ("v1.11.0+d4cacc0")
+		r, _ := regexp.Compile(`v[0-9]+\.[0-9]+\.`)
+		valid := r.MatchString(version.GitVersion)
+		if !valid {
+			return 0, 0, fmt.Errorf("gitVersion does not match expected format")
+		}
+		majorMinorArr := strings.Split(strings.Split(version.GitVersion, "v")[1], ".")
+
+		major, err = strconv.Atoi(majorMinorArr[0])
+		if err != nil {
+			return 0, 0, err
+		}
+		minor, err = strconv.Atoi(majorMinorArr[1])
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+
+	return major, minor, nil
 }
 
 type apiServerConfig struct {
