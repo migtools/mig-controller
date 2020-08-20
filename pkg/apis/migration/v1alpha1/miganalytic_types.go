@@ -56,29 +56,29 @@ type MigAnalyticPlan struct {
 
 // MigAnalyticNamespace defines the observed state of MigAnalyticNamespace
 type MigAnalyticNamespace struct {
-	Namespace                    string                         `json:"namespace"`
-	K8SResourceTotal             int                            `json:"k8sResourceTotal"`
-	ExcludedK8SResourceTotal     int                            `json:"excludedK8SResourceTotal"`
-	IncompatibleK8SResourceTotal int                            `json:"incompatibleK8SResourceTotal"`
-	PVCapacity                   resource.Quantity              `json:"pvCapacity"`
-	PVCount                      int                            `json:"pvCount"`
-	ImageCount                   int                            `json:"imageCount"`
-	ImageSizeTotal               resource.Quantity              `json:"imageSizeTotal"`
-	Images                       []MigAnalyticNamespaceImage    `json:"images,omitempty"`
-	K8SResources                 []MigAnalyticNamespaceResource `json:"k8sResources,omitempty"`
-	ExcludedK8SResources         []MigAnalyticNamespaceResource `json:"excludedK8SResources,omitempty"`
-	IncompatibleK8SResources     []MigAnalyticNamespaceResource `json:"incompatibleK8SResources,omitempty"`
+	Namespace                    string                  `json:"namespace"`
+	K8SResourceTotal             int                     `json:"k8sResourceTotal"`
+	ExcludedK8SResourceTotal     int                     `json:"excludedK8SResourceTotal"`
+	IncompatibleK8SResourceTotal int                     `json:"incompatibleK8SResourceTotal"`
+	PVCapacity                   resource.Quantity       `json:"pvCapacity"`
+	PVCount                      int                     `json:"pvCount"`
+	ImageCount                   int                     `json:"imageCount"`
+	ImageSizeTotal               resource.Quantity       `json:"imageSizeTotal"`
+	Images                       []MigAnalyticNSImage    `json:"images,omitempty"`
+	K8SResources                 []MigAnalyticNSResource `json:"k8sResources,omitempty"`
+	ExcludedK8SResources         []MigAnalyticNSResource `json:"excludedK8SResources,omitempty"`
+	IncompatibleK8SResources     []MigAnalyticNSResource `json:"incompatibleK8SResources,omitempty"`
 }
 
 // MigAnalyticNamespaceResource defines the observed state of MigAnalyticNamespaceResource
-type MigAnalyticNamespaceResource struct {
+type MigAnalyticNSResource struct {
 	Group   string `json:"group"`
 	Version string `json:"version"`
 	Kind    string `json:"kind"`
 	Count   int    `json:"count"`
 }
 
-type MigAnalyticNamespaceImage struct {
+type MigAnalyticNSImage struct {
 	Name      string            `json:"name"`
 	Reference string            `json:"reference"`
 	Size      resource.Quantity `json:"size"`

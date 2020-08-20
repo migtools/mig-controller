@@ -60,8 +60,8 @@ const (
 
 var log = logging.WithName("analytics")
 
-// Add creates a new MigAnalytic Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
-// and Start it when the Manager is Started.
+// Add creates a new MigAnalytic Controller and adds it to the Manager with default RBAC.
+// The Manager will set fields on the Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
@@ -220,8 +220,11 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			Namespace: namespace,
 		}
 
+		excludedResources := plan.Status.ExcludedResources
+		incompatible := plan.Status.Incompatible
+
 		if analytic.Spec.AnalyzeK8SResources {
-			err := r.analyzeK8SResources(dynamic, resources, &ns, plan.Status.ExcludedResources, plan.Status.Incompatible)
+			err := r.analyzeK8SResources(dynamic, resources, &ns, excludedResources, incompatible)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -259,7 +262,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface, resources []*metav1.APIResourceList, namespace *migapi.MigAnalyticNamespace, excludedResources []string, incompatible v1alpha1.Incompatible) error {
+func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
+	resources []*metav1.APIResourceList,
+	ns *migapi.MigAnalyticNamespace,
+	excludedResources []string, incompatible v1alpha1.Incompatible) error {
 	gvk.SortResources(resources)
 	cohabitatingResources := gvk.NewCohabitatingResources()
 
@@ -292,7 +298,7 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface, re
 				}
 			}
 
-			list, err := dynamic.Resource(gvr).Namespace(namespace.Namespace).List(metav1.ListOptions{})
+			list, err := dynamic.Resource(gvr).Namespace(ns.Namespace).List(metav1.ListOptions{})
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -305,24 +311,24 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface, re
 
 				// The lists are mutually exclusive. Only if not excluded check the incompatible GVK list
 				if !excluded {
-					compatible = isCompatible(gvr, namespace.Namespace, incompatible.Namespaces)
+					compatible = isCompatible(gvr, ns.Namespace, incompatible.Namespaces)
 				}
 
-				NamespaceResource := migapi.MigAnalyticNamespaceResource{
+				NamespaceResource := migapi.MigAnalyticNSResource{
 					Group:   gvr.Group,
 					Version: gvr.Version,
 					Kind:    gvr.Resource,
 					Count:   len(list.Items),
 				}
 				if !compatible {
-					namespace.IncompatibleK8SResources = append(namespace.IncompatibleK8SResources, NamespaceResource)
-					namespace.IncompatibleK8SResourceTotal += len(list.Items)
+					ns.IncompatibleK8SResources = append(ns.IncompatibleK8SResources, NamespaceResource)
+					ns.IncompatibleK8SResourceTotal += len(list.Items)
 				} else if excluded {
-					namespace.ExcludedK8SResources = append(namespace.ExcludedK8SResources, NamespaceResource)
-					namespace.ExcludedK8SResourceTotal += len(list.Items)
+					ns.ExcludedK8SResources = append(ns.ExcludedK8SResources, NamespaceResource)
+					ns.ExcludedK8SResourceTotal += len(list.Items)
 				} else {
-					namespace.K8SResources = append(namespace.K8SResources, NamespaceResource)
-					namespace.K8SResourceTotal += len(list.Items)
+					ns.K8SResources = append(ns.K8SResources, NamespaceResource)
+					ns.K8SResourceTotal += len(list.Items)
 				}
 			}
 		}
@@ -331,7 +337,10 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface, re
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client, namespace *migapi.MigAnalyticNamespace, listImages bool, listImagesLimit int) error {
+func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client,
+	namespace *migapi.MigAnalyticNamespace,
+	listImages bool,
+	listImagesLimit int) error {
 	imageStreamList := imagev1.ImageStreamList{}
 	internalRegistry, err := GetRegistryInfo(4, 4, client)
 	if err != nil {
@@ -357,7 +366,7 @@ func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client, namespace 
 					namespace.ImageSizeTotal.Add(size)
 					if listImages && namespace.ImageCount <= listImagesLimit {
 						namespace.Images = append(namespace.Images,
-							migapi.MigAnalyticNamespaceImage{
+							migapi.MigAnalyticNSImage{
 								Name:      image.Name,
 								Reference: image.DockerImageReference,
 								Size:      size,
@@ -370,7 +379,8 @@ func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client, namespace 
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) analyzePVCapacity(client compat.Client, namespace *migapi.MigAnalyticNamespace) error {
+func (r *ReconcileMigAnalytic) analyzePVCapacity(client compat.Client,
+	namespace *migapi.MigAnalyticNamespace) error {
 	pvcList := corev1.PersistentVolumeClaimList{}
 	err := client.List(context.TODO(), k8sclient.InNamespace(namespace.Namespace), &pvcList)
 	if err != nil {
@@ -384,7 +394,8 @@ func (r *ReconcileMigAnalytic) analyzePVCapacity(client compat.Client, namespace
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) getAnalyticPlan(analytic *migapi.MigAnalytic, plan *migapi.MigPlan) error {
+func (r *ReconcileMigAnalytic) getAnalyticPlan(analytic *migapi.MigAnalytic,
+	plan *migapi.MigPlan) error {
 	err := r.Get(
 		context.TODO(),
 		types.NamespacedName{
@@ -500,7 +511,8 @@ func GetRegistryInfo(major, minor int, client k8sclient.Client) (string, error) 
 		if err != nil {
 			return "", nil
 		}
-		internalRegistry := registrySvc.Spec.ClusterIP + ":" + strconv.Itoa(int(registrySvc.Spec.Ports[0].Port))
+		registryPort := strconv.Itoa(int(registrySvc.Spec.Ports[0].Port))
+		internalRegistry := registrySvc.Spec.ClusterIP + ":" + registryPort
 		return internalRegistry, nil
 	} else {
 		config := corev1.ConfigMap{}
@@ -536,7 +548,9 @@ func isExcluded(name string, excludedResources []string) bool {
 	return false
 }
 
-func isCompatible(gvr schema.GroupVersionResource, namespace string, namespaces []v1alpha1.IncompatibleNamespace) bool {
+func isCompatible(gvr schema.GroupVersionResource,
+	namespace string,
+	namespaces []v1alpha1.IncompatibleNamespace) bool {
 	for _, ns := range namespaces {
 		if namespace == ns.Name {
 			for _, gvk := range ns.GVKs {
@@ -549,7 +563,8 @@ func isCompatible(gvr schema.GroupVersionResource, namespace string, namespaces 
 	return true
 }
 
-func getImageDetails(tagItemImageName string, client k8sclient.Client) (*imagev1.Image, resource.Quantity, error) {
+func getImageDetails(tagItemImageName string,
+	client k8sclient.Client) (*imagev1.Image, resource.Quantity, error) {
 	var size resource.Quantity
 	image := &imagev1.Image{}
 	err := client.Get(
