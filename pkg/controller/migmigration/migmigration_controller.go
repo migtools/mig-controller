@@ -328,6 +328,9 @@ func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration
 
 // Ensures that the labels required to assist debugging are present on migmigration
 func (r *ReconcileMigMigration) ensureDebugLabels(migration *migapi.MigMigration) error {
+	if migration.Spec.MigPlanRef == nil {
+		return nil
+	}
 	if migration.Labels == nil {
 		migration.Labels = make(map[string]string)
 	} else {
