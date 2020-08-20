@@ -48,14 +48,14 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 
-		// Get cluster specific registry image
-		registryImage, err := cluster.GetRegistryImage(client)
+		// Migration Registry Secret
+		secret, err := r.ensureRegistrySecret(client, plan, storage)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 
-		// Migration Registry Secret
-		secret, err := r.ensureRegistrySecret(client, plan, storage)
+		// Get cluster specific registry image
+		registryImage, err := cluster.GetRegistryImage(client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -96,6 +96,7 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 }
 
 // Ensure the credentials secret for the migration registry on the specified cluster has been created
+// If the secret is updated, it will return delete the imageregistry reesources
 func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *migapi.MigPlan, storage *migapi.MigStorage) (*kapi.Secret, error) {
 	newSecret, err := plan.BuildRegistrySecret(r, storage)
 	if err != nil {
@@ -106,6 +107,11 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 		return nil, err
 	}
 	if foundSecret == nil {
+		// if for some reason secret was deleted, we need to make sure we redeploy
+		deleteErr := r.deleteImageRegistryResourcesForClient(client, plan)
+		if deleteErr != nil {
+			return nil, liberr.Wrap(deleteErr)
+		}
 		err = client.Create(context.TODO(), newSecret)
 		if err != nil {
 			return nil, err
@@ -114,6 +120,11 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 	}
 	if plan.EqualsRegistrySecret(newSecret, foundSecret) {
 		return foundSecret, nil
+	}
+	// secret is not same, we need to redeploy
+	deleteErr := r.deleteImageRegistryResourcesForClient(client, plan)
+	if deleteErr != nil {
+		return nil, liberr.Wrap(deleteErr)
 	}
 	plan.UpdateRegistrySecret(r, storage, foundSecret)
 	err = client.Update(context.TODO(), foundSecret)
@@ -258,41 +269,9 @@ func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) err
 		return liberr.Wrap(err)
 	}
 	for _, client := range clients {
-		secret, err := plan.GetRegistrySecret(client)
+		err := r.deleteImageRegistryResourcesForClient(client, plan)
 		if err != nil {
 			return liberr.Wrap(err)
-		}
-		if secret != nil {
-			if err := liberr.Wrap(client.Delete(context.Background(), secret)); err != nil {
-				return err
-			}
-		}
-		foundImageStream, err := plan.GetRegistryImageStream(client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if foundImageStream != nil {
-			if err := liberr.Wrap(client.Delete(context.Background(), foundImageStream)); err != nil {
-				return err
-			}
-		}
-		foundDC, err := plan.GetRegistryDC(client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if foundDC != nil {
-			if err := liberr.Wrap(client.Delete(context.Background(), foundDC)); err != nil {
-				return err
-			}
-		}
-		foundService, err := plan.GetRegistryService(client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if foundService != nil {
-			if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
