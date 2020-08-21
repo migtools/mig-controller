@@ -57,7 +57,6 @@ type MigPlanHook struct {
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
-	UnhealthyResources
 	PersistentVolumes `json:",inline"`
 	Namespaces        []string              `json:"namespaces,omitempty"`
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
@@ -69,6 +68,7 @@ type MigPlanSpec struct {
 
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
+	UnhealthyResources
 	Conditions
 	Incompatible      `json:",inline"`
 	ObservedDigest    string   `json:"observedDigest,omitempty"`

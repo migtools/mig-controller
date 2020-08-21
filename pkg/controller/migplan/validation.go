@@ -967,9 +967,9 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			unhealthyResources.Namespaces = append(unhealthyResources.Namespaces, unhealthyNamespace)
 		}
 	}
-	plan.Spec.UnhealthyResources = unhealthyResources
+	plan.Status.UnhealthyResources = unhealthyResources
 
-	if len(plan.Spec.UnhealthyResources.Namespaces) != 0 {
+	if len(plan.Status.UnhealthyResources.Namespaces) != 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     SourcePodsNotHealthy,
 			Status:   True,
