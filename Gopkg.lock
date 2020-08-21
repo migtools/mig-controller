@@ -505,6 +505,18 @@
   revision = "8741ff068a473be041d7bafb4502c12e4f10aab5"
 
 [[projects]]
+  branch = "master"
+  digest = "1:c9f65b3ce80ec80c4ebc1e2d122b8181d7939c1b67f8e8c9f3562cbac32eb5f2"
+  name = "github.com/openshift/library-go"
+  packages = [
+    "pkg/image/internal/digest",
+    "pkg/image/internal/reference",
+    "pkg/image/reference",
+  ]
+  pruneopts = "T"
+  revision = "215f00df72cc3ba45cdb50ec94e94d057750d9c6"
+
+[[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -1369,6 +1381,7 @@
     "github.com/openshift/api/network/v1",
     "github.com/openshift/api/project/v1",
     "github.com/openshift/api/route/v1",
+    "github.com/openshift/library-go/pkg/image/reference",
     "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
