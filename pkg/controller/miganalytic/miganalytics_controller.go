@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -197,12 +195,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		return liberr.Wrap(err)
 	}
 
-	discovery, err := discovery.NewDiscoveryClientForConfig(client.RestConfig())
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	resources, err := collectResources(discovery)
+	resources, err := collectResources(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -229,7 +222,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			}
 		}
 		if analytic.Spec.AnalyzeImageCount {
-			err := r.analyzeImages(client, discovery, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
+			err := r.analyzeImages(client, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -334,18 +327,13 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) analyzeImages(client k8sclient.Client,
-	discovery discovery.DiscoveryInterface,
+func (r *ReconcileMigAnalytic) analyzeImages(client compat.Client,
 	namespace *migapi.MigAnalyticNamespace,
 	listImages bool,
 	listImagesLimit int) error {
 	imageStreamList := imagev1.ImageStreamList{}
 
-	major, minor, err := GetServerVersion(discovery)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
+	major, minor := client.MajorVersion(), client.MinorVersion()
 	internalRegistry, err := GetRegistryInfo(major, minor, client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -420,8 +408,8 @@ func pvStorage(self corev1.ResourceList) *resource.Quantity {
 	return &resource.Quantity{Format: resource.BinarySI}
 }
 
-func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	resources, err := discovery.ServerResources()
+func collectResources(client compat.Client) ([]*metav1.APIResourceList, error) {
+	resources, err := client.ServerResources()
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +468,7 @@ func findSpecTag(tags []imagev1.TagReference, name string) *imagev1.TagReference
 	return nil
 }
 
-func GetRegistryInfo(major, minor int, client k8sclient.Client) (string, error) {
+func GetRegistryInfo(major, minor int, client compat.Client) (string, error) {
 	imageStreams := imagev1.ImageStreamList{}
 
 	err := client.List(context.TODO(), k8sclient.InNamespace("openshift"), &imageStreams)
@@ -589,38 +577,6 @@ func getImageDetails(tagItemImageName string,
 	size = resource.MustParse((strconv.Itoa(int(dockerImageMetadata.Size)/MiB) + MiBSuffix))
 
 	return image, size, nil
-}
-
-func GetServerVersion(client discovery.DiscoveryInterface) (int, int, error) {
-	version, err := client.ServerVersion()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// Attempt parsing version.Major/Minor first, fall back to parsing gitVersion
-	major, err1 := strconv.Atoi(version.Major)
-	minor, err2 := strconv.Atoi(strings.Trim(version.Minor, "+"))
-
-	if err1 != nil || err2 != nil {
-		// gitVersion format ("v1.11.0+d4cacc0")
-		r, _ := regexp.Compile(`v[0-9]+\.[0-9]+\.`)
-		valid := r.MatchString(version.GitVersion)
-		if !valid {
-			return 0, 0, fmt.Errorf("gitVersion does not match expected format")
-		}
-		majorMinorArr := strings.Split(strings.Split(version.GitVersion, "v")[1], ".")
-
-		major, err = strconv.Atoi(majorMinorArr[0])
-		if err != nil {
-			return 0, 0, err
-		}
-		minor, err = strconv.Atoi(majorMinorArr[1])
-		if err != nil {
-			return 0, 0, err
-		}
-	}
-
-	return major, minor, nil
 }
 
 type apiServerConfig struct {
