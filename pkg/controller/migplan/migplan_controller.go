@@ -387,14 +387,9 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 			return err
 		}
 	}
-	foundDC, err := plan.GetRegistryDC(client)
+	err = r.deleteImageRegistryDCForClient(client, plan)
 	if err != nil {
 		return liberr.Wrap(err)
-	}
-	if foundDC != nil {
-		if err := liberr.Wrap(client.Delete(context.Background(), foundDC)); err != nil {
-			return err
-		}
 	}
 	foundService, err := plan.GetRegistryService(client)
 	if err != nil {
@@ -402,6 +397,19 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 	}
 	if foundService != nil {
 		if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryDCForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	foundDC, err := plan.GetRegistryDC(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundDC != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundDC)); err != nil {
 			return err
 		}
 	}

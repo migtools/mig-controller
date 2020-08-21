@@ -107,7 +107,7 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 	}
 	if foundSecret == nil {
 		// if for some reason secret was deleted, we need to make sure we redeploy
-		deleteErr := r.deleteImageRegistryResourcesForClient(client, plan)
+		deleteErr := r.deleteImageRegistryDCForClient(client, plan)
 		if deleteErr != nil {
 			return nil, liberr.Wrap(deleteErr)
 		}
@@ -121,7 +121,7 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 		return foundSecret, nil
 	}
 	// secret is not same, we need to redeploy
-	deleteErr := r.deleteImageRegistryResourcesForClient(client, plan)
+	deleteErr := r.deleteImageRegistryDCForClient(client, plan)
 	if deleteErr != nil {
 		return nil, liberr.Wrap(deleteErr)
 	}
