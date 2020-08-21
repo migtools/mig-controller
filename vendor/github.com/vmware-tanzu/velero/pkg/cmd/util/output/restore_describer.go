@@ -31,7 +31,7 @@ import (
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertFile string) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -56,7 +56,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			}
 		}
 
-		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify)
+		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify, caCertFile)
 
 		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)
@@ -65,7 +65,9 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		d.Printf("Namespaces:\n")
 		var s string
 		if len(restore.Spec.IncludedNamespaces) == 0 {
-			s = "*"
+			s = "all namespaces found in the backup"
+		} else if len(restore.Spec.IncludedNamespaces) == 1 && restore.Spec.IncludedNamespaces[0] == "*" {
+			s = "all namespaces found in the backup"
 		} else {
 			s = strings.Join(restore.Spec.IncludedNamespaces, ", ")
 		}
@@ -114,7 +116,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 	})
 }
 
-func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
+func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
 		return
 	}
@@ -122,7 +124,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 	var buf bytes.Buffer
 	var resultMap map[string]pkgrestore.Result
 
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}

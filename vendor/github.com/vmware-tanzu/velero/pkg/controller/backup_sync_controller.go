@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,19 @@ import (
 	"encoding/json"
 	"time"
 
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/kubernetes"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -43,9 +44,10 @@ type backupSyncController struct {
 	backupClient                velerov1client.BackupsGetter
 	backupLocationClient        velerov1client.BackupStorageLocationsGetter
 	podVolumeBackupClient       velerov1client.PodVolumeBackupsGetter
-	backupLister                listers.BackupLister
-	backupStorageLocationLister listers.BackupStorageLocationLister
-	podVolumeBackupLister       listers.PodVolumeBackupLister
+	backupLister                velerov1listers.BackupLister
+	csiSnapshotClient           *snapshotterClientSet.Clientset
+	kubeClient                  kubernetes.Interface
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
 	defaultBackupSyncPeriod     time.Duration
@@ -57,11 +59,12 @@ func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
-	backupInformer informers.BackupInformer,
-	backupStorageLocationInformer informers.BackupStorageLocationInformer,
-	podVolumeBackupInformer informers.PodVolumeBackupInformer,
+	backupLister velerov1listers.BackupLister,
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	syncPeriod time.Duration,
 	namespace string,
+	csiSnapshotClient *snapshotterClientSet.Clientset,
+	kubeClient kubernetes.Interface,
 	defaultBackupLocation string,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
@@ -79,9 +82,10 @@ func NewBackupSyncController(
 		namespace:                   namespace,
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultBackupSyncPeriod:     syncPeriod,
-		backupLister:                backupInformer.Lister(),
-		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
-		podVolumeBackupLister:       podVolumeBackupInformer.Lister(),
+		backupLister:                backupLister,
+		backupStorageLocationLister: backupStorageLocationLister,
+		csiSnapshotClient:           csiSnapshotClient,
+		kubeClient:                  kubeClient,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -91,10 +95,6 @@ func NewBackupSyncController(
 
 	c.resyncFunc = c.run
 	c.resyncPeriod = 30 * time.Second
-	c.cacheSyncWaiters = []cache.InformerSynced{
-		backupInformer.Informer().HasSynced,
-		backupStorageLocationInformer.Informer().HasSynced,
-	}
 
 	return c
 }
@@ -269,6 +269,34 @@ func (c *backupSyncController) run() {
 					continue
 				default:
 					log.Debug("Synced pod volume backup into cluster")
+				}
+			}
+
+			if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+				// we are syncing these objects only to ensure that the storage snapshots are cleaned up
+				// on backup deletion or expiry.
+				log.Info("Syncing CSI volumesnapshotcontents in backup")
+				snapConts, err := backupStore.GetCSIVolumeSnapshotContents(backupName)
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error getting CSI volumesnapshotcontents for this backup from backup store")
+					continue
+				}
+
+				log.Infof("Syncing %d CSI volumesnapshotcontents in backup", len(snapConts))
+				for _, snapCont := range snapConts {
+					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
+					snapCont.ResourceVersion = ""
+					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(snapCont)
+					switch {
+					case err != nil && kuberrs.IsAlreadyExists(err):
+						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
+						continue
+					case err != nil && !kuberrs.IsAlreadyExists(err):
+						log.WithError(errors.WithStack(err)).Errorf("Error syncing volumesnapshotcontent %s into cluster", snapCont.Name)
+						continue
+					default:
+						log.Infof("Created CSI volumesnapshotcontent %s", created.Name)
+					}
 				}
 			}
 		}

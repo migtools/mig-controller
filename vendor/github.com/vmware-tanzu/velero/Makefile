@@ -40,6 +40,10 @@ CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 li
 CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
 MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 
+# set git sha and tree state
+GIT_SHA = $(shell git rev-parse HEAD)
+GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -113,6 +117,8 @@ local: build-dirs
 	VERSION=$(VERSION) \
 	PKG=$(PKG) \
 	BIN=$(BIN) \
+	GIT_SHA=$(GIT_SHA) \
+	GIT_DIRTY="$(GIT_DIRTY)" \
 	OUTPUT_DIR=$$(pwd)/_output/bin/$(GOOS)/$(GOARCH) \
 	./hack/build.sh
 
@@ -126,6 +132,8 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 		VERSION=$(VERSION) \
 		PKG=$(PKG) \
 		BIN=$(BIN) \
+		GIT_SHA=$(GIT_SHA) \
+		GIT_DIRTY=\"$(GIT_DIRTY)\" \
 		OUTPUT_DIR=/output/$(GOOS)/$(GOARCH) \
 		./hack/build.sh'"
 
@@ -135,21 +143,22 @@ BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
-	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
-	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
+	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# because the Kubernetes code-generator tools require the project to
+	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
+	@# under $GOPATH).
 	@docker run \
 		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd)/vendor/k8s.io/api:/go/src/k8s.io/api:delegated" \
+		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
-		-v "$$(pwd):/go/src/$(PKG):delegated" \
-		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
-		-w /go/src/$(PKG) \
+		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
@@ -225,7 +234,17 @@ clean:
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
-ci: all verify test
+.PHONY: modules
+modules:
+	go mod tidy
+
+.PHONY: verify-modules
+verify-modules: modules
+	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
+		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
+	fi
+
+ci: verify-modules verify all test
 
 changelog:
 	hack/changelog.sh
@@ -279,7 +298,7 @@ serve-docs:
 # tagged version. Once the unstaged changes are ready, they can be added to the
 # staging area using 'git add' and then committed.
 #
-# To run gen-docs: "NEW_DOCS_VERSION=v1.1.0 make gen-docs"
+# To run gen-docs: "NEW_DOCS_VERSION=v1.4 VELERO_VERSION=v1.4.0 make gen-docs"
 #
 # **NOTE**: there are additional manual steps required to finalize the process of generating
 # a new versioned docs site. The full process is documented in site/README-JEKYLL.md.

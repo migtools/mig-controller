@@ -1,7 +1,7 @@
-FROM openshift/origin-release:golang-1.11 AS builder
+FROM openshift/origin-release:golang-1.14 AS builder
 COPY . /go/src/github.com/vmware-tanzu/velero
 RUN cd /go/src/github.com/vmware-tanzu/velero \
-&& CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' ./cmd/velero-restic-restore-helper
+&& CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -mod=mod ./cmd/velero-restic-restore-helper
 
 FROM registry.access.redhat.com/ubi8-minimal
 RUN microdnf -y update && microdnf clean all

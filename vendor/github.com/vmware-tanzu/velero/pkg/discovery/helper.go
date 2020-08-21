@@ -25,9 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	kcmdutil "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -49,10 +52,18 @@ type Helper interface {
 	// APIGroups gets the current set of supported APIGroups
 	// in the cluster.
 	APIGroups() []metav1.APIGroup
+
+	// ServerVersion retrieves and parses the server's k8s version (git version)
+	// in the cluster.
+	ServerVersion() *version.Info
 }
 
 type serverResourcesInterface interface {
+	// ServerPreferredResources() is used to populate Resources() with only Preferred Versions - this is the default
 	ServerPreferredResources() ([]*metav1.APIResourceList, error)
+	// ServerGroupsAndResources returns supported groups and resources for *all* groups and versions
+	// Used to populate Resources() if feature flag is passed
+	ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)
 }
 
 type helper struct {
@@ -60,11 +71,12 @@ type helper struct {
 	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
-	lock         sync.RWMutex
-	mapper       meta.RESTMapper
-	resources    []*metav1.APIResourceList
-	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
-	apiGroups    []metav1.APIGroup
+	lock          sync.RWMutex
+	mapper        meta.RESTMapper
+	resources     []*metav1.APIResourceList
+	resourcesMap  map[schema.GroupVersionResource]metav1.APIResource
+	apiGroups     []metav1.APIGroup
+	serverVersion *version.Info
 }
 
 var _ Helper = &helper{}
@@ -106,14 +118,28 @@ func (h *helper) Refresh() error {
 		return errors.WithStack(err)
 	}
 
-	preferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
-	if err != nil {
-		return errors.WithStack(err)
+	var serverResources []*metav1.APIResourceList
+
+	if features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+		// ServerGroupsAndResources returns all APIGroup and APIResouceList - not only preferred versions
+		_, serverAllResources, err := refreshServerGroupsAndResources(h.discoveryClient, h.logger)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		h.logger.Info("The '%s' feature flag was specified, using all API group versions.", velerov1api.APIGroupVersionsFeatureFlag)
+		serverResources = serverAllResources
+	} else {
+		// ServerPreferredResources() returns only preferred APIGroup - this is the default since no feature flag has been passed
+		serverPreferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		serverResources = serverPreferredResources
 	}
 
 	h.resources = discovery.FilteredBy(
 		discovery.ResourcePredicateFunc(filterByVerbs),
-		preferredResources,
+		serverResources,
 	)
 
 	sortResources(h.resources)
@@ -143,6 +169,13 @@ func (h *helper) Refresh() error {
 	}
 	h.apiGroups = apiGroupList.Groups
 
+	serverVersion, err := h.discoveryClient.ServerVersion()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	h.serverVersion = serverVersion
+
 	return nil
 }
 
@@ -157,6 +190,19 @@ func refreshServerPreferredResources(discoveryClient serverResourcesInterface, l
 		}
 	}
 	return preferredResources, err
+}
+
+func refreshServerGroupsAndResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	serverGroups, serverResources, err := discoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+			for groupVersion, err := range discoveryErr.Groups {
+				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
+			}
+			return serverGroups, serverResources, nil
+		}
+	}
+	return serverGroups, serverResources, err
 }
 
 func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {
@@ -199,4 +245,10 @@ func (h *helper) APIGroups() []metav1.APIGroup {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	return h.apiGroups
+}
+
+func (h *helper) ServerVersion() *version.Info {
+	h.lock.RLock()
+	defer h.lock.RUnlock()
+	return h.serverVersion
 }

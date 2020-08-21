@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -41,7 +42,9 @@ type BackupInfo struct {
 	Log,
 	PodVolumeBackups,
 	VolumeSnapshots,
-	BackupResourceList io.Reader
+	BackupResourceList,
+	CSIVolumeSnapshots,
+	CSIVolumeSnapshotContents io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -56,6 +59,8 @@ type BackupStore interface {
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
+	GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error)
+	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -114,6 +119,10 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		}
 		location.Spec.Config["bucket"] = bucket
 		location.Spec.Config["prefix"] = prefix
+		// Only include a CACert if it's specified in order to maintain compatibility with plugins that don't expect it.
+		if location.Spec.ObjectStorage.CACert != nil {
+			location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
+		}
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)
@@ -211,40 +220,28 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getPodVolumeBackupsKey(info.Name), info.PodVolumeBackups); err != nil {
-		errs := []error{err}
-
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
+	// Since the logic for all of these files is the exact same except for the name and the contents,
+	// use a map literal to iterate through them and write them to the bucket.
+	var backupObjs = map[string]io.Reader{
+		s.layout.getPodVolumeBackupsKey(info.Name):          info.PodVolumeBackups,
+		s.layout.getBackupVolumeSnapshotsKey(info.Name):     info.VolumeSnapshots,
+		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
+		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
+		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(info.Name), info.VolumeSnapshots); err != nil {
-		errs := []error{err}
+	for key, reader := range backupObjs {
+		if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
+			errs := []error{err}
 
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
+			// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
+			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
+			errs = append(errs, deleteErr)
 
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
-	}
-
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupResourceListKey(info.Name), info.BackupResourceList); err != nil {
-		errs := []error{err}
-
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
+			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+			errs = append(errs, deleteErr)
+			return kerrors.NewAggregate(errs)
+		}
 	}
 
 	return nil
@@ -327,6 +324,42 @@ func decode(jsongzReader io.Reader, into interface{}) error {
 	}
 
 	return nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshots were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var csiSnaps []*snapshotv1beta1api.VolumeSnapshot
+	if err := decode(res, &csiSnaps); err != nil {
+		return nil, err
+	}
+	return csiSnaps, nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshotcontents were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var snapConts []*snapshotv1beta1api.VolumeSnapshotContent
+	if err := decode(res, &snapConts); err != nil {
+		return nil, err
+	}
+	return snapConts, nil
 }
 
 func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error) {

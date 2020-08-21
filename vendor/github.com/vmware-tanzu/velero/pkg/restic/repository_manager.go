@@ -245,10 +245,26 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
-	if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
-		return errors.New("timed out waiting for cache to sync")
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	caCert, err := GetCACert(rm.backupLocationLister, rm.namespace, backupLocation)
+	if err != nil {
+		return err
 	}
+	var caCertFile string
+	if caCert != nil {
+		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
+		if err != nil {
+			return err
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
+	cmd.CACertFile = caCertFile
+
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
+		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
+			return errors.New("timed out waiting for cache to sync")
+		}
 		env, err := AzureCmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
 		if err != nil {
 			return err
@@ -259,13 +275,6 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 			return errors.New("timed out waiting for cache to sync")
 		}
 
-		env, err := S3CmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
-		if err != nil {
-			return err
-		}
-		cmd.Env = env
-	}
-	if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
 		bsl, err := rm.backupLocationLister.BackupStorageLocations(rm.namespace).Get(backupLocation)
 		if err != nil {
 			return err
@@ -275,6 +284,12 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 			insecureSkipTLSVerify = false
 		}
 		cmd.InsecureSkipTLSVerify = insecureSkipTLSVerify
+
+		env, err := S3CmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
+		if err != nil {
+			return err
+		}
+		cmd.Env = env
 	}
 
 	stdout, stderr, err := veleroexec.RunCommand(cmd.Cmd())

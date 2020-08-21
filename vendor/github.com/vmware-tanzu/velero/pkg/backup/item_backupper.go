@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,67 +34,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
-type itemBackupperFactory interface {
-	newItemBackupper(
-		backup *Request,
-		podCommandExecutor podexec.PodCommandExecutor,
-		tarWriter tarWriter,
-		dynamicFactory client.DynamicFactory,
-		discoveryHelper discovery.Helper,
-		resticBackupper restic.Backupper,
-		resticSnapshotTracker *pvcSnapshotTracker,
-		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) ItemBackupper
-}
-
-type defaultItemBackupperFactory struct{}
-
-func (f *defaultItemBackupperFactory) newItemBackupper(
-	backupRequest *Request,
-	podCommandExecutor podexec.PodCommandExecutor,
-	tarWriter tarWriter,
-	dynamicFactory client.DynamicFactory,
-	discoveryHelper discovery.Helper,
-	resticBackupper restic.Backupper,
-	resticSnapshotTracker *pvcSnapshotTracker,
-	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) ItemBackupper {
-	ib := &defaultItemBackupper{
-		backupRequest:           backupRequest,
-		tarWriter:               tarWriter,
-		dynamicFactory:          dynamicFactory,
-		discoveryHelper:         discoveryHelper,
-		resticBackupper:         resticBackupper,
-		resticSnapshotTracker:   resticSnapshotTracker,
-		volumeSnapshotterGetter: volumeSnapshotterGetter,
-
-		itemHookHandler: &defaultItemHookHandler{
-			podCommandExecutor: podCommandExecutor,
-		},
-	}
-
-	// this is for testing purposes
-	ib.additionalItemBackupper = ib
-
-	return ib
-}
-
-type ItemBackupper interface {
-	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error)
-}
-
-type defaultItemBackupper struct {
+// itemBackupper can back up individual items to a tar writer.
+type itemBackupper struct {
 	backupRequest           *Request
 	tarWriter               tarWriter
 	dynamicFactory          client.DynamicFactory
@@ -103,7 +55,6 @@ type defaultItemBackupper struct {
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
 	itemHookHandler                    itemHookHandler
-	additionalItemBackupper            ItemBackupper
 	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
 }
 
@@ -111,7 +62,7 @@ type defaultItemBackupper struct {
 // namespaces IncludesExcludes list.
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
@@ -209,6 +160,12 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
+	// capture the version of the object before invoking plugin actions as the plugin may update
+	// the group version of the object.
+	// group version of this object
+	// Used on filepath to backup up all groups and versions
+	version := resourceVersion(obj)
+
 	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
 	if err != nil {
 		backupErrs = append(backupErrs, err)
@@ -253,11 +210,23 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 
+	// Getting the preferred group version of this resource
+	preferredVersion := preferredGVR.Version
+
 	var filePath string
+
+	// API Group version is now part of path of backup as a subdirectory
+	// it will add a prefix to subdirectory name for the preferred version
+	versionPath := version
+
+	if version == preferredVersion {
+		versionPath = version + velerov1api.PreferredVersionDir
+	}
+
 	if namespace != "" {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
+		filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), versionPath, velerov1api.NamespaceScopedDir, namespace, name+".json")
 	} else {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
+		filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), versionPath, velerov1api.ClusterScopedDir, name+".json")
 	}
 
 	itemBytes, err := json.Marshal(obj.UnstructuredContent())
@@ -281,12 +250,39 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return false, errors.WithStack(err)
 	}
 
+	// backing up the preferred version backup without API Group version on path -  this is for backward compability
+
+	log.Debugf("Resource %s/%s, version= %s, preferredVersion=%s", groupResource.String(), name, version, preferredVersion)
+	if version == preferredVersion {
+		if namespace != "" {
+			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.NamespaceScopedDir, namespace, name+".json")
+		} else {
+			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.ClusterScopedDir, name+".json")
+		}
+
+		hdr = &tar.Header{
+			Name:     filePath,
+			Size:     int64(len(itemBytes)),
+			Typeflag: tar.TypeReg,
+			Mode:     0755,
+			ModTime:  time.Now(),
+		}
+
+		if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+			return false, errors.WithStack(err)
+		}
+
+		if _, err := ib.tarWriter.Write(itemBytes); err != nil {
+			return false, errors.WithStack(err)
+		}
+	}
+
 	return true, nil
 }
 
 // backupPodVolumes triggers restic backups of the specified pod volumes, and returns a list of PodVolumeBackups
 // for volumes that were successfully backed up, and a slice of any errors that were encountered.
-func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) ([]*velerov1api.PodVolumeBackup, []error) {
+func (ib *itemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumes) == 0 {
 		return nil, nil
 	}
@@ -299,7 +295,7 @@ func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *co
 	return ib.resticBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, volumes, log)
 }
 
-func (ib *defaultItemBackupper) executeActions(
+func (ib *itemBackupper) executeActions(
 	log logrus.FieldLogger,
 	obj runtime.Unstructured,
 	groupResource schema.GroupResource,
@@ -346,12 +342,20 @@ func (ib *defaultItemBackupper) executeActions(
 				return nil, err
 			}
 
-			additionalItem, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				log.WithFields(logrus.Fields{
+					"groupResource": additionalItem.GroupResource,
+					"namespace":     additionalItem.Namespace,
+					"name":          additionalItem.Name,
+				}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
+				continue
+			}
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
 
-			if _, err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
+			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr); err != nil {
 				return nil, err
 			}
 		}
@@ -362,7 +366,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
 	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -396,10 +400,10 @@ const (
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
+func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
-	if ib.backupRequest.Spec.SnapshotVolumes != nil && !*ib.backupRequest.Spec.SnapshotVolumes {
+	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
 		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
 		return nil
 	}
@@ -499,7 +503,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	return kubeerrs.NewAggregate(errs)
 }
 
-func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
+func volumeSnapshot(backup *velerov1api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
 	return &volume.Snapshot{
 		Spec: volume.SnapshotSpec{
 			BackupName:           backup.Name,
@@ -522,4 +526,11 @@ func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, lo
 func resourceKey(obj runtime.Unstructured) string {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	return fmt.Sprintf("%s/%s", gvk.GroupVersion().String(), gvk.Kind)
+}
+
+// resourceVersion returns a string representing the object's API Version (e.g.
+// v1 if item belongs to apps/v1
+func resourceVersion(obj runtime.Unstructured) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return gvk.Version
 }

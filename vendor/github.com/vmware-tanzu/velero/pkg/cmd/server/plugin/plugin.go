@@ -20,6 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
@@ -38,7 +40,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
-				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction).
+				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction(f)).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
@@ -50,6 +52,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
+				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				Serve()
 		},
 	}
@@ -92,8 +95,20 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
-func newRemapCRDVersionAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewRemapCRDVersionAction(logger), nil
+func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		config, err := f.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		client, err := apiextensions.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
+
+		return backup.NewRemapCRDVersionAction(logger, client.ApiextensionsV1beta1().CustomResourceDefinitions()), nil
+	}
 }
 
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -161,4 +176,19 @@ func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 
 func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewClusterRoleBindingAction(logger), nil
+}
+
+func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangePVCNodeSelectorAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.CoreV1().Nodes(),
+		), nil
+	}
 }

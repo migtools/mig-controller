@@ -27,7 +27,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +46,7 @@ import (
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create " + req.URL.Path)
+		trace := utiltrace.New("Create", utiltrace.Field{Key: "url", Value: req.URL.Path}, utiltrace.Field{Key: "user-agent", Value: &lazyTruncatedUserAgent{req}}, utiltrace.Field{Key: "client", Value: &lazyClientIP{req}})
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
@@ -57,21 +57,24 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
-		var (
-			namespace, name string
-			err             error
-		)
-		if includeName {
-			namespace, name, err = scope.Namer.Name(req)
-		} else {
-			namespace, err = scope.Namer.Namespace(req)
-		}
+		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, w, req)
-			return
+			if includeName {
+				// name was required, return
+				scope.err(err, w, req)
+				return
+			}
+
+			// otherwise attempt to look up the namespace
+			namespace, err = scope.Namer.Namespace(req)
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
 		}
 
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -96,7 +99,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		options := &metav1.CreateOptions{}
 		values := req.URL.Query()
-		if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
+		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
@@ -106,6 +109,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			scope.err(err, w, req)
 			return
 		}
+		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
 
 		defaultGVK := scope.Kind
 		original := r.New()
@@ -128,9 +132,14 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
-		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, dryrun.IsDryRun(options.DryRun), userInfo)
+
+		// On create, get name from new object if unset
+		if len(name) == 0 {
+			_, name, _ = scope.Namer.ObjectName(obj)
+		}
+		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-			err = mutatingAdmission.Admit(admissionAttributes, scope)
+			err = mutatingAdmission.Admit(ctx, admissionAttributes, scope)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -144,11 +153,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				return
 			}
 
-			obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-			if err != nil {
-				scope.err(fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err), w, req)
-				return
-			}
+			obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 		}
 
 		trace.Step("About to store object in database")

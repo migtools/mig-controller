@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2019,2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ type InstallOptions struct {
 	Plugins                           flag.StringArray
 	NoDefaultBackupLocation           bool
 	CRDsOnly                          bool
+	CACertFile                        string
+	Features                          string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -94,11 +96,13 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o. Optional.")
-	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
+	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic daemonset. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
+	flags.StringVar(&o.Features, "features", o.Features, "comma separated list of Velero feature flags to be set on the Velero deployment and the restic daemonset, if restic is enabled")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -138,6 +142,17 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 			return nil, err
 		}
 	}
+	var caCertData []byte
+	if o.CACertFile != "" {
+		realPath, err := filepath.Abs(o.CACertFile)
+		if err != nil {
+			return nil, err
+		}
+		caCertData, err = ioutil.ReadFile(realPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 	veleroPodResources, err := kubeutil.ParseResourceRequirements(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
 	if err != nil {
 		return nil, err
@@ -166,6 +181,8 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
 		Plugins:                           o.Plugins,
 		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
+		CACertData:                        caCertData,
+		Features:                          strings.Split(o.Features, ","),
 	}, nil
 }
 

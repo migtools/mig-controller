@@ -29,6 +29,7 @@ type Command struct {
 	Command               string
 	RepoIdentifier        string
 	PasswordFile          string
+	CACertFile            string
 	Dir                   string
 	Args                  []string
 	ExtraFlags            []string
@@ -51,6 +52,9 @@ func (c *Command) StringSlice() []string {
 	res = append(res, c.Command, repoFlag(c.RepoIdentifier))
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
+	}
+	if c.CACertFile != "" {
+		res = append(res, cacertFlag(c.CACertFile))
 	}
 	if c.InsecureSkipTLSVerify {
 		res = append(res, "--insecure-skip-tls-verify")
@@ -97,4 +101,8 @@ func passwordFlag(file string) string {
 
 func cacheDirFlag(dir string) string {
 	return fmt.Sprintf("--cache-dir=%s", dir)
+}
+
+func cacertFlag(path string) string {
+	return fmt.Sprintf("--cacert=%s", path)
 }

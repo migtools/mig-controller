@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,10 +46,10 @@ var (
 	DefaultVeleroPodMemRequest = "128Mi"
 	DefaultVeleroPodCPULimit   = "1000m"
 	DefaultVeleroPodMemLimit   = "256Mi"
-	DefaultResticPodCPURequest = "0"
-	DefaultResticPodMemRequest = "0"
-	DefaultResticPodCPULimit   = "0"
-	DefaultResticPodMemLimit   = "0"
+	DefaultResticPodCPURequest = "500m"
+	DefaultResticPodMemRequest = "512Mi"
+	DefaultResticPodCPULimit   = "1000m"
+	DefaultResticPodMemLimit   = "1Gi"
 )
 
 func labels() map[string]string {
@@ -137,7 +137,7 @@ func Namespace(namespace string) *corev1.Namespace {
 	}
 }
 
-func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string) *v1.BackupStorageLocation {
+func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *v1.BackupStorageLocation {
 	return &v1.BackupStorageLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
@@ -150,6 +150,7 @@ func BackupStorageLocation(namespace, provider, bucket, prefix string, config ma
 				ObjectStorage: &v1.ObjectStorageLocation{
 					Bucket: bucket,
 					Prefix: prefix,
+					CACert: caCert,
 				},
 			},
 			Config: config,
@@ -217,6 +218,8 @@ type VeleroOptions struct {
 	DefaultResticMaintenanceFrequency time.Duration
 	Plugins                           []string
 	NoDefaultBackupLocation           bool
+	CACertData                        []byte
+	Features                          []string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -252,7 +255,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	}
 
 	if !o.NoDefaultBackupLocation {
-		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
+		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
 		appendUnstructured(resources, bsl)
 	}
 
@@ -272,6 +275,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		WithDefaultResticMaintenanceFrequency(o.DefaultResticMaintenanceFrequency),
 	}
 
+	if len(o.Features) > 0 {
+		deployOpts = append(deployOpts, WithFeatures(o.Features))
+	}
+
 	if o.RestoreOnly {
 		deployOpts = append(deployOpts, WithRestoreOnly())
 	}
@@ -285,12 +292,16 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {
-		ds := DaemonSet(o.Namespace,
+		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
 			WithSecret(secretPresent),
-		)
+		}
+		if len(o.Features) > 0 {
+			dsOpts = append(dsOpts, WithFeatures(o.Features))
+		}
+		ds := DaemonSet(o.Namespace, dsOpts...)
 		appendUnstructured(resources, ds)
 	}
 
