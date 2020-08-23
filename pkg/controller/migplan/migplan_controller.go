@@ -384,6 +384,7 @@ func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
 }
 
 func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
 	secret, err := plan.GetRegistrySecret(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -419,6 +420,7 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 }
 
 func (r ReconcileMigPlan) deleteImageRegistryDCForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
 	foundDC, err := plan.GetRegistryDC(client)
 	if err != nil {
 		return liberr.Wrap(err)

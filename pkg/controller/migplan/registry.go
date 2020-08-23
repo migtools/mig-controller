@@ -267,6 +267,7 @@ func (r ReconcileMigPlan) getBothClients(plan *migapi.MigPlan) ([]compat.Client,
 }
 
 func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
 	clients, err := r.getBothClients(plan)
 	if err != nil {
 		return liberr.Wrap(err)
