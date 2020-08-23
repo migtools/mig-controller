@@ -31,6 +31,10 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		return nil, errors.New("migration registry DeploymentConfig not found")
 	}
 
+	if registryDC.DeletionTimestamp != nil {
+		return nil, errors.New(fmt.Sprintf("DeploymentConfig %s/%s is being garbage collected with deletion timestamp %s", registryDC.Namespace, registryDC.Name, registryDC.DeletionTimestamp))
+	}
+
 	if len(registryService.Spec.Ports) == 0 {
 		return nil, errors.New("Migration Registry service port not found")
 	}
