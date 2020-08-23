@@ -131,10 +131,15 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error 
 }
 
 func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
+	caBundle := p.CustomCABundle
+	if p.CustomCABundle == nil {
+		// always make sure we have a uniform format of data stored in secret k8s API
+		caBundle = []byte{}
+	}
 	registrySecret.Data = map[string][]byte{
 		"access_key":    []byte(secret.Data[AwsAccessKeyId]),
 		"secret_key":    []byte(secret.Data[AwsSecretAccessKey]),
-		"ca_bundle.pem": p.CustomCABundle,
+		"ca_bundle.pem": caBundle,
 	}
 	return nil
 }
