@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	kapi "k8s.io/api/core/v1"
 	"testing"
 
 	"github.com/onsi/gomega"
@@ -253,4 +254,59 @@ func TestPersistentVolumes_EndPvStaging(t *testing.T) {
 				staged:       true,
 			},
 		}))
+}
+
+func TestMigPlan_EqualsRegistrySecret(t *testing.T) {
+	type args struct {
+		a *kapi.Secret
+		b *kapi.Secret
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "Equal secret data",
+			args: args{
+				a: &kapi.Secret{Data: map[string][]byte{
+					"access_key":    {65, 75, 73, 65, 86, 66, 81, 89, 66, 50, 70, 68, 53, 69, 72, 71, 71, 54, 53, 54},
+					"ca_bundle.pem": {},
+					"secret_key":    {113, 98, 84, 121, 85, 85, 106, 121, 49, 48, 68, 52, 109, 122, 49, 87, 113, 118, 108, 73, 110, 82, 54, 43, 49, 90, 85, 54, 119, 80, 67, 74, 119, 81, 111, 80, 73, 83, 55, 48},
+				},
+				},
+				b: &kapi.Secret{Data: map[string][]byte{
+					"access_key":    {65, 75, 73, 65, 86, 66, 81, 89, 66, 50, 70, 68, 53, 69, 72, 71, 71, 54, 53, 54},
+					"ca_bundle.pem": {},
+					"secret_key":    {113, 98, 84, 121, 85, 85, 106, 121, 49, 48, 68, 52, 109, 122, 49, 87, 113, 118, 108, 73, 110, 82, 54, 43, 49, 90, 85, 54, 119, 80, 67, 74, 119, 81, 111, 80, 73, 83, 55, 48},
+				}},
+			},
+			want: true,
+		},
+		{
+			name: "Equal secret data",
+			args: args{
+				a: &kapi.Secret{Data: map[string][]byte{
+					"access_key":    {65, 75, 73, 65, 86, 66, 81, 89, 66, 50, 70, 68, 53, 69, 72, 71, 71, 54, 53, 54},
+					"ca_bundle.pem": nil,
+					"secret_key":    {113, 98, 84, 121, 85, 85, 106, 121, 49, 48, 68, 52, 109, 122, 49, 87, 113, 118, 108, 73, 110, 82, 54, 43, 49, 90, 85, 54, 119, 80, 67, 74, 119, 81, 111, 80, 73, 83, 55, 48},
+				},
+				},
+				b: &kapi.Secret{Data: map[string][]byte{
+					"access_key":    {65, 75, 73, 65, 86, 66, 81, 89, 66, 50, 70, 68, 53, 69, 72, 71, 71, 54, 53, 54},
+					"ca_bundle.pem": {},
+					"secret_key":    {113, 98, 84, 121, 85, 85, 106, 121, 49, 48, 68, 52, 109, 122, 49, 87, 113, 118, 108, 73, 110, 82, 54, 43, 49, 90, 85, 54, 119, 80, 67, 74, 119, 81, 111, 80, 73, 83, 55, 48},
+				}},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &MigPlan{}
+			if got := r.EqualsRegistrySecret(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("EqualsRegistrySecret() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
