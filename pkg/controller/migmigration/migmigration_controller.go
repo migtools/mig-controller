@@ -135,6 +135,13 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Ensure debugging labels are present on migmigration
+	err = r.ensureDebugLabels(migration)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, err
+	}
+
 	// Set values.
 	log.SetValues("migration", migration.Name)
 
@@ -316,5 +323,27 @@ func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration
 			UID:        plan.UID,
 		})
 
+	return nil
+}
+
+// Ensures that the labels required to assist debugging are present on migmigration
+func (r *ReconcileMigMigration) ensureDebugLabels(migration *migapi.MigMigration) error {
+	if migration.Spec.MigPlanRef == nil {
+		return nil
+	}
+	if migration.Labels == nil {
+		migration.Labels = make(map[string]string)
+	} else {
+		if value, exists := migration.Labels[MigPlanDebugLabel]; exists {
+			if value == migration.Spec.MigPlanRef.Name {
+				return nil
+			}
+		}
+	}
+	migration.Labels[MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
+	err := r.Update(context.TODO(), migration)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
 }
