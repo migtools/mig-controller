@@ -6,6 +6,10 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: mighooks.migration.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type=='Ready')].status
+    name: Ready
+    type: string
   group: migration.openshift.io
   names:
     kind: MigHook
