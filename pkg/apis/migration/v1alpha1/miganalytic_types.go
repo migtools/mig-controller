@@ -89,6 +89,12 @@ type MigAnalyticNSImage struct {
 
 // MigAnalytic is the Schema for the miganalytics API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="MigPlan",type=string,JSONPath=`.spec.migPlanRef.name`
+// +kubebuilder:printcolumn:name="PercentComplete",type=string,JSONPath=`.status.analytics.percentComplete`
+// +kubebuilder:printcolumn:name="K8SResourceTotal",type=string,JSONPath=`.status.analytics.k8sResourceTotal`
+// +kubebuilder:printcolumn:name="ImageCount",type=string,JSONPath=`.status.analytics.imageCount`
+// +kubebuilder:printcolumn:name="PVCount",type=string,JSONPath=`.status.analytics.pvCount`
 type MigAnalytic struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

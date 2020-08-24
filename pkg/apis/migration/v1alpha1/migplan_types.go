@@ -80,6 +80,10 @@ type MigPlanStatus struct {
 
 // MigPlan is the Schema for the migplans API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="SrcCluster",type=string,JSONPath=`.spec.srcMigClusterRef.name`
+// +kubebuilder:printcolumn:name="DestCluster",type=string,JSONPath=`.spec.destMigClusterRef.name`
+// +kubebuilder:printcolumn:name="MigStorage",type=string,JSONPath=`.spec.migStorageRef.name`
 type MigPlan struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

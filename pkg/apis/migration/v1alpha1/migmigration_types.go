@@ -53,6 +53,10 @@ type MigMigrationStatus struct {
 
 // MigMigration is the Schema for the migmigrations API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="MigPlan",type=string,JSONPath=`.spec.migPlanRef.name`
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.spec.phase`
+// +kubebuilder:printcolumn:name="IsStage",type=string,JSONPath=`.spec.stage`
 type MigMigration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
