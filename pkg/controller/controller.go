@@ -18,6 +18,7 @@ package controller
 
 import (
 	"github.com/konveyor/mig-controller/pkg/controller/discovery"
+	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
 	"github.com/konveyor/mig-controller/pkg/controller/mighook"
 	"github.com/konveyor/mig-controller/pkg/controller/migmigration"
@@ -40,6 +41,7 @@ var CamControllers = []AddFunction{
 	mighook.Add,
 	migstorage.Add,
 	migplan.Add,
+	miganalytic.Add,
 }
 
 //

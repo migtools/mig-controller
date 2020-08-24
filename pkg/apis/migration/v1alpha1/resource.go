@@ -105,6 +105,35 @@ func (r *MigStorage) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
+//Analytic
+func (r *MigAnalytic) GetCorrelationLabels() map[string]string {
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		PartOfLabel: Application,
+		key:         value,
+	}
+}
+
+func (r *MigAnalytic) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
+}
+
+func (r *MigAnalytic) GetNamespace() string {
+	return r.Namespace
+}
+
+func (r *MigAnalytic) GetName() string {
+	return r.Name
+}
+
+func (r *MigAnalytic) MarkReconciled() {
+	r.Status.ObservedGeneration = r.Generation + 1
+}
+
+func (r *MigAnalytic) HasReconciled() bool {
+	return r.Status.ObservedGeneration == r.Generation
+}
+
 //Hook
 func (r *MigHook) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
