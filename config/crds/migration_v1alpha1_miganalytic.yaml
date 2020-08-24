@@ -11,19 +11,25 @@ spec:
     name: Ready
     type: string
   - JSONPath: .spec.migPlanRef.name
-    name: MigPlan
+    name: Plan
     type: string
   - JSONPath: .status.analytics.percentComplete
-    name: PercentComplete
+    name: Progress
     type: string
   - JSONPath: .status.analytics.k8sResourceTotal
-    name: K8SResourceTotal
+    name: Resources
     type: string
   - JSONPath: .status.analytics.imageCount
-    name: ImageCount
+    name: Images
+    type: string
+  - JSONPath: .status.analytics.imageSizeTotal
+    name: ImageSize
     type: string
   - JSONPath: .status.analytics.pvCount
-    name: PVCount
+    name: PVs
+    type: string
+  - JSONPath: .status.analytics.pvCapacity
+    name: PVCapacity
     type: string
   group: migration.openshift.io
   names:

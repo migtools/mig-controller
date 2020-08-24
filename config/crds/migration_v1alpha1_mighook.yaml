@@ -10,6 +10,12 @@ spec:
   - JSONPath: .status.conditions[?(@.type=='Ready')].status
     name: Ready
     type: string
+  - JSONPath: .spec.image
+    name: Image
+    type: string
+  - JSONPath: .spec.targetCluster
+    name: TargetCluster
+    type: string
   group: migration.openshift.io
   names:
     kind: MigHook
