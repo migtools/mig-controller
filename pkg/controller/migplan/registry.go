@@ -63,14 +63,8 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 
-		// Migration Registry ImageStream
-		err = r.ensureRegistryImageStream(client, plan, secret, registryImage)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-
 		// Migration Registry DeploymentConfig
-		err = r.ensureRegistryDC(client, plan, storage, secret, registryImage)
+		err = r.ensureRegistryDeployment(client, plan, storage, secret, registryImage)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -111,7 +105,7 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 	}
 	if foundSecret == nil {
 		// if for some reason secret was deleted, we need to make sure we redeploy
-		deleteErr := r.deleteImageRegistryDCForClient(client, plan)
+		deleteErr := r.deleteImageRegistryDeploymentForClient(client, plan)
 		if deleteErr != nil {
 			return nil, liberr.Wrap(deleteErr)
 		}
@@ -125,7 +119,7 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 		return foundSecret, nil
 	}
 	// secret is not same, we need to redeploy
-	deleteErr := r.deleteImageRegistryDCForClient(client, plan)
+	deleteErr := r.deleteImageRegistryDeploymentForClient(client, plan)
 	if deleteErr != nil {
 		return nil, liberr.Wrap(deleteErr)
 	}
@@ -138,37 +132,8 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 	return foundSecret, nil
 }
 
-// Ensure the imagestream for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryImageStream(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret, registryImage string) error {
-	newImageStream, err := plan.BuildRegistryImageStream(secret.GetName(), registryImage)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	foundImageStream, err := plan.GetRegistryImageStream(client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	if foundImageStream == nil {
-		err = client.Create(context.TODO(), newImageStream)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		return nil
-	}
-	if plan.EqualsRegistryImageStream(newImageStream, foundImageStream) {
-		return nil
-	}
-	plan.UpdateRegistryImageStream(foundImageStream, registryImage)
-	err = client.Update(context.TODO(), foundImageStream)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	return nil
-}
-
-// Ensure the deploymentconfig for the migration registry on the specified cluster has been created
-func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi.MigPlan,
+// Ensure the deployment for the migration registry on the specified cluster has been created
+func (r ReconcileMigPlan) ensureRegistryDeployment(client k8sclient.Client, plan *migapi.MigPlan,
 	storage *migapi.MigStorage, secret *kapi.Secret, registryImage string) error {
 
 	name := secret.GetName()
@@ -181,26 +146,26 @@ func (r ReconcileMigPlan) ensureRegistryDC(client k8sclient.Client, plan *migapi
 	}
 
 	//Construct Registry DC
-	newDC, err := plan.BuildRegistryDC(storage, proxySecret, name, dirName, registryImage)
+	newDeployment, err := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	foundDC, err := plan.GetRegistryDC(client)
+	foundDeployment, err := plan.GetRegistryDeployment(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if foundDC == nil {
-		err = client.Create(context.TODO(), newDC)
+	if foundDeployment == nil {
+		err = client.Create(context.TODO(), newDeployment)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		return nil
 	}
-	if plan.EqualsRegistryDC(newDC, foundDC) {
+	if plan.EqualsRegistryDeployment(newDeployment, foundDeployment) {
 		return nil
 	}
-	plan.UpdateRegistryDC(storage, foundDC, proxySecret, name, dirName, registryImage)
-	err = client.Update(context.TODO(), foundDC)
+	plan.UpdateRegistryDeployment(storage, foundDeployment, proxySecret, name, dirName, registryImage)
+	err = client.Update(context.TODO(), foundDeployment)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
