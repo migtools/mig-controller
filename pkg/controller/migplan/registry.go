@@ -123,10 +123,13 @@ func (r ReconcileMigPlan) ensureRegistrySecret(client k8sclient.Client, plan *mi
 	if deleteErr != nil {
 		return nil, liberr.Wrap(deleteErr)
 	}
-	plan.UpdateRegistrySecret(r, storage, foundSecret)
+	err = plan.UpdateRegistrySecret(r, storage, foundSecret)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
 	err = client.Update(context.TODO(), foundSecret)
 	if err != nil {
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
 
 	return foundSecret, nil
@@ -146,10 +149,7 @@ func (r ReconcileMigPlan) ensureRegistryDeployment(client k8sclient.Client, plan
 	}
 
 	//Construct Registry DC
-	newDeployment, err := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
+	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage)
 	foundDeployment, err := plan.GetRegistryDeployment(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -176,10 +176,7 @@ func (r ReconcileMigPlan) ensureRegistryDeployment(client k8sclient.Client, plan
 // Ensure the service for the migration registry on the specified cluster has been created
 func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *migapi.MigPlan, secret *kapi.Secret) error {
 	name := secret.GetName()
-	newService, err := plan.BuildRegistryService(name)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
+	newService := plan.BuildRegistryService(name)
 	foundService, err := plan.GetRegistryService(client)
 	if err != nil {
 		return liberr.Wrap(err)
