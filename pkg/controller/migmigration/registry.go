@@ -23,7 +23,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 	if registryService == nil {
 		return nil, errors.New("migration registry service not found")
 	}
-	registryDC, err := t.PlanResources.MigPlan.GetRegistryDC(client)
+	registryDC, err := t.PlanResources.MigPlan.GetRegistryDeployment(client)
 	if err != nil {
 		return nil, err
 	}

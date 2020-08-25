@@ -2,6 +2,7 @@ package cloudprovider
 
 import (
 	"context"
+	"k8s.io/api/apps/v1"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -68,7 +69,7 @@ func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *GCPProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
+func (p *GCPProvider) UpdateRegistryDC(dc *v1.Deployment, name, dirName string) {
 	envVars := dc.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
