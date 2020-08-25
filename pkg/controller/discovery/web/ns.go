@@ -8,8 +8,9 @@ import (
 )
 
 const (
+	Ns2Param       = "ns2"
 	NamespacesRoot = ClusterRoot + "/namespaces"
-	NamespaceRoot  = NamespacesRoot + "/:ns2"
+	NamespaceRoot  = NamespacesRoot + "/:" + Ns2Param
 )
 
 //
@@ -88,7 +89,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		SrvCount, err := model.Service{
+		srvCount, err := model.Service{
 			Base: model.Base{
 				Cluster:   h.cluster.PK,
 				Namespace: m.Name,
@@ -101,14 +102,10 @@ func (h NsHandler) List(ctx *gin.Context) {
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
-		content.Items = append(
-			content.Items,
-			Namespace{
-				Name:         m.Name,
-				ServiceCount: SrvCount,
-				PvcCount:     pvcCount,
-				PodCount:     podCount,
-			})
+		r := Namespace{}
+		r.With(m, srvCount, pvcCount, podCount)
+		r.SelfLink = h.Link(m)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -126,20 +123,42 @@ func (h NsHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, h.cluster.Namespace)
 }
 
+//
+// Build self link.
+func (h NsHandler) Link(m *model.Namespace) string {
+	return h.BaseHandler.Link(
+		NamespaceRoot,
+		Params{
+			Ns2Param: m.Name,
+		})
+}
+
 // Namespace REST resource
 type Namespace struct {
 	// Cluster k8s namespace.
 	Namespace string `json:"namespace,omitempty"`
 	// Cluster k8s name.
 	Name string `json:"name"`
-	// Raw k8s object.
-	Object *v1.Namespace `json:"object,omitempty"`
 	// Number of services.
 	ServiceCount int64 `json:"serviceCount"`
 	// Number of pods.
 	PodCount int64 `json:"podCount"`
 	// Number of PVCs.
 	PvcCount int64 `json:"pvcCount"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
+	// Raw k8s object.
+	Object *v1.Namespace `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *Namespace) With(m *model.Namespace, serviceCount, podCount, pvcCount int64) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.ServiceCount = serviceCount
+	r.PodCount = podCount
+	r.PvcCount = pvcCount
 }
 
 //

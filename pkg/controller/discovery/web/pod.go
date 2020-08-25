@@ -16,8 +16,9 @@ import (
 )
 
 const (
+	PodParam = "pod"
 	PodsRoot = NamespaceRoot + "/pods"
-	PodRoot  = PodsRoot + "/:pod"
+	PodRoot  = PodsRoot + "/:" + PodParam
 	LogRoot  = PodRoot + "/log"
 )
 
@@ -44,16 +45,16 @@ func (h PodHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	namespace := ctx.Param("ns2")
-	name := ctx.Param("pod")
-	pod := model.Pod{
+	namespace := ctx.Param(Ns2Param)
+	name := ctx.Param(PodParam)
+	m := model.Pod{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
 			Namespace: namespace,
 			Name:      name,
 		},
 	}
-	err := pod.Get(h.container.Db)
+	err := m.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -64,11 +65,10 @@ func (h PodHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := Pod{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-		Object:    pod.DecodeObject(),
-	}
+	r := Pod{}
+	r.With(&m)
+	r.SelfLink = h.Link(&h.cluster, &m)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -85,7 +85,7 @@ func (h PodHandler) List(ctx *gin.Context) {
 	collection := model.Pod{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
-			Namespace: ctx.Param("ns2"),
+			Namespace: ctx.Param(Ns2Param),
 		},
 	}
 	count, err := collection.Count(db, model.ListOptions{})
@@ -108,15 +108,26 @@ func (h PodHandler) List(ctx *gin.Context) {
 		Count: count,
 	}
 	for _, m := range list {
-		d := Pod{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-			Object:    m.DecodeObject(),
-		}
-		content.Items = append(content.Items, d)
+		r := Pod{}
+		r.With(m)
+		r.SelfLink = h.Link(&h.cluster, m)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h PodHandler) Link(c *model.Cluster, m *model.Pod) string {
+	return h.BaseHandler.Link(
+		PodRoot,
+		Params{
+			NsParam:      c.Namespace,
+			ClusterParam: c.Name,
+			Ns2Param:     m.Namespace,
+			PodParam:     m.Name,
+		})
 }
 
 //
@@ -145,8 +156,8 @@ func (h LogHandler) List(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	namespace := ctx.Param("ns2")
-	name := ctx.Param("pod")
+	namespace := ctx.Param(Ns2Param)
+	name := ctx.Param(PodParam)
 	pod := model.Pod{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
@@ -305,8 +316,18 @@ type Pod struct {
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *v1.Pod `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *Pod) With(m *model.Pod) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //

@@ -64,10 +64,10 @@ func (r *Container) GetDs(cluster *model.Cluster) (*DataSource, bool) {
 //
 // Add a cluster to the container.
 // Build/update a DataSource for the cluster as needed.
-func (r *Container) Add(cluster *migapi.MigCluster) error {
+func (r *Container) Add(cluster *migapi.MigCluster, collections ...Collection) error {
 	build := func() *DataSource {
-		r.mutex.RLock()
-		defer r.mutex.RUnlock()
+		r.mutex.Lock()
+		defer r.mutex.Unlock()
 		key := DsKey{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
@@ -76,14 +76,8 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 			ds.Stop(false)
 		}
 		ds := &DataSource{
-			Container: r,
-			Collections: Collections{
-				&Namespace{},
-				&Service{},
-				&PVC{},
-				&Pod{},
-				&PV{},
-			},
+			Container:   r,
+			Collections: collections,
 		}
 		r.sources[key] = ds
 		return ds
@@ -101,8 +95,8 @@ func (r *Container) Add(cluster *migapi.MigCluster) error {
 //
 // Delete the DataSource for a deleted MigCluster.
 func (r *Container) Delete(cluster types.NamespacedName) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	key := DsKey{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,

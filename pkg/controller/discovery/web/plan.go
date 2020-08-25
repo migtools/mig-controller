@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/api/core/v1"
 	"net/http"
@@ -14,8 +15,9 @@ import (
 
 // Plan route root.
 const (
+	PlanParam = "plan"
 	PlansRoot = Root + "/plans"
-	PlanRoot  = PlansRoot + "/:plan"
+	PlanRoot  = PlansRoot + "/:" + PlanParam
 )
 
 //
@@ -34,6 +36,7 @@ func (h PlanHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PlansRoot+"/", h.List)
 	r.GET(PlanRoot, h.Get)
 	r.GET(PlanRoot+"/pods", h.Pods)
+	r.GET(PlanRoot+"/tree", h.Tree)
 }
 
 //
@@ -45,19 +48,22 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	if status != http.StatusOK {
 		return status
 	}
-	h.plan = model.Plan{
-		CR: model.CR{
-			Namespace: ctx.Param("ns1"),
-			Name:      ctx.Param("plan"),
-		},
-	}
-	err := h.plan.Get(h.container.Db)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			Log.Trace(err)
-			return http.StatusInternalServerError
-		} else {
-			return http.StatusNotFound
+	name := ctx.Param(PlanParam)
+	if name != "" {
+		h.plan = model.Plan{
+			CR: model.CR{
+				Namespace: ctx.Param(NsParam),
+				Name:      ctx.Param(PlanParam),
+			},
+		}
+		err := h.plan.Get(h.container.Db)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				Log.Trace(err)
+				return http.StatusInternalServerError
+			} else {
+				return http.StatusNotFound
+			}
 		}
 	}
 	status = h.allow(h.getSAR())
@@ -110,12 +116,10 @@ func (h PlanHandler) List(ctx *gin.Context) {
 		Count: count,
 	}
 	for _, m := range list {
-		d := Plan{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-			Object:    m.DecodeObject(),
-		}
-		content.Items = append(content.Items, d)
+		r := Plan{}
+		r.With(m)
+		r.SelfLink = h.Link(m)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -140,11 +144,39 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := Plan{
-		Namespace: h.plan.Namespace,
-		Name:      h.plan.Name,
-		Object:    h.plan.DecodeObject(),
+	r := Plan{}
+	r.With(&h.plan)
+	r.SelfLink = h.Link(&h.plan)
+	content := r
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Get a specific migration tree.
+func (h PlanHandler) Tree(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
 	}
+	tree := PlanTree{
+		db:   h.container.Db,
+		plan: &h.plan,
+	}
+	root, err := tree.Build()
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		} else {
+			ctx.Status(http.StatusNotFound)
+			return
+		}
+	}
+
+	content := root
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -161,6 +193,321 @@ func (h PlanHandler) Pods(ctx *gin.Context) {
 	content.With(ctx, &h)
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h PlanHandler) Link(m *model.Plan) string {
+	return h.BaseHandler.Link(
+		PlanRoot,
+		Params{
+			NsParam:   m.Namespace,
+			PlanParam: m.Name,
+		})
+}
+
+//
+// Tree node.
+type TreeNode struct {
+	Kind       string     `json:"kind"`
+	Namespace  string     `json:"namespace"`
+	Name       string     `json:"name"`
+	Children   []TreeNode `json:"children,omitempty"`
+	ObjectLink string     `json:"objectLink"`
+}
+
+//
+// Plan Tree.
+type PlanTree struct {
+	// Subject.
+	plan *model.Plan
+	// DB client.
+	db model.DB
+	// Plan clusters.
+	cluster struct {
+		// Source cluster.
+		source model.Cluster
+		// Destination cluster.
+		destination model.Cluster
+	}
+}
+
+//
+// Build the tree.
+func (t *PlanTree) Build() (*TreeNode, error) {
+	err := t.setCluster()
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	root := t.getRoot()
+	err = t.addMigrations(root)
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+
+	return root, nil
+}
+
+//
+// Get the relevant correlation labels.
+func (t *PlanTree) cLabel(r migapi.MigResource) model.Label {
+	k, v := r.GetCorrelationLabel()
+	return model.Label{
+		Name:  k,
+		Value: v,
+	}
+}
+
+//
+// Set the cluster field based on
+// the referenced plan.
+func (t *PlanTree) setCluster() error {
+	planObject := t.plan.DecodeObject()
+	sRef := planObject.Spec.SrcMigClusterRef
+	dRef := planObject.Spec.DestMigClusterRef
+	cluster := model.Cluster{
+		CR: model.CR{
+			Namespace: sRef.Namespace,
+			Name:      sRef.Name,
+		},
+	}
+	err := cluster.Get(t.db)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	t.cluster.source = cluster
+	cluster = model.Cluster{
+		CR: model.CR{
+			Namespace: dRef.Namespace,
+			Name:      dRef.Name,
+		},
+	}
+	err = cluster.Get(t.db)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	t.cluster.destination = cluster
+
+	return nil
+}
+
+//
+// Build root node.
+func (t *PlanTree) getRoot() *TreeNode {
+	root := &TreeNode{
+		Kind:       migref.ToKind(t.plan),
+		ObjectLink: PlanHandler{}.Link(t.plan),
+		Namespace:  t.plan.Namespace,
+		Name:       t.plan.Name,
+	}
+
+	return root
+}
+
+//
+// Add related migrations.
+func (t *PlanTree) addMigrations(parent *TreeNode) error {
+	collection := model.Migration{}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		migration := m.DecodeObject()
+		ref := migration.Spec.MigPlanRef
+		if !migref.RefSet(ref) {
+			continue
+		}
+		if ref.Namespace != t.plan.Namespace ||
+			ref.Name != t.plan.Name {
+			continue
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: MigrationHandler{}.Link(m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addBackups(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		err = t.addRestores(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add related velero Backups.
+func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) error {
+	cluster := t.cluster.source
+	collection := model.Backup{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	cLabel := t.cLabel(migration.DecodeObject())
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Labels == nil {
+			continue
+		}
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: BackupHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+		err := t.addPvBackups(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add related velero Restores.
+func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) error {
+	cluster := t.cluster.destination
+	collection := model.Restore{
+		Base: model.Base{
+			Cluster: model.Cluster{
+				CR: model.CR{
+					Namespace: cluster.Namespace,
+					Name:      cluster.Name,
+				}}.PK,
+		},
+	}
+	cLabel := t.cLabel(migration.DecodeObject())
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Labels == nil {
+			continue
+		}
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: RestoreHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+		err := t.addPvRestores(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add related velero PodVolumeBackups.
+func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
+	cluster := t.cluster.source
+	collection := model.PodVolumeBackup{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		for _, ref := range object.OwnerReferences {
+			if ref.Kind != migref.ToKind(backup) ||
+				ref.Name != backup.Name ||
+				m.Namespace != backup.Namespace {
+				continue
+			}
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: PvBackupHandler{}.Link(&cluster, m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+
+	return nil
+}
+
+//
+// Add related velero PodVolumeRestores.
+func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error {
+	cluster := t.cluster.destination
+	collection := model.PodVolumeRestore{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		for _, ref := range object.OwnerReferences {
+			if ref.Kind != migref.ToKind(restore) ||
+				ref.Name != restore.Name ||
+				m.Namespace != restore.Namespace {
+				continue
+			}
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: PvRestoreHandler{}.Link(&cluster, m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+
+	return nil
 }
 
 //
@@ -292,8 +639,18 @@ type Plan struct {
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *migapi.MigPlan `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *Plan) With(m *model.Plan) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //

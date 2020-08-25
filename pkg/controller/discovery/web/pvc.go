@@ -9,8 +9,9 @@ import (
 )
 
 const (
+	PvcParam = "pvc"
 	PvcsRoot = NamespaceRoot + "/persistentvolumeclaims"
-	PvcRoot  = PvcsRoot + "/:pvc"
+	PvcRoot  = PvcsRoot + "/:" + PvcParam
 )
 
 //
@@ -60,12 +61,10 @@ func (h PvcHandler) List(ctx *gin.Context) {
 	content := PvcList{
 		Count: count,
 	}
-	for _, pvc := range list {
-		r := PVC{
-			Namespace: pvc.Namespace,
-			Name:      pvc.Name,
-			Object:    pvc.DecodeObject(),
-		}
+	for _, m := range list {
+		r := PVC{}
+		r.With(m)
+		r.SelfLink = h.Link(&h.cluster, m)
 		content.Items = append(content.Items, r)
 	}
 
@@ -80,14 +79,14 @@ func (h PvcHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	pvc := model.PVC{
+	m := model.PVC{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
-			Namespace: ctx.Param("ns2"),
-			Name:      ctx.Param("pv"),
+			Namespace: ctx.Param(Ns2Param),
+			Name:      ctx.Param(PvcParam),
 		},
 	}
-	err := pvc.Get(h.container.Db)
+	err := m.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -98,13 +97,25 @@ func (h PvcHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := PVC{
-		Namespace: pvc.Namespace,
-		Name:      pvc.Name,
-		Object:    pvc.DecodeObject(),
-	}
+	r := PVC{}
+	r.With(&m)
+	r.SelfLink = h.Link(&h.cluster, &m)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h PvcHandler) Link(c *model.Cluster, m *model.PVC) string {
+	return h.BaseHandler.Link(
+		PvcRoot,
+		Params{
+			NsParam:      c.Namespace,
+			ClusterParam: c.Name,
+			Ns2Param:     m.Namespace,
+			PvcParam:     m.Name,
+		})
 }
 
 // PVC REST resource
@@ -113,8 +124,18 @@ type PVC struct {
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *v1.PersistentVolumeClaim `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *PVC) With(m *model.PVC) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //

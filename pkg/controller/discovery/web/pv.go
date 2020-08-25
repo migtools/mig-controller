@@ -9,8 +9,9 @@ import (
 )
 
 const (
+	PvParam = "pv"
 	PvsRoot = ClusterRoot + "/persistentvolumes"
-	PvRoot  = PvsRoot + "/:pv"
+	PvRoot  = PvsRoot + "/:" + PvParam
 )
 
 //
@@ -60,12 +61,10 @@ func (h PvHandler) List(ctx *gin.Context) {
 	content := PvList{
 		Count: count,
 	}
-	for _, pv := range list {
-		r := PV{
-			Namespace: pv.Namespace,
-			Name:      pv.Name,
-			Object:    pv.DecodeObject(),
-		}
+	for _, m := range list {
+		r := PV{}
+		r.With(m)
+		r.SelfLink = h.Link(&h.cluster, m)
 		content.Items = append(content.Items, r)
 	}
 
@@ -80,13 +79,13 @@ func (h PvHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	pv := model.PV{
+	m := model.PV{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
-			Name:    ctx.Param("pv"),
+			Name:    ctx.Param(PvParam),
 		},
 	}
-	err := pv.Get(h.container.Db)
+	err := m.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -97,13 +96,25 @@ func (h PvHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := PV{
-		Namespace: pv.Namespace,
-		Name:      pv.Name,
-		Object:    pv.DecodeObject(),
-	}
+	r := PV{}
+	r.With(&m)
+	r.SelfLink = h.Link(&h.cluster, &m)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h PvHandler) Link(c *model.Cluster, m *model.PV) string {
+	return h.BaseHandler.Link(
+		PvRoot,
+		Params{
+			NsParam:      c.Namespace,
+			ClusterParam: c.Name,
+			Ns2Param:     m.Namespace,
+			PvParam:      m.Name,
+		})
 }
 
 // PV REST resource
@@ -112,8 +123,18 @@ type PV struct {
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *v1.PersistentVolume `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *PV) With(m *model.PV) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //
