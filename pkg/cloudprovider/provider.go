@@ -1,8 +1,8 @@
 package cloudprovider
 
 import (
-	appsv1 "github.com/openshift/api/apps/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
@@ -28,7 +28,7 @@ type Provider interface {
 	UpdateVSL(location *velero.VolumeSnapshotLocation)
 	UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error
 	UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error
-	UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string)
+	UpdateRegistryDC(dc *appsv1.Deployment, name, dirName string)
 	Validate(secret *kapi.Secret) []string
 	Test(secret *kapi.Secret) error
 }
