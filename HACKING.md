@@ -4,7 +4,7 @@
 
 __1. Install prerequisites__
 
- - golang compiler (tested @ 1.13.8)
+ - golang compiler (tested @ 1.14.4)
  - kubebuilder (tested @ 1.0.7)
  - dep (binary built from https://github.com/golang/dep/pull/1963)
  - mig-operator (tested @ latest) installed on both clusters involved in migration
