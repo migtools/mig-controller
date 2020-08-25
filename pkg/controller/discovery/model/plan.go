@@ -84,3 +84,83 @@ func (m *Plan) Delete(db DB) error {
 	m.SetPk()
 	return Table{db}.Delete(m)
 }
+
+//
+// Migration  model
+type Migration struct {
+	CR
+}
+
+//
+// Update the model `with` a MigMigration.
+func (m *Migration) With(object *migapi.MigMigration) {
+	m.UID = string(object.UID)
+	m.Version = object.ResourceVersion
+	m.Namespace = object.Namespace
+	m.Name = object.Name
+	m.EncodeObject(object)
+}
+
+//
+// Encode the object.
+func (m *Migration) EncodeObject(migration *migapi.MigMigration) {
+	object, _ := json.Marshal(migration)
+	m.Object = string(object)
+}
+
+//
+// Decode the object.
+func (m *Migration) DecodeObject() *migapi.MigMigration {
+	migration := &migapi.MigMigration{}
+	json.Unmarshal([]byte(m.Object), migration)
+	return migration
+}
+
+//
+// Count in the DB.
+func (m Migration) Count(db DB, options ListOptions) (int64, error) {
+	return Table{db}.Count(&m, options)
+}
+
+//
+// Fetch the model from the DB.
+func (m Migration) List(db DB, options ListOptions) ([]*Migration, error) {
+	list := []*Migration{}
+	listed, err := Table{db}.List(&m, options)
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	for _, intPtr := range listed {
+		list = append(list, intPtr.(*Migration))
+	}
+
+	return list, nil
+}
+
+//
+// Fetch the model from the DB.
+func (m *Migration) Get(db DB) error {
+	return Table{db}.Get(m)
+}
+
+//
+// Insert the model into the DB.
+func (m *Migration) Insert(db DB) error {
+	m.SetPk()
+	return Table{db}.Insert(m)
+}
+
+//
+// Update the model in the DB.
+func (m *Migration) Update(db DB) error {
+	m.SetPk()
+	return Table{db}.Update(m)
+}
+
+//
+// Delete the model in the DB.
+func (m *Migration) Delete(db DB) error {
+	m.SetPk()
+	return Table{db}.Delete(m)
+}

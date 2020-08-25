@@ -9,8 +9,9 @@ import (
 )
 
 const (
+	ServiceParam = "service"
 	ServicesRoot = NamespaceRoot + "/services"
-	ServiceRoot  = ServicesRoot + "/:service"
+	ServiceRoot  = ServicesRoot + "/:" + ServiceParam
 )
 
 //
@@ -60,12 +61,10 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 	content := ServiceList{
 		Count: count,
 	}
-	for _, service := range list {
-		r := Service{
-			Namespace: service.Namespace,
-			Name:      service.Name,
-			Object:    service.DecodeObject(),
-		}
+	for _, m := range list {
+		r := Service{}
+		r.With(m)
+		r.SelfLink = h.Link(&h.cluster, m)
 		content.Items = append(content.Items, r)
 	}
 
@@ -80,14 +79,14 @@ func (h ServiceHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	service := model.Service{
+	m := model.Service{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
-			Namespace: ctx.Param("ns2"),
-			Name:      ctx.Param("service"),
+			Namespace: ctx.Param(Ns2Param),
+			Name:      ctx.Param(ServiceParam),
 		},
 	}
-	err := service.Get(h.container.Db)
+	err := m.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -98,13 +97,25 @@ func (h ServiceHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	content := Service{
-		Namespace: service.Namespace,
-		Name:      service.Name,
-		Object:    service.DecodeObject(),
-	}
+	r := Service{}
+	r.With(&m)
+	r.SelfLink = h.Link(&h.cluster, &m)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h ServiceHandler) Link(c *model.Cluster, m *model.Service) string {
+	return h.BaseHandler.Link(
+		ServiceRoot,
+		Params{
+			NsParam:      c.Namespace,
+			ClusterParam: c.Name,
+			Ns2Param:     m.Namespace,
+			ServiceParam: m.Name,
+		})
 }
 
 // Service REST resource
@@ -113,8 +124,18 @@ type Service struct {
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *v1.Service `json:"object,omitempty"`
+}
+
+//
+// Build the resource.
+func (r *Service) With(m *model.Service) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //

@@ -11,8 +11,9 @@ import (
 
 // Cluster-scoped route roots.
 const (
+	ClusterParam = "cluster"
 	ClustersRoot = Root + "/clusters"
-	ClusterRoot  = ClustersRoot + "/:cluster"
+	ClusterRoot  = ClustersRoot + "/:" + ClusterParam
 )
 
 //
@@ -35,8 +36,8 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 	}
 	h.cluster = model.Cluster{
 		CR: model.CR{
-			Namespace: ctx.Param("ns1"),
-			Name:      ctx.Param("cluster"),
+			Namespace: ctx.Param(NsParam),
+			Name:      ctx.Param(ClusterParam),
 		},
 	}
 	status = h.dsReady()
@@ -159,12 +160,10 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 		Count: count,
 	}
 	for _, m := range list {
-		d := Cluster{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-			Object:    m.DecodeObject(),
-		}
-		content.Items = append(content.Items, d)
+		r := Cluster{}
+		r.With(m)
+		r.SelfLink = h.Link(m)
+		content.Items = append(content.Items, r)
 	}
 
 	ctx.JSON(http.StatusOK, content)
@@ -178,13 +177,23 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 		ctx.Status(status)
 		return
 	}
-	content := Cluster{
-		Namespace: h.cluster.Namespace,
-		Name:      h.cluster.Name,
-		Object:    h.cluster.DecodeObject(),
-	}
+	r := Cluster{}
+	r.With(&h.cluster)
+	r.SelfLink = h.Link(&h.cluster)
+	content := r
 
 	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Build self link.
+func (h ClusterHandler) Link(m *model.Cluster) string {
+	return h.BaseHandler.Link(
+		ClusterRoot,
+		Params{
+			NsParam:      m.Namespace,
+			ClusterParam: m.Name,
+		})
 }
 
 //
@@ -194,8 +203,18 @@ type Cluster struct {
 	Namespace string `json:"namespace,omitempty"`
 	// Cluster k8s name.
 	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
 	Object *migapi.MigCluster `json:"object,omitempty"`
+}
+
+//
+// Get self URI.
+func (r *Cluster) With(m *model.Cluster) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
 }
 
 //

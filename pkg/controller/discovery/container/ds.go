@@ -227,13 +227,16 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 // Build the k8s manager.
 func (r *DataSource) buildManager(name string) error {
 	var err error
+	if name == "" {
+		name = "local"
+	}
 	r.manager, err = manager.New(r.RestCfg, manager.Options{})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	dsController, err := controller.New(
-		name,
+		"ds",
 		r.manager,
 		controller.Options{
 			Reconciler: r,

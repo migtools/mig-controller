@@ -28,8 +28,14 @@ var Log *logging.Logger
 
 // Root - all routes.
 const (
-	Root = "/namespaces/:ns1"
+	NsParam      = "ns1"
+	NsCollection = "namespaces"
+	Root         = "/" + NsCollection + "/" + ":" + NsParam
 )
+
+//
+// Params
+type Params = map[string]string
 
 //
 // Web server
@@ -143,6 +149,39 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 		PlanHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
+			},
+		},
+		MigrationHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
+		BackupHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
+		RestoreHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
+		PvBackupHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
+		PvRestoreHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
 			},
 		},
 	}
@@ -288,6 +327,16 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 	}
 
 	return http.StatusForbidden
+}
+
+//
+// Build link.
+func (h *BaseHandler) Link(path string, params Params) string {
+	for k, v := range params {
+		path = strings.Replace(path, ":"+k, v, 1)
+	}
+
+	return path
 }
 
 //

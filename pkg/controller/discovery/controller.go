@@ -72,14 +72,25 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	if err != nil {
 		panic(err)
 	}
-	container := container.NewContainer(nClient, db)
+	cnt := container.NewContainer(nClient, db)
 	web := &web.WebServer{
-		Container: container,
+		Container: cnt,
+	}
+	err = cnt.Add(
+		&migapi.MigCluster{
+			Spec: migapi.MigClusterSpec{
+				IsHostCluster: true,
+			},
+		},
+		&container.Plan{},
+		&container.Migration{})
+	if err != nil {
+		panic(err)
 	}
 	reconciler := ReconcileDiscovery{
 		client:    nClient,
 		scheme:    mgr.GetScheme(),
-		container: container,
+		container: cnt,
 		web:       web,
 	}
 
@@ -104,18 +115,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
-	if err != nil {
-		log.Trace(err)
-		return err
-	}
-	err = c.Watch(
-		&source.Kind{
-			Type: &migapi.MigPlan{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&PlanPredicate{
-			Container: r.(*ReconcileDiscovery).container,
-		})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -154,7 +153,17 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 	if !r.IsValid(cluster) {
 		return reconcile.Result{}, nil
 	}
-	err = r.container.Add(cluster)
+	err = r.container.Add(
+		cluster,
+		&container.Backup{},
+		&container.Restore{},
+		&container.PodVolumeBackup{},
+		&container.PodVolumeRestore{},
+		&container.Namespace{},
+		&container.Service{},
+		&container.PVC{},
+		&container.Pod{},
+		&container.PV{})
 	if err != nil {
 		log.Trace(err)
 		return reQueue, nil
@@ -220,75 +229,5 @@ func (r *ClusterPredicate) Delete(e event.DeleteEvent) bool {
 }
 
 func (r *ClusterPredicate) Generic(e event.GenericEvent) bool {
-	return false
-}
-
-//
-// Plan predicate
-type PlanPredicate struct {
-	Container *container.Container
-}
-
-func (r PlanPredicate) Create(e event.CreateEvent) bool {
-	log.Reset()
-	object, cast := e.Object.(*migapi.MigPlan)
-	if !cast {
-		return false
-	}
-	plan := model.Plan{}
-	plan.With(object)
-	err := plan.Insert(r.Container.Db)
-	if err != nil {
-		log.Trace(err)
-	}
-
-	return false
-}
-
-func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	log.Reset()
-	o, cast := e.ObjectOld.(*migapi.MigPlan)
-	if !cast {
-		return false
-	}
-	n, cast := e.ObjectNew.(*migapi.MigPlan)
-	if !cast {
-		return false
-	}
-	changed := !reflect.DeepEqual(
-		o.Spec.SrcMigClusterRef,
-		n.Spec.SrcMigClusterRef) ||
-		!reflect.DeepEqual(
-			o.Spec.DestMigClusterRef,
-			n.Spec.DestMigClusterRef)
-	if changed {
-		plan := model.Plan{}
-		plan.With(n)
-		err := plan.Update(r.Container.Db)
-		if err != nil {
-			log.Trace(err)
-		}
-	}
-
-	return false
-}
-
-func (r *PlanPredicate) Delete(e event.DeleteEvent) bool {
-	log.Reset()
-	object, cast := e.Object.(*migapi.MigPlan)
-	if !cast {
-		return false
-	}
-	plan := model.Plan{}
-	plan.With(object)
-	err := plan.Delete(r.Container.Db)
-	if err != nil {
-		log.Trace(err)
-	}
-
-	return false
-}
-
-func (r *PlanPredicate) Generic(e event.GenericEvent) bool {
 	return false
 }
