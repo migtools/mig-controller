@@ -73,7 +73,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Result
 	migration.Status.Phase = task.Phase
-	migration.Status.Itenerary = task.Itinerary.Name
+	migration.Status.Itinerary = task.Itinerary.Name
 
 	// Completed
 	if task.Phase == Completed {

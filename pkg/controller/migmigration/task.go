@@ -740,7 +740,7 @@ func (t *Task) init() error {
 	} else {
 		t.Itinerary = FinalItinerary
 	}
-	if t.Owner.Status.Itenerary != t.Itinerary.Name {
+	if t.Owner.Status.Itinerary != t.Itinerary.Name {
 		t.Phase = t.Itinerary.Steps[0].phase
 	}
 

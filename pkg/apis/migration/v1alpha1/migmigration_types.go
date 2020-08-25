@@ -44,7 +44,7 @@ type MigMigrationStatus struct {
 	ObservedDigest string       `json:"observedDigest,omitempty"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
-	Itenerary      string       `json:"itenerary,omitempty"`
+	Itinerary      string       `json:"itinerary,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
 }
 
@@ -53,6 +53,11 @@ type MigMigrationStatus struct {
 
 // MigMigration is the Schema for the migmigrations API
 // +k8s:openapi-gen=true
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
+// +kubebuilder:printcolumn:name="Plan",type=string,JSONPath=".spec.migPlanRef.name"
+// +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=".spec.stage"
+// +kubebuilder:printcolumn:name="Itinerary",type=string,JSONPath=".status.itinerary"
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 type MigMigration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
