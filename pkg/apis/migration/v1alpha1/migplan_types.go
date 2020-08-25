@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
@@ -250,13 +251,16 @@ func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStora
 func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, registrySecret *kapi.Secret) error {
 	credSecret, err := storage.GetBackupStorageCredSecret(client)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	if credSecret == nil {
 		return errors.New("Credentials secret not found.")
 	}
 	provider := storage.GetBackupStorageProvider()
-	provider.UpdateRegistrySecret(credSecret, registrySecret)
+	err = provider.UpdateRegistrySecret(credSecret, registrySecret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
 }
 
@@ -286,7 +290,7 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 }
 
 // Build a Registry Deployment.
-func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name, dirName string, registryImage string) (*appsv1.Deployment, error) {
+func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name, dirName, registryImage string) *appsv1.Deployment {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -297,8 +301,8 @@ func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage)
-	return deployment, err
+	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage)
+	return deployment
 }
 
 // Get registry proxy secret for registry DC
@@ -333,8 +337,7 @@ func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret,
 }
 
 // Update a Registry Deployment as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment,
-	proxySecret *kapi.Secret, name, dirName string, registryImage string) error {
+func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment, proxySecret *kapi.Secret, name, dirName, registryImage string) {
 
 	envFrom := []kapi.EnvFromSource{}
 	// If Proxy secret exists, set env from it
@@ -395,8 +398,6 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 	}
 	provider := storage.GetBackupStorageProvider()
 	provider.UpdateRegistryDC(deployment, name, dirName)
-
-	return nil
 }
 
 // Get an existing registry Deployment on the specified cluster.
@@ -441,7 +442,7 @@ func (r *MigPlan) EqualsRegistryDeployment(a, b *appsv1.Deployment) bool {
 }
 
 // Build a Registry Service as desired for the specified cluster.
-func (r *MigPlan) BuildRegistryService(name string) (*kapi.Service, error) {
+func (r *MigPlan) BuildRegistryService(name string) *kapi.Service {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -452,12 +453,12 @@ func (r *MigPlan) BuildRegistryService(name string) (*kapi.Service, error) {
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryService(service, name)
-	return service, err
+	r.UpdateRegistryService(service, name)
+	return service
 }
 
 // Update a Registry Service as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) error {
+func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 	service.Spec = kapi.ServiceSpec{
 		Ports: []kapi.ServicePort{
 			kapi.ServicePort{
@@ -472,7 +473,6 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) erro
 			"deploymentconfig": name,
 		},
 	}
-	return nil
 }
 
 // Get an existing registry Service on the specifiedcluster.
