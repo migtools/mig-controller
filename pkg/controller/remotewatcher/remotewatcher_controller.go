@@ -16,9 +16,6 @@ package remotewatcher
 import (
 	"github.com/konveyor/controller/pkg/logging"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	kapi "k8s.io/api/core/v1"
-	storageapi "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -96,79 +93,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 		&handler.EnqueueRequestForObject{},
 		&VSLPredicate{})
-	if err != nil {
-		return err
-	}
-
-	// Secret
-	err = c.Watch(
-		&source.Kind{
-			Type: &kapi.Secret{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&SecretPredicate{})
-	if err != nil {
-		return err
-	}
-
-	// Pod
-	err = c.Watch(
-		&source.Kind{
-			Type: &kapi.Pod{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&PodPredicate{})
-	if err != nil {
-		return err
-	}
-
-	// PV
-	err = c.Watch(
-		&source.Kind{
-			Type: &kapi.PersistentVolume{},
-		},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// PVC
-	err = c.Watch(
-		&source.Kind{
-			Type: &kapi.PersistentVolumeClaim{},
-		},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Namespaces
-	err = c.Watch(
-		&source.Kind{
-			Type: &kapi.Namespace{},
-		},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// StorageClass
-	err = c.Watch(
-		&source.Kind{
-			Type: &storageapi.StorageClass{},
-		},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Job
-	err = c.Watch(
-		&source.Kind{
-			Type: &batchv1.Job{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&JobPredicate{})
 	if err != nil {
 		return err
 	}

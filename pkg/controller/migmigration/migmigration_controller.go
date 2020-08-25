@@ -171,7 +171,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Re-queue (after) in seconds.
-	requeueAfter := time.Duration(0) // not re-queued.
+	requeueAfter := time.Duration(PollReQ)
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
