@@ -13,6 +13,20 @@
     "uid":"robomaker-2018-06-29"
   },
   "operations":{
+    "BatchDeleteWorlds":{
+      "name":"BatchDeleteWorlds",
+      "http":{
+        "method":"POST",
+        "requestUri":"/batchDeleteWorlds"
+      },
+      "input":{"shape":"BatchDeleteWorldsRequest"},
+      "output":{"shape":"BatchDeleteWorldsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
     "BatchDescribeSimulationJob":{
       "name":"BatchDescribeSimulationJob",
       "http":{
@@ -51,6 +65,51 @@
       },
       "input":{"shape":"CancelSimulationJobRequest"},
       "output":{"shape":"CancelSimulationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "CancelSimulationJobBatch":{
+      "name":"CancelSimulationJobBatch",
+      "http":{
+        "method":"POST",
+        "requestUri":"/cancelSimulationJobBatch"
+      },
+      "input":{"shape":"CancelSimulationJobBatchRequest"},
+      "output":{"shape":"CancelSimulationJobBatchResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "CancelWorldExportJob":{
+      "name":"CancelWorldExportJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/cancelWorldExportJob"
+      },
+      "input":{"shape":"CancelWorldExportJobRequest"},
+      "output":{"shape":"CancelWorldExportJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "CancelWorldGenerationJob":{
+      "name":"CancelWorldGenerationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/cancelWorldGenerationJob"
+      },
+      "input":{"shape":"CancelWorldGenerationJobRequest"},
+      "output":{"shape":"CancelWorldGenerationJobResponse"},
       "errors":[
         {"shape":"ResourceNotFoundException"},
         {"shape":"InvalidParameterException"},
@@ -191,6 +250,58 @@
         {"shape":"ServiceUnavailableException"}
       ]
     },
+    "CreateWorldExportJob":{
+      "name":"CreateWorldExportJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createWorldExportJob"
+      },
+      "input":{"shape":"CreateWorldExportJobRequest"},
+      "output":{"shape":"CreateWorldExportJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"IdempotentParameterMismatchException"},
+        {"shape":"ServiceUnavailableException"}
+      ]
+    },
+    "CreateWorldGenerationJob":{
+      "name":"CreateWorldGenerationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createWorldGenerationJob"
+      },
+      "input":{"shape":"CreateWorldGenerationJobRequest"},
+      "output":{"shape":"CreateWorldGenerationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"IdempotentParameterMismatchException"},
+        {"shape":"ServiceUnavailableException"}
+      ]
+    },
+    "CreateWorldTemplate":{
+      "name":"CreateWorldTemplate",
+      "http":{
+        "method":"POST",
+        "requestUri":"/createWorldTemplate"
+      },
+      "input":{"shape":"CreateWorldTemplateRequest"},
+      "output":{"shape":"CreateWorldTemplateResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceAlreadyExistsException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
     "DeleteFleet":{
       "name":"DeleteFleet",
       "http":{
@@ -243,6 +354,21 @@
       "output":{"shape":"DeleteSimulationApplicationResponse"},
       "errors":[
         {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "DeleteWorldTemplate":{
+      "name":"DeleteWorldTemplate",
+      "http":{
+        "method":"POST",
+        "requestUri":"/deleteWorldTemplate"
+      },
+      "input":{"shape":"DeleteWorldTemplateRequest"},
+      "output":{"shape":"DeleteWorldTemplateResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
         {"shape":"ThrottlingException"},
         {"shape":"InternalServerException"}
       ]
@@ -352,6 +478,95 @@
         {"shape":"ThrottlingException"}
       ]
     },
+    "DescribeSimulationJobBatch":{
+      "name":"DescribeSimulationJobBatch",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeSimulationJobBatch"
+      },
+      "input":{"shape":"DescribeSimulationJobBatchRequest"},
+      "output":{"shape":"DescribeSimulationJobBatchResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "DescribeWorld":{
+      "name":"DescribeWorld",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeWorld"
+      },
+      "input":{"shape":"DescribeWorldRequest"},
+      "output":{"shape":"DescribeWorldResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "DescribeWorldExportJob":{
+      "name":"DescribeWorldExportJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeWorldExportJob"
+      },
+      "input":{"shape":"DescribeWorldExportJobRequest"},
+      "output":{"shape":"DescribeWorldExportJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "DescribeWorldGenerationJob":{
+      "name":"DescribeWorldGenerationJob",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeWorldGenerationJob"
+      },
+      "input":{"shape":"DescribeWorldGenerationJobRequest"},
+      "output":{"shape":"DescribeWorldGenerationJobResponse"},
+      "errors":[
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "DescribeWorldTemplate":{
+      "name":"DescribeWorldTemplate",
+      "http":{
+        "method":"POST",
+        "requestUri":"/describeWorldTemplate"
+      },
+      "input":{"shape":"DescribeWorldTemplateRequest"},
+      "output":{"shape":"DescribeWorldTemplateResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "GetWorldTemplateBody":{
+      "name":"GetWorldTemplateBody",
+      "http":{
+        "method":"POST",
+        "requestUri":"/getWorldTemplateBody"
+      },
+      "input":{"shape":"GetWorldTemplateBodyRequest"},
+      "output":{"shape":"GetWorldTemplateBodyResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
     "ListDeploymentJobs":{
       "name":"ListDeploymentJobs",
       "http":{
@@ -425,6 +640,19 @@
         {"shape":"InternalServerException"}
       ]
     },
+    "ListSimulationJobBatches":{
+      "name":"ListSimulationJobBatches",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listSimulationJobBatches"
+      },
+      "input":{"shape":"ListSimulationJobBatchesRequest"},
+      "output":{"shape":"ListSimulationJobBatchesResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
     "ListSimulationJobs":{
       "name":"ListSimulationJobs",
       "http":{
@@ -452,6 +680,62 @@
         {"shape":"ResourceNotFoundException"},
         {"shape":"InvalidParameterException"},
         {"shape":"ThrottlingException"}
+      ]
+    },
+    "ListWorldExportJobs":{
+      "name":"ListWorldExportJobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listWorldExportJobs"
+      },
+      "input":{"shape":"ListWorldExportJobsRequest"},
+      "output":{"shape":"ListWorldExportJobsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "ListWorldGenerationJobs":{
+      "name":"ListWorldGenerationJobs",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listWorldGenerationJobs"
+      },
+      "input":{"shape":"ListWorldGenerationJobsRequest"},
+      "output":{"shape":"ListWorldGenerationJobsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"},
+        {"shape":"ThrottlingException"}
+      ]
+    },
+    "ListWorldTemplates":{
+      "name":"ListWorldTemplates",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listWorldTemplates"
+      },
+      "input":{"shape":"ListWorldTemplatesRequest"},
+      "output":{"shape":"ListWorldTemplatesResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "ListWorlds":{
+      "name":"ListWorlds",
+      "http":{
+        "method":"POST",
+        "requestUri":"/listWorlds"
+      },
+      "input":{"shape":"ListWorldsRequest"},
+      "output":{"shape":"ListWorldsResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
       ]
     },
     "RegisterRobot":{
@@ -483,6 +767,22 @@
         {"shape":"ThrottlingException"},
         {"shape":"LimitExceededException"},
         {"shape":"InvalidParameterException"},
+        {"shape":"InternalServerException"}
+      ]
+    },
+    "StartSimulationJobBatch":{
+      "name":"StartSimulationJobBatch",
+      "http":{
+        "method":"POST",
+        "requestUri":"/startSimulationJobBatch"
+      },
+      "input":{"shape":"StartSimulationJobBatchRequest"},
+      "output":{"shape":"StartSimulationJobBatchResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"LimitExceededException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"IdempotentParameterMismatchException"},
         {"shape":"InternalServerException"}
       ]
     },
@@ -565,6 +865,21 @@
         {"shape":"ThrottlingException"},
         {"shape":"InternalServerException"}
       ]
+    },
+    "UpdateWorldTemplate":{
+      "name":"UpdateWorldTemplate",
+      "http":{
+        "method":"POST",
+        "requestUri":"/updateWorldTemplate"
+      },
+      "input":{"shape":"UpdateWorldTemplateRequest"},
+      "output":{"shape":"UpdateWorldTemplateResponse"},
+      "errors":[
+        {"shape":"InvalidParameterException"},
+        {"shape":"ResourceNotFoundException"},
+        {"shape":"ThrottlingException"},
+        {"shape":"InternalServerException"}
+      ]
     }
   },
   "shapes":{
@@ -588,6 +903,19 @@
       "max":100,
       "min":1
     },
+    "BatchDeleteWorldsRequest":{
+      "type":"structure",
+      "required":["worlds"],
+      "members":{
+        "worlds":{"shape":"Arns"}
+      }
+    },
+    "BatchDeleteWorldsResponse":{
+      "type":"structure",
+      "members":{
+        "unprocessedWorlds":{"shape":"Arns"}
+      }
+    },
     "BatchDescribeSimulationJobRequest":{
       "type":"structure",
       "required":["jobs"],
@@ -602,7 +930,16 @@
         "unprocessedJobs":{"shape":"Arns"}
       }
     },
+    "BatchPolicy":{
+      "type":"structure",
+      "members":{
+        "timeoutInSeconds":{"shape":"BatchTimeoutInSeconds"},
+        "maxConcurrency":{"shape":"MaxConcurrency"}
+      }
+    },
+    "BatchTimeoutInSeconds":{"type":"long"},
     "Boolean":{"type":"boolean"},
+    "BoxedBoolean":{"type":"boolean"},
     "CancelDeploymentJobRequest":{
       "type":"structure",
       "required":["job"],
@@ -611,6 +948,18 @@
       }
     },
     "CancelDeploymentJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "CancelSimulationJobBatchRequest":{
+      "type":"structure",
+      "required":["batch"],
+      "members":{
+        "batch":{"shape":"Arn"}
+      }
+    },
+    "CancelSimulationJobBatchResponse":{
       "type":"structure",
       "members":{
       }
@@ -627,6 +976,30 @@
       "members":{
       }
     },
+    "CancelWorldExportJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{"shape":"Arn"}
+      }
+    },
+    "CancelWorldExportJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
+    "CancelWorldGenerationJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{"shape":"Arn"}
+      }
+    },
+    "CancelWorldGenerationJobResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
     "ClientRequestToken":{
       "type":"string",
       "max":64,
@@ -638,6 +1011,18 @@
       "max":1024,
       "min":1,
       "pattern":"[a-zA-Z0-9_.\\-]*"
+    },
+    "Compute":{
+      "type":"structure",
+      "members":{
+        "simulationUnitLimit":{"shape":"SimulationUnit"}
+      }
+    },
+    "ComputeResponse":{
+      "type":"structure",
+      "members":{
+        "simulationUnitLimit":{"shape":"SimulationUnit"}
+      }
     },
     "ConcurrentDeploymentException":{
       "type":"structure",
@@ -774,8 +1159,7 @@
         "name",
         "sources",
         "simulationSoftwareSuite",
-        "robotSoftwareSuite",
-        "renderingEngine"
+        "robotSoftwareSuite"
       ],
       "members":{
         "name":{"shape":"Name"},
@@ -835,14 +1219,23 @@
           "idempotencyToken":true
         },
         "outputLocation":{"shape":"OutputLocation"},
+        "loggingConfig":{"shape":"LoggingConfig"},
         "maxJobDurationInSeconds":{"shape":"JobDuration"},
         "iamRole":{"shape":"IamRole"},
         "failureBehavior":{"shape":"FailureBehavior"},
         "robotApplications":{"shape":"RobotApplicationConfigs"},
         "simulationApplications":{"shape":"SimulationApplicationConfigs"},
+        "dataSources":{"shape":"DataSourceConfigs"},
         "tags":{"shape":"TagMap"},
-        "vpcConfig":{"shape":"VPCConfig"}
+        "vpcConfig":{"shape":"VPCConfig"},
+        "compute":{"shape":"Compute"}
       }
+    },
+    "CreateSimulationJobRequests":{
+      "type":"list",
+      "member":{"shape":"SimulationJobRequest"},
+      "max":1000,
+      "min":1
     },
     "CreateSimulationJobResponse":{
       "type":"structure",
@@ -855,16 +1248,134 @@
         "failureCode":{"shape":"SimulationJobErrorCode"},
         "clientRequestToken":{"shape":"ClientRequestToken"},
         "outputLocation":{"shape":"OutputLocation"},
+        "loggingConfig":{"shape":"LoggingConfig"},
         "maxJobDurationInSeconds":{"shape":"JobDuration"},
         "simulationTimeMillis":{"shape":"SimulationTimeMillis"},
         "iamRole":{"shape":"IamRole"},
         "robotApplications":{"shape":"RobotApplicationConfigs"},
         "simulationApplications":{"shape":"SimulationApplicationConfigs"},
+        "dataSources":{"shape":"DataSources"},
         "tags":{"shape":"TagMap"},
-        "vpcConfig":{"shape":"VPCConfigResponse"}
+        "vpcConfig":{"shape":"VPCConfigResponse"},
+        "compute":{"shape":"ComputeResponse"}
+      }
+    },
+    "CreateWorldExportJobRequest":{
+      "type":"structure",
+      "required":[
+        "worlds",
+        "outputLocation",
+        "iamRole"
+      ],
+      "members":{
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "idempotencyToken":true
+        },
+        "worlds":{"shape":"Arns"},
+        "outputLocation":{"shape":"OutputLocation"},
+        "iamRole":{"shape":"IamRole"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "CreateWorldExportJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"WorldExportJobStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "failureCode":{"shape":"WorldExportJobErrorCode"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "outputLocation":{"shape":"OutputLocation"},
+        "iamRole":{"shape":"IamRole"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "CreateWorldGenerationJobRequest":{
+      "type":"structure",
+      "required":[
+        "template",
+        "worldCount"
+      ],
+      "members":{
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "idempotencyToken":true
+        },
+        "template":{"shape":"Arn"},
+        "worldCount":{"shape":"WorldCount"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "CreateWorldGenerationJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"WorldGenerationJobStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "failureCode":{"shape":"WorldGenerationJobErrorCode"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "template":{"shape":"Arn"},
+        "worldCount":{"shape":"WorldCount"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "CreateWorldTemplateRequest":{
+      "type":"structure",
+      "members":{
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "name":{"shape":"TemplateName"},
+        "templateBody":{"shape":"Json"},
+        "templateLocation":{"shape":"TemplateLocation"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "CreateWorldTemplateResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "createdAt":{"shape":"CreatedAt"},
+        "name":{"shape":"TemplateName"},
+        "tags":{"shape":"TagMap"}
       }
     },
     "CreatedAt":{"type":"timestamp"},
+    "DataSource":{
+      "type":"structure",
+      "members":{
+        "name":{"shape":"Name"},
+        "s3Bucket":{"shape":"S3Bucket"},
+        "s3Keys":{"shape":"S3KeyOutputs"}
+      }
+    },
+    "DataSourceConfig":{
+      "type":"structure",
+      "required":[
+        "name",
+        "s3Bucket",
+        "s3Keys"
+      ],
+      "members":{
+        "name":{"shape":"Name"},
+        "s3Bucket":{"shape":"S3Bucket"},
+        "s3Keys":{"shape":"S3Keys"}
+      }
+    },
+    "DataSourceConfigs":{
+      "type":"list",
+      "member":{"shape":"DataSourceConfig"},
+      "max":5,
+      "min":1
+    },
+    "DataSourceNames":{
+      "type":"list",
+      "member":{"shape":"Name"}
+    },
+    "DataSources":{
+      "type":"list",
+      "member":{"shape":"DataSource"}
+    },
     "DeleteFleetRequest":{
       "type":"structure",
       "required":["fleet"],
@@ -915,6 +1426,18 @@
       "members":{
       }
     },
+    "DeleteWorldTemplateRequest":{
+      "type":"structure",
+      "required":["template"],
+      "members":{
+        "template":{"shape":"Arn"}
+      }
+    },
+    "DeleteWorldTemplateResponse":{
+      "type":"structure",
+      "members":{
+      }
+    },
     "DeploymentApplicationConfig":{
       "type":"structure",
       "required":[
@@ -938,7 +1461,9 @@
       "type":"structure",
       "members":{
         "concurrentDeploymentPercentage":{"shape":"Percentage"},
-        "failureThresholdPercentage":{"shape":"Percentage"}
+        "failureThresholdPercentage":{"shape":"Percentage"},
+        "robotDeploymentTimeoutInSeconds":{"shape":"DeploymentTimeout"},
+        "downloadConditionFile":{"shape":"S3Object"}
       }
     },
     "DeploymentJob":{
@@ -965,14 +1490,17 @@
         "RobotDeploymentNoResponse",
         "RobotAgentConnectionTimeout",
         "GreengrassDeploymentFailed",
+        "InvalidGreengrassGroup",
         "MissingRobotArchitecture",
         "MissingRobotApplicationArchitecture",
         "MissingRobotDeploymentResource",
         "GreengrassGroupVersionDoesNotExist",
+        "LambdaDeleted",
         "ExtractingBundleFailure",
         "PreLaunchFileFailure",
         "PostLaunchFileFailure",
         "BadPermissionError",
+        "DownloadConditionFailed",
         "InternalServerError"
       ]
     },
@@ -1007,6 +1535,7 @@
         "Canceled"
       ]
     },
+    "DeploymentTimeout":{"type":"long"},
     "DeploymentVersion":{
       "type":"string",
       "max":255,
@@ -1139,6 +1668,30 @@
         "tags":{"shape":"TagMap"}
       }
     },
+    "DescribeSimulationJobBatchRequest":{
+      "type":"structure",
+      "required":["batch"],
+      "members":{
+        "batch":{"shape":"Arn"}
+      }
+    },
+    "DescribeSimulationJobBatchResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"SimulationJobBatchStatus"},
+        "lastUpdatedAt":{"shape":"LastUpdatedAt"},
+        "createdAt":{"shape":"CreatedAt"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "batchPolicy":{"shape":"BatchPolicy"},
+        "failureCode":{"shape":"SimulationJobBatchErrorCode"},
+        "failureReason":{"shape":"GenericString"},
+        "failedRequests":{"shape":"FailedCreateSimulationJobRequests"},
+        "pendingRequests":{"shape":"CreateSimulationJobRequests"},
+        "createdRequests":{"shape":"SimulationJobSummaries"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
     "DescribeSimulationJobRequest":{
       "type":"structure",
       "required":["job"],
@@ -1159,13 +1712,96 @@
         "failureReason":{"shape":"GenericString"},
         "clientRequestToken":{"shape":"ClientRequestToken"},
         "outputLocation":{"shape":"OutputLocation"},
+        "loggingConfig":{"shape":"LoggingConfig"},
         "maxJobDurationInSeconds":{"shape":"JobDuration"},
         "simulationTimeMillis":{"shape":"SimulationTimeMillis"},
         "iamRole":{"shape":"IamRole"},
         "robotApplications":{"shape":"RobotApplicationConfigs"},
         "simulationApplications":{"shape":"SimulationApplicationConfigs"},
+        "dataSources":{"shape":"DataSources"},
         "tags":{"shape":"TagMap"},
-        "vpcConfig":{"shape":"VPCConfigResponse"}
+        "vpcConfig":{"shape":"VPCConfigResponse"},
+        "networkInterface":{"shape":"NetworkInterface"},
+        "compute":{"shape":"ComputeResponse"}
+      }
+    },
+    "DescribeWorldExportJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{"shape":"Arn"}
+      }
+    },
+    "DescribeWorldExportJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"WorldExportJobStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "failureCode":{"shape":"WorldExportJobErrorCode"},
+        "failureReason":{"shape":"GenericString"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "worlds":{"shape":"Arns"},
+        "outputLocation":{"shape":"OutputLocation"},
+        "iamRole":{"shape":"IamRole"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "DescribeWorldGenerationJobRequest":{
+      "type":"structure",
+      "required":["job"],
+      "members":{
+        "job":{"shape":"Arn"}
+      }
+    },
+    "DescribeWorldGenerationJobResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"WorldGenerationJobStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "failureCode":{"shape":"WorldGenerationJobErrorCode"},
+        "failureReason":{"shape":"GenericString"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "template":{"shape":"Arn"},
+        "worldCount":{"shape":"WorldCount"},
+        "finishedWorldsSummary":{"shape":"FinishedWorldsSummary"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "DescribeWorldRequest":{
+      "type":"structure",
+      "required":["world"],
+      "members":{
+        "world":{"shape":"Arn"}
+      }
+    },
+    "DescribeWorldResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "generationJob":{"shape":"Arn"},
+        "template":{"shape":"Arn"},
+        "createdAt":{"shape":"CreatedAt"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "DescribeWorldTemplateRequest":{
+      "type":"structure",
+      "required":["template"],
+      "members":{
+        "template":{"shape":"Arn"}
+      }
+    },
+    "DescribeWorldTemplateResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "name":{"shape":"TemplateName"},
+        "createdAt":{"shape":"CreatedAt"},
+        "lastUpdatedAt":{"shape":"LastUpdatedAt"},
+        "tags":{"shape":"TagMap"}
       }
     },
     "EnvironmentVariableKey":{
@@ -1184,7 +1820,22 @@
     "EnvironmentVariableValue":{
       "type":"string",
       "max":1024,
-      "min":1
+      "min":1,
+      "pattern":".*"
+    },
+    "FailedAt":{"type":"timestamp"},
+    "FailedCreateSimulationJobRequest":{
+      "type":"structure",
+      "members":{
+        "request":{"shape":"SimulationJobRequest"},
+        "failureReason":{"shape":"GenericString"},
+        "failureCode":{"shape":"SimulationJobErrorCode"},
+        "failedAt":{"shape":"FailedAt"}
+      }
+    },
+    "FailedCreateSimulationJobRequests":{
+      "type":"list",
+      "member":{"shape":"FailedCreateSimulationJobRequest"}
     },
     "FailureBehavior":{
       "type":"string",
@@ -1192,6 +1843,13 @@
         "Fail",
         "Continue"
       ]
+    },
+    "FailureSummary":{
+      "type":"structure",
+      "members":{
+        "totalFailureCount":{"shape":"Integer"},
+        "failures":{"shape":"WorldFailures"}
+      }
     },
     "Filter":{
       "type":"structure",
@@ -1212,6 +1870,14 @@
       "max":1,
       "min":1
     },
+    "FinishedWorldsSummary":{
+      "type":"structure",
+      "members":{
+        "finishedCount":{"shape":"Integer"},
+        "succeededWorlds":{"shape":"Arns"},
+        "failureSummary":{"shape":"FailureSummary"}
+      }
+    },
     "Fleet":{
       "type":"structure",
       "members":{
@@ -1229,8 +1895,27 @@
       "max":200,
       "min":0
     },
+    "FloorplanCount":{"type":"integer"},
     "GenericInteger":{"type":"integer"},
-    "GenericString":{"type":"string"},
+    "GenericString":{
+      "type":"string",
+      "max":1024,
+      "min":0,
+      "pattern":".*"
+    },
+    "GetWorldTemplateBodyRequest":{
+      "type":"structure",
+      "members":{
+        "template":{"shape":"Arn"},
+        "generationJob":{"shape":"Arn"}
+      }
+    },
+    "GetWorldTemplateBodyResponse":{
+      "type":"structure",
+      "members":{
+        "templateBody":{"shape":"Json"}
+      }
+    },
     "IamRole":{
       "type":"string",
       "max":255,
@@ -1240,7 +1925,8 @@
     "Id":{
       "type":"string",
       "max":1224,
-      "min":1
+      "min":1,
+      "pattern":".*"
     },
     "IdempotentParameterMismatchException":{
       "type":"structure",
@@ -1250,6 +1936,8 @@
       "error":{"httpStatusCode":400},
       "exception":true
     },
+    "Integer":{"type":"integer"},
+    "InteriorCountPerFloorplan":{"type":"integer"},
     "InternalServerException":{
       "type":"structure",
       "members":{
@@ -1267,6 +1955,12 @@
       "exception":true
     },
     "JobDuration":{"type":"long"},
+    "Json":{
+      "type":"string",
+      "max":262144,
+      "min":1,
+      "pattern":"[\\S\\s]+"
+    },
     "LastStartedAt":{"type":"timestamp"},
     "LastUpdatedAt":{"type":"timestamp"},
     "LaunchConfig":{
@@ -1278,7 +1972,9 @@
       "members":{
         "packageName":{"shape":"Command"},
         "launchFile":{"shape":"Command"},
-        "environmentVariables":{"shape":"EnvironmentVariableMap"}
+        "environmentVariables":{"shape":"EnvironmentVariableMap"},
+        "portForwardingConfig":{"shape":"PortForwardingConfig"},
+        "streamUI":{"shape":"Boolean"}
       }
     },
     "LimitExceededException":{
@@ -1366,6 +2062,21 @@
         "nextToken":{"shape":"PaginationToken"}
       }
     },
+    "ListSimulationJobBatchesRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{"shape":"PaginationToken"},
+        "maxResults":{"shape":"MaxResults"},
+        "filters":{"shape":"Filters"}
+      }
+    },
+    "ListSimulationJobBatchesResponse":{
+      "type":"structure",
+      "members":{
+        "simulationJobBatchSummaries":{"shape":"SimulationJobBatchSummaries"},
+        "nextToken":{"shape":"PaginationToken"}
+      }
+    },
     "ListSimulationJobsRequest":{
       "type":"structure",
       "members":{
@@ -1399,6 +2110,75 @@
         "tags":{"shape":"TagMap"}
       }
     },
+    "ListWorldExportJobsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{"shape":"PaginationToken"},
+        "maxResults":{"shape":"MaxResults"},
+        "filters":{"shape":"Filters"}
+      }
+    },
+    "ListWorldExportJobsResponse":{
+      "type":"structure",
+      "required":["worldExportJobSummaries"],
+      "members":{
+        "worldExportJobSummaries":{"shape":"WorldExportJobSummaries"},
+        "nextToken":{"shape":"PaginationToken"}
+      }
+    },
+    "ListWorldGenerationJobsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{"shape":"PaginationToken"},
+        "maxResults":{"shape":"MaxResults"},
+        "filters":{"shape":"Filters"}
+      }
+    },
+    "ListWorldGenerationJobsResponse":{
+      "type":"structure",
+      "required":["worldGenerationJobSummaries"],
+      "members":{
+        "worldGenerationJobSummaries":{"shape":"WorldGenerationJobSummaries"},
+        "nextToken":{"shape":"PaginationToken"}
+      }
+    },
+    "ListWorldTemplatesRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{"shape":"PaginationToken"},
+        "maxResults":{"shape":"MaxResults"}
+      }
+    },
+    "ListWorldTemplatesResponse":{
+      "type":"structure",
+      "members":{
+        "templateSummaries":{"shape":"TemplateSummaries"},
+        "nextToken":{"shape":"PaginationToken"}
+      }
+    },
+    "ListWorldsRequest":{
+      "type":"structure",
+      "members":{
+        "nextToken":{"shape":"PaginationToken"},
+        "maxResults":{"shape":"MaxResults"},
+        "filters":{"shape":"Filters"}
+      }
+    },
+    "ListWorldsResponse":{
+      "type":"structure",
+      "members":{
+        "worldSummaries":{"shape":"WorldSummaries"},
+        "nextToken":{"shape":"PaginationToken"}
+      }
+    },
+    "LoggingConfig":{
+      "type":"structure",
+      "required":["recordAllRosTopics"],
+      "members":{
+        "recordAllRosTopics":{"shape":"BoxedBoolean"}
+      }
+    },
+    "MaxConcurrency":{"type":"integer"},
     "MaxResults":{"type":"integer"},
     "Name":{
       "type":"string",
@@ -1406,9 +2186,24 @@
       "min":1,
       "pattern":"[a-zA-Z0-9_\\-]*"
     },
+    "NetworkInterface":{
+      "type":"structure",
+      "members":{
+        "networkInterfaceId":{"shape":"GenericString"},
+        "privateIpAddress":{"shape":"GenericString"},
+        "publicIpAddress":{"shape":"GenericString"}
+      }
+    },
     "NonEmptyString":{
       "type":"string",
-      "min":1
+      "max":255,
+      "min":1,
+      "pattern":".+"
+    },
+    "NonSystemPort":{
+      "type":"integer",
+      "max":65535,
+      "min":1024
     },
     "OutputLocation":{
       "type":"structure",
@@ -1426,7 +2221,8 @@
     "Path":{
       "type":"string",
       "max":1024,
-      "min":1
+      "min":1,
+      "pattern":".*"
     },
     "PercentDone":{
       "type":"float",
@@ -1437,6 +2233,35 @@
       "type":"integer",
       "max":100,
       "min":1
+    },
+    "Port":{
+      "type":"integer",
+      "max":65535,
+      "min":1
+    },
+    "PortForwardingConfig":{
+      "type":"structure",
+      "members":{
+        "portMappings":{"shape":"PortMappingList"}
+      }
+    },
+    "PortMapping":{
+      "type":"structure",
+      "required":[
+        "jobPort",
+        "applicationPort"
+      ],
+      "members":{
+        "jobPort":{"shape":"Port"},
+        "applicationPort":{"shape":"NonSystemPort"},
+        "enableOnPublicIp":{"shape":"Boolean"}
+      }
+    },
+    "PortMappingList":{
+      "type":"list",
+      "member":{"shape":"PortMapping"},
+      "max":10,
+      "min":0
     },
     "ProgressDetail":{
       "type":"structure",
@@ -1478,6 +2303,8 @@
     },
     "RenderingEngineVersionType":{
       "type":"string",
+      "max":4,
+      "min":1,
       "pattern":"1.x"
     },
     "ResourceAlreadyExistsException":{
@@ -1548,9 +2375,7 @@
     },
     "RobotApplicationNames":{
       "type":"list",
-      "member":{"shape":"Name"},
-      "max":1,
-      "min":1
+      "member":{"shape":"Name"}
     },
     "RobotApplicationSummaries":{
       "type":"list",
@@ -1585,6 +2410,7 @@
       "enum":[
         "Validating",
         "DownloadingExtracting",
+        "ExecutingDownloadCondition",
         "ExecutingPreLaunch",
         "Launching",
         "ExecutingPostLaunch",
@@ -1604,13 +2430,17 @@
     },
     "RobotSoftwareSuiteType":{
       "type":"string",
-      "enum":["ROS"]
+      "enum":[
+        "ROS",
+        "ROS2"
+      ]
     },
     "RobotSoftwareSuiteVersionType":{
       "type":"string",
       "enum":[
         "Kinetic",
-        "Melodic"
+        "Melodic",
+        "Dashing"
       ]
     },
     "RobotStatus":{
@@ -1644,6 +2474,35 @@
       "min":1,
       "pattern":".*"
     },
+    "S3KeyOutput":{
+      "type":"structure",
+      "members":{
+        "s3Key":{"shape":"S3Key"},
+        "etag":{"shape":"S3Etag"}
+      }
+    },
+    "S3KeyOutputs":{
+      "type":"list",
+      "member":{"shape":"S3KeyOutput"}
+    },
+    "S3Keys":{
+      "type":"list",
+      "member":{"shape":"S3Key"},
+      "max":100,
+      "min":1
+    },
+    "S3Object":{
+      "type":"structure",
+      "required":[
+        "bucket",
+        "key"
+      ],
+      "members":{
+        "bucket":{"shape":"S3Bucket"},
+        "key":{"shape":"S3Key"},
+        "etag":{"shape":"S3Etag"}
+      }
+    },
     "SecurityGroups":{
       "type":"list",
       "member":{"shape":"NonEmptyString"},
@@ -1667,7 +2526,8 @@
       "members":{
         "application":{"shape":"Arn"},
         "applicationVersion":{"shape":"Version"},
-        "launchConfig":{"shape":"LaunchConfig"}
+        "launchConfig":{"shape":"LaunchConfig"},
+        "worldConfigs":{"shape":"WorldConfigs"}
       }
     },
     "SimulationApplicationConfigs":{
@@ -1678,9 +2538,7 @@
     },
     "SimulationApplicationNames":{
       "type":"list",
-      "member":{"shape":"Name"},
-      "max":1,
-      "min":1
+      "member":{"shape":"Name"}
     },
     "SimulationApplicationSummaries":{
       "type":"list",
@@ -1712,13 +2570,51 @@
         "failureReason":{"shape":"GenericString"},
         "clientRequestToken":{"shape":"ClientRequestToken"},
         "outputLocation":{"shape":"OutputLocation"},
+        "loggingConfig":{"shape":"LoggingConfig"},
         "maxJobDurationInSeconds":{"shape":"JobDuration"},
         "simulationTimeMillis":{"shape":"SimulationTimeMillis"},
         "iamRole":{"shape":"IamRole"},
         "robotApplications":{"shape":"RobotApplicationConfigs"},
         "simulationApplications":{"shape":"SimulationApplicationConfigs"},
+        "dataSources":{"shape":"DataSources"},
         "tags":{"shape":"TagMap"},
-        "vpcConfig":{"shape":"VPCConfigResponse"}
+        "vpcConfig":{"shape":"VPCConfigResponse"},
+        "networkInterface":{"shape":"NetworkInterface"},
+        "compute":{"shape":"ComputeResponse"}
+      }
+    },
+    "SimulationJobBatchErrorCode":{
+      "type":"string",
+      "enum":["InternalServiceError"]
+    },
+    "SimulationJobBatchStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "InProgress",
+        "Failed",
+        "Completed",
+        "Canceled",
+        "Canceling",
+        "Completing",
+        "TimingOut",
+        "TimedOut"
+      ]
+    },
+    "SimulationJobBatchSummaries":{
+      "type":"list",
+      "member":{"shape":"SimulationJobBatchSummary"}
+    },
+    "SimulationJobBatchSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "lastUpdatedAt":{"shape":"LastUpdatedAt"},
+        "createdAt":{"shape":"CreatedAt"},
+        "status":{"shape":"SimulationJobBatchStatus"},
+        "failedRequestCount":{"shape":"Integer"},
+        "pendingRequestCount":{"shape":"Integer"},
+        "createdRequestCount":{"shape":"Integer"}
       }
     },
     "SimulationJobErrorCode":{
@@ -1729,6 +2625,7 @@
         "SimulationApplicationCrash",
         "BadPermissionsRobotApplication",
         "BadPermissionsSimulationApplication",
+        "BadPermissionsS3Object",
         "BadPermissionsS3Output",
         "BadPermissionsCloudwatchLogs",
         "SubnetIpLimitExceeded",
@@ -1736,12 +2633,39 @@
         "BadPermissionsUserCredentials",
         "InvalidBundleRobotApplication",
         "InvalidBundleSimulationApplication",
+        "InvalidS3Resource",
+        "LimitExceeded",
+        "MismatchedEtag",
         "RobotApplicationVersionMismatchedEtag",
         "SimulationApplicationVersionMismatchedEtag",
+        "ResourceNotFound",
+        "RequestThrottled",
+        "BatchTimedOut",
+        "BatchCanceled",
+        "InvalidInput",
+        "WrongRegionS3Bucket",
         "WrongRegionS3Output",
         "WrongRegionRobotApplication",
         "WrongRegionSimulationApplication"
       ]
+    },
+    "SimulationJobRequest":{
+      "type":"structure",
+      "required":["maxJobDurationInSeconds"],
+      "members":{
+        "outputLocation":{"shape":"OutputLocation"},
+        "loggingConfig":{"shape":"LoggingConfig"},
+        "maxJobDurationInSeconds":{"shape":"JobDuration"},
+        "iamRole":{"shape":"IamRole"},
+        "failureBehavior":{"shape":"FailureBehavior"},
+        "useDefaultApplications":{"shape":"BoxedBoolean"},
+        "robotApplications":{"shape":"RobotApplicationConfigs"},
+        "simulationApplications":{"shape":"SimulationApplicationConfigs"},
+        "dataSources":{"shape":"DataSourceConfigs"},
+        "vpcConfig":{"shape":"VPCConfig"},
+        "compute":{"shape":"Compute"},
+        "tags":{"shape":"TagMap"}
+      }
     },
     "SimulationJobStatus":{
       "type":"string",
@@ -1772,7 +2696,8 @@
         "name":{"shape":"Name"},
         "status":{"shape":"SimulationJobStatus"},
         "simulationApplicationNames":{"shape":"SimulationApplicationNames"},
-        "robotApplicationNames":{"shape":"RobotApplicationNames"}
+        "robotApplicationNames":{"shape":"RobotApplicationNames"},
+        "dataSourceNames":{"shape":"DataSourceNames"}
       }
     },
     "SimulationJobs":{
@@ -1788,13 +2713,23 @@
     },
     "SimulationSoftwareSuiteType":{
       "type":"string",
-      "enum":["Gazebo"]
+      "enum":[
+        "Gazebo",
+        "RosbagPlay"
+      ]
     },
     "SimulationSoftwareSuiteVersionType":{
       "type":"string",
-      "pattern":"7|9"
+      "max":1024,
+      "min":0,
+      "pattern":"7|9|Kinetic|Melodic|Dashing"
     },
     "SimulationTimeMillis":{"type":"long"},
+    "SimulationUnit":{
+      "type":"integer",
+      "max":15,
+      "min":1
+    },
     "Source":{
       "type":"structure",
       "members":{
@@ -1819,6 +2754,35 @@
     "Sources":{
       "type":"list",
       "member":{"shape":"Source"}
+    },
+    "StartSimulationJobBatchRequest":{
+      "type":"structure",
+      "required":["createSimulationJobRequests"],
+      "members":{
+        "clientRequestToken":{
+          "shape":"ClientRequestToken",
+          "idempotencyToken":true
+        },
+        "batchPolicy":{"shape":"BatchPolicy"},
+        "createSimulationJobRequests":{"shape":"CreateSimulationJobRequests"},
+        "tags":{"shape":"TagMap"}
+      }
+    },
+    "StartSimulationJobBatchResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"SimulationJobBatchStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "clientRequestToken":{"shape":"ClientRequestToken"},
+        "batchPolicy":{"shape":"BatchPolicy"},
+        "failureCode":{"shape":"SimulationJobBatchErrorCode"},
+        "failureReason":{"shape":"GenericString"},
+        "failedRequests":{"shape":"FailedCreateSimulationJobRequests"},
+        "pendingRequests":{"shape":"CreateSimulationJobRequests"},
+        "createdRequests":{"shape":"SimulationJobSummaries"},
+        "tags":{"shape":"TagMap"}
+      }
     },
     "Subnets":{
       "type":"list",
@@ -1896,6 +2860,36 @@
       "min":0,
       "pattern":"[a-zA-Z0-9 _.\\-\\/+=:]*"
     },
+    "TemplateLocation":{
+      "type":"structure",
+      "required":[
+        "s3Bucket",
+        "s3Key"
+      ],
+      "members":{
+        "s3Bucket":{"shape":"S3Bucket"},
+        "s3Key":{"shape":"S3Key"}
+      }
+    },
+    "TemplateName":{
+      "type":"string",
+      "max":255,
+      "min":0,
+      "pattern":".*"
+    },
+    "TemplateSummaries":{
+      "type":"list",
+      "member":{"shape":"TemplateSummary"}
+    },
+    "TemplateSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "createdAt":{"shape":"CreatedAt"},
+        "lastUpdatedAt":{"shape":"LastUpdatedAt"},
+        "name":{"shape":"TemplateName"}
+      }
+    },
     "ThrottlingException":{
       "type":"structure",
       "members":{
@@ -1960,8 +2954,7 @@
         "application",
         "sources",
         "simulationSoftwareSuite",
-        "robotSoftwareSuite",
-        "renderingEngine"
+        "robotSoftwareSuite"
       ],
       "members":{
         "application":{"shape":"Arn"},
@@ -1984,6 +2977,25 @@
         "renderingEngine":{"shape":"RenderingEngine"},
         "lastUpdatedAt":{"shape":"LastUpdatedAt"},
         "revisionId":{"shape":"RevisionId"}
+      }
+    },
+    "UpdateWorldTemplateRequest":{
+      "type":"structure",
+      "required":["template"],
+      "members":{
+        "template":{"shape":"Arn"},
+        "name":{"shape":"TemplateName"},
+        "templateBody":{"shape":"Json"},
+        "templateLocation":{"shape":"TemplateLocation"}
+      }
+    },
+    "UpdateWorldTemplateResponse":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "name":{"shape":"TemplateName"},
+        "createdAt":{"shape":"CreatedAt"},
+        "lastUpdatedAt":{"shape":"LastUpdatedAt"}
       }
     },
     "VPCConfig":{
@@ -2012,7 +3024,133 @@
     },
     "VersionQualifier":{
       "type":"string",
+      "max":255,
+      "min":1,
       "pattern":"ALL"
+    },
+    "WorldConfig":{
+      "type":"structure",
+      "members":{
+        "world":{"shape":"Arn"}
+      }
+    },
+    "WorldConfigs":{
+      "type":"list",
+      "member":{"shape":"WorldConfig"},
+      "max":1,
+      "min":0
+    },
+    "WorldCount":{
+      "type":"structure",
+      "members":{
+        "floorplanCount":{"shape":"FloorplanCount"},
+        "interiorCountPerFloorplan":{"shape":"InteriorCountPerFloorplan"}
+      }
+    },
+    "WorldExportJobErrorCode":{
+      "type":"string",
+      "enum":[
+        "InternalServiceError",
+        "LimitExceeded",
+        "ResourceNotFound",
+        "RequestThrottled",
+        "InvalidInput",
+        "AccessDenied"
+      ]
+    },
+    "WorldExportJobStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "Running",
+        "Completed",
+        "Failed",
+        "Canceling",
+        "Canceled"
+      ]
+    },
+    "WorldExportJobSummaries":{
+      "type":"list",
+      "member":{"shape":"WorldExportJobSummary"},
+      "max":100,
+      "min":0
+    },
+    "WorldExportJobSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "status":{"shape":"WorldExportJobStatus"},
+        "createdAt":{"shape":"CreatedAt"},
+        "worlds":{"shape":"Arns"}
+      }
+    },
+    "WorldFailure":{
+      "type":"structure",
+      "members":{
+        "failureCode":{"shape":"WorldGenerationJobErrorCode"},
+        "sampleFailureReason":{"shape":"GenericString"},
+        "failureCount":{"shape":"Integer"}
+      }
+    },
+    "WorldFailures":{
+      "type":"list",
+      "member":{"shape":"WorldFailure"},
+      "max":100,
+      "min":0
+    },
+    "WorldGenerationJobErrorCode":{
+      "type":"string",
+      "enum":[
+        "InternalServiceError",
+        "LimitExceeded",
+        "ResourceNotFound",
+        "RequestThrottled",
+        "InvalidInput",
+        "AllWorldGenerationFailed"
+      ]
+    },
+    "WorldGenerationJobStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "Running",
+        "Completed",
+        "Failed",
+        "PartialFailed",
+        "Canceling",
+        "Canceled"
+      ]
+    },
+    "WorldGenerationJobSummaries":{
+      "type":"list",
+      "member":{"shape":"WorldGenerationJobSummary"},
+      "max":100,
+      "min":0
+    },
+    "WorldGenerationJobSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "template":{"shape":"Arn"},
+        "createdAt":{"shape":"CreatedAt"},
+        "status":{"shape":"WorldGenerationJobStatus"},
+        "worldCount":{"shape":"WorldCount"},
+        "succeededWorldCount":{"shape":"Integer"},
+        "failedWorldCount":{"shape":"Integer"}
+      }
+    },
+    "WorldSummaries":{
+      "type":"list",
+      "member":{"shape":"WorldSummary"}
+    },
+    "WorldSummary":{
+      "type":"structure",
+      "members":{
+        "arn":{"shape":"Arn"},
+        "createdAt":{"shape":"CreatedAt"},
+        "generationJob":{"shape":"Arn"},
+        "template":{"shape":"Arn"}
+      }
     },
     "errorMessage":{"type":"string"}
   }

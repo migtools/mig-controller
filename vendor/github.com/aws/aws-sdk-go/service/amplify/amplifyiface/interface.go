@@ -64,6 +64,10 @@ type AmplifyAPI interface {
 	CreateAppWithContext(aws.Context, *amplify.CreateAppInput, ...request.Option) (*amplify.CreateAppOutput, error)
 	CreateAppRequest(*amplify.CreateAppInput) (*request.Request, *amplify.CreateAppOutput)
 
+	CreateBackendEnvironment(*amplify.CreateBackendEnvironmentInput) (*amplify.CreateBackendEnvironmentOutput, error)
+	CreateBackendEnvironmentWithContext(aws.Context, *amplify.CreateBackendEnvironmentInput, ...request.Option) (*amplify.CreateBackendEnvironmentOutput, error)
+	CreateBackendEnvironmentRequest(*amplify.CreateBackendEnvironmentInput) (*request.Request, *amplify.CreateBackendEnvironmentOutput)
+
 	CreateBranch(*amplify.CreateBranchInput) (*amplify.CreateBranchOutput, error)
 	CreateBranchWithContext(aws.Context, *amplify.CreateBranchInput, ...request.Option) (*amplify.CreateBranchOutput, error)
 	CreateBranchRequest(*amplify.CreateBranchInput) (*request.Request, *amplify.CreateBranchOutput)
@@ -84,6 +88,10 @@ type AmplifyAPI interface {
 	DeleteAppWithContext(aws.Context, *amplify.DeleteAppInput, ...request.Option) (*amplify.DeleteAppOutput, error)
 	DeleteAppRequest(*amplify.DeleteAppInput) (*request.Request, *amplify.DeleteAppOutput)
 
+	DeleteBackendEnvironment(*amplify.DeleteBackendEnvironmentInput) (*amplify.DeleteBackendEnvironmentOutput, error)
+	DeleteBackendEnvironmentWithContext(aws.Context, *amplify.DeleteBackendEnvironmentInput, ...request.Option) (*amplify.DeleteBackendEnvironmentOutput, error)
+	DeleteBackendEnvironmentRequest(*amplify.DeleteBackendEnvironmentInput) (*request.Request, *amplify.DeleteBackendEnvironmentOutput)
+
 	DeleteBranch(*amplify.DeleteBranchInput) (*amplify.DeleteBranchOutput, error)
 	DeleteBranchWithContext(aws.Context, *amplify.DeleteBranchInput, ...request.Option) (*amplify.DeleteBranchOutput, error)
 	DeleteBranchRequest(*amplify.DeleteBranchInput) (*request.Request, *amplify.DeleteBranchOutput)
@@ -100,9 +108,21 @@ type AmplifyAPI interface {
 	DeleteWebhookWithContext(aws.Context, *amplify.DeleteWebhookInput, ...request.Option) (*amplify.DeleteWebhookOutput, error)
 	DeleteWebhookRequest(*amplify.DeleteWebhookInput) (*request.Request, *amplify.DeleteWebhookOutput)
 
+	GenerateAccessLogs(*amplify.GenerateAccessLogsInput) (*amplify.GenerateAccessLogsOutput, error)
+	GenerateAccessLogsWithContext(aws.Context, *amplify.GenerateAccessLogsInput, ...request.Option) (*amplify.GenerateAccessLogsOutput, error)
+	GenerateAccessLogsRequest(*amplify.GenerateAccessLogsInput) (*request.Request, *amplify.GenerateAccessLogsOutput)
+
 	GetApp(*amplify.GetAppInput) (*amplify.GetAppOutput, error)
 	GetAppWithContext(aws.Context, *amplify.GetAppInput, ...request.Option) (*amplify.GetAppOutput, error)
 	GetAppRequest(*amplify.GetAppInput) (*request.Request, *amplify.GetAppOutput)
+
+	GetArtifactUrl(*amplify.GetArtifactUrlInput) (*amplify.GetArtifactUrlOutput, error)
+	GetArtifactUrlWithContext(aws.Context, *amplify.GetArtifactUrlInput, ...request.Option) (*amplify.GetArtifactUrlOutput, error)
+	GetArtifactUrlRequest(*amplify.GetArtifactUrlInput) (*request.Request, *amplify.GetArtifactUrlOutput)
+
+	GetBackendEnvironment(*amplify.GetBackendEnvironmentInput) (*amplify.GetBackendEnvironmentOutput, error)
+	GetBackendEnvironmentWithContext(aws.Context, *amplify.GetBackendEnvironmentInput, ...request.Option) (*amplify.GetBackendEnvironmentOutput, error)
+	GetBackendEnvironmentRequest(*amplify.GetBackendEnvironmentInput) (*request.Request, *amplify.GetBackendEnvironmentOutput)
 
 	GetBranch(*amplify.GetBranchInput) (*amplify.GetBranchOutput, error)
 	GetBranchWithContext(aws.Context, *amplify.GetBranchInput, ...request.Option) (*amplify.GetBranchOutput, error)
@@ -123,6 +143,14 @@ type AmplifyAPI interface {
 	ListApps(*amplify.ListAppsInput) (*amplify.ListAppsOutput, error)
 	ListAppsWithContext(aws.Context, *amplify.ListAppsInput, ...request.Option) (*amplify.ListAppsOutput, error)
 	ListAppsRequest(*amplify.ListAppsInput) (*request.Request, *amplify.ListAppsOutput)
+
+	ListArtifacts(*amplify.ListArtifactsInput) (*amplify.ListArtifactsOutput, error)
+	ListArtifactsWithContext(aws.Context, *amplify.ListArtifactsInput, ...request.Option) (*amplify.ListArtifactsOutput, error)
+	ListArtifactsRequest(*amplify.ListArtifactsInput) (*request.Request, *amplify.ListArtifactsOutput)
+
+	ListBackendEnvironments(*amplify.ListBackendEnvironmentsInput) (*amplify.ListBackendEnvironmentsOutput, error)
+	ListBackendEnvironmentsWithContext(aws.Context, *amplify.ListBackendEnvironmentsInput, ...request.Option) (*amplify.ListBackendEnvironmentsOutput, error)
+	ListBackendEnvironmentsRequest(*amplify.ListBackendEnvironmentsInput) (*request.Request, *amplify.ListBackendEnvironmentsOutput)
 
 	ListBranches(*amplify.ListBranchesInput) (*amplify.ListBranchesOutput, error)
 	ListBranchesWithContext(aws.Context, *amplify.ListBranchesInput, ...request.Option) (*amplify.ListBranchesOutput, error)

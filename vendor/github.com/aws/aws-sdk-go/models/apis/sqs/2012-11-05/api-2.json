@@ -368,6 +368,10 @@
       }
     },
     "Boolean":{"type":"boolean"},
+    "BoxedInteger":{
+      "type":"integer",
+      "box":true
+    },
     "ChangeMessageVisibilityBatchRequest":{
       "type":"structure",
       "required":[
@@ -446,6 +450,10 @@
         "Attributes":{
           "shape":"QueueAttributeMap",
           "locationName":"Attribute"
+        },
+        "tags":{
+          "shape":"TagMap",
+          "locationName":"Tag"
         }
       }
     },
@@ -605,14 +613,17 @@
       "type":"structure",
       "required":["QueueUrl"],
       "members":{
-        "QueueUrl":{"shape":"String"}
+        "QueueUrl":{"shape":"String"},
+        "NextToken":{"shape":"Token"},
+        "MaxResults":{"shape":"BoxedInteger"}
       }
     },
     "ListDeadLetterSourceQueuesResult":{
       "type":"structure",
       "required":["queueUrls"],
       "members":{
-        "queueUrls":{"shape":"QueueUrlList"}
+        "queueUrls":{"shape":"QueueUrlList"},
+        "NextToken":{"shape":"Token"}
       }
     },
     "ListQueueTagsRequest":{
@@ -634,13 +645,16 @@
     "ListQueuesRequest":{
       "type":"structure",
       "members":{
-        "QueueNamePrefix":{"shape":"String"}
+        "QueueNamePrefix":{"shape":"String"},
+        "NextToken":{"shape":"Token"},
+        "MaxResults":{"shape":"BoxedInteger"}
       }
     },
     "ListQueuesResult":{
       "type":"structure",
       "members":{
-        "QueueUrls":{"shape":"QueueUrlList"}
+        "QueueUrls":{"shape":"QueueUrlList"},
+        "NextToken":{"shape":"Token"}
       }
     },
     "Message":{
@@ -701,6 +715,18 @@
       },
       "flattened":true
     },
+    "MessageBodySystemAttributeMap":{
+      "type":"map",
+      "key":{
+        "shape":"MessageSystemAttributeNameForSends",
+        "locationName":"Name"
+      },
+      "value":{
+        "shape":"MessageSystemAttributeValue",
+        "locationName":"Value"
+      },
+      "flattened":true
+    },
     "MessageList":{
       "type":"list",
       "member":{
@@ -742,8 +768,32 @@
         "ApproximateFirstReceiveTimestamp",
         "SequenceNumber",
         "MessageDeduplicationId",
-        "MessageGroupId"
+        "MessageGroupId",
+        "AWSTraceHeader"
       ]
+    },
+    "MessageSystemAttributeNameForSends":{
+      "type":"string",
+      "enum":["AWSTraceHeader"]
+    },
+    "MessageSystemAttributeValue":{
+      "type":"structure",
+      "required":["DataType"],
+      "members":{
+        "StringValue":{"shape":"String"},
+        "BinaryValue":{"shape":"Binary"},
+        "StringListValues":{
+          "shape":"StringList",
+          "flattened":true,
+          "locationName":"StringListValue"
+        },
+        "BinaryListValues":{
+          "shape":"BinaryList",
+          "flattened":true,
+          "locationName":"BinaryListValue"
+        },
+        "DataType":{"shape":"String"}
+      }
     },
     "OverLimit":{
       "type":"structure",
@@ -912,6 +962,10 @@
           "shape":"MessageBodyAttributeMap",
           "locationName":"MessageAttribute"
         },
+        "MessageSystemAttributes":{
+          "shape":"MessageBodySystemAttributeMap",
+          "locationName":"MessageSystemAttribute"
+        },
         "MessageDeduplicationId":{"shape":"String"},
         "MessageGroupId":{"shape":"String"}
       }
@@ -947,6 +1001,7 @@
         "MessageId":{"shape":"String"},
         "MD5OfMessageBody":{"shape":"String"},
         "MD5OfMessageAttributes":{"shape":"String"},
+        "MD5OfMessageSystemAttributes":{"shape":"String"},
         "SequenceNumber":{"shape":"String"}
       }
     },
@@ -972,6 +1027,10 @@
           "shape":"MessageBodyAttributeMap",
           "locationName":"MessageAttribute"
         },
+        "MessageSystemAttributes":{
+          "shape":"MessageBodySystemAttributeMap",
+          "locationName":"MessageSystemAttribute"
+        },
         "MessageDeduplicationId":{"shape":"String"},
         "MessageGroupId":{"shape":"String"}
       }
@@ -981,6 +1040,7 @@
       "members":{
         "MD5OfMessageBody":{"shape":"String"},
         "MD5OfMessageAttributes":{"shape":"String"},
+        "MD5OfMessageSystemAttributes":{"shape":"String"},
         "MessageId":{"shape":"String"},
         "SequenceNumber":{"shape":"String"}
       }
@@ -1041,6 +1101,7 @@
       }
     },
     "TagValue":{"type":"string"},
+    "Token":{"type":"string"},
     "TooManyEntriesInBatchRequest":{
       "type":"structure",
       "members":{

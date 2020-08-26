@@ -289,7 +289,10 @@
         "lambda":{"shape":"LambdaAction"},
         "iotEvents":{"shape":"IotEventsAction"},
         "sqs":{"shape":"SqsAction"},
-        "firehose":{"shape":"FirehoseAction"}
+        "firehose":{"shape":"FirehoseAction"},
+        "dynamoDB":{"shape":"DynamoDBAction"},
+        "dynamoDBv2":{"shape":"DynamoDBv2Action"},
+        "iotSiteWise":{"shape":"IotSiteWiseAction"}
       }
     },
     "Actions":{
@@ -300,6 +303,43 @@
       "type":"string",
       "max":2048,
       "min":1
+    },
+    "AssetId":{"type":"string"},
+    "AssetPropertyAlias":{"type":"string"},
+    "AssetPropertyBooleanValue":{"type":"string"},
+    "AssetPropertyDoubleValue":{"type":"string"},
+    "AssetPropertyEntryId":{"type":"string"},
+    "AssetPropertyId":{"type":"string"},
+    "AssetPropertyIntegerValue":{"type":"string"},
+    "AssetPropertyOffsetInNanos":{"type":"string"},
+    "AssetPropertyQuality":{"type":"string"},
+    "AssetPropertyStringValue":{"type":"string"},
+    "AssetPropertyTimeInSeconds":{"type":"string"},
+    "AssetPropertyTimestamp":{
+      "type":"structure",
+      "required":["timeInSeconds"],
+      "members":{
+        "timeInSeconds":{"shape":"AssetPropertyTimeInSeconds"},
+        "offsetInNanos":{"shape":"AssetPropertyOffsetInNanos"}
+      }
+    },
+    "AssetPropertyValue":{
+      "type":"structure",
+      "required":["value"],
+      "members":{
+        "value":{"shape":"AssetPropertyVariant"},
+        "timestamp":{"shape":"AssetPropertyTimestamp"},
+        "quality":{"shape":"AssetPropertyQuality"}
+      }
+    },
+    "AssetPropertyVariant":{
+      "type":"structure",
+      "members":{
+        "stringValue":{"shape":"AssetPropertyStringValue"},
+        "integerValue":{"shape":"AssetPropertyIntegerValue"},
+        "doubleValue":{"shape":"AssetPropertyDoubleValue"},
+        "booleanValue":{"shape":"AssetPropertyBooleanValue"}
+      }
     },
     "Attribute":{
       "type":"structure",
@@ -331,6 +371,10 @@
       "type":"string",
       "max":512
     },
+    "ContentExpression":{
+      "type":"string",
+      "min":1
+    },
     "CreateDetectorModelRequest":{
       "type":"structure",
       "required":[
@@ -344,7 +388,8 @@
         "detectorModelDescription":{"shape":"DetectorModelDescription"},
         "key":{"shape":"AttributeJsonPath"},
         "roleArn":{"shape":"AmazonResourceName"},
-        "tags":{"shape":"Tags"}
+        "tags":{"shape":"Tags"},
+        "evaluationMethod":{"shape":"EvaluationMethod"}
       }
     },
     "CreateDetectorModelResponse":{
@@ -487,7 +532,8 @@
         "creationTime":{"shape":"Timestamp"},
         "lastUpdateTime":{"shape":"Timestamp"},
         "status":{"shape":"DetectorModelVersionStatus"},
-        "key":{"shape":"AttributeJsonPath"}
+        "key":{"shape":"AttributeJsonPath"},
+        "evaluationMethod":{"shape":"EvaluationMethod"}
       }
     },
     "DetectorModelDefinition":{
@@ -553,8 +599,49 @@
         "roleArn":{"shape":"AmazonResourceName"},
         "creationTime":{"shape":"Timestamp"},
         "lastUpdateTime":{"shape":"Timestamp"},
-        "status":{"shape":"DetectorModelVersionStatus"}
+        "status":{"shape":"DetectorModelVersionStatus"},
+        "evaluationMethod":{"shape":"EvaluationMethod"}
       }
+    },
+    "DynamoDBAction":{
+      "type":"structure",
+      "required":[
+        "hashKeyField",
+        "hashKeyValue",
+        "tableName"
+      ],
+      "members":{
+        "hashKeyType":{"shape":"DynamoKeyType"},
+        "hashKeyField":{"shape":"DynamoKeyField"},
+        "hashKeyValue":{"shape":"DynamoKeyValue"},
+        "rangeKeyType":{"shape":"DynamoKeyType"},
+        "rangeKeyField":{"shape":"DynamoKeyField"},
+        "rangeKeyValue":{"shape":"DynamoKeyValue"},
+        "operation":{"shape":"DynamoOperation"},
+        "payloadField":{"shape":"DynamoKeyField"},
+        "tableName":{"shape":"DynamoTableName"},
+        "payload":{"shape":"Payload"}
+      }
+    },
+    "DynamoDBv2Action":{
+      "type":"structure",
+      "required":["tableName"],
+      "members":{
+        "tableName":{"shape":"DynamoTableName"},
+        "payload":{"shape":"Payload"}
+      }
+    },
+    "DynamoKeyField":{"type":"string"},
+    "DynamoKeyType":{"type":"string"},
+    "DynamoKeyValue":{"type":"string"},
+    "DynamoOperation":{"type":"string"},
+    "DynamoTableName":{"type":"string"},
+    "EvaluationMethod":{
+      "type":"string",
+      "enum":[
+        "BATCH",
+        "SERIAL"
+      ]
     },
     "Event":{
       "type":"structure",
@@ -578,7 +665,8 @@
       "required":["deliveryStreamName"],
       "members":{
         "deliveryStreamName":{"shape":"DeliveryStreamName"},
-        "separator":{"shape":"FirehoseSeparator"}
+        "separator":{"shape":"FirehoseSeparator"},
+        "payload":{"shape":"Payload"}
       }
     },
     "FirehoseSeparator":{
@@ -673,14 +761,27 @@
       "type":"structure",
       "required":["inputName"],
       "members":{
-        "inputName":{"shape":"InputName"}
+        "inputName":{"shape":"InputName"},
+        "payload":{"shape":"Payload"}
+      }
+    },
+    "IotSiteWiseAction":{
+      "type":"structure",
+      "required":["propertyValue"],
+      "members":{
+        "entryId":{"shape":"AssetPropertyEntryId"},
+        "assetId":{"shape":"AssetId"},
+        "propertyId":{"shape":"AssetPropertyId"},
+        "propertyAlias":{"shape":"AssetPropertyAlias"},
+        "propertyValue":{"shape":"AssetPropertyValue"}
       }
     },
     "IotTopicPublishAction":{
       "type":"structure",
       "required":["mqttTopic"],
       "members":{
-        "mqttTopic":{"shape":"MQTTTopic"}
+        "mqttTopic":{"shape":"MQTTTopic"},
+        "payload":{"shape":"Payload"}
       }
     },
     "KeyValue":{
@@ -693,7 +794,8 @@
       "type":"structure",
       "required":["functionArn"],
       "members":{
-        "functionArn":{"shape":"AmazonResourceName"}
+        "functionArn":{"shape":"AmazonResourceName"},
+        "payload":{"shape":"Payload"}
       }
     },
     "LimitExceededException":{
@@ -846,6 +948,24 @@
         "transitionEvents":{"shape":"TransitionEvents"}
       }
     },
+    "Payload":{
+      "type":"structure",
+      "required":[
+        "contentExpression",
+        "type"
+      ],
+      "members":{
+        "contentExpression":{"shape":"ContentExpression"},
+        "type":{"shape":"PayloadType"}
+      }
+    },
+    "PayloadType":{
+      "type":"string",
+      "enum":[
+        "STRING",
+        "JSON"
+      ]
+    },
     "PutLoggingOptionsRequest":{
       "type":"structure",
       "required":["loggingOptions"],
@@ -891,10 +1011,15 @@
       "type":"structure",
       "required":["targetArn"],
       "members":{
-        "targetArn":{"shape":"AmazonResourceName"}
+        "targetArn":{"shape":"AmazonResourceName"},
+        "payload":{"shape":"Payload"}
       }
     },
-    "Seconds":{"type":"integer"},
+    "Seconds":{
+      "type":"integer",
+      "max":31622400,
+      "min":1
+    },
     "ServiceUnavailableException":{
       "type":"structure",
       "members":{
@@ -906,13 +1031,15 @@
     },
     "SetTimerAction":{
       "type":"structure",
-      "required":[
-        "timerName",
-        "seconds"
-      ],
+      "required":["timerName"],
       "members":{
         "timerName":{"shape":"TimerName"},
-        "seconds":{"shape":"Seconds"}
+        "seconds":{
+          "shape":"Seconds",
+          "deprecated":true,
+          "deprecatedMessage":"seconds is deprecated. You can use durationExpression for SetTimerAction. The value of seconds can be used as a string expression for durationExpression."
+        },
+        "durationExpression":{"shape":"VariableValue"}
       }
     },
     "SetVariableAction":{
@@ -931,7 +1058,8 @@
       "required":["queueUrl"],
       "members":{
         "queueUrl":{"shape":"QueueUrl"},
-        "useBase64":{"shape":"UseBase64"}
+        "useBase64":{"shape":"UseBase64"},
+        "payload":{"shape":"Payload"}
       }
     },
     "State":{
@@ -1083,7 +1211,8 @@
         },
         "detectorModelDefinition":{"shape":"DetectorModelDefinition"},
         "detectorModelDescription":{"shape":"DetectorModelDescription"},
-        "roleArn":{"shape":"AmazonResourceName"}
+        "roleArn":{"shape":"AmazonResourceName"},
+        "evaluationMethod":{"shape":"EvaluationMethod"}
       }
     },
     "UpdateDetectorModelResponse":{
