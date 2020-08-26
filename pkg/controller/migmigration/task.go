@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
+	"errors"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
+	libitr "github.com/konveyor/controller/pkg/itinerary"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	imagev1 "github.com/openshift/api/image/v1"
-	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -85,129 +86,99 @@ const (
 	HasISs       = 0x10 // Only when ISs migrated
 )
 
-type Itinerary struct {
-	Name  string
-	Steps []Step
-}
-
-var StageItinerary = Itinerary{
+var StageItinerary = libitr.Itinerary{
 	Name: "Stage",
-	Steps: []Step{
-		{phase: Created},
-		{phase: Started},
-		{phase: Prepare},
-		{phase: EnsureCloudSecretPropagated},
-		{phase: EnsureStagePodsFromRunning, all: HasPVs},
-		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
-		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
-		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, any: HasPVs | HasISs},
-		{phase: RestartRestic, all: HasStagePods},
-		{phase: ResticRestarted, all: HasStagePods},
-		{phase: QuiesceApplications, all: Quiesce},
-		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, any: HasPVs | HasISs},
-		{phase: StageBackupCreated, any: HasPVs | HasISs},
-		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
-		{phase: EnsureStageRestore, any: HasPVs | HasISs},
-		{phase: StageRestoreCreated, any: HasPVs | HasISs},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: Completed},
+	Pipeline: libitr.Pipeline{
+		{Name: Created},
+		{Name: Started},
+		{Name: Prepare},
+		{Name: EnsureCloudSecretPropagated},
+		{Name: EnsureStagePodsFromRunning, All: HasPVs},
+		{Name: EnsureStagePodsFromTemplates, All: HasPVs},
+		{Name: EnsureStagePodsFromOrphanedPVCs, All: HasPVs},
+		{Name: StagePodsCreated, All: HasStagePods},
+		{Name: AnnotateResources, Any: HasPVs | HasISs},
+		{Name: RestartRestic, All: HasStagePods},
+		{Name: ResticRestarted, All: HasStagePods},
+		{Name: QuiesceApplications, All: Quiesce},
+		{Name: EnsureQuiesced, All: Quiesce},
+		{Name: EnsureStageBackup, Any: HasPVs | HasISs},
+		{Name: StageBackupCreated, Any: HasPVs | HasISs},
+		{Name: EnsureStageBackupReplicated, Any: HasPVs | HasISs},
+		{Name: EnsureStageRestore, Any: HasPVs | HasISs},
+		{Name: StageRestoreCreated, Any: HasPVs | HasISs},
+		{Name: EnsureStagePodsDeleted, All: HasStagePods},
+		{Name: EnsureStagePodsTerminated, All: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Any: HasPVs | HasISs},
+		{Name: Completed},
 	},
 }
 
-var FinalItinerary = Itinerary{
+var FinalItinerary = libitr.Itinerary{
 	Name: "Final",
-	Steps: []Step{
-		{phase: Created},
-		{phase: Started},
-		{phase: Prepare},
-		{phase: EnsureCloudSecretPropagated},
-		{phase: PreBackupHooks},
-		{phase: EnsureInitialBackup},
-		{phase: InitialBackupCreated},
-		{phase: EnsureStagePodsFromRunning, all: HasPVs},
-		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
-		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
-		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, any: HasPVs | HasISs},
-		{phase: RestartRestic, all: HasStagePods},
-		{phase: ResticRestarted, all: HasStagePods},
-		{phase: QuiesceApplications, all: Quiesce},
-		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, any: HasPVs | HasISs},
-		{phase: StageBackupCreated, any: HasPVs | HasISs},
-		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
-		{phase: EnsureStageRestore, any: HasPVs | HasISs},
-		{phase: StageRestoreCreated, any: HasPVs | HasISs},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: EnsureInitialBackupReplicated},
-		{phase: PostBackupHooks},
-		{phase: PreRestoreHooks},
-		{phase: EnsureFinalRestore},
-		{phase: FinalRestoreCreated},
-		{phase: PostRestoreHooks},
-		{phase: Verification, all: HasVerify},
-		{phase: Completed},
+	Pipeline: libitr.Pipeline{
+		{Name: Created},
+		{Name: Started},
+		{Name: Prepare},
+		{Name: EnsureCloudSecretPropagated},
+		{Name: PreBackupHooks},
+		{Name: EnsureInitialBackup},
+		{Name: InitialBackupCreated},
+		{Name: EnsureStagePodsFromRunning, All: HasPVs},
+		{Name: EnsureStagePodsFromTemplates, All: HasPVs},
+		{Name: EnsureStagePodsFromOrphanedPVCs, All: HasPVs},
+		{Name: StagePodsCreated, All: HasStagePods},
+		{Name: AnnotateResources, Any: HasPVs | HasISs},
+		{Name: RestartRestic, All: HasStagePods},
+		{Name: ResticRestarted, All: HasStagePods},
+		{Name: QuiesceApplications, All: Quiesce},
+		{Name: EnsureQuiesced, All: Quiesce},
+		{Name: EnsureStageBackup, Any: HasPVs | HasISs},
+		{Name: StageBackupCreated, Any: HasPVs | HasISs},
+		{Name: EnsureStageBackupReplicated, Any: HasPVs | HasISs},
+		{Name: EnsureStageRestore, Any: HasPVs | HasISs},
+		{Name: StageRestoreCreated, Any: HasPVs | HasISs},
+		{Name: EnsureStagePodsDeleted, All: HasStagePods},
+		{Name: EnsureStagePodsTerminated, All: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Any: HasPVs | HasISs},
+		{Name: EnsureInitialBackupReplicated},
+		{Name: PostBackupHooks},
+		{Name: PreRestoreHooks},
+		{Name: EnsureFinalRestore},
+		{Name: FinalRestoreCreated},
+		{Name: PostRestoreHooks},
+		{Name: Verification, All: HasVerify},
+		{Name: Completed},
 	},
 }
 
-var CancelItinerary = Itinerary{
+var CancelItinerary = libitr.Itinerary{
 	Name: "Cancel",
-	Steps: []Step{
-		{phase: Canceling},
-		{phase: DeleteBackups},
-		{phase: DeleteRestores},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: DeleteMigrated},
-		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
-		{phase: Canceled},
-		{phase: Completed},
+	Pipeline: libitr.Pipeline{
+		{Name: Canceling},
+		{Name: DeleteBackups},
+		{Name: DeleteRestores},
+		{Name: EnsureStagePodsDeleted, All: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Any: HasPVs | HasISs},
+		{Name: DeleteMigrated},
+		{Name: EnsureMigratedDeleted},
+		{Name: UnQuiesceApplications, All: Quiesce},
+		{Name: Canceled},
+		{Name: Completed},
 	},
 }
 
-var FailedItinerary = Itinerary{
+var FailedItinerary = libitr.Itinerary{
 	Name: "Failed",
-	Steps: []Step{
-		{phase: MigrationFailed},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: DeleteMigrated},
-		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
-		{phase: Completed},
+	Pipeline: libitr.Pipeline{
+		{Name: MigrationFailed},
+		{Name: EnsureStagePodsDeleted, All: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Any: HasPVs | HasISs},
+		{Name: DeleteMigrated},
+		{Name: EnsureMigratedDeleted},
+		{Name: UnQuiesceApplications, All: Quiesce},
+		{Name: Completed},
 	},
-}
-
-// Step
-type Step struct {
-	// A phase name.
-	phase string
-	// Step included when ALL flags evaluate true.
-	all uint8
-	// Step included when ANY flag evaluates true.
-	any uint8
-}
-
-// Get a progress report.
-// Returns: phase, n, total.
-func (r Itinerary) progressReport(phase string) (string, int, int) {
-	n := 0
-	total := len(r.Steps)
-	for i, step := range r.Steps {
-		if step.phase == phase {
-			n = i + 1
-			break
-		}
-	}
-
-	return phase, n, total
 }
 
 // A Velero task that provides the complete backup & restore workflow.
@@ -231,7 +202,7 @@ type Task struct {
 	BackupResources mapset.Set
 	Phase           string
 	Requeue         time.Duration
-	Itinerary       Itinerary
+	Itinerary       libitr.Itinerary
 	Errors          []string
 }
 
@@ -741,8 +712,10 @@ func (t *Task) init() error {
 		t.Itinerary = FinalItinerary
 	}
 	if t.Owner.Status.Itinerary != t.Itinerary.Name {
-		t.Phase = t.Itinerary.Steps[0].phase
+		t.Phase = t.Itinerary.Pipeline[0].Name
 	}
+
+	t.Itinerary.Predicate = t
 
 	hasImageStreams, err := t.hasImageStreams()
 	if err != nil {
@@ -758,93 +731,44 @@ func (t *Task) init() error {
 			Durable:  true,
 		})
 	}
+
 	return nil
 }
 
 // Advance the task to the next phase.
 func (t *Task) next() error {
-	current := -1
-	for i, step := range t.Itinerary.Steps {
-		if step.phase != t.Phase {
-			continue
-		}
-		current = i
-		break
-	}
-	if current == -1 {
+	next, done, err := t.Itinerary.Next(t.Phase)
+	if errors.Is(err, libitr.StepNotFound) {
 		t.Phase = Completed
 		return nil
 	}
-	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
-		next := t.Itinerary.Steps[n]
-		flag, err := t.allFlags(next)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if !flag {
-			continue
-		}
-		flag, err = t.anyFlags(next)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if !flag {
-			continue
-		}
-		t.Phase = next.phase
-		return nil
+	if !done {
+		t.Phase = next.Name
+	} else {
+		t.Phase = Completed
 	}
-	t.Phase = Completed
+
 	return nil
 }
 
 // Evaluate `all` flags.
-func (t *Task) allFlags(step Step) (bool, error) {
-	if step.all&HasPVs != 0 && !t.hasPVs() {
-		return false, nil
-	}
-	if step.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
-		return false, nil
-	}
-	if step.all&Quiesce != 0 && !t.quiesce() {
-		return false, nil
-	}
-	if step.all&HasVerify != 0 && !t.hasVerify() {
-		return false, nil
-	}
-	hasImageStream, err := t.hasImageStreams()
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	if step.all&HasISs != 0 && hasImageStream {
-		return false, nil
+func (t *Task) Evaluate(flag libitr.Flag) (allowed bool, err error) {
+	switch flag {
+	case HasPVs:
+		allowed = t.hasPVs()
+	case HasStagePods:
+		allowed = t.Owner.Status.HasCondition(StagePodsCreated)
+	case Quiesce:
+		allowed = t.quiesce()
+	case HasVerify:
+		allowed = t.hasVerify()
+	case HasISs:
+		allowed, err = t.hasImageStreams()
+	default:
+		err = liberr.New("unknown predicate")
 	}
 
-	return true, nil
-}
-
-// Evaluate `any` flags.
-func (t *Task) anyFlags(step Step) (bool, error) {
-	if step.any&HasPVs != 0 && t.hasPVs() {
-		return true, nil
-	}
-	if step.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
-		return true, nil
-	}
-	if step.any&Quiesce != 0 && t.quiesce() {
-		return true, nil
-	}
-	if step.any&HasVerify != 0 && t.hasVerify() {
-		return true, nil
-	}
-	hasImageStream, err := t.hasImageStreams()
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	if step.any&HasISs != 0 && hasImageStream {
-		return true, nil
-	}
-	return step.any == uint8(0), nil
+	return
 }
 
 // Phase fail.

@@ -17,6 +17,7 @@ limitations under the License.
 package migmigration
 
 import (
+	libitr "github.com/konveyor/controller/pkg/itinerary"
 	"reflect"
 	"testing"
 	"time"
@@ -88,22 +89,22 @@ func TestReconcile(t *testing.T) {
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	stage := StageItinerary
-	common := Itinerary{}
+	common := libitr.Itinerary{}
 
-	for i, step := range StageItinerary.Steps {
+	for i, step := range StageItinerary.Pipeline {
 		found := false
-		for _, finalStep := range FinalItinerary.Steps[i:] {
-			if step.phase == finalStep.phase {
-				common.Steps = append(common.Steps, step)
+		for _, finalStep := range FinalItinerary.Pipeline[i:] {
+			if step.Name == finalStep.Name {
+				common.Pipeline = append(common.Pipeline, step)
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("'%s' is not contained within the final itinerary", step.phase)
+			t.Errorf("'%s' is not contained within the final itinerary", step.Name)
 		}
 	}
 
-	g.Expect(reflect.DeepEqual(stage.Steps, common.Steps)).To(gomega.BeTrue())
+	g.Expect(reflect.DeepEqual(stage.Pipeline, common.Pipeline)).To(gomega.BeTrue())
 
 }
