@@ -32,6 +32,19 @@ func (c *Container) Get(owner meta.Object) (Reconciler, bool) {
 }
 
 //
+// List all reconcilers.
+func (c *Container) List() []Reconciler {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	list := []Reconciler{}
+	for _, r := range c.content {
+		list = append(list, r)
+	}
+
+	return list
+}
+
+//
 // Add a reconciler.
 func (c *Container) Add(reconciler Reconciler) error {
 	c.mutex.Lock()

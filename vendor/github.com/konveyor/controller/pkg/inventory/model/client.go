@@ -15,7 +15,7 @@ const (
 
 //
 // Tx.Commit()
-// Tx.Rollback()
+// Tx.End()
 // Called and the transaction is not in progress by
 // the associated Client.
 var TxInvalidError = errors.New("transaction not valid")
@@ -29,8 +29,12 @@ type DB interface {
 	Close(bool) error
 	// Get the specified model.
 	Get(Model) error
-	// List models based on `selector` model.
-	List(Model, ListOptions, interface{}) error
+	// Get for update of the specified model.
+	GetForUpdate(Model) (*Tx, error)
+	// List models based on the type of slice.
+	List(interface{}, ListOptions) error
+	// Count based on the specified model.
+	Count(Model, Predicate) (int64, error)
 	// Begin a transaction.
 	Begin() (*Tx, error)
 	// Insert a model.
@@ -39,16 +43,20 @@ type DB interface {
 	Update(Model) error
 	// Delete a model.
 	Delete(Model) error
+	// Watch a model collection.
+	Watch(Model, EventHandler) (*Watch, error)
+	// The journal
+	Journal() *Journal
 }
 
 //
 // Database client.
 type Client struct {
 	// Protect internal state.
-	sync.Mutex
+	sync.RWMutex
 	// The sqlite3 database will not support
 	// concurrent write operations.
-	mutex sync.Mutex
+	dbMutex sync.Mutex
 	// file path.
 	path string
 	// Model
@@ -57,6 +65,8 @@ type Client struct {
 	db *sql.DB
 	// Current database transaction.
 	tx *sql.Tx
+	// Journal
+	journal Journal
 }
 
 //
@@ -119,53 +129,48 @@ func (r *Client) Get(model Model) error {
 }
 
 //
-// List models.
-func (r *Client) List(model Model, options ListOptions, list interface{}) error {
-	mv := reflect.TypeOf(model)
-	switch mv.Kind() {
-	case reflect.Ptr:
-		mv = mv.Elem()
-	default:
-		return nil
+// Get the model for update.
+// Locks the DB by beginning a transaction.
+// The caller MUST commit/end the returned Tx.
+func (r *Client) GetForUpdate(model Model) (*Tx, error) {
+	tx, err := r.Begin()
+	if err != nil {
+		return nil, liberr.Wrap(err)
 	}
-	lv := reflect.ValueOf(list)
-	lt := reflect.TypeOf(list)
-	switch lt.Kind() {
-	case reflect.Ptr:
-		lv = lv.Elem()
-		lt = lt.Elem()
-	default:
-		return nil
-	}
-	switch lv.Kind() {
-	case reflect.Slice:
-		l, err := Table{r.db}.List(model, options)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		concrete := reflect.MakeSlice(lv.Type(), 0, 0)
-		for i := 0; i < len(l); i++ {
-			m := reflect.ValueOf(l[i]).Elem()
-			concrete = reflect.Append(concrete, m)
-		}
-		lv.Set(concrete)
+	err = Table{r.db}.Get(model)
+	if err != nil {
+		tx.End()
+		tx = nil
 	}
 
-	return nil
+	return tx, err
+}
+
+//
+// List models.
+// The `list` must be: *[]Model.
+func (r *Client) List(list interface{}, options ListOptions) error {
+	return Table{r.db}.List(list, options)
+}
+
+//
+// Count models.
+func (r *Client) Count(model Model, predicate Predicate) (int64, error) {
+	return Table{r.db}.Count(model, predicate)
 }
 
 //
 // Begin a transaction.
 // Example:
 //   tx, _ := client.Begin()
-//   defer tx.Rollback()
+//   defer tx.End()
 //   client.Insert(model)
 //   client.Insert(model)
 //   tx.Commit()
 func (r *Client) Begin() (*Tx, error) {
 	r.Lock()
 	defer r.Unlock()
-	r.mutex.Lock()
+	r.dbMutex.Lock()
 	tx, err := r.db.Begin()
 	if err != nil {
 		return nil, err
@@ -179,11 +184,10 @@ func (r *Client) Begin() (*Tx, error) {
 func (r *Client) Insert(model Model) error {
 	r.Lock()
 	defer r.Unlock()
-	model.SetPk()
 	table := Table{}
 	if r.tx == nil {
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
+		r.dbMutex.Lock()
+		defer r.dbMutex.Unlock()
 		table.DB = r.db
 	} else {
 		table.DB = r.tx
@@ -196,6 +200,10 @@ func (r *Client) Insert(model Model) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	r.journal.Created(model)
+	if r.tx == nil {
+		r.journal.Commit()
+	}
 
 	return nil
 }
@@ -205,22 +213,30 @@ func (r *Client) Insert(model Model) error {
 func (r *Client) Update(model Model) error {
 	r.Lock()
 	defer r.Unlock()
-	model.SetPk()
 	table := Table{}
 	if r.tx == nil {
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
+		r.dbMutex.Lock()
+		defer r.dbMutex.Unlock()
 		table.DB = r.db
 	} else {
 		table.DB = r.tx
 	}
-	err := table.Update(model)
+	current := r.journal.copy(model)
+	err := table.Get(current)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = table.Update(model)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	err = r.replaceLabels(table, model)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	r.journal.Updated(current, model)
+	if r.tx == nil {
+		r.journal.Commit()
 	}
 
 	return nil
@@ -231,11 +247,10 @@ func (r *Client) Update(model Model) error {
 func (r *Client) Delete(model Model) error {
 	r.Lock()
 	defer r.Unlock()
-	model.SetPk()
 	table := Table{}
 	if r.tx == nil {
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
+		r.dbMutex.Lock()
+		defer r.dbMutex.Unlock()
 		table.DB = r.db
 	} else {
 		table.DB = r.tx
@@ -248,8 +263,52 @@ func (r *Client) Delete(model Model) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	r.journal.Deleted(model)
+	if r.tx == nil {
+		r.journal.Commit()
+	}
 
 	return nil
+}
+
+//
+// Watch model events.
+func (r *Client) Watch(model Model, handler EventHandler) (*Watch, error) {
+	r.Lock()
+	defer r.Unlock()
+	mt := reflect.TypeOf(model)
+	switch mt.Kind() {
+	case reflect.Ptr:
+		mt = mt.Elem()
+	}
+	watch, err := r.journal.Watch(model, handler)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	listPtr := reflect.New(reflect.SliceOf(mt))
+	err = Table{r.db}.List(listPtr.Interface(), ListOptions{})
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	list := listPtr.Elem()
+	for i := 0; i < list.Len(); i++ {
+		m := list.Index(i).Addr().Interface()
+		watch.notify(
+			&Event{
+				Model:  m.(Model),
+				Action: Created,
+			})
+	}
+
+	watch.Start()
+
+	return watch, nil
+}
+
+//
+// The associated journal.
+func (r *Client) Journal() *Journal {
+	return &r.journal
 }
 
 //
@@ -274,11 +333,25 @@ func (r *Client) insertLabels(table Table, model Model) error {
 //
 // Delete labels for a model in the DB.
 func (r *Client) deleteLabels(table Table, model Model) error {
-	return table.Delete(
-		&Label{
-			Kind:   table.Name(model),
-			Parent: model.Pk(),
+	list := []Label{}
+	err := table.List(
+		&list,
+		ListOptions{
+			Predicate: And(
+				Eq("Kind", table.Name(model)),
+				Eq("Parent", model.Pk())),
 		})
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, label := range list {
+		err := table.Delete(&label)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return nil
 }
 
 //
@@ -299,7 +372,7 @@ func (r *Client) replaceLabels(table Table, model Model) error {
 //
 // Commit a transaction.
 // This MUST be preceeded by Begin() which returns
-// the `tx` transaction token.
+// the `tx` transaction.  This will end the transaction.
 func (r *Client) commit(tx *Tx) error {
 	r.Lock()
 	defer r.Unlock()
@@ -307,28 +380,41 @@ func (r *Client) commit(tx *Tx) error {
 		return liberr.Wrap(TxInvalidError)
 	}
 	defer func() {
-		r.mutex.Unlock()
+		r.dbMutex.Unlock()
 		r.tx = nil
 	}()
-	return r.tx.Commit()
+	err := r.tx.Commit()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	r.journal.Commit()
+
+	return nil
 }
 
 //
-// Rollback a transaction.
+// End a transaction.
 // This MUST be preceeded by Begin() which returns
-// the `tx` transaction token.
-func (r *Client) rollback(tx *Tx) error {
+// the `tx` transaction.
+func (r *Client) end(tx *Tx) error {
 	r.Lock()
 	defer r.Unlock()
 	if r.tx == nil || r.tx != tx.ref {
 		return liberr.Wrap(TxInvalidError)
 	}
 	defer func() {
-		r.mutex.Unlock()
+		r.dbMutex.Unlock()
 		r.tx = nil
 	}()
+	err := r.tx.Rollback()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
-	return r.tx.Rollback()
+	r.journal.Unstage()
+
+	return nil
 }
 
 //
@@ -342,12 +428,16 @@ type Tx struct {
 
 //
 // Commit a transaction.
+// Staged changes are committed in the DB.
+// This will end the transaction.
 func (r *Tx) Commit() error {
 	return r.client.commit(r)
 }
 
 //
-// Rollback a transaction.
-func (r *Tx) rollback() {
-	r.client.rollback(r)
+// End a transaction.
+// Staged changes are discarded.
+// See: Commit().
+func (r *Tx) End() error {
+	return r.client.end(r)
 }

@@ -380,14 +380,15 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3b46c4f287d692dc266644e2dbdc0fa688b7a8e7d954c9127b71650a5e8a08cc"
+  digest = "1:a8b794bddd0da31e708ba4b7acd70d1f3ff95e0cac7f8b032413be1ab5399617"
   name = "github.com/konveyor/controller"
   packages = [
     "pkg/error",
+    "pkg/itinerary",
     "pkg/logging",
   ]
   pruneopts = "T"
-  revision = "8b02d7a5c9194f3417985a91a09f2654561a97e3"
+  revision = "229059a2af8a18d8bb110fae275eaeed381ed298"
 
 [[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
@@ -1369,6 +1370,7 @@
     "github.com/google/uuid",
     "github.com/joho/godotenv",
     "github.com/konveyor/controller/pkg/error",
+    "github.com/konveyor/controller/pkg/itinerary",
     "github.com/konveyor/controller/pkg/logging",
     "github.com/mattn/go-sqlite3",
     "github.com/onsi/ginkgo",
