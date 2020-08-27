@@ -292,7 +292,6 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-
 		// Dest cluster refresh
 		dstCluster, err := plan.GetDestinationCluster(r.Client)
 		if err != nil {
@@ -303,19 +302,17 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-
 		// Storage refresh
 		storage, err := plan.GetStorage(r.Client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		storage.Spec.Refresh = true
-		err = r.Update(context.TODO(), srcCluster)
+		err = r.Update(context.TODO(), storage)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-
-		// Finished
+		// Mark refresh as completed
 		plan.Spec.Refresh = false
 	}
 	return nil

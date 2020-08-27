@@ -27,6 +27,8 @@ var NoReQ = time.Duration(0)
 const (
 	Created                         = ""
 	Started                         = "Started"
+	Refresh                         = "Refresh"
+	EnsureRefreshed                 = "EnsureRefreshed"
 	Prepare                         = "Prepare"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
@@ -95,6 +97,8 @@ var StageItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
+		{phase: Refresh},
+		{phase: EnsureRefreshed},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
@@ -123,6 +127,8 @@ var FinalItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
+		{phase: Refresh},
+		{phase: EnsureRefreshed},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: PreBackupHooks},
@@ -256,6 +262,32 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case Refresh:
+		t.Requeue = FastReQ
+		err := t.refreshClusters()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.refreshStorage()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.refreshPlan()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case EnsureRefreshed:
+		t.Requeue = FastReQ
+		refreshed := t.ensureRefreshed()
+		if refreshed {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+
 	case Prepare:
 		t.Requeue = PollReQ
 		err := t.ensureStagePodsDeleted()

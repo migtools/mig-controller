@@ -1,10 +1,12 @@
 package migmigration
 
 import (
+	"context"
 	"fmt"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	health "github.com/konveyor/mig-controller/pkg/health"
 )
@@ -104,4 +106,63 @@ func (t *Task) reportHealthCondition() {
 			Message:  fmt.Sprintf(UnhealthyNamespacesMessage, destination),
 		})
 	}
+}
+
+// Trigger a refresh on both MigCluster resources
+func (t *Task) refreshClusters() error {
+	// Source
+	srcCluster := t.PlanResources.SrcMigCluster
+	t.PlanResources.SrcMigCluster.Spec.Refresh = true
+	err := t.Client.Update(context.TODO(), srcCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Destination
+	dstCluster := t.PlanResources.DestMigCluster
+	dstCluster.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), dstCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	return nil
+}
+
+// Trigger a refresh on MigStorage resource
+func (t *Task) refreshStorage() error {
+	storage := t.PlanResources.MigStorage
+	storage.Spec.Refresh = true
+	err := t.Client.Update(context.TODO(), storage)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// Trigger a refresh on MigPlan resource
+func (t *Task) refreshPlan() error {
+	plan := t.PlanResources.MigPlan
+	plan.Spec.Refresh = true
+	err := t.Client.Update(context.TODO(), plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// Verify storage, clusters, and plan finished with refresh before migrating
+func (t *Task) ensureRefreshed() bool {
+	refreshed := false
+
+	src := t.PlanResources.SrcMigCluster
+	dst := t.PlanResources.DestMigCluster
+	storage := t.PlanResources.MigStorage
+	plan := t.PlanResources.MigPlan
+
+	if !src.Spec.Refresh && !dst.Spec.Refresh && !storage.Spec.Refresh && !plan.Spec.Refresh {
+		refreshed = true
+	}
+
+	return refreshed
 }
