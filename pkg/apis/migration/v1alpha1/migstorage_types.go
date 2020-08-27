@@ -39,6 +39,7 @@ type MigStorageSpec struct {
 	BackupStorageConfig    `json:"backupStorageConfig"`
 	VolumeSnapshotProvider string `json:"volumeSnapshotProvider,omitempty"`
 	VolumeSnapshotConfig   `json:"volumeSnapshotConfig,omitempty"`
+	Refresh                bool `json:"refresh,omitempty"`
 }
 
 // MigStorageStatus defines the observed state of MigStorage

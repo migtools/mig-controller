@@ -64,6 +64,7 @@ type MigPlanSpec struct {
 	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 	Closed            bool                  `json:"closed,omitempty"`
 	Hooks             []MigPlanHook         `json:"hooks,omitempty"`
+	Refresh           bool                  `json:"refresh,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan

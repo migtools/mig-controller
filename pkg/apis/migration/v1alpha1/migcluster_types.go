@@ -63,6 +63,7 @@ type MigClusterSpec struct {
 	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
 	Insecure                bool                  `json:"insecure,omitempty"`
 	RestartRestic           *bool                 `json:"restartRestic,omitempty"`
+	Refresh                 bool                  `json:"refresh,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
