@@ -178,6 +178,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Apply changes.
 	cluster.MarkReconciled()
+	cluster.Spec.Refresh = false
 	err = r.Update(context.TODO(), cluster)
 	if err != nil {
 		log.Trace(err)

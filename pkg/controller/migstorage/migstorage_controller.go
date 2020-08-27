@@ -131,6 +131,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Apply changes.
 	storage.MarkReconciled()
+	storage.Spec.Refresh = false
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
 		log.Trace(err)

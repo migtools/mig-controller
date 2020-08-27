@@ -264,6 +264,9 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
+	// Ensure refresh
+	r.ensureRefresh(plan)
+
 	// Apply changes.
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
@@ -274,6 +277,48 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Done
 	return reconcile.Result{}, nil
+}
+
+// Ensure refresh is performed if requested
+func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
+	if plan.Spec.Refresh {
+		// Source cluster refresh
+		srcCluster, err := plan.GetSourceCluster(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		srcCluster.Spec.Refresh = true
+		err = r.Update(context.TODO(), srcCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		// Dest cluster refresh
+		dstCluster, err := plan.GetDestinationCluster(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		dstCluster.Spec.Refresh = true
+		err = r.Update(context.TODO(), dstCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		// Storage refresh
+		storage, err := plan.GetStorage(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		storage.Spec.Refresh = true
+		err = r.Update(context.TODO(), srcCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		// Finished
+		plan.Spec.Refresh = false
+	}
+	return nil
 }
 
 // Detect that a plan is been closed and ensure all its referenced
