@@ -328,7 +328,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
 		err := t.annotateStageResources()
@@ -457,7 +457,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
@@ -476,7 +476,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
@@ -509,7 +509,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}

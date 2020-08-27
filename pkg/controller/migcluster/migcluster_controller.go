@@ -64,6 +64,9 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Add reference to controller on ReconcileMigCluster object to be used
 	// for adding remote watches at a later time
 	r.Controller = c
+	if c != c {
+		return nil
+	}
 
 	// Watch for changes to MigCluster
 	err = c.Watch(

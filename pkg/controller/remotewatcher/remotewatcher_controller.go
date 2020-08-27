@@ -17,7 +17,6 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -45,10 +44,10 @@ func newReconciler(
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return err
-	}
+	// c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
