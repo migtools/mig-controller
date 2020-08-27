@@ -15,15 +15,12 @@ package remotewatcher
 
 import (
 	"github.com/konveyor/controller/pkg/logging"
-	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 var log = logging.WithName("remote-watch")
@@ -49,50 +46,6 @@ func newReconciler(
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	c, err := controller.New("remotewatcher-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return err
-	}
-
-	// Backup
-	err = c.Watch(
-		&source.Kind{
-			Type: &velerov1.Backup{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&BackupPredicate{})
-	if err != nil {
-		return err
-	}
-
-	// Restore
-	err = c.Watch(
-		&source.Kind{
-			Type: &velerov1.Restore{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&RestorePredicate{})
-	if err != nil {
-		return err
-	}
-
-	// BSL
-	err = c.Watch(
-		&source.Kind{
-			Type: &velerov1.BackupStorageLocation{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&BSLPredicate{})
-	if err != nil {
-		return err
-	}
-
-	// VSL
-	err = c.Watch(
-		&source.Kind{
-			Type: &velerov1.VolumeSnapshotLocation{},
-		},
-		&handler.EnqueueRequestForObject{},
-		&VSLPredicate{})
 	if err != nil {
 		return err
 	}

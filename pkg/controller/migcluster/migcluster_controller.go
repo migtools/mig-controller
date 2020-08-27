@@ -149,11 +149,11 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	if !cluster.Status.HasBlockerCondition() {
 		// Remote Watch.
-		err = r.setupRemoteWatch(cluster)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
+		// err = r.setupRemoteWatch(cluster)
+		// if err != nil {
+		// 	log.Trace(err)
+		// 	return reconcile.Result{Requeue: true}, nil
+		// }
 
 		// Storage Classes
 		err = r.setStorageClasses(cluster)
@@ -162,7 +162,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{Requeue: true}, nil
 		}
 	} else {
-		r.shutdownRemoteWatch(cluster)
+		// r.shutdownRemoteWatch(cluster)
 	}
 
 	// Ready
