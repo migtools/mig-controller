@@ -87,6 +87,23 @@
         {"shape":"ResourceContentionFault"}
       ]
     },
+    "CancelInstanceRefresh":{
+      "name":"CancelInstanceRefresh",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"CancelInstanceRefreshType"},
+      "output":{
+        "shape":"CancelInstanceRefreshAnswer",
+        "resultWrapper":"CancelInstanceRefreshResult"
+      },
+      "errors":[
+        {"shape":"LimitExceededFault"},
+        {"shape":"ResourceContentionFault"},
+        {"shape":"ActiveInstanceRefreshNotFoundFault"}
+      ]
+    },
     "CompleteLifecycleAction":{
       "name":"CompleteLifecycleAction",
       "http":{
@@ -300,6 +317,22 @@
         "resultWrapper":"DescribeAutoScalingNotificationTypesResult"
       },
       "errors":[
+        {"shape":"ResourceContentionFault"}
+      ]
+    },
+    "DescribeInstanceRefreshes":{
+      "name":"DescribeInstanceRefreshes",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"DescribeInstanceRefreshesType"},
+      "output":{
+        "shape":"DescribeInstanceRefreshesAnswer",
+        "resultWrapper":"DescribeInstanceRefreshesResult"
+      },
+      "errors":[
+        {"shape":"InvalidNextToken"},
         {"shape":"ResourceContentionFault"}
       ]
     },
@@ -735,6 +768,23 @@
         {"shape":"ResourceContentionFault"}
       ]
     },
+    "StartInstanceRefresh":{
+      "name":"StartInstanceRefresh",
+      "http":{
+        "method":"POST",
+        "requestUri":"/"
+      },
+      "input":{"shape":"StartInstanceRefreshType"},
+      "output":{
+        "shape":"StartInstanceRefreshAnswer",
+        "resultWrapper":"StartInstanceRefreshResult"
+      },
+      "errors":[
+        {"shape":"LimitExceededFault"},
+        {"shape":"ResourceContentionFault"},
+        {"shape":"InstanceRefreshInProgressFault"}
+      ]
+    },
     "SuspendProcesses":{
       "name":"SuspendProcesses",
       "http":{
@@ -778,6 +828,18 @@
     }
   },
   "shapes":{
+    "ActiveInstanceRefreshNotFoundFault":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"XmlStringMaxLen255"}
+      },
+      "error":{
+        "code":"ActiveInstanceRefreshNotFound",
+        "httpStatusCode":400,
+        "senderFault":true
+      },
+      "exception":true
+    },
     "Activities":{
       "type":"list",
       "member":{"shape":"Activity"}
@@ -939,7 +1001,8 @@
         "Tags":{"shape":"TagDescriptionList"},
         "TerminationPolicies":{"shape":"TerminationPolicies"},
         "NewInstancesProtectedFromScaleIn":{"shape":"InstanceProtected"},
-        "ServiceLinkedRoleARN":{"shape":"ResourceName"}
+        "ServiceLinkedRoleARN":{"shape":"ResourceName"},
+        "MaxInstanceLifetime":{"shape":"MaxInstanceLifetime"}
       }
     },
     "AutoScalingGroupDesiredCapacity":{"type":"integer"},
@@ -981,13 +1044,15 @@
       ],
       "members":{
         "InstanceId":{"shape":"XmlStringMaxLen19"},
+        "InstanceType":{"shape":"XmlStringMaxLen255"},
         "AutoScalingGroupName":{"shape":"XmlStringMaxLen255"},
         "AvailabilityZone":{"shape":"XmlStringMaxLen255"},
         "LifecycleState":{"shape":"XmlStringMaxLen32"},
         "HealthStatus":{"shape":"XmlStringMaxLen32"},
         "LaunchConfigurationName":{"shape":"XmlStringMaxLen255"},
         "LaunchTemplate":{"shape":"LaunchTemplateSpecification"},
-        "ProtectedFromScaleIn":{"shape":"InstanceProtected"}
+        "ProtectedFromScaleIn":{"shape":"InstanceProtected"},
+        "WeightedCapacity":{"shape":"XmlStringMaxLen32"}
       }
     },
     "AutoScalingInstances":{
@@ -1075,6 +1140,19 @@
       "type":"list",
       "member":{"shape":"BlockDeviceMapping"}
     },
+    "CancelInstanceRefreshAnswer":{
+      "type":"structure",
+      "members":{
+        "InstanceRefreshId":{"shape":"XmlStringMaxLen255"}
+      }
+    },
+    "CancelInstanceRefreshType":{
+      "type":"structure",
+      "required":["AutoScalingGroupName"],
+      "members":{
+        "AutoScalingGroupName":{"shape":"XmlStringMaxLen255"}
+      }
+    },
     "ClassicLinkVPCSecurityGroups":{
       "type":"list",
       "member":{"shape":"XmlStringMaxLen255"}
@@ -1128,7 +1206,8 @@
         "NewInstancesProtectedFromScaleIn":{"shape":"InstanceProtected"},
         "LifecycleHookSpecificationList":{"shape":"LifecycleHookSpecifications"},
         "Tags":{"shape":"Tags"},
-        "ServiceLinkedRoleARN":{"shape":"ResourceName"}
+        "ServiceLinkedRoleARN":{"shape":"ResourceName"},
+        "MaxInstanceLifetime":{"shape":"MaxInstanceLifetime"}
       }
     },
     "CreateLaunchConfigurationType":{
@@ -1152,7 +1231,8 @@
         "IamInstanceProfile":{"shape":"XmlStringMaxLen1600"},
         "EbsOptimized":{"shape":"EbsOptimized"},
         "AssociatePublicIpAddress":{"shape":"AssociatePublicIpAddress"},
-        "PlacementTenancy":{"shape":"XmlStringMaxLen64"}
+        "PlacementTenancy":{"shape":"XmlStringMaxLen64"},
+        "MetadataOptions":{"shape":"InstanceMetadataOptions"}
       }
     },
     "CreateOrUpdateTagsType":{
@@ -1265,6 +1345,23 @@
       "type":"structure",
       "members":{
         "AutoScalingNotificationTypes":{"shape":"AutoScalingNotificationTypes"}
+      }
+    },
+    "DescribeInstanceRefreshesAnswer":{
+      "type":"structure",
+      "members":{
+        "InstanceRefreshes":{"shape":"InstanceRefreshes"},
+        "NextToken":{"shape":"XmlString"}
+      }
+    },
+    "DescribeInstanceRefreshesType":{
+      "type":"structure",
+      "required":["AutoScalingGroupName"],
+      "members":{
+        "AutoScalingGroupName":{"shape":"XmlStringMaxLen255"},
+        "InstanceRefreshIds":{"shape":"InstanceRefreshIds"},
+        "NextToken":{"shape":"XmlString"},
+        "MaxRecords":{"shape":"MaxRecords"}
       }
     },
     "DescribeLifecycleHookTypesAnswer":{
@@ -1564,17 +1661,46 @@
       ],
       "members":{
         "InstanceId":{"shape":"XmlStringMaxLen19"},
+        "InstanceType":{"shape":"XmlStringMaxLen255"},
         "AvailabilityZone":{"shape":"XmlStringMaxLen255"},
         "LifecycleState":{"shape":"LifecycleState"},
         "HealthStatus":{"shape":"XmlStringMaxLen32"},
         "LaunchConfigurationName":{"shape":"XmlStringMaxLen255"},
         "LaunchTemplate":{"shape":"LaunchTemplateSpecification"},
-        "ProtectedFromScaleIn":{"shape":"InstanceProtected"}
+        "ProtectedFromScaleIn":{"shape":"InstanceProtected"},
+        "WeightedCapacity":{"shape":"XmlStringMaxLen32"}
       }
     },
     "InstanceIds":{
       "type":"list",
       "member":{"shape":"XmlStringMaxLen19"}
+    },
+    "InstanceMetadataEndpointState":{
+      "type":"string",
+      "enum":[
+        "disabled",
+        "enabled"
+      ]
+    },
+    "InstanceMetadataHttpPutResponseHopLimit":{
+      "type":"integer",
+      "max":64,
+      "min":1
+    },
+    "InstanceMetadataHttpTokensState":{
+      "type":"string",
+      "enum":[
+        "optional",
+        "required"
+      ]
+    },
+    "InstanceMetadataOptions":{
+      "type":"structure",
+      "members":{
+        "HttpTokens":{"shape":"InstanceMetadataHttpTokensState"},
+        "HttpPutResponseHopLimit":{"shape":"InstanceMetadataHttpPutResponseHopLimit"},
+        "HttpEndpoint":{"shape":"InstanceMetadataEndpointState"}
+      }
     },
     "InstanceMonitoring":{
       "type":"structure",
@@ -1583,6 +1709,50 @@
       }
     },
     "InstanceProtected":{"type":"boolean"},
+    "InstanceRefresh":{
+      "type":"structure",
+      "members":{
+        "InstanceRefreshId":{"shape":"XmlStringMaxLen255"},
+        "AutoScalingGroupName":{"shape":"XmlStringMaxLen255"},
+        "Status":{"shape":"InstanceRefreshStatus"},
+        "StatusReason":{"shape":"XmlStringMaxLen1023"},
+        "StartTime":{"shape":"TimestampType"},
+        "EndTime":{"shape":"TimestampType"},
+        "PercentageComplete":{"shape":"IntPercent"},
+        "InstancesToUpdate":{"shape":"InstancesToUpdate"}
+      }
+    },
+    "InstanceRefreshIds":{
+      "type":"list",
+      "member":{"shape":"XmlStringMaxLen255"}
+    },
+    "InstanceRefreshInProgressFault":{
+      "type":"structure",
+      "members":{
+        "message":{"shape":"XmlStringMaxLen255"}
+      },
+      "error":{
+        "code":"InstanceRefreshInProgress",
+        "httpStatusCode":400,
+        "senderFault":true
+      },
+      "exception":true
+    },
+    "InstanceRefreshStatus":{
+      "type":"string",
+      "enum":[
+        "Pending",
+        "InProgress",
+        "Successful",
+        "Failed",
+        "Cancelling",
+        "Cancelled"
+      ]
+    },
+    "InstanceRefreshes":{
+      "type":"list",
+      "member":{"shape":"InstanceRefresh"}
+    },
     "Instances":{
       "type":"list",
       "member":{"shape":"Instance"}
@@ -1597,6 +1767,15 @@
         "SpotInstancePools":{"shape":"SpotInstancePools"},
         "SpotMaxPrice":{"shape":"MixedInstanceSpotPrice"}
       }
+    },
+    "InstancesToUpdate":{
+      "type":"integer",
+      "min":0
+    },
+    "IntPercent":{
+      "type":"integer",
+      "max":100,
+      "min":0
     },
     "InvalidNextToken":{
       "type":"structure",
@@ -1637,7 +1816,8 @@
         "CreatedTime":{"shape":"TimestampType"},
         "EbsOptimized":{"shape":"EbsOptimized"},
         "AssociatePublicIpAddress":{"shape":"AssociatePublicIpAddress"},
-        "PlacementTenancy":{"shape":"XmlStringMaxLen64"}
+        "PlacementTenancy":{"shape":"XmlStringMaxLen64"},
+        "MetadataOptions":{"shape":"InstanceMetadataOptions"}
       }
     },
     "LaunchConfigurationNameType":{
@@ -1687,7 +1867,8 @@
     "LaunchTemplateOverrides":{
       "type":"structure",
       "members":{
-        "InstanceType":{"shape":"XmlStringMaxLen255"}
+        "InstanceType":{"shape":"XmlStringMaxLen255"},
+        "WeightedCapacity":{"shape":"XmlStringMaxLen32"}
       }
     },
     "LaunchTemplateSpecification":{
@@ -1804,6 +1985,7 @@
       "type":"list",
       "member":{"shape":"LoadBalancerTargetGroupState"}
     },
+    "MaxInstanceLifetime":{"type":"integer"},
     "MaxNumberOfAutoScalingGroups":{"type":"integer"},
     "MaxNumberOfLaunchConfigurations":{"type":"integer"},
     "MaxRecords":{"type":"integer"},
@@ -2024,7 +2206,8 @@
         "MetricAggregationType":{"shape":"XmlStringMaxLen32"},
         "StepAdjustments":{"shape":"StepAdjustments"},
         "EstimatedInstanceWarmup":{"shape":"EstimatedInstanceWarmup"},
-        "TargetTrackingConfiguration":{"shape":"TargetTrackingConfiguration"}
+        "TargetTrackingConfiguration":{"shape":"TargetTrackingConfiguration"},
+        "Enabled":{"shape":"ScalingPolicyEnabled"}
       }
     },
     "PutScheduledUpdateGroupActionType":{
@@ -2062,6 +2245,21 @@
         "LifecycleActionToken":{"shape":"LifecycleActionToken"},
         "InstanceId":{"shape":"XmlStringMaxLen19"}
       }
+    },
+    "RefreshInstanceWarmup":{
+      "type":"integer",
+      "min":0
+    },
+    "RefreshPreferences":{
+      "type":"structure",
+      "members":{
+        "MinHealthyPercentage":{"shape":"IntPercent"},
+        "InstanceWarmup":{"shape":"RefreshInstanceWarmup"}
+      }
+    },
+    "RefreshStrategy":{
+      "type":"string",
+      "enum":["Rolling"]
     },
     "ResourceContentionFault":{
       "type":"structure",
@@ -2142,9 +2340,11 @@
         "MetricAggregationType":{"shape":"XmlStringMaxLen32"},
         "EstimatedInstanceWarmup":{"shape":"EstimatedInstanceWarmup"},
         "Alarms":{"shape":"Alarms"},
-        "TargetTrackingConfiguration":{"shape":"TargetTrackingConfiguration"}
+        "TargetTrackingConfiguration":{"shape":"TargetTrackingConfiguration"},
+        "Enabled":{"shape":"ScalingPolicyEnabled"}
       }
     },
+    "ScalingPolicyEnabled":{"type":"boolean"},
     "ScalingProcessQuery":{
       "type":"structure",
       "required":["AutoScalingGroupName"],
@@ -2265,6 +2465,21 @@
       "type":"string",
       "max":255,
       "min":1
+    },
+    "StartInstanceRefreshAnswer":{
+      "type":"structure",
+      "members":{
+        "InstanceRefreshId":{"shape":"XmlStringMaxLen255"}
+      }
+    },
+    "StartInstanceRefreshType":{
+      "type":"structure",
+      "required":["AutoScalingGroupName"],
+      "members":{
+        "AutoScalingGroupName":{"shape":"XmlStringMaxLen255"},
+        "Strategy":{"shape":"RefreshStrategy"},
+        "Preferences":{"shape":"RefreshPreferences"}
+      }
     },
     "StepAdjustment":{
       "type":"structure",
@@ -2387,7 +2602,8 @@
         "VPCZoneIdentifier":{"shape":"XmlStringMaxLen2047"},
         "TerminationPolicies":{"shape":"TerminationPolicies"},
         "NewInstancesProtectedFromScaleIn":{"shape":"InstanceProtected"},
-        "ServiceLinkedRoleARN":{"shape":"ResourceName"}
+        "ServiceLinkedRoleARN":{"shape":"ResourceName"},
+        "MaxInstanceLifetime":{"shape":"MaxInstanceLifetime"}
       }
     },
     "Values":{

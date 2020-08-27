@@ -24,6 +24,7 @@ required = [
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/vmware-tanzu/velero/pkg/apis/velero/v1",
     "github.com/konveyor/controller/pkg/error",
+    "github.com/aws/aws-sdk-go",
     ]
 
 [prune]
@@ -53,6 +54,10 @@ required = [
 [[constraint]]
   name = "github.com/openshift/api"
   branch = "release-3.11"
+ 
+[[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "v1.34.11"
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 

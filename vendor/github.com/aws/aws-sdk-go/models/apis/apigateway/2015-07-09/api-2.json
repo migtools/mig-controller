@@ -389,7 +389,8 @@
       "errors":[
         {"shape":"UnauthorizedException"},
         {"shape":"NotFoundException"},
-        {"shape":"TooManyRequestsException"}
+        {"shape":"TooManyRequestsException"},
+        {"shape":"BadRequestException"}
       ]
     },
     "DeleteGatewayResponse":{
@@ -2874,7 +2875,8 @@
     "EndpointConfiguration":{
       "type":"structure",
       "members":{
-        "types":{"shape":"ListOfEndpointType"}
+        "types":{"shape":"ListOfEndpointType"},
+        "vpcEndpointIds":{"shape":"ListOfString"}
       }
     },
     "EndpointType":{
@@ -4020,7 +4022,8 @@
         "timeoutInMillis":{"shape":"Integer"},
         "cacheNamespace":{"shape":"String"},
         "cacheKeyParameters":{"shape":"ListOfString"},
-        "integrationResponses":{"shape":"MapOfIntegrationResponse"}
+        "integrationResponses":{"shape":"MapOfIntegrationResponse"},
+        "tlsConfig":{"shape":"TlsConfig"}
       }
     },
     "IntegrationResponse":{
@@ -4385,7 +4388,8 @@
         "cacheNamespace":{"shape":"String"},
         "cacheKeyParameters":{"shape":"ListOfString"},
         "contentHandling":{"shape":"ContentHandlingStrategy"},
-        "timeoutInMillis":{"shape":"NullableInteger"}
+        "timeoutInMillis":{"shape":"NullableInteger"},
+        "tlsConfig":{"shape":"TlsConfig"}
       }
     },
     "PutIntegrationResponseRequest":{
@@ -4830,6 +4834,12 @@
       }
     },
     "Timestamp":{"type":"timestamp"},
+    "TlsConfig":{
+      "type":"structure",
+      "members":{
+        "insecureSkipVerification":{"shape":"Boolean"}
+      }
+    },
     "TooManyRequestsException":{
       "type":"structure",
       "members":{
