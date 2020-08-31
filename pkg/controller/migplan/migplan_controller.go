@@ -296,6 +296,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		DestinationClusterNotReady, InvalidDestinationClusterRef,
 		StorageNotReady, InvalidStorageRef,
 	) {
+		plan.Spec.Refresh = false
 		return nil
 	}
 
