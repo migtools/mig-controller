@@ -264,14 +264,6 @@ func (t *Task) Run() error {
 		}
 	case Refresh:
 		t.Requeue = FastReQ
-		err := t.refreshClusters()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		err = t.refreshStorage()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		err = t.refreshPlan()
 		if err != nil {
 			return liberr.Wrap(err)

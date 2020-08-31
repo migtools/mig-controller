@@ -108,38 +108,6 @@ func (t *Task) reportHealthCondition() {
 	}
 }
 
-// Trigger a refresh on both MigCluster resources
-func (t *Task) refreshClusters() error {
-	// Source
-	srcCluster := t.PlanResources.SrcMigCluster
-	t.PlanResources.SrcMigCluster.Spec.Refresh = true
-	err := t.Client.Update(context.TODO(), srcCluster)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Destination
-	dstCluster := t.PlanResources.DestMigCluster
-	dstCluster.Spec.Refresh = true
-	err = t.Client.Update(context.TODO(), dstCluster)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	return nil
-}
-
-// Trigger a refresh on MigStorage resource
-func (t *Task) refreshStorage() error {
-	storage := t.PlanResources.MigStorage
-	storage.Spec.Refresh = true
-	err := t.Client.Update(context.TODO(), storage)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	return nil
-}
-
 // Trigger a refresh on MigPlan resource
 func (t *Task) refreshPlan() error {
 	plan := t.PlanResources.MigPlan
@@ -151,16 +119,11 @@ func (t *Task) refreshPlan() error {
 	return nil
 }
 
-// Verify storage, clusters, and plan finished with refresh before migrating
+// Verify plan finished with refresh before migrating
 func (t *Task) ensureRefreshed() bool {
 	refreshed := false
 
-	src := t.PlanResources.SrcMigCluster
-	dst := t.PlanResources.DestMigCluster
-	storage := t.PlanResources.MigStorage
-	plan := t.PlanResources.MigPlan
-
-	if !src.Spec.Refresh && !dst.Spec.Refresh && !storage.Spec.Refresh && !plan.Spec.Refresh {
+	if !t.PlanResources.MigPlan.Spec.Refresh {
 		refreshed = true
 	}
 
