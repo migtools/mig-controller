@@ -345,7 +345,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		// Mark plan refresh as in-progress
+		// Mark plan refresh as in-progress by adding label
 		if plan.Labels == nil {
 			plan.Labels = make(map[string]string)
 		}
