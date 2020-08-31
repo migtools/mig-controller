@@ -219,6 +219,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Ensure refresh
+	err = r.ensureRefresh(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// PV discovery
 	err = r.updatePvs(plan)
 	if err != nil {
@@ -263,9 +270,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
-
-	// Ensure refresh
-	r.ensureRefresh(plan)
 
 	// Apply changes.
 	plan.MarkReconciled()
@@ -328,7 +332,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		return nil
 	}
 
-	// Refresh requested but not running. Start refresh.
+	// Refresh requested but not actively running. Start refresh.
 	if !refreshInProgress && plan.Spec.Refresh {
 		srcCluster.Spec.Refresh = true
 		err = r.Update(context.TODO(), srcCluster)

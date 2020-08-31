@@ -39,6 +39,12 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
+	// Skip PV update if refresh requested
+	// PV update will happen at completion of refresh
+	if plan.Spec.Refresh {
+		return nil
+	}
+
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
