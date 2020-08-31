@@ -107,16 +107,6 @@ Provides support for CR references. The global `Map` correlates resources refere
 `ObjectReference` fields on the CR to the CR itself.  When watched using the provided
 watch event `Handler`, a reconcile event is queued for the _owner CR_ instead of an event
 for the watched (target) resource.
-
----
-
-#### [`pkg/remote`](https://github.com/konveyor/mig-controller/tree/master/pkg/remote)
-
-Provides support for _watching_ resources on _other_ clusters. This includes a
-mapping of a special `Manager` that watches resources on the remote cluster to
-a specific `Cluster`. When a watch event is received, a reconcile event is queued
-to the `Cluster` controller reconciler.  The `Map` is managed by the `Cluster`
-controller. 
  
 ---
 

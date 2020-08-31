@@ -281,19 +281,56 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 // Ensure refresh is performed if requested
 func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
-	if plan.Spec.Refresh {
-		// Source cluster refresh
-		srcCluster, err := plan.GetSourceCluster(r.Client)
+	// A "Refresh", triggered by `plan.spec.refresh = true` will reconcile
+	// the MigPlan, MigStorage, and MigClusters.
+	// When all of these items are reconciled, `spec.refresh` on each
+	// will be set back to `false`
+
+	var srcCluster, dstCluster *migapi.MigCluster
+	var storage *migapi.MigStorage
+	var err error
+
+	// Abort if items to be refreshed are not ready
+	if plan.Status.HasAnyCondition(
+		SourceClusterNotReady, InvalidSourceClusterRef,
+		DestinationClusterNotReady, InvalidDestinationClusterRef,
+		StorageNotReady, InvalidStorageRef,
+	) {
+		return nil
+	}
+
+	_, refreshInProgress := plan.ObjectMeta.Labels[migapi.RefreshInProgressLabel]
+
+	// Get src, dst, storage if refresh running or requested.
+	if refreshInProgress || plan.Spec.Refresh {
+		srcCluster, err = plan.GetSourceCluster(r.Client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		dstCluster, err = plan.GetDestinationCluster(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		storage, err = plan.GetStorage(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	// Refresh is running. Check if Clusters and Storage refresh is done.
+	if refreshInProgress && plan.Spec.Refresh {
+		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
+			// Refresh is finished. Mark plan as refreshed.
+			plan.Spec.Refresh = false
+			delete(plan.Labels, migapi.RefreshInProgressLabel)
+		}
+		return nil
+	}
+
+	// Refresh requested but not running. Start refresh.
+	if !refreshInProgress && plan.Spec.Refresh {
 		srcCluster.Spec.Refresh = true
 		err = r.Update(context.TODO(), srcCluster)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		// Dest cluster refresh
-		dstCluster, err := plan.GetDestinationCluster(r.Client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -302,18 +339,16 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		// Storage refresh
-		storage, err := plan.GetStorage(r.Client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
 		storage.Spec.Refresh = true
 		err = r.Update(context.TODO(), storage)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		// Mark refresh as completed
-		plan.Spec.Refresh = false
+		// Mark plan refresh as in-progress
+		if plan.Labels == nil {
+			plan.Labels = make(map[string]string)
+		}
+		plan.Labels[migapi.RefreshInProgressLabel] = migapi.True
 	}
 	return nil
 }

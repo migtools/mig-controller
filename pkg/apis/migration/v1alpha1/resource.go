@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+
 	"github.com/google/uuid"
 )
 
 const (
-	TouchAnnotation = "openshift.io/touch"
-	VeleroNamespace = "openshift-migration"
+	TouchAnnotation        = "openshift.io/touch"
+	RefreshInProgressLabel = "migration.openshift.io/refresh-in-progress"
+	VeleroNamespace        = "openshift-migration"
 )
 
 // Migration application CR.
