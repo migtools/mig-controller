@@ -280,7 +280,7 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case EnsureRefreshed:
-		t.Requeue = FastReQ
+		t.Requeue = PollReQ
 		refreshed := t.ensureRefreshed()
 		if refreshed {
 			if err = t.next(); err != nil {
