@@ -303,7 +303,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	}
 
 	refreshRequested := plan.Spec.Refresh
-	refreshInProgress := plan.Status.HasCondition(RefreshInProgress)
+	refreshInProgress := plan.Status.HasCondition(migapi.RefreshInProgress)
 
 	// Get src, dst, storage if refresh running or requested.
 	if refreshInProgress || refreshRequested {
@@ -325,7 +325,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	if refreshInProgress {
 		// Mark refresh as completed if Storage and Cluster refreshes are done.
 		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
-			plan.Status.DeleteCondition(RefreshInProgress)
+			plan.Status.DeleteCondition(migapi.RefreshInProgress)
 		}
 		return nil
 	}
@@ -350,7 +350,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		}
 		// Mark plan refresh as in-progress with durable condition
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     RefreshInProgress,
+			Type:     migapi.RefreshInProgress,
 			Status:   True,
 			Category: Advisory,
 			Message:  RefreshInProgressMessage,

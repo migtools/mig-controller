@@ -123,7 +123,8 @@ func (t *Task) refreshPlan() error {
 func (t *Task) ensureRefreshed() bool {
 	refreshed := false
 
-	if !t.PlanResources.MigPlan.Spec.Refresh {
+	if !t.PlanResources.MigPlan.Spec.Refresh &&
+		!t.PlanResources.MigPlan.Status.HasCondition(migapi.RefreshInProgress) {
 		refreshed = true
 	}
 

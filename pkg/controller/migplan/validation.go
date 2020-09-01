@@ -68,7 +68,6 @@ const (
 	InvalidHookSAName                          = "InvalidHookSAName"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
-	RefreshInProgress                          = "RefreshInProgress"
 )
 
 // Categories
@@ -594,7 +593,7 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 
 // Validate PV actions.
 func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
-	if plan.Status.HasCondition(RefreshInProgress) {
+	if plan.Status.HasCondition(migapi.RefreshInProgress) {
 		return nil
 	}
 
@@ -1121,7 +1120,7 @@ func (r *NfsValidation) Run(client k8sclient.Client) error {
 	if !r.Plan.Status.HasAnyCondition(PvsDiscovered) {
 		return nil
 	}
-	if r.Plan.Status.HasAnyCondition(Suspended, RefreshInProgress) {
+	if r.Plan.Status.HasAnyCondition(Suspended, migapi.RefreshInProgress) {
 		r.Plan.Status.StageCondition(NfsNotAccessible)
 		return nil
 	}

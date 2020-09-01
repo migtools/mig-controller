@@ -15,7 +15,7 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	nEnsured := 0
 
 	if plan.Status.HasCriticalCondition() ||
-		plan.Status.HasAnyCondition(Suspended, RefreshInProgress) {
+		plan.Status.HasAnyCondition(Suspended, migapi.RefreshInProgress) {
 		plan.Status.StageCondition(RegistriesEnsured)
 		return nil
 	}
