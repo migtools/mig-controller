@@ -294,13 +294,12 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	var storage *migapi.MigStorage
 	var err error
 
-	// Abort if items to be refreshed are not ready
+	// Retry on next reconcile if refs invalid
 	if plan.Status.HasAnyCondition(
-		SourceClusterNotReady, InvalidSourceClusterRef,
-		DestinationClusterNotReady, InvalidDestinationClusterRef,
-		StorageNotReady, InvalidStorageRef,
+		InvalidSourceClusterRef,
+		InvalidDestinationClusterRef,
+		InvalidStorageRef,
 	) {
-		plan.Spec.Refresh = false
 		return nil
 	}
 
@@ -326,8 +325,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	if refreshInProgress && plan.Spec.Refresh {
 		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
 			// Refresh is finished. Mark plan as refreshed.
-			plan.Spec.Refresh = false
-			delete(plan.Labels, migapi.RefreshInProgressLabel)
+			plan.Status.DeleteCondition(RefreshInProgress)
 		}
 		return nil
 	}
@@ -350,10 +348,13 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 		// Mark plan refresh as in-progress by adding label
-		if plan.Labels == nil {
-			plan.Labels = make(map[string]string)
-		}
-		plan.Labels[migapi.RefreshInProgressLabel] = migapi.True
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     RefreshInProgress,
+			Status:   True,
+			Category: Advisory,
+			Message:  RefreshInProgressMessage,
+		})
+		plan.Spec.Refresh = false
 	}
 	return nil
 }
