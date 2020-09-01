@@ -287,8 +287,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	// A "Refresh", triggered by `plan.spec.refresh = true` will reconcile
 	// the MigPlan, MigStorage, and MigClusters.
-	// When all of these items are reconciled, `spec.refresh` on each
-	// will be set back to `false`
+	// The `RefreshInProgress` condition tracks completion of requested refresh.
 
 	var srcCluster, dstCluster *migapi.MigCluster
 	var storage *migapi.MigStorage
@@ -303,10 +302,11 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		return nil
 	}
 
+	refreshRequested := plan.Spec.Refresh
 	refreshInProgress := plan.Status.HasCondition(RefreshInProgress)
 
 	// Get src, dst, storage if refresh running or requested.
-	if refreshInProgress || plan.Spec.Refresh {
+	if refreshInProgress || refreshRequested {
 		srcCluster, err = plan.GetSourceCluster(r.Client)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -321,17 +321,18 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		}
 	}
 
-	// Refresh is running. Check if Clusters and Storage refresh is done.
+	// Case: Refresh is running
 	if refreshInProgress {
+		// Mark refresh as completed if Storage and Cluster refreshes are done.
 		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
-			// Refresh is finished. Mark plan as refreshed.
 			plan.Status.DeleteCondition(RefreshInProgress)
 		}
 		return nil
 	}
 
-	// Refresh requested but not actively running. Start refresh.
-	if !refreshInProgress && plan.Spec.Refresh {
+	// Case: Refresh requested but not actively running.
+	if !refreshInProgress && refreshRequested {
+		// Start refresh
 		srcCluster.Spec.Refresh = true
 		err = r.Update(context.TODO(), srcCluster)
 		if err != nil {
@@ -347,7 +348,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		// Mark plan refresh as in-progress by adding label
+		// Mark plan refresh as in-progress with durable condition
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     RefreshInProgress,
 			Status:   True,
