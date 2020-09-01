@@ -18,7 +18,8 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	var client k8sclient.Client
 	nEnsured := 0
 
-	if plan.Status.HasCriticalCondition() || plan.Status.HasAnyCondition(Suspended) {
+	if plan.Status.HasCriticalCondition() ||
+		plan.Status.HasAnyCondition(Suspended, RefreshInProgress) {
 		plan.Status.StageCondition(StorageEnsured)
 		return nil
 	}

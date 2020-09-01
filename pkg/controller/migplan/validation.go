@@ -143,7 +143,7 @@ const (
 	InvalidHookSANameMessage                          = "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'"
 	HookPhaseUnknownMessage                           = "The hook phase must be one of: PreRestore, PostRestore, PreBackup, PostBackup"
 	HookPhaseDuplicateMessage                         = "Only one hook may be specified per phase"
-	RefreshInProgressMessage                          = "RefreshInProgressMessage"
+	RefreshInProgressMessage                          = "Waiting on referenced `migstorage` and `migclusters` to reconcile."
 )
 
 // Valid AccessMode values
@@ -594,6 +594,10 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 
 // Validate PV actions.
 func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
+	if plan.Status.HasCondition(RefreshInProgress) {
+		return nil
+	}
+
 	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
 
@@ -1117,7 +1121,7 @@ func (r *NfsValidation) Run(client k8sclient.Client) error {
 	if !r.Plan.Status.HasAnyCondition(PvsDiscovered) {
 		return nil
 	}
-	if r.Plan.Status.HasAnyCondition(Suspended) {
+	if r.Plan.Status.HasAnyCondition(Suspended, RefreshInProgress) {
 		r.Plan.Status.StageCondition(NfsNotAccessible)
 		return nil
 	}

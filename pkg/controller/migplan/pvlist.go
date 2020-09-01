@@ -18,7 +18,7 @@ type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
-	if plan.Status.HasCondition(Suspended) {
+	if plan.Status.HasAnyCondition(Suspended, RefreshInProgress) {
 		plan.Status.StageCondition(PvsDiscovered)
 		plan.Status.StageCondition(PvNoSupportedAction)
 		plan.Status.StageCondition(PvNoStorageClassSelection)
@@ -36,12 +36,6 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		NsNotFoundOnSourceCluster,
 		NsLimitExceeded,
 		NsListEmpty) {
-		return nil
-	}
-
-	// Skip PV update if refresh requested
-	// PV update will happen at completion of refresh
-	if plan.Spec.Refresh {
 		return nil
 	}
 
