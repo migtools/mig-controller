@@ -114,9 +114,9 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
 	annotations := make(map[string]string)
 	if migration.Spec.Stage {
-		annotations[StageOrFinalAnnotation] = "stage"
+		annotations[StageOrFinalMigrationAnnotation] = StageMigration
 	} else {
-		annotations[StageOrFinalAnnotation] = "final"
+		annotations[StageOrFinalMigrationAnnotation] = FinalMigration
 	}
 	return annotations
 }

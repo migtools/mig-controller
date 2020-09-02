@@ -15,16 +15,19 @@ import (
 
 // Velero Plugin Annotations
 const (
-	StageOrFinalAnnotation   = "openshift.io/migrate-copy-phase"   // (stage|final)
-	PvActionAnnotation       = "openshift.io/migrate-type"         // (move|copy)
-	PvStorageClassAnnotation = "openshift.io/target-storage-class" // storageClassName
-	PvAccessModeAnnotation   = "openshift.io/target-access-mode"   // accessMode
-	QuiesceAnnotation        = "openshift.io/migrate-quiesce-pods" // (true|false)
-	QuiesceNodeSelector      = "migration.openshift.io/quiesceDaemonSet"
-	SuspendAnnotation        = "migration.openshift.io/preQuiesceSuspend"
-	ReplicasAnnotation       = "migration.openshift.io/preQuiesceReplicas"
-	NodeSelectorAnnotation   = "migration.openshift.io/preQuiesceNodeSelector"
-	StagePodImageAnnotation  = "migration.openshift.io/stage-pod-image"
+	StageOrFinalMigrationAnnotation = "migration.openshift.io/migmigration-type" // (stage|final)
+	StageMigration                  = "stage"
+	FinalMigration                  = "final"
+	PvActionAnnotation              = "openshift.io/migrate-type"          // (move|copy)
+	PvStorageClassAnnotation        = "openshift.io/target-storage-class"  // storageClassName
+	PvAccessModeAnnotation          = "openshift.io/target-access-mode"    // accessMode
+	PvCopyMethodAnnotation          = "migration.openshift.io/copy-method" // (snapshot|filesystem)
+	QuiesceAnnotation               = "openshift.io/migrate-quiesce-pods"  // (true|false)
+	QuiesceNodeSelector             = "migration.openshift.io/quiesceDaemonSet"
+	SuspendAnnotation               = "migration.openshift.io/preQuiesceSuspend"
+	ReplicasAnnotation              = "migration.openshift.io/preQuiesceReplicas"
+	NodeSelectorAnnotation          = "migration.openshift.io/preQuiesceNodeSelector"
+	StagePodImageAnnotation         = "migration.openshift.io/stage-pod-image"
 )
 
 // Restic Annotations
@@ -72,6 +75,7 @@ type ServiceAccounts map[string]map[string]bool
 // The PvActionAnnotation annotation is added to PV & PVC as needed by the velero plugin.
 // The PvStorageClassAnnotation annotation is added to PVC as needed by the velero plugin.
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
+// The PvCopyMethodAnnotation annotation is added to PVC as needed by the velero plugin.
 // The ResticPvBackupAnnotation is added to Pods as needed by Restic.
 // The ResticPvVerifyAnnotation is added to Pods as needed by Restic.
 // The IncludedInStageBackupLabel label is added to Pods, PVs, PVCs, ImageStreams and
@@ -232,6 +236,7 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 // The IncludedInStageBackupLabel label is added to PVs and PVCs and is referenced
 // by the velero.Backup label selector.
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
+// The PvCopyMethodAnnotation annotation is added to PV and PVC as needed by the velero plugin.
 func (t *Task) annotatePVs(client k8sclient.Client) error {
 	pvs := t.getPVs()
 	for _, pv := range pvs.List {
@@ -252,6 +257,10 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 		pvResource.Annotations[PvActionAnnotation] = pv.Selection.Action
 		// PV storageClass annotation needed by the velero plugin.
 		pvResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+		if pv.Selection.Action == migapi.PvCopyAction {
+			// PV copyMethod annotation needed by the velero plugin.
+			pvResource.Annotations[PvCopyMethodAnnotation] = pv.Selection.CopyMethod
+		}
 		// Add label used by stage backup label selector.
 		if pvResource.Labels == nil {
 			pvResource.Labels = make(map[string]string)
@@ -291,6 +300,8 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 		if pv.Selection.Action == migapi.PvCopyAction {
 			// PV storageClass annotation needed by the velero plugin.
 			pvcResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+			// PV copyMethod annotation needed by the velero plugin.
+			pvcResource.Annotations[PvCopyMethodAnnotation] = pv.Selection.CopyMethod
 			// PV accessMode annotation needed by the velero plugin, if present on the PV.
 			if pv.Selection.AccessMode != "" {
 				pvcResource.Annotations[PvAccessModeAnnotation] = string(pv.Selection.AccessMode)
