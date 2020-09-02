@@ -293,6 +293,11 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	var storage *migapi.MigStorage
 	var err error
 
+	// Always refresh on first reconcile.
+	if plan.ObjectMeta.Generation == 1 {
+		plan.Spec.Refresh = true
+	}
+
 	// Retry on next reconcile if refs invalid
 	if plan.Status.HasAnyCondition(
 		InvalidSourceClusterRef,
