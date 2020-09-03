@@ -42,11 +42,12 @@ type MigMigrationSpec struct {
 type MigMigrationStatus struct {
 	Conditions
 	UnhealthyResources
-	ObservedDigest string       `json:"observedDigest,omitempty"`
-	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
-	Phase          string       `json:"phase,omitempty"`
-	Itinerary      string       `json:"itinerary,omitempty"`
-	Errors         []string     `json:"errors,omitempty"`
+	ObservedDigest   string       `json:"observedDigest,omitempty"`
+	StartTimestamp   *metav1.Time `json:"startTimestamp,omitempty"`
+	Phase            string       `json:"phase,omitempty"`
+	PhaseDescription string       `json:"phase,omitempty"`
+	Itinerary        string       `json:"itinerary,omitempty"`
+	Errors           []string     `json:"errors,omitempty"`
 }
 
 // +genclient
