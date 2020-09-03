@@ -75,6 +75,13 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	migration.Status.Phase = task.Phase
 	migration.Status.Itinerary = task.Itinerary.Name
 
+	// Description
+	if description, ok := PhaseDescriptions[task.Phase]; ok {
+		migration.Status.PhaseDescription = description
+	} else {
+		migration.Status.PhaseDescription = ""
+	}
+
 	// Completed
 	if task.Phase == Completed {
 		migration.Status.DeleteCondition(Running)
