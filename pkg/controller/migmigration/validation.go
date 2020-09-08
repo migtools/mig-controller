@@ -58,7 +58,7 @@ const (
 	UnhealthyNamespacesMessage = "'%s' cluster has unhealthy namespaces. See status.namespaces for details."
 	ResticErrorsMessage        = "There were errors found in %d Restic volume restores. See restore `%s` for details"
 	ResticVerifyErrorsMessage  = "There were verify errors found in %d Restic volume restores. See restore `%s` for details"
-	StageNoOpMessage           = "Stage migration was run without any PVs. No Velero operations were initiated."
+	StageNoOpMessage           = "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated."
 )
 
 // Validate the plan resource.
