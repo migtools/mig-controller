@@ -18,6 +18,7 @@ package main
 
 import (
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"github.com/konveyor/mig-controller/pkg/apis"
