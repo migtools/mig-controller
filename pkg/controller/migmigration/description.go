@@ -48,6 +48,6 @@ var PhaseDescriptions = map[string]string{
 	"DeleteRestores":                  "Deleting Velero Restores created during migration.",
 	"MigrationFailed":                 "Migration failed.",
 	"Canceling":                       "Migration cancellation in progress.",
-	"Canceled":                        "Migration cancelled.",
+	"Canceled":                        "Migration canceled.",
 	"Completed":                       "Migration completed.",
 }
