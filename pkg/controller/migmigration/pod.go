@@ -150,23 +150,7 @@ func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) 
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	list := &corev1.PodList{}
-	selector := labels.SelectorFromSet(
-		map[string]string{
-			"component": "velero",
-		})
-	err = client.List(
-		context.TODO(),
-		&k8sclient.ListOptions{
-			Namespace:     migapi.VeleroNamespace,
-			LabelSelector: selector,
-		},
-		list)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	return list.Items, nil
+	return pods.FindVeleroPods(client)
 }
 
 // Ensure the velero cloud-credentials secret content has been
