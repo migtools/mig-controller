@@ -1182,18 +1182,12 @@ func (r *NfsValidation) validate() error {
 
 // Find a pod suitable for command execution.
 func (r *NfsValidation) findPod() error {
-	list := kapi.PodList{}
-	options := k8sclient.MatchingLabels(map[string]string{"component": "velero"})
-	options.Namespace = migapi.VeleroNamespace
-	err := r.client.List(
-		context.TODO(),
-		options,
-		&list)
+	podList, err := pods.FindVeleroPods(r.client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	for i := range list.Items {
-		r.pod = &list.Items[i]
+	for _, pod := range podList {
+		r.pod = &pod
 		command := pods.PodCommand{
 			Args:    []string{"/usr/bin/nc", "-h"},
 			RestCfg: r.restCfg,
