@@ -1,6 +1,6 @@
 ---
 name: Tracking issue
-about: Create a meta-issue for tracking larger efforts spanning multiple issues
+about: Create an issue for tracking larger efforts spanning multiple issues
   and PRs
 title: ''
 labels: meta-issue
@@ -10,7 +10,7 @@ assignees: ''
 
 ## Description
 
-This issue aggregates work being done on _task x_.
+This issue tracks work being done on _thing x_.
 
 ## Related issues
 
