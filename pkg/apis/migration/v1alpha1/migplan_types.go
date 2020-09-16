@@ -84,6 +84,7 @@ type MigPlanStatus struct {
 // +kubebuilder:printcolumn:name="Source",type=string,JSONPath=".spec.srcMigClusterRef.name"
 // +kubebuilder:printcolumn:name="Target",type=string,JSONPath=".spec.destMigClusterRef.name"
 // +kubebuilder:printcolumn:name="Storage",type=string,JSONPath=".spec.migStorageRef.name"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type MigPlan struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

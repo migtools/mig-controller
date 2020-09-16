@@ -58,6 +58,7 @@ type MigMigrationStatus struct {
 // +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=".spec.stage"
 // +kubebuilder:printcolumn:name="Itinerary",type=string,JSONPath=".status.itinerary"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type MigMigration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -55,6 +55,7 @@ type MigStorageStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="BackupStorageProvider",type=string,JSONPath=".spec.backupStorageProvider"
 // +kubebuilder:printcolumn:name="VolumeSnapshotProvider",type=string,JSONPath=".spec.volumeSnapshotProvider"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type MigStorage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
