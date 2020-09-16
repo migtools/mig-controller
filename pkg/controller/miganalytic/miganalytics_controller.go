@@ -185,6 +185,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		return liberr.Wrap(err)
 	}
 
+	if analytic.Status.Analytics.PercentComplete == 100 {
+		return nil
+	}
+
 	srcCluster, err := plan.GetSourceCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
