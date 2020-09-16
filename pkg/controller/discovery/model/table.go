@@ -99,7 +99,7 @@ SELECT
 {{ end -}}
 FROM {{.Table}}
 WHERE
-{{ if .Pk -}}
+{{ if and .Pk (not .Pk.Empty) -}}
 {{ .Pk.Name }} = {{ .Pk.Param }}
 {{ else -}}
 {{ range $i,$f := .Keys -}}
@@ -752,6 +752,7 @@ func (t Table) getSQL(table string, fields []*Field) (string, error) {
 		TmplData{
 			Table:  table,
 			Keys:   t.KeyFields(fields),
+			Pk:     t.PkField(fields),
 			Fields: fields,
 		})
 	if err != nil {
