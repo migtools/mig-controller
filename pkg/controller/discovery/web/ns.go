@@ -103,7 +103,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 			return
 		}
 		r := Namespace{}
-		r.With(m, srvCount, pvcCount, podCount)
+		r.With(m, srvCount, podCount, pvcCount)
 		r.SelfLink = h.Link(m)
 		content.Items = append(content.Items, r)
 	}
