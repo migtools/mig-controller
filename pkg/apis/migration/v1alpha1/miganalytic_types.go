@@ -97,6 +97,7 @@ type MigAnalyticNSImage struct {
 // +kubebuilder:printcolumn:name="ImageSize",type=string,JSONPath=".status.analytics.imageSizeTotal"
 // +kubebuilder:printcolumn:name="PVs",type=string,JSONPath=".status.analytics.pvCount"
 // +kubebuilder:printcolumn:name="PVCapacity",type=string,JSONPath=".status.analytics.pvCapacity"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type MigAnalytic struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
