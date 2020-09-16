@@ -185,6 +185,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		return liberr.Wrap(err)
 	}
 
+	if analytic.Status.Analytics.PercentComplete == 100 {
+		return nil
+	}
+
 	srcCluster, err := plan.GetSourceCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -208,6 +212,11 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 	analytic.Status.Analytics.Plan = plan.Name
 
 	for i, namespace := range plan.Spec.Namespaces {
+		for _, ns := range analytic.Status.Analytics.Namespaces {
+			if ns.Namespace == namespace {
+				continue
+			}
+		}
 		ns := migapi.MigAnalyticNamespace{
 			Namespace: namespace,
 		}
