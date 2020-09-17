@@ -20,6 +20,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/controller/discovery"
 	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
+	"github.com/konveyor/mig-controller/pkg/controller/migdirect"
 	"github.com/konveyor/mig-controller/pkg/controller/mighook"
 	"github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	"github.com/konveyor/mig-controller/pkg/controller/migplan"
@@ -42,6 +43,7 @@ var CamControllers = []AddFunction{
 	migstorage.Add,
 	migplan.Add,
 	miganalytic.Add,
+	migdirect.Add,
 }
 
 //
