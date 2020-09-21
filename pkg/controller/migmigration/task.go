@@ -69,6 +69,8 @@ const (
 	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
 	Canceled                        = "Canceled"
+	Rollback                        = "Rollback"
+	RollbackComplete                = "RollbackComplete"
 	Completed                       = "Completed"
 )
 
@@ -160,9 +162,6 @@ var CancelItinerary = Itinerary{
 		{phase: DeleteRestores},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: DeleteMigrated},
-		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
 		{phase: Canceled},
 		{phase: Completed},
 	},
@@ -174,9 +173,24 @@ var FailedItinerary = Itinerary{
 		{phase: MigrationFailed},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
+		{phase: Completed},
+	},
+}
+
+var RollbackItinerary = Itinerary{
+	Name: "Rollback",
+	Steps: []Step{
+		{phase: Rollback},
+		{phase: DeleteBackups},
+		{phase: DeleteRestores},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
+		// note this one may be tricky since quiesce is currently
+		//  on the MigMigration. Ping @jortel for ideas on this.
+		// {phase: UnQuiesceApplications, all: Quiesce},
+		{phase: RollbackComplete},
 		{phase: Completed},
 	},
 }
@@ -247,7 +261,7 @@ func (t *Task) Run() error {
 
 	// Run the current phase.
 	switch t.Phase {
-	case Created, Started:
+	case Created, Started, Rollback, RollbackComplete: //TODO: what actions needs to be done in Rollback-like steps?
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -640,6 +654,10 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case Canceling:
+		// Skip directly to Completed if the Cancel was set on a Rollback migration.
+		if t.rollback() {
+			t.Phase = Completed
+		}
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceling,
 			Status:   True,
@@ -653,13 +671,7 @@ func (t *Task) Run() error {
 		}
 
 	case MigrationFailed:
-		if Settings.Migration.FailureRollback {
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		} else {
-			t.Phase = Completed
-		}
+		t.Phase = Completed
 
 	case DeleteMigrated:
 		err := t.deleteMigrated()
@@ -731,6 +743,8 @@ func (t *Task) init() error {
 		t.Itinerary = FailedItinerary
 	} else if t.canceled() {
 		t.Itinerary = CancelItinerary
+	} else if t.rollback() {
+		t.Itinerary = RollbackItinerary
 	} else if t.stage() {
 		t.Itinerary = StageItinerary
 	} else {
@@ -878,6 +892,11 @@ func (t *Task) failed() bool {
 // Get whether the migration is cancelled.
 func (t *Task) canceled() bool {
 	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Canceling)
+}
+
+// Get whether the migration is rollback.
+func (t *Task) rollback() bool {
+	return t.Owner.Spec.Rollback
 }
 
 // Get whether the migration is stage.

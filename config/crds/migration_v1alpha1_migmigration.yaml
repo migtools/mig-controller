@@ -49,6 +49,8 @@ spec:
           properties:
             canceled:
               type: boolean
+            rollback:
+              type: boolean
             keepAnnotations:
               type: boolean
             migPlanRef:

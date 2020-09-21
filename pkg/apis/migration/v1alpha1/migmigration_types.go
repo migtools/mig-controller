@@ -35,6 +35,7 @@ type MigMigrationSpec struct {
 	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
 	Verify          bool                  `json:"verify,omitempty"`
 	Canceled        bool                  `json:"canceled,omitempty"`
+	Rollback        bool                  `json:"rollback,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration
