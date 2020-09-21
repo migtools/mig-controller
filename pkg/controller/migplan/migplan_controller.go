@@ -379,15 +379,7 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 			return err
 		}
 	}
-	foundImageStream, err := plan.GetRegistryImageStream(client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	if foundImageStream != nil {
-		if err := liberr.Wrap(client.Delete(context.Background(), foundImageStream)); err != nil {
-			return err
-		}
-	}
+
 	err = r.deleteImageRegistryDeploymentForClient(client, plan)
 	if err != nil {
 		return liberr.Wrap(err)

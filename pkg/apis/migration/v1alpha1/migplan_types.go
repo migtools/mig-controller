@@ -347,6 +347,14 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		envFrom = append(envFrom, source)
 	}
 
+	//set debug mode env var
+	debugVar := []kapi.EnvVar{
+		{
+			Name:  "REGISTRY_HTTP_DEBUG_ADDR",
+			Value: ":5001",
+		},
+	}
+
 	deployment.Spec = appsv1.DeploymentSpec{
 		Replicas: pointer.Int32Ptr(1),
 		Selector: metav1.SetAsLabelSelector(map[string]string{
@@ -365,12 +373,29 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 				Containers: []kapi.Container{
 					kapi.Container{
 						EnvFrom: envFrom,
+						Env:     debugVar,
 						Image:   registryImage,
 						Name:    "registry",
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
 								Protocol:      kapi.ProtocolTCP,
+							},
+						},
+						LivenessProbe: &kapi.Probe{
+							Handler: kapi.Handler{
+								HTTPGet: &kapi.HTTPGetAction{
+									Path: "/",
+									Port: intstr.IntOrString{IntVal: 5000},
+								},
+							},
+						},
+						ReadinessProbe: &kapi.Probe{
+							Handler: kapi.Handler{
+								HTTPGet: &kapi.HTTPGetAction{
+									Path: "/",
+									Port: intstr.IntOrString{IntVal: 5000},
+								},
 							},
 						},
 						Resources: kapi.ResourceRequirements{},
