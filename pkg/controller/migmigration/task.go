@@ -9,14 +9,10 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
-	"github.com/konveyor/mig-controller/pkg/settings"
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// Application settings.
-var Settings = &settings.Settings
 
 // Requeue
 var FastReQ = time.Duration(time.Millisecond * 100)
