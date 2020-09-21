@@ -366,3 +366,45 @@ func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
 	plan.Status.ExcludedResources = excludedResources
 	return nil
 }
+
+func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
+	secret, err := plan.GetRegistrySecret(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if secret != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), secret)); err != nil {
+			return err
+		}
+	}
+
+	err = r.deleteImageRegistryDeploymentForClient(client, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	foundService, err := plan.GetRegistryService(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundService != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
+	foundDeployment, err := plan.GetRegistryDeployment(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundDeployment != nil {
+		if err := liberr.Wrap(client.Delete(context.Background(), foundDeployment)); err != nil {
+			return err
+		}
+	}
+	return nil
+}

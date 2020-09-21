@@ -6,7 +6,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
-	appsv1 "github.com/openshift/api/apps/v1"
+	//appsv1 "github.com/openshift/api/apps/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"google.golang.org/api/option"
 	kapi "k8s.io/api/core/v1"
