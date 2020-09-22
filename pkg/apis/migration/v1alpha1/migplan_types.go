@@ -385,16 +385,16 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 						LivenessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/",
-									Port: intstr.IntOrString{IntVal: 5000},
+									Path: "/debug/health",
+									Port: intstr.IntOrString{IntVal: 5001},
 								},
 							},
 						},
 						ReadinessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/",
-									Port: intstr.IntOrString{IntVal: 5000},
+									Path: "/debug/health",
+									Port: intstr.IntOrString{IntVal: 5001},
 								},
 							},
 						},
