@@ -389,6 +389,10 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 								ContainerPort: 5000,
 								Protocol:      kapi.ProtocolTCP,
 							},
+							kapi.ContainerPort{
+								ContainerPort: 5001,
+								Protocol:      kapi.ProtocolTCP,
+							},
 						},
 						LivenessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
