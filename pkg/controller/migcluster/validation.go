@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	auth "k8s.io/api/authorization/v1"
@@ -20,7 +21,6 @@ const (
 	InvalidSaToken       = "InvalidSaToken"
 	TestConnectFailed    = "TestConnectFailed"
 	SaTokenNotPrivileged = "SaTokenNotPrivileged"
-	MissingCaBundle      = "MissingCaBundle"
 )
 
 // Categories
@@ -48,10 +48,10 @@ const (
 const (
 	ReadyMessage                = "The cluster is ready."
 	MissingURLMessage           = "The `url` is required when `isHostCluster` is false."
-	MissingCaBundleMessage      = "The `caBundle` is required when `insecure` is false."
+	CaBundleMessage             = "The `caBundle` may be required when `insecure` is false."
 	InvalidSaSecretRefMessage   = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage       = "The `saToken` not found in `serviceAccountSecretRef` secret."
-	TestConnectFailedMessage    = "Test connect failed: %s"
+	TestConnectFailedMessage    = "Test connect failed. %s: %s"
 	MalformedURLMessage         = "The `url` is malformed."
 	InvalidURLSchemeMessage     = "The `url` scheme must be 'http' or 'https'."
 	SaTokenNotPrivilegedMessage = "The `saToken` has insufficient privileges."
@@ -80,12 +80,6 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 
 	// Token privileges
 	err = r.validateSaTokenPrivileges(cluster)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// CA Bundle
-	err = r.validateCaBundle(cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -209,7 +203,11 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	timeout := time.Duration(time.Second * 5)
 	err := cluster.TestConnection(r.Client, timeout)
 	if err != nil {
-		message := fmt.Sprintf(TestConnectFailedMessage, err)
+		helpText := ""
+		if strings.Contains(err.Error(), "x509") {
+			helpText = CaBundleMessage
+		}
+		message := fmt.Sprintf(TestConnectFailedMessage, helpText, err)
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     TestConnectFailed,
 			Status:   True,
@@ -275,24 +273,6 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 			Reason:   Unauthorized,
 			Category: Critical,
 			Message:  SaTokenNotPrivilegedMessage,
-		})
-	}
-	return nil
-}
-
-func (r ReconcileMigCluster) validateCaBundle(cluster *migapi.MigCluster) error {
-	if cluster.Spec.IsHostCluster == true {
-		return nil
-	}
-
-	// Validate caBundle is provided if running in secure mode
-	if cluster.Spec.Insecure == false && len(cluster.Spec.CABundle) == 0 {
-		cluster.Status.SetCondition(migapi.Condition{
-			Type:     MissingCaBundle,
-			Status:   True,
-			Reason:   NotSet,
-			Category: Critical,
-			Message:  MissingCaBundleMessage,
 		})
 	}
 	return nil
