@@ -18,6 +18,12 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// Progress messages
+const (
+	BackupProgressMessage          = "[Backup %s] %d out of estimated total of %d objects backed up"
+	PodVolumeBackupProgressMessage = "[VolumeBackup %s] %d of %d bytes backed up"
+)
+
 // Ensure the initial backup on the source cluster has been created
 // and has the proper settings.
 func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
@@ -121,6 +127,10 @@ func (t *Task) getStageBackup() (*velero.Backup, error) {
 	return t.getBackup(labels)
 }
 
+func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
+	return nil
+}
+
 // Get an existing Backup on the source cluster.
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	client, err := t.getSourceClient()
@@ -145,20 +155,29 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 // Update Task.Progress with latest available progress information
 func (t *Task) updateBackupProgress(backup *velero.Backup) {
 	progress := []string{}
-	// get progress of Backup task
-	// get progress of PodVolumeBackups associated with given Backup
+	if backup.Status.Progress != nil {
+		backupProgress := fmt.Sprintf(
+			BackupProgressMessage,
+			backup.Name,
+			backup.Status.Progress.ItemsBackedUp,
+			backup.Status.Progress.TotalItems,
+		)
+		progress = append(progress, backupProgress)
+	}
+	pvbs := t.getPodVolumeBackupsForBackup(backup)
+	if pvbs != nil {
+		for _, pvb := range pvbs.Items {
+			// gather progress here
+		}
+	}
 	t.Progress = progress
 }
 
-// Find all PodVolumeBackups associated with the given Backup
-func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
-	return nil
-}
-
 // Get whether a backup has completed on the source cluster.
-func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
+func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	completed := false
 	reasons := []string{}
+
 	switch backup.Status.Phase {
 	case velero.BackupPhaseCompleted:
 		completed = true
