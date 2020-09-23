@@ -23,7 +23,6 @@ var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
 	"persistentvolumeclaims",
 	"namespaces",
 	"imagestreams",
-	"imagestreamtags",
 	"secrets",
 	"configmaps",
 	"pods",
@@ -31,6 +30,7 @@ var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
 
 // Excluded resource defaults
 var ExcludedInitialResources = mapset.NewSetFromSlice([]interface{}{
+	"imagestreams",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 })
