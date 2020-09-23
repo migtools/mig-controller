@@ -148,7 +148,30 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	if len(list.Items) > 0 {
 		return &list.Items[0], nil
 	}
+	return nil, nil
+}
 
+func (t *Task) getPodVolumeBackup() (*velero.PodVolumeBackup, error) {
+	labels := t.Owner.GetCorrelationLabels()
+	labels[StageBackupLabel] = t.UID()
+	log.Info("git the labels")
+	log.Info(fmt.Sprintf("#%v", labels))
+	client, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+	list := velero.PodVolumeBackupList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(labels),
+		&list)
+	if err != nil {
+		return nil, err
+	}
+	if len(list.Items) > 0 {
+		log.Info("No pod volume")
+		return &list.Items[0], nil
+	}
 	return nil, nil
 }
 
