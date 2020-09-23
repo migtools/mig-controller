@@ -148,31 +148,37 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	if len(list.Items) > 0 {
 		return &list.Items[0], nil
 	}
+
 	return nil, nil
 }
 
-func (t *Task) getPodVolumeBackup() (*velero.PodVolumeBackup, error) {
-	labels := t.Owner.GetCorrelationLabels()
-	labels[StageBackupLabel] = t.UID()
-	log.Info("git the labels")
-	log.Info(fmt.Sprintf("#%v", labels))
+func (t *Task) getPodVolumeBackup(backup *velero.Backup) {
+	nl := map[string]string{
+		"velero.io/backup-name": backup.Name,
+	}
+
 	client, err := t.getSourceClient()
 	if err != nil {
-		return nil, err
+		log.Trace(err)
 	}
 	list := velero.PodVolumeBackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
+		k8sclient.MatchingLabels(nl),
 		&list)
 	if err != nil {
-		return nil, err
+		log.Trace(err)
 	}
 	if len(list.Items) > 0 {
-		log.Info("No pod volume")
-		return &list.Items[0], nil
+		log.Info(fmt.Sprintf("total %v", len(list.Items)))
+		for _, podVolumeBackup := range list.Items {
+			t.Progress = append(t.Progress, fmt.Sprintf("[VolumeBackup %v] %v out of %v bytes backed up", podVolumeBackup.Name, podVolumeBackup.Status.Progress.BytesDone, podVolumeBackup.Status.Progress.TotalBytes))
+			log.Info(fmt.Sprintf("Remaining: %v", podVolumeBackup.Name))
+			log.Info(fmt.Sprintf("Remaining: %v", podVolumeBackup.Status.Progress.BytesDone))
+			log.Info(fmt.Sprintf("Total: %v", podVolumeBackup.Status.Progress.TotalBytes))
+		}
+
 	}
-	return nil, nil
 }
 
 // Update Task.Progress with latest available progress information
