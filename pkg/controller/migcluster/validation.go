@@ -48,7 +48,7 @@ const (
 const (
 	ReadyMessage                = "The cluster is ready."
 	MissingURLMessage           = "The `url` is required when `isHostCluster` is false."
-	CaBundleMessage             = "The `caBundle` may be required when `insecure` is false."
+	CaBundleMessage             = "The `caBundle` is required for self-signed APIserver certificates"
 	InvalidSaSecretRefMessage   = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage       = "The `saToken` not found in `serviceAccountSecretRef` secret."
 	TestConnectFailedMessage    = "Test connect failed. %s: %s"
@@ -204,7 +204,8 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	err := cluster.TestConnection(r.Client, timeout)
 	if err != nil {
 		helpText := ""
-		if strings.Contains(err.Error(), "x509") {
+		if strings.Contains(err.Error(), "x509") &&
+			len(cluster.Spec.CABundle) == 0 && !cluster.Spec.Insecure {
 			helpText = CaBundleMessage
 		}
 		message := fmt.Sprintf(TestConnectFailedMessage, helpText, err)
