@@ -273,6 +273,7 @@ type Task struct {
 	Annotations     map[string]string
 	BackupResources mapset.Set
 	Phase           string
+	Progress        []string
 	Requeue         time.Duration
 	Itinerary       Itinerary
 	Errors          []string
@@ -540,6 +541,7 @@ func (t *Task) Run() error {
 		if backup == nil {
 			return errors.New("Backup not found")
 		}
+		t.updateBackupProgress(backup)
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
 			if len(reasons) > 0 {
