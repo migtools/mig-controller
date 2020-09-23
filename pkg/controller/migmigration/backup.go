@@ -142,6 +142,19 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	return nil, nil
 }
 
+// Update Task.Progress with latest available progress information
+func (t *Task) updateBackupProgress(backup *velero.Backup) {
+	progress := []string{}
+	// get progress of Backup task
+	// get progress of PodVolumeBackups associated with given Backup
+	t.Progress = progress
+}
+
+// Find all PodVolumeBackups associated with the given Backup
+func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
+	return nil
+}
+
 // Get whether a backup has completed on the source cluster.
 func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	completed := false
