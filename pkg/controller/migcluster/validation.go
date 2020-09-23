@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	auth "k8s.io/api/authorization/v1"
@@ -47,9 +48,10 @@ const (
 const (
 	ReadyMessage                = "The cluster is ready."
 	MissingURLMessage           = "The `url` is required when `isHostCluster` is false."
+	CaBundleMessage             = "The `caBundle` is required for self-signed APIserver certificates"
 	InvalidSaSecretRefMessage   = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage       = "The `saToken` not found in `serviceAccountSecretRef` secret."
-	TestConnectFailedMessage    = "Test connect failed: %s"
+	TestConnectFailedMessage    = "Test connect failed. %s: %s"
 	MalformedURLMessage         = "The `url` is malformed."
 	InvalidURLSchemeMessage     = "The `url` scheme must be 'http' or 'https'."
 	SaTokenNotPrivilegedMessage = "The `saToken` has insufficient privileges."
@@ -76,6 +78,7 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 		return liberr.Wrap(err)
 	}
 
+	// Token privileges
 	err = r.validateSaTokenPrivileges(cluster)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -200,7 +203,12 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 	timeout := time.Duration(time.Second * 5)
 	err := cluster.TestConnection(r.Client, timeout)
 	if err != nil {
-		message := fmt.Sprintf(TestConnectFailedMessage, err)
+		helpText := ""
+		if strings.Contains(err.Error(), "x509") &&
+			len(cluster.Spec.CABundle) == 0 && !cluster.Spec.Insecure {
+			helpText = CaBundleMessage
+		}
+		message := fmt.Sprintf(TestConnectFailedMessage, helpText, err)
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     TestConnectFailed,
 			Status:   True,
