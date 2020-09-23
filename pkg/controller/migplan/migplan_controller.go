@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	"strconv"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -277,6 +278,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Timed requeue on Plan conflict.
+	if plan.Status.HasCondition(PlanConflict) {
+		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
 	// Done
