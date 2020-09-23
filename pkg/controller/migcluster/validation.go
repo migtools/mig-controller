@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"time"
 
 	auth "k8s.io/api/authorization/v1"
@@ -20,6 +21,8 @@ const (
 	InvalidSaToken       = "InvalidSaToken"
 	TestConnectFailed    = "TestConnectFailed"
 	SaTokenNotPrivileged = "SaTokenNotPrivileged"
+	MissingCaBundle      = "MissingCaBundle"
+	MalformedCaBundle    = "MalformedCaBundle"
 )
 
 // Categories
@@ -47,6 +50,8 @@ const (
 const (
 	ReadyMessage                = "The cluster is ready."
 	MissingURLMessage           = "The `url` is required when `isHostCluster` is false."
+	MissingCaBundleMessage      = "The `caBundle` is required when `insecure` is false."
+	MalformedCaBundleMessage    = "The `caBundle` must be base64 encoded."
 	InvalidSaSecretRefMessage   = "The `serviceAccountSecretRef` must reference a `secret`."
 	InvalidSaTokenMessage       = "The `saToken` not found in `serviceAccountSecretRef` secret."
 	TestConnectFailedMessage    = "Test connect failed: %s"
@@ -76,7 +81,14 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 		return liberr.Wrap(err)
 	}
 
+	// Token privileges
 	err = r.validateSaTokenPrivileges(cluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// CA Bundle
+	err = r.validateCaBundle(cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -267,6 +279,37 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 			Category: Critical,
 			Message:  SaTokenNotPrivilegedMessage,
 		})
+	}
+	return nil
+}
+
+func (r ReconcileMigCluster) validateCaBundle(cluster *migapi.MigCluster) error {
+	// Validate caBundle is provided if running in secure mode
+	if cluster.Spec.Insecure == false && len(cluster.Spec.CABundle) == 0 {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     MissingCaBundle,
+			Status:   True,
+			Reason:   NotSet,
+			Category: Critical,
+			Message:  MissingCaBundleMessage,
+		})
+	}
+
+	// Validate caBundle is a base64 encoded string
+	if cluster.Spec.Insecure == false && len(cluster.Spec.CABundle) > 0 {
+		isBase64, _ := regexp.MatchString(
+			"^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$",
+			string(cluster.Spec.CABundle),
+		)
+		if !isBase64 {
+			cluster.Status.SetCondition(migapi.Condition{
+				Type:     MalformedCaBundle,
+				Status:   True,
+				Reason:   Malformed,
+				Category: Critical,
+				Message:  MalformedCaBundleMessage,
+			})
+		}
 	}
 	return nil
 }
