@@ -199,6 +199,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
 
+	// Ensure refresh
+	err = r.ensureRefresh(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Plan Suspended
 	err = r.planSuspended(plan)
 	if err != nil {
@@ -215,13 +222,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Validations.
 	err = r.validate(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	// Ensure refresh
-	err = r.ensureRefresh(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -289,7 +289,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	return reconcile.Result{}, nil
 }
 
-// Ensure refresh is performed if requested
+// Ensure refresh is performed if requested, or on 1st reconcile
 func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	// A "Refresh", triggered by `plan.spec.refresh = true` will reconcile
 	// the MigPlan, MigStorage, and MigClusters.
@@ -300,35 +300,27 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	var err error
 
 	// Always refresh on first reconcile.
-	if plan.ObjectMeta.Generation == 1 {
+	if len(plan.Status.ObservedDigest) == 0 {
 		plan.Spec.Refresh = true
-	}
-
-	// Retry on next reconcile if refs invalid
-	if plan.Status.HasAnyCondition(
-		InvalidSourceClusterRef,
-		InvalidDestinationClusterRef,
-		InvalidStorageRef,
-	) {
-		return nil
 	}
 
 	refreshRequested := plan.Spec.Refresh
 	refreshInProgress := plan.Status.HasCondition(migapi.RefreshInProgress)
 
 	// Get src, dst, storage if refresh running or requested.
+	// Retry on next reconcile if unretrievable
 	if refreshInProgress || refreshRequested {
 		srcCluster, err = plan.GetSourceCluster(r.Client)
 		if err != nil {
-			return liberr.Wrap(err)
+			return nil
 		}
 		dstCluster, err = plan.GetDestinationCluster(r.Client)
 		if err != nil {
-			return liberr.Wrap(err)
+			return nil
 		}
 		storage, err = plan.GetStorage(r.Client)
 		if err != nil {
-			return liberr.Wrap(err)
+			return nil
 		}
 	}
 
