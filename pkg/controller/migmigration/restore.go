@@ -142,7 +142,7 @@ func (t Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		reasons = append(
 			reasons,
 			fmt.Sprintf(
-				"Restore: %s/%s partially failed.",
+				"Restore: %s/%s failed.",
 				restore.Namespace,
 				restore.Name))
 	case velero.RestorePhasePartiallyFailed:
