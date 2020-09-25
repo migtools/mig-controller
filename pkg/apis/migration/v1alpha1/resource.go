@@ -163,6 +163,40 @@ func (r *MigHook) HasReconciled() bool {
 	return r.Status.ObservedGeneration == r.Generation
 }
 
+// Direct
+func (r *MigDirect) GetCorrelationLabels() map[string]string {
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		PartOfLabel: Application,
+		key:         value,
+	}
+}
+
+func (r *MigDirect) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
+}
+
+func (r *MigDirect) GetNamespace() string {
+	return r.Namespace
+}
+
+func (r *MigDirect) GetName() string {
+	return r.Name
+}
+
+func (r *MigDirect) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
+	r.Status.ObservedDigest = digest(r.Spec)
+}
+
+func (r *MigDirect) HasReconciled() bool {
+	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
 // Cluster
 func (r *MigCluster) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()

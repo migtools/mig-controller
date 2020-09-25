@@ -17,22 +17,26 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // MigDirectSpec defines the desired state of MigDirect
 type MigDirectSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	SrcMigClusterRef       *kapi.ObjectReference   `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef      *kapi.ObjectReference   `json:"destMigClusterRef,omitempty"`
+	PersistentVolumeClaims []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
 }
 
 // MigDirectStatus defines the observed state of MigDirect
 type MigDirectStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Conditions
+	ObservedDigest string       `json:"observedDigest"`
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+	Phase          string       `json:"phase,omitempty"`
+	Itinerary      string       `json:"itinerary,omitempty"`
+	Errors         []string     `json:"errors,omitempty"`
 }
 
 // +genclient
@@ -55,6 +59,33 @@ type MigDirectList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []MigDirect `json:"items"`
+}
+
+func (r *MigDirect) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
+	return GetCluster(client, r.Spec.SrcMigClusterRef)
+}
+
+func (r *MigDirect) GetDestinationCluster(client k8sclient.Client) (*MigCluster, error) {
+	return GetCluster(client, r.Spec.DestMigClusterRef)
+}
+
+// Add (de-duplicated) errors.
+func (r *MigDirect) AddErrors(errors []string) {
+	m := map[string]bool{}
+	for _, e := range r.Status.Errors {
+		m[e] = true
+	}
+	for _, error := range errors {
+		_, found := m[error]
+		if !found {
+			r.Status.Errors = append(r.Status.Errors, error)
+		}
+	}
+}
+
+// HasErrors will notify about error presence on the MigDirect resource
+func (r *MigDirect) HasErrors() bool {
+	return len(r.Status.Errors) > 0
 }
 
 func init() {
