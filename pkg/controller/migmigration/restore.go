@@ -46,6 +46,8 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -246,10 +248,23 @@ func (t *Task) deleteRestores() error {
 		return liberr.Wrap(err)
 	}
 
+	// migmigration-based labels
+	correlationLabels := t.Owner.GetCorrelationLabels()
+
+	// migplan-based labels for rollback function
+	if t.Itinerary.Name == "Rollback" {
+		migplan, err := t.Owner.GetPlan(client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		//TODO: ensure what labels does it really use
+		correlationLabels = migplan.GetCorrelationLabels()
+	}
+
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
+		k8sclient.MatchingLabels(correlationLabels),
 		&list)
 	if err != nil {
 		return liberr.Wrap(err)
