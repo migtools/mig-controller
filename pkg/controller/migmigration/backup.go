@@ -163,10 +163,65 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	return nil, nil
 }
 
-// Update Task.Progress with latest available progress information
-func (t *Task) updateBackupProgress(backup *velero.Backup, pvbList *velero.PodVolumeBackupList) {
+// Get whether a backup has completed on the source cluster.
+func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
+	completed := false
+	reasons := []string{}
 	progress := []string{}
-	if backup.Status.Progress != nil {
+
+	pvbs := t.getPodVolumeBackupsForBackup(backup)
+
+	getPodVolumeBackupsProgress := func(pvbList *velero.PodVolumeBackupList) (progress []string) {
+		if pvbList == nil {
+			return
+		}
+		for _, pvb := range pvbList.Items {
+			switch pvb.Status.Phase {
+			case velero.PodVolumeBackupPhaseInProgress:
+				progress = append(
+					progress,
+					fmt.Sprintf(
+						"PodVolumeBackup %s/%s: %s out of %s backed up",
+						pvb.Namespace,
+						pvb.Name,
+						bytesToSI(pvb.Status.Progress.BytesDone),
+						bytesToSI(pvb.Status.Progress.TotalBytes)))
+			case velero.PodVolumeBackupPhaseCompleted:
+				progress = append(
+					progress,
+					fmt.Sprintf(
+						"PodVolumeBackup %s/%s: Completed (%s backed up)",
+						pvb.Namespace,
+						pvb.Name,
+						bytesToSI(pvb.Status.Progress.TotalBytes)))
+			case velero.PodVolumeBackupPhaseFailed:
+				progress = append(
+					progress,
+					fmt.Sprintf(
+						"PodVolumeBackup %s/%s: Failed",
+						pvb.Namespace,
+						pvb.Name))
+			default:
+				progress = append(
+					progress,
+					fmt.Sprintf(
+						"PodVolumeBackup %s/%s: Waiting for ongoing volume backup(s) to complete",
+						pvb.Namespace,
+						pvb.Name))
+			}
+		}
+		return
+	}
+
+	switch backup.Status.Phase {
+	case velero.BackupPhaseNew:
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Not started yet",
+				backup.Namespace,
+				backup.Name))
+	case velero.BackupPhaseInProgress:
 		progress = append(
 			progress,
 			fmt.Sprintf(
@@ -175,52 +230,20 @@ func (t *Task) updateBackupProgress(backup *velero.Backup, pvbList *velero.PodVo
 				backup.Name,
 				backup.Status.Progress.ItemsBackedUp,
 				backup.Status.Progress.TotalItems))
-	}
-	if pvbList != nil {
-		for _, pvb := range pvbList.Items {
-			progress = append(progress,
-				fmt.Sprintf(
-					"PodVolumeBackup %s/%s: %d of %d bytes backed up",
-					pvb.Namespace,
-					pvb.Name,
-					pvb.Status.Progress.BytesDone,
-					pvb.Status.Progress.TotalBytes))
-		}
-	}
-	t.Progress = progress
-}
-
-// returns reasons of failed PVBs
-func (t *Task) getPodVolumeBackupReasons(pvbList *velero.PodVolumeBackupList) (reasons []string) {
-	if pvbList == nil {
-		return
-	}
-	for _, pvb := range pvbList.Items {
-		if pvb.Status.Phase == velero.PodVolumeBackupPhaseFailed {
-			reasons = append(
-				reasons,
-				fmt.Sprintf(
-					"PodVolumeBackup: %s/%s failed",
-					pvb.Namespace,
-					pvb.Name))
-		}
-	}
-	return
-}
-
-// Get whether a backup has completed on the source cluster.
-func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
-	completed := false
-	reasons := []string{}
-
-	pvbs := t.getPodVolumeBackupsForBackup(backup)
-
-	switch backup.Status.Phase {
-	case velero.BackupPhaseInProgress:
-		t.updateBackupProgress(backup, pvbs)
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseCompleted:
 		completed = true
-		t.updateBackupProgress(backup, pvbs)
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Completed",
+				backup.Namespace,
+				backup.Name))
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailed:
 		completed = true
 		reasons = append(
@@ -229,8 +252,6 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 				"Backup: %s/%s failed.",
 				backup.Namespace,
 				backup.Name))
-		pvbReasons := t.getPodVolumeBackupReasons(pvbs)
-		reasons = append(reasons, pvbReasons...)
 	case velero.BackupPhasePartiallyFailed:
 		completed = true
 		reasons = append(
@@ -239,8 +260,9 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 				"Backup: %s/%s partially failed.",
 				backup.Namespace,
 				backup.Name))
-		pvbReasons := t.getPodVolumeBackupReasons(pvbs)
-		reasons = append(reasons, pvbReasons...)
+		reasons = append(
+			reasons,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailedValidation:
 		reasons = backup.Status.ValidationErrors
 		reasons = append(
@@ -252,6 +274,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		completed = true
 	}
 
+	t.Progress = progress
 	return completed, reasons
 }
 
@@ -435,4 +458,19 @@ func findPVVerify(pvList migapi.PersistentVolumes, pvName string) bool {
 		}
 	}
 	return false
+}
+
+func bytesToSI(bytes int64) string {
+	const baseUnit = 1000
+	if bytes < baseUnit {
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+	const siUnits = "kMGTPE"
+	div, exp := int64(baseUnit), 0
+	for n := bytes / baseUnit; n >= baseUnit; n /= baseUnit {
+		div *= baseUnit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB",
+		float64(bytes)/float64(div), siUnits[exp])
 }
