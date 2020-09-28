@@ -139,15 +139,47 @@ func (t Task) getRestore(labels map[string]string) (*velero.Restore, error) {
 func (t *Task) updateRestoreProgress(restore *velero.Restore, pvrList *velero.PodVolumeRestoreList) {
 	progress := []string{}
 	// update restore progress
-
+	progress = append(
+		progress,
+		fmt.Sprintf(
+			"Restore %s/%s: is in phase: %s",
+			restore.Namespace,
+			restore.Name,
+			restore.Status.Phase))
 	// update podvolumerestore progress
+	if pvrList != nil {
+		for _, pvr := range pvrList.Items {
+			progress = append(progress,
+				fmt.Sprintf(
+					"PodVolumeRestore %s/%s: %d out of %d bytes restored",
+					pvr.Namespace,
+					pvr.Name,
+					pvr.Status.Progress.BytesDone,
+					pvr.Status.Progress.TotalBytes))
+		}
+	}
 	t.Progress = progress
 }
 
 // Get PVRs associated with a Restore
 func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.PodVolumeRestoreList {
 	list := velero.PodVolumeRestoreList{}
-	// find pod volume restores associated with given restore
+	nl := map[string]string{
+		velero.RestoreNameLabel: restore.Name,
+	}
+	client, err := t.getDestinationClient()
+	if err != nil {
+		log.Trace(err)
+		return nil
+	}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(nl),
+		&list)
+	if err != nil {
+		log.Trace(err)
+		return nil
+	}
 	return &list
 }
 
