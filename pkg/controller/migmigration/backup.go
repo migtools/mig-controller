@@ -362,6 +362,7 @@ func (t *Task) deleteBackups() error {
 
 // Determine whether backups are replicated by velero on the destination cluster.
 func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
+	progress := []string{}
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return false, err
@@ -379,8 +380,15 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Not replicated",
+				backup.Namespace,
+				backup.Name,
+			))
 	}
-
+	t.Progress = progress
 	return false, err
 }
 
