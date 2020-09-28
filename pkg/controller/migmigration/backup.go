@@ -125,7 +125,6 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 	nl := map[string]string{
 		velero.BackupNameLabel: backup.Name,
 	}
-
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
