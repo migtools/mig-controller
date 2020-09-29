@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	"strconv"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -68,6 +69,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{},
 	)
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to deployment registry referenced by MigPlan
+	err = c.Watch(
+		&registryHealth{
+			hostClient: mgr.GetClient(),
+			Interval: time.Second*5},
+			&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

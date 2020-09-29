@@ -116,8 +116,8 @@ func PodsUnhealthy(client k8sclient.Client, options *k8sclient.ListOptions) (*[]
 	unhealthy := []unstructured.Unstructured{}
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != corev1.PodFailed &&
-			!containerUnhealthy(pod) &&
-			!unhealthyStatusConditions(pod) {
+			!ContainerUnhealthy(pod) &&
+			!UnhealthyStatusConditions(pod) {
 			continue
 		}
 
@@ -134,7 +134,7 @@ func PodsUnhealthy(client k8sclient.Client, options *k8sclient.ListOptions) (*[]
 	return &unhealthy, nil
 }
 
-func unhealthyStatusConditions(pod corev1.Pod) bool {
+func UnhealthyStatusConditions(pod corev1.Pod) bool {
 	if pod.Status.Phase == corev1.PodRunning {
 		return false
 	}
@@ -148,7 +148,7 @@ func unhealthyStatusConditions(pod corev1.Pod) bool {
 	return false
 }
 
-func containerUnhealthy(pod corev1.Pod) bool {
+func ContainerUnhealthy(pod corev1.Pod) bool {
 	// Consider suspicious containers as an error state
 	podContainersStatuses := append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...)
 	for _, containerStatus := range podContainersStatuses {
