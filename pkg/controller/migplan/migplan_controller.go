@@ -73,6 +73,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to deployment registry referenced by MigPlan
+	err = c.Watch(
+		&registryHealth{
+			hostClient: mgr.GetClient(),
+			Interval: time.Second*5},
+			&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to MigClusters referenced by MigPlans
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
