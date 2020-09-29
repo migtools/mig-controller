@@ -150,7 +150,7 @@ func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		reasons = append(
 			reasons,
 			fmt.Sprintf(
-				"Backup: %s/%s partially failed.",
+				"Backup: %s/%s failed.",
 				backup.Namespace,
 				backup.Name))
 	case velero.BackupPhasePartiallyFailed:
