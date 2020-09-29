@@ -54,6 +54,7 @@ type Condition struct {
 	Durable            bool        `json:"durable,omitempty"`
 	Items              []string    `json:"-"`
 	staged             bool
+	Step               string `json:"step,omitempty"`
 }
 
 // Update this condition with another's fields.
@@ -69,6 +70,7 @@ func (r *Condition) Update(other Condition) {
 	r.Message = other.Message
 	r.Durable = other.Durable
 	r.Items = other.Items
+	r.Step = other.Step
 	r.LastTransitionTime = metav1.NewTime(time.Now())
 }
 
@@ -80,6 +82,7 @@ func (r *Condition) Equal(other Condition) bool {
 		r.Reason == other.Reason &&
 		r.Message == other.Message &&
 		r.Durable == other.Durable &&
+		r.Step == other.Step &&
 		reflect.DeepEqual(r.Items, other.Items)
 }
 

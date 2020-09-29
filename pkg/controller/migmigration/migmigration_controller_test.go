@@ -90,17 +90,21 @@ func Test_Itineraries(t *testing.T) {
 	stage := StageItinerary
 	common := Itinerary{}
 
-	for _, step := range StageItinerary.Steps {
-		found := false
-		for _, finalStep := range FinalItinerary.Steps {
-			if step.phase == finalStep.phase {
-				common.Steps = append(common.Steps, step)
-				found = true
-				break
+	for i, step := range StageItinerary.Steps {
+		for _, finalStep := range FinalItinerary.Steps[i:] {
+			for _, phase := range step.Phases {
+				found := false
+				for _, finalPhase := range finalStep.Phases {
+					if phase.phase == finalPhase.phase {
+						common.Steps = append(common.Steps, step)
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("'%s' is not contained within the final itinerary", phase.phase)
+				}
 			}
-		}
-		if !found {
-			t.Errorf("'%s' is not contained within the final itinerary", step.phase)
 		}
 	}
 
