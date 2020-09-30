@@ -424,6 +424,7 @@ func (t *Task) ensureDestinationStagePodsStarted() (report PodStartReport, err e
 }
 
 func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, err error) {
+	progress := []string{}
 	hasHealthyClaims := func(pod *corev1.Pod) (healthy bool) {
 		healthy = true
 		for _, vol := range pod.Spec.Volumes {
@@ -479,7 +480,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 	if err != nil {
 		return
 	}
-
+	report.started = true
 	for _, pod := range podList.Items {
 		ready := false
 		for _, c := range pod.Status.ContainerStatuses {
@@ -489,14 +490,28 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			}
 		}
 		if !ready {
+			progress = append(
+				progress,
+				fmt.Sprintf(
+					"Stage Pod %s/%s: Not running. Phase %s",
+					pod.Namespace,
+					pod.Name,
+					pod.Status.Phase))
+			report.started = false
 			if !hasHealthyClaims(&pod) {
 				report.failed = true
 			}
-			return
+		} else {
+			progress = append(
+				progress,
+				fmt.Sprintf(
+					"Stage Pod %s/%s: Running",
+					pod.Namespace,
+					pod.Name))
+
 		}
 	}
-
-	report.started = true
+	t.setProgress(progress)
 	return
 }
 
@@ -527,7 +542,6 @@ func (t *Task) ensureStagePodsDeleted() error {
 				pod.Name)
 		}
 	}
-
 	return nil
 }
 
@@ -555,7 +569,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			return false, nil
+			return false, err
 		}
 	}
 	t.Owner.Status.DeleteCondition(StagePodsCreated)
