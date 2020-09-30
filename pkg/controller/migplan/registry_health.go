@@ -5,6 +5,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	corev1 "k8s.io/api/core/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -14,7 +15,6 @@ import (
 	"time"
 )
 
-
 // A registry health checker which routinely checks whether registries are healthy or not
 type registryHealth struct {
 	hostClient client.Client
@@ -22,7 +22,7 @@ type registryHealth struct {
 	handler    handler.EventHandler
 	queue      workqueue.RateLimitingInterface
 	predicates []predicate.Predicate
-	podLabels map[string]string
+	podLabels  map[string]string
 }
 
 // Start the health checks
@@ -60,7 +60,7 @@ func (r *registryHealth) run() {
 	//Now using srcClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
 	//repeat all the above steps for all the plans for both clusters
 
-	for{
+	for {
 		time.Sleep(r.Interval)
 		planList, err := v1alpha1.ListPlans(r.hostClient)
 		if err != nil {
@@ -68,10 +68,8 @@ func (r *registryHealth) run() {
 			return
 		}
 
-		for _, plan := range planList{
+		for _, plan := range planList {
 			//TODO avoid race condition check
-
-
 			srcCluster, err := plan.GetSourceCluster(r.hostClient)
 			if err != nil {
 				log.Trace(err)
@@ -84,63 +82,69 @@ func (r *registryHealth) run() {
 				return
 			}
 
-			if srcCluster.Status.IsReady() {
-				srcClient, err := srcCluster.GetClient(r.hostClient)
-				if err != nil {
-					log.Trace(err)
-					return
-				}
-
-				registryPodsSrc, err := r.getRegistryPods(plan, srcClient)
-				if err != nil {
-					log.Trace(err)
-					return
-				}
-
-				for _, registryPod := range registryPodsSrc.Items{
-					if !registryPod.Status.ContainerStatuses[0].Ready {
-						r.enqueue(plan)
-						continue
-					}
-				}
+			isSrcRegistryPodUnhealthy, err := r.isRegistryPodUnhealthy(plan, srcCluster)
+			if err != nil {
+				log.Trace(err)
+				return
+			}
+			if isSrcRegistryPodUnhealthy {
+				r.enqueue(plan)
+				continue
 			}
 
-			if destCluster.Status.IsReady() {
-				destClient, err := destCluster.GetClient(r.hostClient)
-				if err != nil {
-					log.Trace(err)
-					return
-				}
-
-				registryPodsDest, err := r.getRegistryPods(plan, destClient)
-				if err != nil {
-					log.Trace(err)
-					return
-				}
-
-				for _, registryPod := range registryPodsDest.Items{
-					if !registryPod.Status.ContainerStatuses[0].Ready {
-						r.enqueue(plan)
-						continue
-					}
-				}
+			isDestRegistryPodUnhealthy, err := r.isRegistryPodUnhealthy(plan, destCluster)
+			if err != nil {
+				log.Trace(err)
+				return
 			}
-
-
+			if isDestRegistryPodUnhealthy {
+				r.enqueue(plan)
+			}
 		}
 
 	}
-//TODO: need see if this go routine should be stopped and returned
-
+	//TODO: need see if this go routine should be stopped and returned
 }
 
-func (r *registryHealth) getRegistryPods(plan v1alpha1.MigPlan, registryClient compat.Client) (corev1.PodList, error){
+func (r *registryHealth) getRegistryPods(plan v1alpha1.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
 
 	registryPodList := corev1.PodList{}
-	err := registryClient.List(context.TODO(), k8sclient.MatchingLabels(plan.GetLabels()), &registryPodList)
+	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+			"migplan": plan.Name,
+		}),
+	}, &registryPodList)
+
 	if err != nil {
 		log.Trace(err)
 		return corev1.PodList{}, err
 	}
 	return registryPodList, nil
+}
+
+func (r *registryHealth) isRegistryPodUnhealthy(plan v1alpha1.MigPlan, cluster *v1alpha1.MigCluster) (bool, error) {
+
+	if !cluster.Status.IsReady() {
+		log.Info("Cannot check registry pod health, cluster is not ready", cluster.Name, plan.Name)
+		return false, nil
+	}
+
+	clusterClient, err := cluster.GetClient(r.hostClient)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	registryPods, err := r.getRegistryPods(plan, clusterClient)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	for _, registryPod := range registryPods.Items {
+		if !registryPod.Status.ContainerStatuses[0].Ready {
+			return true, nil
+		}
+	}
+	return false, nil
 }
