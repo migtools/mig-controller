@@ -297,7 +297,7 @@ func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
-	labels["migplan"] = string(r.Name)
+	labels["migplan"] = string(r.UID)
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    labels,
@@ -369,7 +369,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		Selector: metav1.SetAsLabelSelector(map[string]string{
 			"app":        name,
 			"deployment": name,
-			"migplan": r.Name,
+			"migplan":    r.Name,
 		}),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -377,7 +377,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 				Labels: map[string]string{
 					"app":        name,
 					"deployment": name,
-					"migplan": r.Name,
+					"migplan":    r.Name,
 				},
 			},
 			Spec: kapi.PodSpec{
