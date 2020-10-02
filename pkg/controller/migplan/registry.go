@@ -2,7 +2,9 @@ package migplan
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
 	"fmt"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -97,6 +99,47 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	}
 
 	return err
+}
+
+func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
+	nEnsured := 0
+	clusters, err := r.planClusters(plan)
+	if err != nil{
+		return liberr.Wrap(err)
+	}
+
+	for _, cluster := range clusters{
+
+		if !cluster.Status.IsReady() {
+			continue
+		}
+
+		client, err := cluster.GetClient(r)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		registryStatusUnhealthy, err := isRegistryPodUnhealthy(plan, client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		if !registryStatusUnhealthy{
+			nEnsured++
+		}
+	}
+
+	if nEnsured == 2 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     RegistriesHealthy,
+			Status:   True,
+			Category: migapi.Required,
+			Message:  RegistriesHealthyMessage,
+		})
+	}
+
+	return err
+
 }
 
 // Ensure the credentials secret for the migration registry on the specified cluster has been created
@@ -248,4 +291,36 @@ func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) err
 		}
 	}
 	return nil
+}
+
+func isRegistryPodUnhealthy(plan *migapi.MigPlan, client compat.Client) (bool, error) {
+
+	registryPods, err := getRegistryPods(plan, client)
+	if err != nil {
+		log.Trace(err)
+		return false, err
+	}
+
+	for _, registryPod := range registryPods.Items {
+		if !registryPod.Status.ContainerStatuses[0].Ready {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
+
+	registryPodList := corev1.PodList{}
+	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+			"migplan": string(plan.UID),
+		}),
+	}, &registryPodList)
+
+	if err != nil {
+		log.Trace(err)
+		return corev1.PodList{}, err
+	}
+	return registryPodList, nil
 }

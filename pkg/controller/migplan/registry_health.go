@@ -111,7 +111,7 @@ func (r *registryHealth) getRegistryPods(plan v1alpha1.MigPlan, registryClient c
 	registryPodList := corev1.PodList{}
 	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
 		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
-			"migplan": plan.Name,
+			"migplan": string(plan.UID),
 		}),
 	}, &registryPodList)
 

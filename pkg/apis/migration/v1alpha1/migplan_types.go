@@ -358,7 +358,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		Selector: metav1.SetAsLabelSelector(map[string]string{
 			"app":        name,
 			"deployment": name,
-			"migplan":    r.Name,
+			"migplan":    string(r.UID),
 		}),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -366,7 +366,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 				Labels: map[string]string{
 					"app":        name,
 					"deployment": name,
-					"migplan":    r.Name,
+					"migplan":    string(r.UID),
 				},
 			},
 			Spec: kapi.PodSpec{
