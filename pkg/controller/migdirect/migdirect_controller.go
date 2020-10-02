@@ -146,6 +146,3 @@ func (r *ReconcileMigDirect) Reconcile(request reconcile.Request) (reconcile.Res
 	// Done
 	return reconcile.Result{}, nil
 }
-
-func (r *ReconcileMigDirect) CreateRsyncTransferPod() {
-}

@@ -24,9 +24,11 @@ import (
 
 // MigDirectSpec defines the desired state of MigDirect
 type MigDirectSpec struct {
-	SrcMigClusterRef       *kapi.ObjectReference   `json:"srcMigClusterRef,omitempty"`
-	DestMigClusterRef      *kapi.ObjectReference   `json:"destMigClusterRef,omitempty"`
-	PersistentVolumeClaims []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
+	SrcMigClusterRef            *kapi.ObjectReference   `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef           *kapi.ObjectReference   `json:"destMigClusterRef,omitempty"`
+	PersistentVolumeClaims      []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
+	StorageClassMapping         map[string]string
+	CreateDestinationNamespaces bool `json:"createDestinationNamespaces,omitempty"`
 }
 
 // MigDirectStatus defines the observed state of MigDirect
@@ -38,6 +40,9 @@ type MigDirectStatus struct {
 	Itinerary      string       `json:"itinerary,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
 }
+
+// TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
+// MigDirectStatus
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

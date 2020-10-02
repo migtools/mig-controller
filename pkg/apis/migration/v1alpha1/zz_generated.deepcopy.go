@@ -554,6 +554,13 @@ func (in *MigDirectSpec) DeepCopyInto(out *MigDirectSpec) {
 			}
 		}
 	}
+	if in.StorageClassMapping != nil {
+		in, out := &in.StorageClassMapping, &out.StorageClassMapping
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

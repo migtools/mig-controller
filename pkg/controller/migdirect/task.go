@@ -6,6 +6,7 @@ import (
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -19,23 +20,30 @@ const (
 	Created                      = ""
 	Started                      = "Started"
 	Prepare                      = "Prepare"
-	EnsureDestinationNamespaces  = "EnsureDestinationNamespaces"
+	CreateDestinationNamespaces  = "CreateDestinationNamespaces"
 	DestinationNamespacesCreated = "DestinationNamespacesCreated"
-	EnsureDestinationPVCs        = "EnsureDestinationPVCs"
+	CreateDestinationPVCs        = "CreateDestinationPVCs"
 	DestinationPVCsCreated       = "DestinationPVCsCreated"
-	EnsureStunnelCerts           = "EnsureStunnelCerts"
-	StunnelCertsCreated          = "StunnelCertsCreated"
-	EnsureRsyncSecret            = "EnsureRsyncSecret"
-	RsyncSecretCreated           = "RsyncSecretCreated"
-	EnsureRsyncPods              = "EnsureRsyncPods"
-	RsyncPodsCreated             = "RsyncPodsCreated"
-	Verification                 = "Verification"
-	EnsureRsyncPodsDeleted       = "EnsureRsyncPodsDeleted"
-	EnsureRsyncPodsTerminated    = "EnsureRsyncPodsTerminated"
-	DeleteStunnelCerts           = "DeleteStunnelCerts"
-	DeleteRsyncSecret            = "DeleteRsyncSecret"
-	Completed                    = "Completed"
-	MigrationFailed              = "MigrationFailed"
+	CreateStunnelCerts           = "CreateStunnelCerts"
+	CreateRsyncConfig            = "CreateRsyncConfig"
+	// Do not initiate Rsync process unless we know stunnel is up and running
+	// and in a healthy state
+
+	// Distinguish rsync transfer pod step from rsync client pod
+	// i.e. Create transfer pod, ensure it is healthy, then start client pod
+	CreateStunnelPodOnSource        = "CreateStunnelPodOnSource"
+	EnsureStunnelPodOnSourceHealthy = "EnsureStunnelPodOnSourceHealthy"
+	//Next two phases are on destination
+	CreateRsyncTransferPod        = "CreateRsyncTransferPod"
+	EnsureRsyncTransferPodHealthy = "EnsureRsyncTransferPodHealthy"
+	CreateRsyncClientPods         = "CreateRsyncClientPods"
+	Verification                  = "Verification"
+	EnsureRsyncPodsDeleted        = "EnsureRsyncPodsDeleted"
+	EnsureRsyncPodsTerminated     = "EnsureRsyncPodsTerminated"
+	DeleteStunnelCerts            = "DeleteStunnelCerts"
+	DeleteRsyncSecret             = "DeleteRsyncSecret"
+	Completed                     = "Completed"
+	MigrationFailed               = "MigrationFailed"
 )
 
 // Flags
@@ -80,10 +88,11 @@ var PVCItinerary = Itinerary{
 		{phase: Created},
 		{phase: Started},
 		{phase: Prepare},
-		{phase: EnsureDestinationNamespaces},
+		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
-		{phase: EnsureDestinationPVCs},
+		{phase: CreateDestinationPVCs},
 		{phase: DestinationPVCsCreated},
+		{phase: CreateRsyncConfig},
 		{phase: Completed},
 	},
 }
@@ -140,7 +149,10 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case Prepare:
-	case EnsureDestinationNamespaces:
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CreateDestinationNamespaces:
 		// Create all of the namespaces the migrated PVCs are in are created on the
 		// destination
 		err := t.ensureDestinationNamespaces()
@@ -153,19 +165,20 @@ func (t *Task) Run() error {
 		}
 	case DestinationNamespacesCreated:
 		// Ensure the namespaces are created
+		// TODO: bad func name
 		err := t.getDestinationNamespaces()
 		if err != nil {
-			liberr.Wrap(err)
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case EnsureDestinationPVCs:
+	case CreateDestinationPVCs:
 		// Create the PVCs on the destination
-		err := t.ensureDestinationPVCs()
+		err := t.createDestinationPVCs()
 		if err != nil {
-			liberr.Wrap(err)
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
@@ -175,7 +188,16 @@ func (t *Task) Run() error {
 		// Get the PVCs on the destination and confirm they are bound
 		err := t.getDestinationPVCs()
 		if err != nil {
-			liberr.Wrap(err)
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CreateRsyncConfig:
+		err := t.createRsyncConfig()
+		if err != nil {
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
@@ -245,4 +267,30 @@ func (t *Task) addErrors(errors []string) {
 // Get whether the migration has failed
 func (t *Task) failed() bool {
 	return t.Owner.HasErrors() || t.Owner.Status.HasCondition(Failed)
+}
+
+// Get client for source cluster
+func (t *Task) getSourceClient() (compat.Client, error) {
+	cluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return nil, err
+	}
+	client, err := cluster.GetClient(t.Client)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+// Get client for destination cluster
+func (t *Task) getDestinationClient() (compat.Client, error) {
+	cluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return nil, err
+	}
+	client, err := cluster.GetClient(t.Client)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
