@@ -353,14 +353,6 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		envFrom = append(envFrom, source)
 	}
 
-	//set debug mode env var
-	debugVar := []kapi.EnvVar{
-		{
-			Name:  "REGISTRY_HTTP_DEBUG_ADDR",
-			Value: ":5001",
-		},
-	}
-
 	deployment.Spec = appsv1.DeploymentSpec{
 		Replicas: pointer.Int32Ptr(1),
 		Selector: metav1.SetAsLabelSelector(map[string]string{
@@ -380,35 +372,33 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						EnvFrom: envFrom,
-						Env:     debugVar,
-						Image:   registryImage,
-						Name:    "registry",
+						EnvFrom:                  envFrom,
+						Image:                    registryImage,
+						Name:                     "registry",
+						TerminationMessagePolicy: kapi.TerminationMessageFallbackToLogsOnError,
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
-								Protocol:      kapi.ProtocolTCP,
-							},
-							kapi.ContainerPort{
-								ContainerPort: 5001,
 								Protocol:      kapi.ProtocolTCP,
 							},
 						},
 						LivenessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/debug/health",
-									Port: intstr.IntOrString{IntVal: 5001},
+									Path: "/v2/_catalog",
+									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
+							PeriodSeconds: 5,
 						},
 						ReadinessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/debug/health",
-									Port: intstr.IntOrString{IntVal: 5001},
+									Path: "/v2/_catalog",
+									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
+							PeriodSeconds: 5,
 						},
 						Resources: kapi.ResourceRequirements{},
 						VolumeMounts: []kapi.VolumeMount{
