@@ -83,12 +83,6 @@ func (t *Task) createRsyncConfig() error {
 		return err
 	}
 
-	// Get client for source
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return err
-	}
-
 	// Create rsync configmap/secret on source + destination
 	// Create rsync secret (which contains user/pass for rsync transfer pod) in
 	// each namespace being migrated
@@ -187,4 +181,8 @@ func (t *Task) getPVCNamespaceMap() map[string][]string {
 		}
 	}
 	return nsMap
+}
+
+func (t *Task) getRsyncRoute() string {
+	return ""
 }

@@ -24,7 +24,7 @@ const (
 	DestinationNamespacesCreated = "DestinationNamespacesCreated"
 	CreateDestinationPVCs        = "CreateDestinationPVCs"
 	DestinationPVCsCreated       = "DestinationPVCsCreated"
-	CreateStunnelCerts           = "CreateStunnelCerts"
+	CreateStunnelConfig          = "CreateStunnelConfig"
 	CreateRsyncConfig            = "CreateRsyncConfig"
 	// Do not initiate Rsync process unless we know stunnel is up and running
 	// and in a healthy state
@@ -93,6 +93,7 @@ var PVCItinerary = Itinerary{
 		{phase: CreateDestinationPVCs},
 		{phase: DestinationPVCsCreated},
 		{phase: CreateRsyncConfig},
+		{phase: CreateStunnelConfig},
 		{phase: Completed},
 	},
 }
@@ -196,6 +197,15 @@ func (t *Task) Run() error {
 		}
 	case CreateRsyncConfig:
 		err := t.createRsyncConfig()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CreateStunnelConfig:
+		err := t.createStunnelConfig()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
