@@ -1,14 +1,9 @@
 package migplan
 
 import (
-	"context"
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/compat"
-	corev1 "k8s.io/api/core/v1"
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -76,29 +71,65 @@ func (r *registryHealth) run() {
 				//TODO Error condition would result in loosing the watch util the pod restarts
 				return
 			}
+
+			if !srcCluster.Status.IsReady() {
+				log.Info("Cannot check registry pod health, cluster is not ready", srcCluster.Name, plan.Name)
+				return
+			}
+
+			srcClient, err := srcCluster.GetClient(r.hostClient)
+			if err != nil {
+				return
+			}
+
 			destCluster, err := plan.GetDestinationCluster(r.hostClient)
 			if err != nil {
 				log.Trace(err)
 				return
 			}
 
-			isSrcRegistryPodUnhealthy, err := r.isRegistryPodUnhealthy(plan, srcCluster)
-			if err != nil {
-				log.Trace(err)
+			if !destCluster.Status.IsReady() {
+				log.Info("Cannot check registry pod health, cluster is not ready", destCluster.Name, plan.Name)
 				return
-			}
-			if isSrcRegistryPodUnhealthy {
-				r.enqueue(plan)
-				continue
 			}
 
-			isDestRegistryPodUnhealthy, err := r.isRegistryPodUnhealthy(plan, destCluster)
+			destClient, err := destCluster.GetClient(r.hostClient)
+			if err != nil {
+				return
+			}
+
+			isSrcRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, srcClient)
 			if err != nil {
 				log.Trace(err)
 				return
 			}
-			if isDestRegistryPodUnhealthy {
+
+			isDestRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, destClient)
+			if err != nil {
+				log.Trace(err)
+				return
+			}
+
+			switch  {
+			//enqueue a reconcile event when the src registry pod is unhealthy and the plan is ready
+			case isSrcRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
 				r.enqueue(plan)
+				continue
+
+			//enqueue a reconcile event when the src registry pod is healthy and the plan is not ready
+			case !isSrcRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
+				r.enqueue(plan)
+				continue
+
+			//enqueue a reconcile event when the destination registry pod is unhealthy and the plan is ready
+			case isDestRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
+				r.enqueue(plan)
+				continue
+
+			//enqueue a reconcile event when the destination registry pod is healthy and the plan is not ready
+			case !isDestRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
+				r.enqueue(plan)
+				continue
 			}
 		}
 
@@ -106,45 +137,3 @@ func (r *registryHealth) run() {
 	//TODO: need see if this go routine should be stopped and returned
 }
 
-func (r *registryHealth) getRegistryPods(plan v1alpha1.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
-
-	registryPodList := corev1.PodList{}
-	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
-		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
-			"migplan": string(plan.UID),
-		}),
-	}, &registryPodList)
-
-	if err != nil {
-		log.Trace(err)
-		return corev1.PodList{}, err
-	}
-	return registryPodList, nil
-}
-
-func (r *registryHealth) isRegistryPodUnhealthy(plan v1alpha1.MigPlan, cluster *v1alpha1.MigCluster) (bool, error) {
-
-	if !cluster.Status.IsReady() {
-		log.Info("Cannot check registry pod health, cluster is not ready", cluster.Name, plan.Name)
-		return false, nil
-	}
-
-	clusterClient, err := cluster.GetClient(r.hostClient)
-	if err != nil {
-		log.Trace(err)
-		return false, err
-	}
-
-	registryPods, err := r.getRegistryPods(plan, clusterClient)
-	if err != nil {
-		log.Trace(err)
-		return false, err
-	}
-
-	for _, registryPod := range registryPods.Items {
-		if !registryPod.Status.ContainerStatuses[0].Ready {
-			return true, nil
-		}
-	}
-	return false, nil
-}
