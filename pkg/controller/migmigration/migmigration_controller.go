@@ -167,7 +167,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	err = r.setOwnerReference(migration)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Re-queue (after) in seconds.
@@ -190,7 +190,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
 			log.Trace(err)
-			return reconcile.Result{}, err
+			return reconcile.Result{Requeue: true}, err
 		}
 	}
 

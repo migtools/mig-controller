@@ -263,7 +263,7 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case Refresh:
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		err = t.refreshPlan()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -272,7 +272,7 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case EnsureRefreshed:
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		refreshed := t.ensureRefreshed()
 		if refreshed {
 			if err = t.next(); err != nil {

@@ -300,7 +300,7 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 	var err error
 
 	// Always refresh on first reconcile.
-	if len(plan.Status.ObservedDigest) == 0 {
+	if plan.ObjectMeta.Generation == 0 {
 		plan.Spec.Refresh = true
 	}
 
@@ -324,17 +324,8 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 		}
 	}
 
-	// Case: Refresh is running
-	if refreshInProgress {
-		// Mark refresh as completed if Storage and Cluster refreshes are done.
-		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
-			plan.Status.DeleteCondition(migapi.RefreshInProgress)
-		}
-		return nil
-	}
-
-	// Case: Refresh requested but not actively running.
-	if !refreshInProgress && refreshRequested {
+	// Case: Refresh requested
+	if refreshRequested {
 		// Start refresh
 		srcCluster.Spec.Refresh = true
 		err = r.Update(context.TODO(), srcCluster)
@@ -360,7 +351,17 @@ func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
 			Durable:  true,
 		})
 		plan.Spec.Refresh = false
+		return nil
 	}
+
+	// Case: Refresh is running
+	if refreshInProgress {
+		// Mark refresh as completed if Storage and Cluster refreshes are done.
+		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
+			plan.Status.DeleteCondition(migapi.RefreshInProgress)
+		}
+	}
+
 	return nil
 }
 
