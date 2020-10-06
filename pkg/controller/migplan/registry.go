@@ -2,14 +2,13 @@ package migplan
 
 import (
 	"context"
-	corev1 "k8s.io/api/core/v1"
 	"fmt"
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
-
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -101,8 +100,11 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	return err
 }
 
+// Ensure the migration registries on both source and dest clusters are healthy
 func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 	nEnsured := 0
+	unHealthyPod := corev1.Pod{}
+	uHealthyClusterName := ""
 	clusters, err := r.planClusters(plan)
 	if err != nil{
 		return liberr.Wrap(err)
@@ -119,13 +121,16 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 
-		registryStatusUnhealthy, err := isRegistryPodUnhealthy(plan, client)
+		registryStatusUnhealthy, podObj, err := isRegistryPodUnHealthy(plan, client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 
 		if !registryStatusUnhealthy{
 			nEnsured++
+		}else{
+			unHealthyPod = podObj
+			uHealthyClusterName = cluster.ObjectMeta.Name
 		}
 	}
 
@@ -135,6 +140,14 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			Status:   True,
 			Category: migapi.Required,
 			Message:  RegistriesHealthyMessage,
+		})
+	}else {
+		message := fmt.Sprintf(RegistriesUnHealthyMessage, unHealthyPod.Name, unHealthyPod.Namespace, uHealthyClusterName)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     RegistriesHealthy,
+			Status:   False,
+			Category: migapi.Required,
+			Message:  message,
 		})
 	}
 
@@ -293,20 +306,20 @@ func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) err
 	return nil
 }
 
-func isRegistryPodUnhealthy(plan *migapi.MigPlan, client compat.Client) (bool, error) {
-
+func isRegistryPodUnHealthy(plan *migapi.MigPlan, client compat.Client) (bool, corev1.Pod, error) {
+	unHealthyPod := corev1.Pod{}
 	registryPods, err := getRegistryPods(plan, client)
 	if err != nil {
 		log.Trace(err)
-		return false, err
+		return false, unHealthyPod, err
 	}
 
 	for _, registryPod := range registryPods.Items {
-		if !registryPod.Status.ContainerStatuses[0].Ready {
-			return true, nil
+		if !registryPod.Status.ContainerStatuses[0].Ready{
+			return true, registryPod, nil
 		}
 	}
-	return false, nil
+	return false, unHealthyPod, nil
 }
 
 func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
