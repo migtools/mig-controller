@@ -86,13 +86,21 @@ func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook miga
 		return false, err
 	} else if runningJob.Status.Failed >= HookJobFailedLimit {
 		err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
+		t.Progress = []string{
+			fmt.Sprintf("Hook job %s/%s failed", runningJob.Namespace, runningJob.Name)}
 		return false, err
 	} else if len(runningJob.Status.Conditions) > 0 && runningJob.Status.Conditions[0].Reason == BackoffLimitExceededError {
 		err := fmt.Errorf("Hook job %s failed.", runningJob.Name)
+		t.Progress = []string{
+			fmt.Sprintf("Hook job %s/%s failed", runningJob.Namespace, runningJob.Name)}
 		return false, err
 	} else if runningJob.Status.Succeeded == 1 {
+		t.Progress = []string{
+			fmt.Sprintf("Hook job %s/%s succeeded", runningJob.Namespace, runningJob.Name)}
 		return true, nil
 	} else {
+		t.Progress = []string{
+			fmt.Sprintf("Hook job %s/%s is running", runningJob.Namespace, runningJob.Name)}
 		return false, nil
 	}
 }
