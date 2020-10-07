@@ -197,6 +197,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}()
 
+	//Add migplan status label to migmigration
+	err = r.AddRunningLabelForPlan(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
@@ -374,6 +382,48 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 			Category: Advisory,
 			Message:  SuspendedMessage,
 		})
+	}
+
+	return nil
+}
+
+func (r *ReconcileMigPlan) AddRunningLabelForPlan(plan *migapi.MigPlan) error {
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	if len(migrations) == 0 {
+		if plan.Labels == nil {
+			plan.Labels = make(map[string]string)
+		}
+		plan.Labels["migplan-running"] = "false"
+		err = r.Update(context.TODO(), plan)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}else {
+		for _, m := range migrations {
+			if m.Status.HasCondition(migctl.Running) {
+				if plan.Labels == nil {
+					plan.Labels = make(map[string]string)
+				}
+				plan.Labels["migplan-running"] = "true"
+				err = r.Update(context.TODO(), plan)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			} else {
+				if plan.Labels == nil {
+					plan.Labels = make(map[string]string)
+				}
+				plan.Labels["migplan-running"] = "false"
+				err = r.Update(context.TODO(), plan)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+		}
 	}
 
 	return nil
