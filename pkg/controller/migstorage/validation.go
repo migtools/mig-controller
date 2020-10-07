@@ -1,9 +1,11 @@
 package migstorage
 
 import (
+	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"path"
 )
 
 // Notes:
@@ -43,19 +45,6 @@ const (
 	False = migapi.False
 )
 
-// Messages
-const (
-	ReadyMessage                   = "The storage is ready."
-	InvalidBSProviderMessage       = "The `backupStorageProvider` must be: (aws|gcp|azure)."
-	InvalidBSCredsSecretRefMessage = "The `backupStorageConfig.credsSecretRef` must reference a `secret`."
-	InvalidBSFieldsMessage         = "The `backupStorageConfig` settings [] not valid."
-	InvalidVSProviderMessage       = "The `volumeSnapshotProvider` must be: (aws|gcp|azure)."
-	InvalidVSCredsSecretRefMessage = "The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`."
-	InvalidVSFieldsMessage         = "The `volumeSnapshotConfig` settings [] not valid."
-	BSProviderTestFailedMessage    = "The Backup storage cloudprovider test failed []."
-	VSProviderTestFailedMessage    = "The Volume Snapshot cloudprovider test failed []."
-)
-
 // Validate the storage resource.
 func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
 	err := r.validateBackupStorage(storage)
@@ -79,7 +68,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidBSProviderMessage,
+			Message:  "The `spec.BackupStorageProvider` must be: (aws|gcp|azure).",
 		})
 		return nil
 	}
@@ -93,7 +82,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
-			Message:  InvalidBSProviderMessage,
+			Message:  fmt.Sprintf("The `spec.BackupStorageProvider` must be: (aws|gcp|azure), provider %s", storage.Spec.BackupStorageProvider),
 		})
 		return nil
 	}
@@ -105,7 +94,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidBSCredsSecretRefMessage,
+			Message:  "The `backupStorageConfig.credsSecretRef` must reference a valid `secret`.",
 		})
 		return nil
 	}
@@ -123,7 +112,8 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidBSCredsSecretRefMessage,
+			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`, subject %s",
+				path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace, storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
 		})
 		return nil
 	}
@@ -136,8 +126,9 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
-			Message:  InvalidBSFieldsMessage,
-			Items:    fields,
+			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`, subject %s, []",
+				path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace, storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
+			Items: fields,
 		})
 		return nil
 	}
@@ -151,7 +142,7 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 				Status:   True,
 				Reason:   TestFailed,
 				Category: Critical,
-				Message:  BSProviderTestFailedMessage,
+				Message:  fmt.Sprintf("The `backupStorageConfig` settings [] not provided in secret %s not valid.", path.Join(secret.Namespace, secret.Name)),
 				Items:    []string{err.Error()},
 			})
 		}
@@ -179,7 +170,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotSupported,
 				Category: Critical,
-				Message:  InvalidVSProviderMessage,
+				Message:  fmt.Sprintf("The `volumeSnapshotProvider` must be: (aws|gcp|azure)., provider: %s", storage.Spec.VolumeSnapshotProvider),
 			})
 			return nil
 		}
@@ -191,7 +182,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
-				Message:  InvalidVSCredsSecretRefMessage,
+				Message:  "The `volumeSnapshotConfig.credsSecretRef` must reference a valid `secret`.",
 			})
 			return nil
 		}
@@ -203,7 +194,9 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotFound,
 				Category: Critical,
-				Message:  InvalidVSCredsSecretRefMessage,
+				Message: fmt.Sprintf("The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`. subject %s", path.Join(
+					storage.Spec.VolumeSnapshotConfig.CredsSecretRef.Namespace,
+					storage.Spec.VolumeSnapshotConfig.CredsSecretRef.Namespace)),
 			})
 			return nil
 		}
@@ -216,7 +209,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotSupported,
 				Category: Critical,
-				Message:  InvalidVSFieldsMessage,
+				Message:  fmt.Sprintf("The `volumeSnapshotConfig` settings [] in secret %s not valid.", path.Join(secret.Namespace, secret.Name)),
 				Items:    fields,
 			})
 			return nil
@@ -232,7 +225,7 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   TestFailed,
 				Category: Critical,
-				Message:  VSProviderTestFailedMessage,
+				Message:  "The Volume Snapshot cloudprovider test failed [].",
 				Items:    []string{err.Error()},
 			})
 		}
