@@ -51,89 +51,89 @@ func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
 
 //Run the health checks for registry pods
 func (r *registryHealth) run() {
-	//List all the migplans using the hostClient
-	//Now using srcClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
+	//List all the migplans that are in running state using the hostClient
+	//Now using srcClient and destClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
 	//repeat all the above steps for all the plans for both clusters
 
 	for {
 		time.Sleep(r.Interval)
-		planList, err := v1alpha1.ListPlans(r.hostClient)
+		planList, err := v1alpha1.ListRunningPlans(r.hostClient)
 		if err != nil {
 			log.Trace(err)
 			return
 		}
+		if planList != nil {
+			for _, plan := range planList {
+				//TODO avoid race condition check
+				srcCluster, err := plan.GetSourceCluster(r.hostClient)
+				if err != nil {
+					log.Trace(err)
+					//TODO Error condition would result in loosing the watch util the pod restarts
+					return
+				}
 
-		for _, plan := range planList {
-			//TODO avoid race condition check
-			srcCluster, err := plan.GetSourceCluster(r.hostClient)
-			if err != nil {
-				log.Trace(err)
-				//TODO Error condition would result in loosing the watch util the pod restarts
-				return
-			}
+				if !srcCluster.Status.IsReady() {
+					log.Info("Cannot check registry pod health, cluster is not ready", srcCluster.Name, plan.Name)
+					return
+				}
 
-			if !srcCluster.Status.IsReady() {
-				log.Info("Cannot check registry pod health, cluster is not ready", srcCluster.Name, plan.Name)
-				return
-			}
+				srcClient, err := srcCluster.GetClient(r.hostClient)
+				if err != nil {
+					return
+				}
 
-			srcClient, err := srcCluster.GetClient(r.hostClient)
-			if err != nil {
-				return
-			}
+				destCluster, err := plan.GetDestinationCluster(r.hostClient)
+				if err != nil {
+					log.Trace(err)
+					return
+				}
 
-			destCluster, err := plan.GetDestinationCluster(r.hostClient)
-			if err != nil {
-				log.Trace(err)
-				return
-			}
+				if !destCluster.Status.IsReady() {
+					log.Info("Cannot check registry pod health, cluster is not ready", destCluster.Name, plan.Name)
+					return
+				}
 
-			if !destCluster.Status.IsReady() {
-				log.Info("Cannot check registry pod health, cluster is not ready", destCluster.Name, plan.Name)
-				return
-			}
+				destClient, err := destCluster.GetClient(r.hostClient)
+				if err != nil {
+					return
+				}
 
-			destClient, err := destCluster.GetClient(r.hostClient)
-			if err != nil {
-				return
-			}
+				isSrcRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, srcClient)
+				if err != nil {
+					log.Trace(err)
+					return
+				}
 
-			isSrcRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, srcClient)
-			if err != nil {
-				log.Trace(err)
-				return
-			}
+				isDestRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, destClient)
+				if err != nil {
+					log.Trace(err)
+					return
+				}
 
-			isDestRegistryPodUnhealthy, _, err := isRegistryPodUnHealthy(&plan, destClient)
-			if err != nil {
-				log.Trace(err)
-				return
-			}
+				switch {
+				//enqueue a reconcile event when the src registry pod is unhealthy and the plan is ready
+				case isSrcRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
+					r.enqueue(plan)
+					continue
 
-			switch  {
-			//enqueue a reconcile event when the src registry pod is unhealthy and the plan is ready
-			case isSrcRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
-				r.enqueue(plan)
-				continue
+				//enqueue a reconcile event when the src registry pod is healthy and the plan is not ready
+				case !isSrcRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
+					r.enqueue(plan)
+					continue
 
-			//enqueue a reconcile event when the src registry pod is healthy and the plan is not ready
-			case !isSrcRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
-				r.enqueue(plan)
-				continue
+				//enqueue a reconcile event when the destination registry pod is unhealthy and the plan is ready
+				case isDestRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
+					r.enqueue(plan)
+					continue
 
-			//enqueue a reconcile event when the destination registry pod is unhealthy and the plan is ready
-			case isDestRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
-				r.enqueue(plan)
-				continue
-
-			//enqueue a reconcile event when the destination registry pod is healthy and the plan is not ready
-			case !isDestRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
-				r.enqueue(plan)
-				continue
+				//enqueue a reconcile event when the destination registry pod is healthy and the plan is not ready
+				case !isDestRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
+					r.enqueue(plan)
+					continue
+				}
 			}
 		}
 
 	}
 	//TODO: need see if this go routine should be stopped and returned
 }
-

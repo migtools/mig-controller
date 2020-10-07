@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"strconv"
 
 	kapi "k8s.io/api/core/v1"
@@ -20,6 +21,23 @@ func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 	list := MigPlanList{}
 	options := k8sclient.MatchingField(ClosedIndexField, strconv.FormatBool(false))
 	err := client.List(context.TODO(), options, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
+}
+
+// List `Running` MigPlans
+// Returns and empty list when none found.
+func ListRunningPlans(client k8sclient.Client) ([]MigPlan, error) {
+	list := MigPlanList{}
+	options := k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+			"migplan-running" : "true",
+		}),
+	}
+	err := client.List(context.TODO(), &options, &list)
 	if err != nil {
 		return nil, err
 	}
