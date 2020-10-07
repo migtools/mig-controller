@@ -39,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const MigplanRunning = "migplan-running"
+
 var log = logging.WithName("plan")
 
 // Application settings.
@@ -403,43 +405,46 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 
 func (r *ReconcileMigPlan) AddRunningLabelForPlan(plan *migapi.MigPlan) error {
 	migrations, err := plan.ListMigrations(r)
+	runningMigrations := 0
+	needsUpdate := false
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	if len(migrations) == 0 {
+	//Check if there are any associated migrations that are running
+	for _, m := range migrations {
+		if m.Status.HasCondition(migctl.Running) {
+			runningMigrations++
+		}
+	}
+
+	//No migrations associated with the migplan or there are no running migrations for the Migplan
+	if len(migrations) == 0 || runningMigrations == 0 {
+		if plan.Labels != nil {
+			if _, found := plan.Labels[MigplanRunning]; found {
+				delete(plan.Labels, MigplanRunning)
+				needsUpdate = true
+			}
+		}
+		return nil
+	}
+
+	//Migplan is associated with Running migrations
+	if runningMigrations > 0 {
 		if plan.Labels == nil {
 			plan.Labels = make(map[string]string)
 		}
-		plan.Labels["migplan-running"] = "false"
+		plan.Labels[MigplanRunning] = "true"
+		needsUpdate = true
+	}
+
+	//Plan update call
+	if needsUpdate {
 		err = r.Update(context.TODO(), plan)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-	}else {
-		for _, m := range migrations {
-			if m.Status.HasCondition(migctl.Running) {
-				if plan.Labels == nil {
-					plan.Labels = make(map[string]string)
-				}
-				plan.Labels["migplan-running"] = "true"
-				err = r.Update(context.TODO(), plan)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			} else {
-				if plan.Labels == nil {
-					plan.Labels = make(map[string]string)
-				}
-				plan.Labels["migplan-running"] = "false"
-				err = r.Update(context.TODO(), plan)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-		}
 	}
-
 	return nil
 }
 
