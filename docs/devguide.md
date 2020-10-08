@@ -21,7 +21,7 @@ The reconciler will:
 ## Organization
 
 All constructs should be organized, scoped, and named based on a specific topic or concern. Constructs 
-named _uitl_, _helper_, _misc_ are __highly__ discouraged as they are an anti-pattern. Everything should
+named _util_, _helper_, _misc_ are __highly__ discouraged as they are an anti-pattern. Everything should
 fit within an appropriately named: package, .go (file), struct, function. Thoughtful organization and naming
 reflects a thoughtful design.
 
