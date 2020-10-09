@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// A registry health checker which routinely checks whether registries are healthy or not
-type registryHealth struct {
+// A registry health checker which routinely checks whether registries are healthy or not for migplan's running migrations
+type registryHealthRunning struct {
 	hostClient client.Client
 	Interval   time.Duration
 	handler    handler.EventHandler
@@ -21,7 +21,7 @@ type registryHealth struct {
 }
 
 // Start the health checks
-func (r *registryHealth) Start(
+func (r *registryHealthRunning) Start(
 	handler handler.EventHandler,
 	queue workqueue.RateLimitingInterface,
 	predicates ...predicate.Predicate) error {
@@ -35,7 +35,7 @@ func (r *registryHealth) Start(
 }
 
 // Enqueue a reconcile request event for migplan
-func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
+func (r *registryHealthRunning) enqueue(plan v1alpha1.MigPlan) {
 	event := event.GenericEvent{
 		Meta:   &plan.ObjectMeta,
 		Object: &plan,
@@ -50,7 +50,7 @@ func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
 }
 
 //Run the health checks for registry pods
-func (r *registryHealth) run() {
+func (r *registryHealthRunning) run() {
 	//List all the migplans that are in running state using the hostClient
 	//Now using srcClient and destClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
 	//repeat all the above steps for all the plans for both clusters
@@ -115,19 +115,8 @@ func (r *registryHealth) run() {
 				case isSrcRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
 					r.enqueue(plan)
 					continue
-
-				//enqueue a reconcile event when the src registry pod is healthy and the plan is not ready
-				case !isSrcRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
-					r.enqueue(plan)
-					continue
-
 				//enqueue a reconcile event when the destination registry pod is unhealthy and the plan is ready
 				case isDestRegistryPodUnhealthy && plan.Status.HasCondition(RegistriesHealthy):
-					r.enqueue(plan)
-					continue
-
-				//enqueue a reconcile event when the destination registry pod is healthy and the plan is not ready
-				case !isDestRegistryPodUnhealthy && !plan.Status.HasCondition(RegistriesHealthy):
 					r.enqueue(plan)
 					continue
 				}

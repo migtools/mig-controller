@@ -39,7 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const MigplanRunning = "migplan-running"
+const (
+	MigplanRunning         = "migplan-running"
+	MigplanMigrationFailed = "migplan-migration-failed"
+)
 
 var log = logging.WithName("plan")
 
@@ -75,12 +78,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to deployment registry referenced by MigPlan
+	// Watch for changes to deployment registry referenced by MigPlan that have running migrations
 	err = c.Watch(
-		&registryHealth{
+		&registryHealthRunning{
 			hostClient: mgr.GetClient(),
-			Interval: time.Second*5},
-			&handler.EnqueueRequestForObject{})
+			Interval:   time.Second * 5},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to deployment registry referenced by MigPlan that have failed migrations
+	err = c.Watch(
+		&registryHealthFailed{
+			hostClient: mgr.GetClient(),
+			Interval:   time.Second * 5},
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -199,14 +212,19 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}()
 
-	//Add migplan status label to migmigration
-	err = r.AddRunningLabelForPlan(plan)
+	//Add or Update labels for migplan having running migrations
+	err = r.AddUpdateLabelRunningMigration(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-
+	//Add or Update labels for migplan having failed migrations
+	err = r.AddUpdateLabelFailedMigration(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
@@ -389,10 +407,11 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r *ReconcileMigPlan) AddRunningLabelForPlan(plan *migapi.MigPlan) error {
-	migrations, err := plan.ListMigrations(r)
+func (r *ReconcileMigPlan) AddUpdateLabelRunningMigration(plan *migapi.MigPlan) error {
+
 	runningMigrations := 0
 	needsUpdate := false
+	migrations, err := plan.ListMigrations(r)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -404,23 +423,65 @@ func (r *ReconcileMigPlan) AddRunningLabelForPlan(plan *migapi.MigPlan) error {
 		}
 	}
 
-	//No migrations associated with the migplan or there are no running migrations for the Migplan
-	if len(migrations) == 0 || runningMigrations == 0 {
+	switch {
+	//There are no running migrations associated with the Migplan
+	case runningMigrations == 0:
 		if plan.Labels != nil {
 			if _, found := plan.Labels[MigplanRunning]; found {
 				delete(plan.Labels, MigplanRunning)
 				needsUpdate = true
 			}
 		}
-		return nil
-	}
-
 	//Migplan is associated with Running migrations
-	if runningMigrations > 0 {
+	case runningMigrations > 0:
 		if plan.Labels == nil {
 			plan.Labels = make(map[string]string)
 		}
 		plan.Labels[MigplanRunning] = "true"
+		needsUpdate = true
+	}
+
+	//Plan update call
+	if needsUpdate {
+		err = r.Update(context.TODO(), plan)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileMigPlan) AddUpdateLabelFailedMigration(plan *migapi.MigPlan) error {
+
+	failedMigrations := 0
+	needsUpdate := false
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	//Check if there are any associated migrations that are failed
+	for _, m := range migrations {
+		if m.Status.HasCondition(migctl.PlanNotReady) {
+			failedMigrations++
+		}
+	}
+
+	switch {
+	//There are no failed migrations associated with the Migplan
+	case failedMigrations == 0:
+		if plan.Labels != nil {
+			if _, found := plan.Labels[MigplanMigrationFailed]; found {
+				delete(plan.Labels, MigplanMigrationFailed)
+				needsUpdate = true
+			}
+		}
+	//Migplan is associated with Failed migrations
+	case failedMigrations > 0:
+		if plan.Labels == nil {
+			plan.Labels = make(map[string]string)
+		}
+		plan.Labels[MigplanMigrationFailed] = "true"
 		needsUpdate = true
 	}
 
