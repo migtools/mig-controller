@@ -45,6 +45,24 @@ func ListRunningPlans(client k8sclient.Client) ([]MigPlan, error) {
 	return list.Items, err
 }
 
+// List `Failed` MigPlans
+// Returns and empty list when none found.
+func ListFailedPlans(client k8sclient.Client) ([]MigPlan, error) {
+	list := MigPlanList{}
+	options := k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+			"migplan-migration-failed" : "true",
+		}),
+	}
+	err := client.List(context.TODO(), &options, &list)
+	if err != nil {
+		return nil, err
+	}
+
+	return list.Items, err
+}
+
+
 // List MigCluster
 // Returns and empty list when none found.
 func ListClusters(client k8sclient.Client) ([]MigCluster, error) {
