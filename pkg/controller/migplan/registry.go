@@ -114,10 +114,13 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 
-		registryStatusUnhealthy, podObj, err := isRegistryPodUnHealthy(plan, client)
+		registryPods, err := getRegistryPods(plan, client)
 		if err != nil {
+			log.Trace(err)
 			return liberr.Wrap(err)
 		}
+
+		registryStatusUnhealthy, podObj := isRegistryPodUnHealthy(registryPods)
 
 		if !registryStatusUnhealthy{
 			nEnsured++
@@ -299,20 +302,14 @@ func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) err
 	return nil
 }
 
-func isRegistryPodUnHealthy(plan *migapi.MigPlan, client compat.Client) (bool, corev1.Pod, error) {
+func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
 	unHealthyPod := corev1.Pod{}
-	registryPods, err := getRegistryPods(plan, client)
-	if err != nil {
-		log.Trace(err)
-		return false, unHealthyPod, err
-	}
-
 	for _, registryPod := range registryPods.Items {
 		if !registryPod.Status.ContainerStatuses[0].Ready{
-			return true, registryPod, nil
+			return true, registryPod
 		}
 	}
-	return false, unHealthyPod, nil
+	return false, unHealthyPod
 }
 
 func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {

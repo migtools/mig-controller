@@ -15,6 +15,11 @@ import (
 // Convenience functions for managing the object model.
 ///
 
+const (
+	MigplanMigrationRunning = "migplan.migration.openshift.io/running"
+	MigplanMigrationFailed  = "migplan.migration.openshift.io/failed"
+)
+
 // List `open` MigPlans
 // Returns and empty list when none found.
 func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
@@ -30,12 +35,10 @@ func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 
 // List `Running` MigPlans
 // Returns and empty list when none found.
-func ListRunningPlans(client k8sclient.Client) ([]MigPlan, error) {
+func ListPlansOnLabels(client k8sclient.Client, labels map[string]string) ([]MigPlan, error) {
 	list := MigPlanList{}
 	options := k8sclient.ListOptions{
-		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
-			"migplan-running" : "true",
-		}),
+		LabelSelector: k8sLabels.SelectorFromSet(labels),
 	}
 	err := client.List(context.TODO(), &options, &list)
 	if err != nil {
@@ -44,24 +47,6 @@ func ListRunningPlans(client k8sclient.Client) ([]MigPlan, error) {
 
 	return list.Items, err
 }
-
-// List `Failed` MigPlans
-// Returns and empty list when none found.
-func ListFailedPlans(client k8sclient.Client) ([]MigPlan, error) {
-	list := MigPlanList{}
-	options := k8sclient.ListOptions{
-		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
-			"migplan-migration-failed" : "true",
-		}),
-	}
-	err := client.List(context.TODO(), &options, &list)
-	if err != nil {
-		return nil, err
-	}
-
-	return list.Items, err
-}
-
 
 // List MigCluster
 // Returns and empty list when none found.
