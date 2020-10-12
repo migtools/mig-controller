@@ -187,9 +187,7 @@ var RollbackItinerary = Itinerary{
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
-		// note this one may be tricky since quiesce is currently
-		//  on the MigMigration. Ping @jortel for ideas on this.
-		// {phase: UnQuiesceApplications, all: Quiesce},
+		{phase: UnQuiesceApplications, all: Quiesce},
 		{phase: RollbackComplete},
 		{phase: Completed},
 	},

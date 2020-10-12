@@ -67,8 +67,8 @@ const (
 	MigPlanDebugLabel = "migration.openshift.io/migplan-name"
 	// Identifies associated migplan
 	// to allow migplan restored resources rollback
-	// The value is Task.Owner.Spec.migPlanRef.UID
-	MigPlanLabel = "migration.openshift.io/migplan-ref"
+	// The value is Task.PlanResources.MigPlan.UID
+	MigPlanLabel = "migplan"
 )
 
 // Set of Service Accounts.

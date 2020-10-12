@@ -248,18 +248,17 @@ func (t *Task) deleteRestores() error {
 		return liberr.Wrap(err)
 	}
 
-	// migmigration-based labels
-	correlationLabels := t.Owner.GetCorrelationLabels()
+	log.Info("########################## delete restores")
 
-	// migplan-based labels for rollback function
-	if t.Itinerary.Name == "Rollback" {
-		migplan, err := t.Owner.GetPlan(client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		//TODO: ensure what labels does it really use
-		correlationLabels = migplan.GetCorrelationLabels()
+	migplan, err := t.Owner.GetPlan(client)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
+
+	log.Info("########################## delete restores Rollback")
+
+	correlationLabels := migplan.GetCorrelationLabels()
+	log.Info(fmt.Sprintf("migplan corellabels %v", correlationLabels))
 
 	list := velero.RestoreList{}
 	err = client.List(
@@ -270,11 +269,15 @@ func (t *Task) deleteRestores() error {
 		return liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
+		log.Info("########################## restore item")
+		log.Info(fmt.Sprintf("restore deletion: %v", restore))
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
 	}
+
+	log.Info("########################## restore delete end")
 
 	return nil
 }
