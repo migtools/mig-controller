@@ -1,8 +1,9 @@
 package migplan
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/client-go/util/workqueue"
