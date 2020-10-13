@@ -2,14 +2,13 @@ package cloudprovider
 
 import (
 	"context"
-	"k8s.io/api/apps/v1"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/google/uuid"
-	//appsv1 "github.com/openshift/api/apps/v1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"google.golang.org/api/option"
+	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
@@ -69,7 +68,7 @@ func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *GCPProvider) UpdateRegistryDC(dc *v1.Deployment, name, dirName string) {
+func (p *GCPProvider) UpdateRegistryDC(dc *appsv1.Deployment, name, dirName string) {
 	envVars := dc.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}

@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"k8s.io/api/apps/v1"
 	"net"
 	"net/http"
 	"net/url"
-
-	"github.com/google/uuid"
-
 	"strconv"
 	"time"
 
@@ -20,10 +16,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	kapi "k8s.io/api/core/v1"
-
+	"github.com/google/uuid"
 	"github.com/konveyor/mig-controller/pkg/settings"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	kapi "k8s.io/api/core/v1"
 )
 
 var Settings = &settings.Settings
@@ -144,7 +141,7 @@ func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *AWSProvider) UpdateRegistryDC(dc *v1.Deployment, name, dirName string) {
+func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.Deployment, name, dirName string) {
 	region := p.Region
 	if region == "" {
 		region = AwsS3DefaultRegion

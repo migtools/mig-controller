@@ -61,7 +61,7 @@ func (r *registryHealth) run() {
 
 	for {
 		time.Sleep(r.Interval)
-		planList, err := v1alpha1.ListPlansOnLabels(r.hostClient, r.planLabels)
+		planList, err := v1alpha1.ListPlansWithLabels(r.hostClient, r.planLabels)
 		if err != nil {
 			log.Trace(err)
 			return

@@ -423,6 +423,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 }
 
 // Get an existing registry Deployment on the specified cluster.
+//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
 func (r *MigPlan) GetRegistryDeployment(client k8sclient.Client) (*appsv1.Deployment, error) {
 	list := appsv1.DeploymentList{}
 	labels := r.GetCorrelationLabels()
@@ -455,6 +456,9 @@ func (r *MigPlan) EqualsRegistryDeployment(a, b *appsv1.Deployment) bool {
 		if !(reflect.DeepEqual(container.Env, b.Spec.Template.Spec.Containers[i].Env) &&
 			reflect.DeepEqual(container.Name, b.Spec.Template.Spec.Containers[i].Name) &&
 			reflect.DeepEqual(container.Ports, b.Spec.Template.Spec.Containers[i].Ports) &&
+			reflect.DeepEqual(container.LivenessProbe, b.Spec.Template.Spec.Containers[i].LivenessProbe) &&
+			reflect.DeepEqual(container.ReadinessProbe, b.Spec.Template.Spec.Containers[i].ReadinessProbe) &&
+			reflect.DeepEqual(container.TerminationMessagePolicy, b.Spec.Template.Spec.Containers[i].TerminationMessagePolicy) &&
 			reflect.DeepEqual(container.Image, b.Spec.Template.Spec.Containers[i].Image) &&
 			reflect.DeepEqual(container.VolumeMounts, b.Spec.Template.Spec.Containers[i].VolumeMounts)) {
 			return false
@@ -498,6 +502,7 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 }
 
 // Get an existing registry Service on the specifiedcluster.
+//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
 func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, error) {
 	list := kapi.ServiceList{}
 	labels := r.GetCorrelationLabels()
