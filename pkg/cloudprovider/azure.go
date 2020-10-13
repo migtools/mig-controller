@@ -120,8 +120,8 @@ func (p *AzureProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret
 	return nil
 }
 
-func (p *AzureProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirName string) {
-	envVars := dc.Spec.Template.Spec.Containers[0].Env
+func (p *AzureProvider) UpdateRegistryDeployment(deployment *appsv1.Deployment, name, dirName string) {
+	envVars := deployment.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
 	}
@@ -148,7 +148,7 @@ func (p *AzureProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, di
 			},
 		},
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, azureEnvVars...)
+	deployment.Spec.Template.Spec.Containers[0].Env = append(envVars, azureEnvVars...)
 }
 
 func (p *AzureProvider) Validate(secret *kapi.Secret) []string {

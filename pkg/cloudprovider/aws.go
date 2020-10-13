@@ -141,12 +141,12 @@ func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *AWSProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirName string) {
+func (p *AWSProvider) UpdateRegistryDeployment(deployment *appsv1.Deployment, name, dirName string) {
 	region := p.Region
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	envVars := deployment.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
 	}
@@ -194,18 +194,18 @@ func (p *AWSProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirN
 			Value: strconv.FormatBool(p.Insecure),
 		},
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
+	deployment.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
 
 	if len(p.CustomCABundle) > 0 {
-		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
 			kapi.VolumeMount{
 				Name:      "registry-secret",
 				ReadOnly:  true,
 				MountPath: "/etc/ssl/certs/ca_bundle.pem",
 				SubPath:   "ca_bundle.pem",
 			})
-		dc.Spec.Template.Spec.Volumes = append(dc.Spec.Template.Spec.Volumes, kapi.Volume{
+		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, kapi.Volume{
 			Name: "registry-secret",
 			VolumeSource: kapi.VolumeSource{
 				Secret: &kapi.SecretVolumeSource{
