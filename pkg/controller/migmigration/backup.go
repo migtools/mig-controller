@@ -122,7 +122,7 @@ func (t *Task) getStageBackup() (*velero.Backup, error) {
 }
 
 func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
-	nl := map[string]string{
+	backupAssociationLabel := map[string]string{
 		velero.BackupNameLabel: backup.Name,
 	}
 	client, err := t.getSourceClient()
@@ -133,7 +133,7 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 	list := velero.PodVolumeBackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(nl),
+		k8sclient.MatchingLabels(backupAssociationLabel),
 		&list)
 	if err != nil {
 		log.Trace(err)
@@ -460,6 +460,8 @@ func findPVVerify(pvList migapi.PersistentVolumes, pvName string) bool {
 	return false
 }
 
+// converts raw 'bytes' to nearest possible SI unit
+// with a precision of 2 decimal digits
 func bytesToSI(bytes int64) string {
 	const baseUnit = 1000
 	if bytes < baseUnit {

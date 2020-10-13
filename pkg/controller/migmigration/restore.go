@@ -138,7 +138,7 @@ func (t Task) getRestore(labels map[string]string) (*velero.Restore, error) {
 // Get PVRs associated with a Restore
 func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.PodVolumeRestoreList {
 	list := velero.PodVolumeRestoreList{}
-	nl := map[string]string{
+	restoreAssociationLabel := map[string]string{
 		velero.RestoreNameLabel: restore.Name,
 	}
 	client, err := t.getDestinationClient()
@@ -148,7 +148,7 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 	}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(nl),
+		k8sclient.MatchingLabels(restoreAssociationLabel),
 		&list)
 	if err != nil {
 		log.Trace(err)
