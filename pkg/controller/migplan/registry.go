@@ -3,6 +3,7 @@ package migplan
 import (
 	"context"
 	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
@@ -97,13 +98,13 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}
-	uHealthyClusterName := ""
+	unHealthyClusterName := ""
 	clusters, err := r.planClusters(plan)
-	if err != nil{
+	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	for _, cluster := range clusters{
+	for _, cluster := range clusters {
 
 		if !cluster.Status.IsReady() {
 			continue
@@ -122,11 +123,11 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 
 		registryStatusUnhealthy, podObj := isRegistryPodUnHealthy(registryPods)
 
-		if !registryStatusUnhealthy{
+		if !registryStatusUnhealthy {
 			nEnsured++
-		}else{
+		} else {
 			unHealthyPod = podObj
-			uHealthyClusterName = cluster.ObjectMeta.Name
+			unHealthyClusterName = cluster.ObjectMeta.Name
 		}
 	}
 
@@ -137,13 +138,13 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			Category: migapi.Required,
 			Message:  RegistriesHealthyMessage,
 		})
-	}else {
-		message := fmt.Sprintf(RegistriesUnHealthyMessage, unHealthyPod.Name, unHealthyPod.Namespace, uHealthyClusterName)
+	} else {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     RegistriesHealthy,
 			Status:   False,
 			Category: migapi.Required,
-			Message:  message,
+			Message:  fmt.Sprintf("The Migration registry pod %s/%s is not in a healthy state on cluster %s",
+				                                   unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName),
 		})
 	}
 
@@ -305,7 +306,7 @@ func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) err
 func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
 	unHealthyPod := corev1.Pod{}
 	for _, registryPod := range registryPods.Items {
-		if !registryPod.Status.ContainerStatuses[0].Ready{
+		if !registryPod.Status.ContainerStatuses[0].Ready {
 			return true, registryPod
 		}
 	}

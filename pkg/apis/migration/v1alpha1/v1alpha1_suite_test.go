@@ -20,13 +20,13 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"strconv"
 	"testing"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 

@@ -135,7 +135,6 @@ const (
 	StorageEnsuredMessage                             = "The storage resources have been created."
 	RegistriesEnsuredMessage                          = "The migration registry resources have been created."
 	RegistriesHealthyMessage                          = "The Migration registries are in a healthy state"
-	RegistriesUnHealthyMessage                        = "The Migration registry pod %s in namespace %s is not in a healthy state on cluster %s"
 	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                                     = "The migration plan is closed."
 	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."

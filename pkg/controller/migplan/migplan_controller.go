@@ -80,7 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			planLabels: map[string]string{
 				migapi.MigplanMigrationRunning: "true",
 			},
-			Interval:   time.Second * 5},
+			Interval: time.Second * 5},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			planLabels: map[string]string{
 				migapi.MigplanMigrationFailed: "true",
 			},
-			Interval:   time.Second * 5},
+			Interval: time.Second * 5},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
@@ -422,7 +422,7 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, state string ) error {
+func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, state string) error {
 
 	migrationStateInstances := 0
 	needsUpdate := false
