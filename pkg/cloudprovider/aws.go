@@ -141,7 +141,7 @@ func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.Deployment, name, dirName string) {
+func (p *AWSProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirName string) {
 	region := p.Region
 	if region == "" {
 		region = AwsS3DefaultRegion

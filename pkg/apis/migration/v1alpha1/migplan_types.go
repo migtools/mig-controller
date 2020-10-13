@@ -419,7 +419,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		},
 	}
 	provider := storage.GetBackupStorageProvider()
-	provider.UpdateRegistryDC(deployment, name, dirName)
+	provider.UpdateRegistryDeployment(deployment, name, dirName)
 }
 
 // Get an existing registry Deployment on the specified cluster.
