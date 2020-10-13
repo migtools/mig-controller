@@ -259,7 +259,7 @@ func (t *Task) Run() error {
 
 	// Run the current phase.
 	switch t.Phase {
-	case Created, Started, Rollback, RollbackComplete: //TODO: what actions needs to be done in Rollback-like steps?
+	case Created, Started, Rollback, RollbackComplete:
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}

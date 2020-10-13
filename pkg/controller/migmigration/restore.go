@@ -92,6 +92,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	newRestore.Labels[StageRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -248,36 +249,25 @@ func (t *Task) deleteRestores() error {
 		return liberr.Wrap(err)
 	}
 
-	log.Info("########################## delete restores")
-
 	migplan, err := t.Owner.GetPlan(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	log.Info("########################## delete restores Rollback")
-
-	correlationLabels := migplan.GetCorrelationLabels()
-	log.Info(fmt.Sprintf("migplan corellabels %v", correlationLabels))
-
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(correlationLabels),
+		k8sclient.MatchingLabels(migplan.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
-		log.Info("########################## restore item")
-		log.Info(fmt.Sprintf("restore deletion: %v", restore))
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
 	}
-
-	log.Info("########################## restore delete end")
 
 	return nil
 }
@@ -289,7 +279,7 @@ func (t *Task) deleteMigrated() error {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
+		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 
 	for _, gvr := range GVRs {
@@ -330,7 +320,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
+		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
