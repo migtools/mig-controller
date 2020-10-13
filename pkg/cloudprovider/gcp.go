@@ -68,8 +68,8 @@ func (p *GCPProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) 
 	return nil
 }
 
-func (p *GCPProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirName string) {
-	envVars := dc.Spec.Template.Spec.Containers[0].Env
+func (p *GCPProvider) UpdateRegistryDeployment(deployment *appsv1.Deployment, name, dirName string) {
+	envVars := deployment.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
 	}
@@ -91,14 +91,14 @@ func (p *GCPProvider) UpdateRegistryDeployment(dc *appsv1.Deployment, name, dirN
 			Value: "/credentials/cloud",
 		},
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, gcpEnvVars...)
-	dc.Spec.Template.Spec.Containers[0].VolumeMounts = []kapi.VolumeMount{
+	deployment.Spec.Template.Spec.Containers[0].Env = append(envVars, gcpEnvVars...)
+	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []kapi.VolumeMount{
 		{
 			Name:      "cloud-credentials",
 			MountPath: "/credentials",
 		},
 	}
-	dc.Spec.Template.Spec.Volumes = []kapi.Volume{
+	deployment.Spec.Template.Spec.Volumes = []kapi.Volume{
 		{
 			Name: "cloud-credentials",
 			VolumeSource: kapi.VolumeSource{
