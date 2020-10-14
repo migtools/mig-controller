@@ -265,10 +265,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Category: Critical,
 			Message:  StorageNotReadyMessage,
 		})
-		// this is necessary because between there are multiple checks happening
-		// between validateStorage and ensureStorage, if any of those checks are failing
-		// we will never run ensureStorage. This is an attempt to always have the right
-		// state
+		// Image registry must cleaned up if deleted MigStorage is unready
 		return liberr.Wrap(r.deleteImageRegistryResources(plan))
 	}
 
