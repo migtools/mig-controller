@@ -47,7 +47,7 @@ var Settings = &settings.Settings
 // Migctl state to Migplan label map
 var planStateLabels = map[string]string{
 	migctl.Running: migapi.MigplanMigrationRunning,
-	migctl.Failed: migapi.MigplanMigrationFailed,
+	migctl.Failed:  migapi.MigplanMigrationFailed,
 }
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -436,7 +436,7 @@ func (r *ReconcileMigPlan) ensureMigrationStateLabels(plan *migapi.MigPlan) erro
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	return nil	
+	return nil
 }
 
 func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, state string) error {
