@@ -55,9 +55,7 @@ func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
 
 // Run the health checks for registry pods
 func (r *registryHealth) run() {
-	// List all the migplans that are in running state using the hostClient
-	// Now using srcClient and destClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
-	// repeat all the above steps for all the plans for both clusters
+	// Enqueue MigPlans for a given label that have unhealthy registry pods
 
 	for {
 		time.Sleep(r.Interval)
@@ -121,12 +119,12 @@ func (r *registryHealth) run() {
 					continue
 				}
 
-				if r.checkPodHealthAndPlanConditionToEnqueue(srcRegistryPods, &plan) {
+				if r.checkPodHealthAndPlanCondition(srcRegistryPods, &plan) {
 					r.enqueue(plan)
 					continue
 				}
 
-				if r.checkPodHealthAndPlanConditionToEnqueue(destRegistryPods, &plan) {
+				if r.checkPodHealthAndPlanCondition(destRegistryPods, &plan) {
 					r.enqueue(plan)
 					continue
 				}
@@ -137,7 +135,7 @@ func (r *registryHealth) run() {
 	// TODO: need see if this go routine should be stopped and returned
 }
 
-func (r *registryHealth) checkPodHealthAndPlanConditionToEnqueue(podList corev1.PodList, plan *v1alpha1.MigPlan) bool {
+func (r *registryHealth) checkPodHealthAndPlanCondition(podList corev1.PodList, plan *v1alpha1.MigPlan) bool {
 
 	podStateUnhealthy, _ := isRegistryPodUnHealthy(podList)
 	enqueue := false

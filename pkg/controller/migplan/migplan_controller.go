@@ -44,6 +44,12 @@ var log = logging.WithName("plan")
 // Application settings.
 var Settings = &settings.Settings
 
+// Migctl state to Migplan label map
+var planStateLabels = map[string]string{
+	migctl.Running: migapi.MigplanMigrationRunning,
+	migctl.Failed: migapi.MigplanMigrationFailed,
+}
+
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -213,19 +219,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}()
 
-	//Add or Update labels for migplan having running migrations
-	err = r.AddUpdateMigrationStateToPlan(plan, migctl.Running)
+	// Ensure migration state labels are present on Migplan
+	err = r.ensureMigrationStateLabels(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	//Add or Update labels for migplan having failed migrations
-	err = r.AddUpdateMigrationStateToPlan(plan, migctl.Failed)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
@@ -408,6 +408,23 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	return nil
 }
 
+func (r *ReconcileMigPlan) ensureMigrationStateLabels(plan *migapi.MigPlan) error {
+
+	//Add or Update labels for migplan having running migrations
+	err := r.AddUpdateMigrationStateToPlan(plan, migctl.Running)
+
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	//Add or Update labels for migplan having failed migrations
+	err = r.AddUpdateMigrationStateToPlan(plan, migctl.Failed)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil	
+}
+
 func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, state string) error {
 
 	migrationStateInstances := 0
@@ -422,22 +439,24 @@ func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, s
 		for _, m := range migrations {
 			if m.Status.HasCondition(state) || m.Status.HasCondition(migctl.PlanNotReady) {
 				migrationStateInstances++
+				break
 			}
 		}
 	} else {
 		for _, m := range migrations {
 			if m.Status.HasCondition(state) {
 				migrationStateInstances++
+				break
 			}
 		}
 	}
 
-	planLabel := getLabelForPlan(state)
+	planLabel := planStateLabels[state]
 
 	switch {
 
 	case migrationStateInstances == 0 && plan.Labels != nil:
-		//There migrations associated with the Migplan for the given state
+		//No migrations associated with the Migplan for the given state
 		if _, found := plan.Labels[planLabel]; found {
 			delete(plan.Labels, planLabel)
 			needsUpdate = true
@@ -459,22 +478,6 @@ func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, s
 	return liberr.Wrap(r.Update(context.TODO(), plan))
 }
 
-func getLabelForPlan(state string) string {
-
-	planLabel := ""
-
-	switch {
-
-	case state == migctl.Running:
-		planLabel = migapi.MigplanMigrationRunning
-
-	case state == migctl.Failed:
-		planLabel = migapi.MigplanMigrationFailed
-	}
-
-	return planLabel
-}
-
 // Update Status.ExcludedResources based on settings
 func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
 	excludedResources := Settings.Plan.ExcludedResources
@@ -489,8 +492,9 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 		return liberr.Wrap(err)
 	}
 	if secret != nil {
-		if err := liberr.Wrap(client.Delete(context.Background(), secret)); err != nil {
-			return err
+		err := client.Delete(context.Background(), secret)
+		if err != nil {
+			return liberr.Wrap(err)
 		}
 	}
 
@@ -503,8 +507,9 @@ func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient
 		return liberr.Wrap(err)
 	}
 	if foundService != nil {
-		if err := liberr.Wrap(client.Delete(context.Background(), foundService)); err != nil {
-			return err
+		err := client.Delete(context.Background(), foundService)
+		if err != nil {
+			return liberr.Wrap(err)
 		}
 	}
 	return nil
@@ -517,8 +522,9 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 		return liberr.Wrap(err)
 	}
 	if foundDeployment != nil {
-		if err := liberr.Wrap(client.Delete(context.Background(), foundDeployment)); err != nil {
-			return err
+		err := client.Delete(context.Background(), foundDeployment)
+		if err != nil {
+			return liberr.Wrap(err)
 		}
 	}
 	return nil
