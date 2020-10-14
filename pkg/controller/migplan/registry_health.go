@@ -40,17 +40,17 @@ func (r *registryHealth) Start(
 
 // Enqueue a reconcile request event for migplan
 func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
-	event := event.GenericEvent{
+	e := event.GenericEvent{
 		Meta:   &plan.ObjectMeta,
 		Object: &plan,
 	}
-	for _, predicate := range r.predicates {
-		if !predicate.Generic(event) {
+	for _, p := range r.predicates {
+		if !p.Generic(e) {
 			return
 		}
 	}
 
-	r.handler.Generic(event, r.queue)
+	r.handler.Generic(e, r.queue)
 }
 
 //Run the health checks for registry pods
