@@ -388,20 +388,24 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 						LivenessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/v2/_catalog",
+									Path: "/v2/_catalog?n=5",
 									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
-							PeriodSeconds: 5,
+							PeriodSeconds:       5,
+							TimeoutSeconds:      3,
+							InitialDelaySeconds: 15,
 						},
 						ReadinessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/v2/_catalog",
+									Path: "/v2/_catalog?n=5",
 									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
-							PeriodSeconds: 5,
+							PeriodSeconds:       5,
+							TimeoutSeconds:      3,
+							InitialDelaySeconds: 15,
 						},
 						Resources: kapi.ResourceRequirements{},
 						VolumeMounts: []kapi.VolumeMount{
