@@ -208,7 +208,7 @@ func (r ReconcileMigPlan) ensureRegistryDeployment(client k8sclient.Client, plan
 		return liberr.Wrap(err)
 	}
 
-	//Construct Registry DC
+	// Construct Registry DC
 	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage)
 	foundDeployment, err := plan.GetRegistryDeployment(client)
 	if err != nil {

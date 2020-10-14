@@ -53,11 +53,11 @@ func (r *registryHealth) enqueue(plan v1alpha1.MigPlan) {
 	r.handler.Generic(e, r.queue)
 }
 
-//Run the health checks for registry pods
+// Run the health checks for registry pods
 func (r *registryHealth) run() {
-	//List all the migplans that are in running state using the hostClient
-	//Now using srcClient and destClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
-	//repeat all the above steps for all the plans for both clusters
+	// List all the migplans that are in running state using the hostClient
+	// Now using srcClient and destClient for each migplan find the registry pods, if registry container is not ready then enqueue this migplan
+	// repeat all the above steps for all the plans for both clusters
 
 	for {
 		time.Sleep(r.Interval)
@@ -68,25 +68,31 @@ func (r *registryHealth) run() {
 		}
 		if planList != nil {
 			for _, plan := range planList {
-				//TODO avoid race condition check
 				srcCluster, err := plan.GetSourceCluster(r.hostClient)
 				if err != nil {
-					log.Trace(err)
-					//TODO Error condition would result in loosing the watch util the pod restarts
+					log.Error(err, "unable to get source cluster, skipping mig registry health check")
+					continue
 				}
 
 				if !srcCluster.Status.IsReady() {
-					log.Info("Cannot check registry pod health, cluster is not ready", srcCluster.Name, plan.Name)
+					log.Info("Cannot check registry pod health, cluster is not ready",
+						"cluster name", srcCluster.Name,
+						"cluster namespace", srcCluster.Namespace,
+						"plan name", plan.Name,
+						"plan namespace", plan.Namespace)
+					continue
 				}
 
 				srcClient, err := srcCluster.GetClient(r.hostClient)
 				if err != nil {
-					log.Trace(err)
+					log.Error(err, "unable to get source cluster client, skipping mig registry health check")
+					continue
 				}
 
 				destCluster, err := plan.GetDestinationCluster(r.hostClient)
 				if err != nil {
-					log.Trace(err)
+					log.Error(err, "unable to get destination cluster, skipping mig registry health check")
+					continue
 				}
 
 				if !destCluster.Status.IsReady() {
@@ -95,17 +101,24 @@ func (r *registryHealth) run() {
 
 				destClient, err := destCluster.GetClient(r.hostClient)
 				if err != nil {
-					log.Trace(err)
+					log.Info("Cannot check registry pod health, cluster is not ready",
+						"cluster name", srcCluster.Name,
+						"cluster namespace", srcCluster.Namespace,
+						"plan name", plan.Name,
+						"plan namespace", plan.Namespace)
+					continue
 				}
 
 				srcRegistryPods, err := getRegistryPods(&plan, srcClient)
 				if err != nil {
-					log.Trace(err)
+					log.Error(err, "unable to get source registry pods, skipping mig registry health check")
+					continue
 				}
 
 				destRegistryPods, err := getRegistryPods(&plan, destClient)
 				if err != nil {
-					log.Trace(err)
+					log.Error(err, "unable to get destination registry pods, skipping mig registry health check")
+					continue
 				}
 
 				if r.checkPodHealthAndPlanConditionToEnqueue(srcRegistryPods, &plan) {
@@ -121,7 +134,7 @@ func (r *registryHealth) run() {
 		}
 
 	}
-	//TODO: need see if this go routine should be stopped and returned
+	// TODO: need see if this go routine should be stopped and returned
 }
 
 func (r *registryHealth) checkPodHealthAndPlanConditionToEnqueue(podList corev1.PodList, plan *v1alpha1.MigPlan) bool {
@@ -132,11 +145,11 @@ func (r *registryHealth) checkPodHealthAndPlanConditionToEnqueue(podList corev1.
 	switch {
 
 	case podStateUnhealthy && plan.Status.HasCondition(RegistriesHealthy) && plan.Status.IsReady():
-		//enqueue a reconcile event when the registry pod is unhealthy and the plan is ready
+		// enqueue a reconcile event when the registry pod is unhealthy and the plan is ready
 		enqueue = true
 
 	case !podStateUnhealthy && !plan.Status.HasCondition(RegistriesHealthy) && !plan.Status.IsReady():
-		//enqueue a reconcile event when the registry pod is healthy and the plan is not ready
+		// enqueue a reconcile event when the registry pod is healthy and the plan is not ready
 		enqueue = true
 	}
 
