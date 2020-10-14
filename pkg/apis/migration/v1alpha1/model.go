@@ -34,7 +34,7 @@ func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 	return list.Items, err
 }
 
-// List `Running` MigPlans
+// List MigPlans with labels
 // Returns and empty list when none found.
 func ListPlansWithLabels(client k8sclient.Client, labels map[string]string) ([]MigPlan, error) {
 	list := MigPlanList{}

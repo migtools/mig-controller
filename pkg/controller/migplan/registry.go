@@ -150,8 +150,8 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			Type:     RegistriesHealthy,
 			Status:   False,
 			Category: migapi.Required,
-			Message:  fmt.Sprintf("The Migration registry pod %s/%s is not in a healthy state on cluster %s",
-				                                   unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName),
+			Message: fmt.Sprintf("The Migration registry pod %s/%s is not in a healthy state on cluster %s",
+				unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName),
 		})
 	}
 
@@ -267,40 +267,21 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 	return nil
 }
 
-func (r ReconcileMigPlan) getBothClients(plan *migapi.MigPlan) ([]compat.Client, error) {
-	sourceCluster, err := plan.GetSourceCluster(r)
-	if err != nil {
-		return []compat.Client{}, liberr.Wrap(err)
-	}
-	if sourceCluster == nil || !sourceCluster.Status.IsReady() {
-		return []compat.Client{}, liberr.Wrap(fmt.Errorf("either source cluster is nil or not ready"))
-	}
-	sourceClient, err := sourceCluster.GetClient(r)
-	if err != nil {
-		return []compat.Client{}, liberr.Wrap(err)
-	}
-
-	destinationCluster, err := plan.GetDestinationCluster(r)
-	if err != nil {
-		return []compat.Client{}, liberr.Wrap(err)
-	}
-	if destinationCluster == nil || !destinationCluster.Status.IsReady() {
-		return []compat.Client{}, liberr.Wrap(fmt.Errorf("either destination cluster is nil or not ready"))
-	}
-	destinationClient, err := destinationCluster.GetClient(r)
-	if err != nil {
-		return []compat.Client{}, liberr.Wrap(err)
-	}
-
-	return []compat.Client{sourceClient, destinationClient}, nil
-}
-
 func (r ReconcileMigPlan) deleteImageRegistryResources(plan *migapi.MigPlan) error {
 	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
-	clients, err := r.getBothClients(plan)
+	planRefResources, err := plan.GetRefResources(r)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	srcClient, err := planRefResources.SrcMigCluster.GetClient(r.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	destClient, err := planRefResources.DestMigCluster.GetClient(r.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	clients := []compat.Client{srcClient, destClient}
 	for _, client := range clients {
 		err := r.deleteImageRegistryResourcesForClient(client, plan)
 		if err != nil {

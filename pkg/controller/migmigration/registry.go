@@ -3,6 +3,7 @@ package migmigration
 import (
 	"errors"
 	"fmt"
+	liberr "github.com/konveyor/controller/pkg/error"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,22 +22,22 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		return nil, err
 	}
 	if registryService == nil {
-		return nil, errors.New("migration registry service not found")
+		return nil, liberr.Wrap(errors.New("migration registry service not found"))
 	}
 	registryDC, err := t.PlanResources.MigPlan.GetRegistryDeployment(client)
 	if err != nil {
 		return nil, err
 	}
 	if registryDC == nil {
-		return nil, errors.New("migration registry DeploymentConfig not found")
+		return nil, liberr.Wrap(errors.New("migration registry DeploymentConfig not found"))
 	}
 
 	if registryDC.DeletionTimestamp != nil {
-		return nil, errors.New(fmt.Sprintf("DeploymentConfig %s/%s is being garbage collected with deletion timestamp %s", registryDC.Namespace, registryDC.Name, registryDC.DeletionTimestamp))
+		return nil, liberr.Wrap(errors.New(fmt.Sprintf("Deployment %s/%s is being garbage collected with deletion timestamp %s", registryDC.Namespace, registryDC.Name, registryDC.DeletionTimestamp)))
 	}
 
 	if len(registryService.Spec.Ports) == 0 {
-		return nil, errors.New("Migration Registry service port not found")
+		return nil, liberr.Wrap(errors.New("Migration Registry service port not found"))
 	}
 	annotations[MigRegistryAnnotationKey] = fmt.Sprintf("%s:%d", registryService.Spec.ClusterIP,
 		registryService.Spec.Ports[0].Port)
