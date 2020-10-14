@@ -20,9 +20,6 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 
 	if plan.Status.HasCriticalCondition() {
 		plan.Status.StageCondition(RegistriesEnsured)
-		// this is required because when migstorage is not ready, plan automatically
-		// has a critical condition, hence chances are if migstorage is not ready will
-		// we most likely return from here
 		err := r.deleteImageRegistryResources(plan)
 		if err != nil {
 			return liberr.Wrap(err)
