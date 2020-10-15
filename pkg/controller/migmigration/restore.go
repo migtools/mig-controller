@@ -3,7 +3,9 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -169,40 +171,44 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		if pvrList == nil {
 			return
 		}
+		m := make(map[string]string)
+		var keys []string
 		for _, pvr := range pvrList.Items {
+			msg := ""
 			switch pvr.Status.Phase {
 			case velero.PodVolumeRestorePhaseInProgress:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeRestore %s/%s: %s out of %s restored",
-						pvr.Namespace,
-						pvr.Name,
-						bytesToSI(pvr.Status.Progress.BytesDone),
-						bytesToSI(pvr.Status.Progress.TotalBytes)))
+				msg = fmt.Sprintf(
+					"PodVolumeRestore %s/%s: %s out of %s restored, Totaltime: %s",
+					pvr.Namespace,
+					pvr.Name,
+					bytesToSI(pvr.Status.Progress.BytesDone),
+					bytesToSI(pvr.Status.Progress.TotalBytes),
+					time.Now().Sub(pvr.Status.StartTimestamp.Time))
 			case velero.PodVolumeRestorePhaseCompleted:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeRestore %s/%s: Completed (%s restored)",
-						pvr.Namespace,
-						pvr.Name,
-						bytesToSI(pvr.Status.Progress.TotalBytes)))
+				msg = fmt.Sprintf(
+					"PodVolumeRestore %s/%s: Completed (%s restored), Totaltime: %s",
+					pvr.Namespace,
+					pvr.Name,
+					bytesToSI(pvr.Status.Progress.TotalBytes),
+					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
 			case velero.PodVolumeRestorePhaseFailed:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeRestore %s/%s: Failed",
-						pvr.Namespace,
-						pvr.Name))
+				msg = fmt.Sprintf(
+					"PodVolumeRestore %s/%s: Failed, Totaltime: %s",
+					pvr.Namespace,
+					pvr.Name,
+					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
 			default:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeRestore %s/%s: Waiting for ongoing volume restore(s) to complete",
-						pvr.Namespace,
-						pvr.Name))
+				msg = fmt.Sprintf(
+					"PodVolumeRestore %s/%s: Waiting for ongoing volume restore(s) to complete",
+					pvr.Namespace,
+					pvr.Name)
 			}
+			m[pvr.Namespace+"/"+pvr.Name] = msg
+			keys = append(keys, pvr.Namespace+"/"+pvr.Name)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			progress = append(progress, m[k])
 		}
 		return
 	}

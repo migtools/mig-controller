@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -137,12 +138,12 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 		&list)
 	if err != nil {
 		log.Trace(err)
-		return nil
+		return &list
 	}
 	return &list
 }
 
-// Get an existing Backup on the source cluster.
+// Get an existing Backup on the source cluster.of course it's possible but then we need to somehow store only the ns/pvb in another array sort it, then match the status etc
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -175,40 +176,44 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		if pvbList == nil {
 			return
 		}
+		m := make(map[string]string)
+		var keys []string
 		for _, pvb := range pvbList.Items {
+			msg := ""
 			switch pvb.Status.Phase {
 			case velero.PodVolumeBackupPhaseInProgress:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeBackup %s/%s: %s out of %s backed up",
-						pvb.Namespace,
-						pvb.Name,
-						bytesToSI(pvb.Status.Progress.BytesDone),
-						bytesToSI(pvb.Status.Progress.TotalBytes)))
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: %s out of %s backed up, Totaltime: %s",
+					pvb.Namespace,
+					pvb.Name,
+					bytesToSI(pvb.Status.Progress.BytesDone),
+					bytesToSI(pvb.Status.Progress.TotalBytes),
+					time.Now().Sub(pvb.Status.StartTimestamp.Time))
 			case velero.PodVolumeBackupPhaseCompleted:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeBackup %s/%s: Completed (%s backed up)",
-						pvb.Namespace,
-						pvb.Name,
-						bytesToSI(pvb.Status.Progress.TotalBytes)))
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Completed (%s backed up), Totaltime: %s",
+					pvb.Namespace,
+					pvb.Name,
+					bytesToSI(pvb.Status.Progress.TotalBytes),
+					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
 			case velero.PodVolumeBackupPhaseFailed:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeBackup %s/%s: Failed",
-						pvb.Namespace,
-						pvb.Name))
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Failed, Totaltime: %s",
+					pvb.Namespace,
+					pvb.Name,
+					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
 			default:
-				progress = append(
-					progress,
-					fmt.Sprintf(
-						"PodVolumeBackup %s/%s: Waiting for ongoing volume backup(s) to complete",
-						pvb.Namespace,
-						pvb.Name))
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Waiting for ongoing volume backup(s) to complete",
+					pvb.Namespace,
+					pvb.Name)
 			}
+			m[pvb.Namespace+"/"+pvb.Name] = msg
+			keys = append(keys, pvb.Namespace+"/"+pvb.Name)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			progress = append(progress, m[k])
 		}
 		return
 	}
