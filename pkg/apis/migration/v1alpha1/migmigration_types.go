@@ -57,6 +57,7 @@ type MigMigrationStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Plan",type=string,JSONPath=".spec.migPlanRef.name"
 // +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=".spec.stage"
+// +kubebuilder:printcolumn:name="Rollback",type=string,JSONPath=".spec.rollback"
 // +kubebuilder:printcolumn:name="Itinerary",type=string,JSONPath=".status.itinerary"
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
