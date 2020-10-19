@@ -56,7 +56,7 @@ const (
 	// Identifies the resource as migrated by us
 	// for easy search or application rollback.
 	// The value is the Task.UID().
-	MigratedByLabel = "migration.openshift.io/migrated-by" // (migmigration UID)
+	MigMigrationLabel = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
 	// Identifies associated migmigration
 	// to assist manual debugging
 	// The value is Task.Owner.Name
@@ -68,7 +68,7 @@ const (
 	// Identifies associated migplan
 	// to allow migplan restored resources rollback
 	// The value is Task.PlanResources.MigPlan.UID
-	MigPlanLabel = "migplan"
+	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
 )
 
 // Set of Service Accounts.

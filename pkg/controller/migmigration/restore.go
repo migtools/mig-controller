@@ -46,6 +46,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
 	err = client.Create(context.TODO(), newRestore)
@@ -92,6 +93,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	newRestore.Labels[StageRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
