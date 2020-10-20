@@ -123,22 +123,21 @@ func (t *Task) getStageBackup() (*velero.Backup, error) {
 }
 
 func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
+	list := velero.PodVolumeBackupList{}
 	backupAssociationLabel := map[string]string{
 		velero.BackupNameLabel: backup.Name,
 	}
 	client, err := t.getSourceClient()
 	if err != nil {
 		log.Trace(err)
-		return nil
+		return &list
 	}
-	list := velero.PodVolumeBackupList{}
 	err = client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(backupAssociationLabel),
 		&list)
 	if err != nil {
 		log.Trace(err)
-		return &list
 	}
 	return &list
 }
@@ -173,17 +172,12 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	pvbs := t.getPodVolumeBackupsForBackup(backup)
 
 	getPodVolumeBackupsProgress := func(pvbList *velero.PodVolumeBackupList) (progress []string) {
-		if pvbList == nil {
-			return
-		}
-		m := make(map[string]string)
-		var keys []string
+		m, keys, msg := make(map[string]string), make([]string, 0), ""
 		for _, pvb := range pvbList.Items {
-			msg := ""
 			switch pvb.Status.Phase {
 			case velero.PodVolumeBackupPhaseInProgress:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: %s out of %s backed up, Totaltime: %s",
+					"PodVolumeBackup %s/%s: %s out of %s backed up (%s)",
 					pvb.Namespace,
 					pvb.Name,
 					bytesToSI(pvb.Status.Progress.BytesDone),
@@ -191,14 +185,14 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 					time.Now().Sub(pvb.Status.StartTimestamp.Time))
 			case velero.PodVolumeBackupPhaseCompleted:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: Completed (%s backed up), Totaltime: %s",
+					"PodVolumeBackup %s/%s: Completed, %s backed up (%s)",
 					pvb.Namespace,
 					pvb.Name,
 					bytesToSI(pvb.Status.Progress.TotalBytes),
 					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
 			case velero.PodVolumeBackupPhaseFailed:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: Failed, Totaltime: %s",
+					"PodVolumeBackup %s/%s: Failed (%s)",
 					pvb.Namespace,
 					pvb.Name,
 					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
@@ -211,6 +205,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 			m[pvb.Namespace+"/"+pvb.Name] = msg
 			keys = append(keys, pvb.Namespace+"/"+pvb.Name)
 		}
+		// sort the progress array to maintain order everytime it's updated
 		sort.Strings(keys)
 		for _, k := range keys {
 			progress = append(progress, m[k])

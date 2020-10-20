@@ -146,7 +146,7 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 	client, err := t.getDestinationClient()
 	if err != nil {
 		log.Trace(err)
-		return nil
+		return &list
 	}
 	err = client.List(
 		context.TODO(),
@@ -154,7 +154,6 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 		&list)
 	if err != nil {
 		log.Trace(err)
-		return nil
 	}
 	return &list
 }
@@ -168,17 +167,12 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	pvrs := t.getPodVolumeRestoresForRestore(restore)
 
 	getPodVolumeRestoresProgress := func(pvrList *velero.PodVolumeRestoreList) (progress []string) {
-		if pvrList == nil {
-			return
-		}
-		m := make(map[string]string)
-		var keys []string
+		m, keys, msg := make(map[string]string), make([]string, 0), ""
 		for _, pvr := range pvrList.Items {
-			msg := ""
 			switch pvr.Status.Phase {
 			case velero.PodVolumeRestorePhaseInProgress:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: %s out of %s restored, Totaltime: %s",
+					"PodVolumeRestore %s/%s: %s out of %s restored (%s)",
 					pvr.Namespace,
 					pvr.Name,
 					bytesToSI(pvr.Status.Progress.BytesDone),
@@ -186,14 +180,14 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 					time.Now().Sub(pvr.Status.StartTimestamp.Time))
 			case velero.PodVolumeRestorePhaseCompleted:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Completed (%s restored), Totaltime: %s",
+					"PodVolumeRestore %s/%s: Completed, %s restored (%s)",
 					pvr.Namespace,
 					pvr.Name,
 					bytesToSI(pvr.Status.Progress.TotalBytes),
 					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
 			case velero.PodVolumeRestorePhaseFailed:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Failed, Totaltime: %s",
+					"PodVolumeRestore %s/%s: Failed, (%s)",
 					pvr.Namespace,
 					pvr.Name,
 					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
@@ -206,6 +200,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 			m[pvr.Namespace+"/"+pvr.Name] = msg
 			keys = append(keys, pvr.Namespace+"/"+pvr.Name)
 		}
+		// sort the progress array to maintain order everytime it's updated
 		sort.Strings(keys)
 		for _, k := range keys {
 			progress = append(progress, m[k])
