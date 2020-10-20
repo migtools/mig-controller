@@ -70,7 +70,6 @@ const (
 	Canceling                       = "Canceling"
 	Canceled                        = "Canceled"
 	Rollback                        = "Rollback"
-	RollbackComplete                = "RollbackComplete"
 	Completed                       = "Completed"
 )
 
@@ -188,7 +187,6 @@ var RollbackItinerary = Itinerary{
 		{phase: DeleteMigrated},
 		{phase: EnsureMigratedDeleted},
 		{phase: UnQuiesceApplications, all: Quiesce},
-		{phase: RollbackComplete},
 		{phase: Completed},
 	},
 }
@@ -259,7 +257,7 @@ func (t *Task) Run() error {
 
 	// Run the current phase.
 	switch t.Phase {
-	case Created, Started, Rollback, RollbackComplete:
+	case Created, Started, Rollback:
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
