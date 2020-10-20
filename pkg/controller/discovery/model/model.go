@@ -4,13 +4,14 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"fmt"
-	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/mig-controller/pkg/settings"
-	_ "github.com/mattn/go-sqlite3"
 	pathlib "path"
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/settings"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Shared logger.
@@ -58,6 +59,7 @@ func Create() (*sql.DB, error) {
 		&Pod{},
 		&PV{},
 		&PVC{},
+		&StorageClass{},
 	}
 	for _, m := range models {
 		ddl, err := Table{}.DDL(m)
