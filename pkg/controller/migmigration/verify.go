@@ -108,25 +108,46 @@ func (t *Task) reportHealthCondition() {
 	}
 }
 
-// Trigger a refresh on MigPlan resource
-func (t *Task) refreshPlan() error {
+// Start a refresh on MigPlan and attached resources
+func (t *Task) startRefresh() error {
 	plan := t.PlanResources.MigPlan
 	plan.Spec.Refresh = true
 	err := t.Client.Update(context.TODO(), plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	storage := t.PlanResources.MigStorage
+	storage.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), storage)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	srcCluster := t.PlanResources.SrcMigCluster
+	srcCluster.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), srcCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	destCluster := t.PlanResources.DestMigCluster
+	destCluster.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), destCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	return nil
 }
 
 // Verify plan finished with refresh before migrating
-func (t *Task) ensureRefreshed() bool {
-	refreshed := false
-
-	if !t.PlanResources.MigPlan.Spec.Refresh &&
-		!t.PlanResources.MigPlan.Status.HasCondition(migapi.RefreshInProgress) {
-		refreshed = true
+func (t *Task) waitForRefresh() bool {
+	if t.PlanResources.MigPlan.Spec.Refresh == true ||
+		t.PlanResources.MigStorage.Spec.Refresh == true ||
+		t.PlanResources.SrcMigCluster.Spec.Refresh == true ||
+		t.PlanResources.DestMigCluster.Spec.Refresh == true {
+		return false
 	}
-
-	return refreshed
+	return true
 }

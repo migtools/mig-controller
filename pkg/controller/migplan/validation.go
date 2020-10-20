@@ -593,10 +593,6 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 
 // Validate PV actions.
 func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
-	if plan.Status.HasCondition(migapi.RefreshInProgress) {
-		return nil
-	}
-
 	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
 
@@ -1113,7 +1109,7 @@ func (r *NfsValidation) Run(client k8sclient.Client) error {
 	if !r.Plan.Status.HasAnyCondition(PvsDiscovered) {
 		return nil
 	}
-	if r.Plan.Status.HasAnyCondition(Suspended, migapi.RefreshInProgress) {
+	if r.Plan.Status.HasAnyCondition(Suspended) {
 		r.Plan.Status.StageCondition(NfsNotAccessible)
 		return nil
 	}

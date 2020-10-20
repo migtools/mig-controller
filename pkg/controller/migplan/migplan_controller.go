@@ -199,13 +199,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Begin staging conditions.
 	plan.Status.BeginStagingConditions()
 
-	// Ensure refresh
-	err = r.ensureRefresh(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
 	// Plan Suspended
 	err = r.planSuspended(plan)
 	if err != nil {
@@ -272,6 +265,9 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
+	// Mark as refreshed
+	plan.Spec.Refresh = false
+
 	// Apply changes.
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
@@ -287,82 +283,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Done
 	return reconcile.Result{}, nil
-}
-
-// Ensure refresh is performed if requested, or on 1st reconcile
-func (r *ReconcileMigPlan) ensureRefresh(plan *migapi.MigPlan) error {
-	// A "Refresh", triggered by `plan.spec.refresh = true` will reconcile
-	// the MigPlan, MigStorage, and MigClusters.
-	// The `RefreshInProgress` condition tracks completion of requested refresh.
-
-	var srcCluster, dstCluster *migapi.MigCluster
-	var storage *migapi.MigStorage
-	var err error
-
-	// Always refresh on first reconcile.
-	if plan.ObjectMeta.Generation == 0 {
-		plan.Spec.Refresh = true
-	}
-
-	refreshRequested := plan.Spec.Refresh
-	refreshInProgress := plan.Status.HasCondition(migapi.RefreshInProgress)
-
-	// Get src, dst, storage if refresh running or requested.
-	// Retry on next reconcile if unretrievable
-	if refreshInProgress || refreshRequested {
-		srcCluster, err = plan.GetSourceCluster(r.Client)
-		if err != nil {
-			return nil
-		}
-		dstCluster, err = plan.GetDestinationCluster(r.Client)
-		if err != nil {
-			return nil
-		}
-		storage, err = plan.GetStorage(r.Client)
-		if err != nil {
-			return nil
-		}
-	}
-
-	// Case: Refresh requested
-	if refreshRequested {
-		// Start refresh
-		srcCluster.Spec.Refresh = true
-		err = r.Update(context.TODO(), srcCluster)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		dstCluster.Spec.Refresh = true
-		err = r.Update(context.TODO(), dstCluster)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		storage.Spec.Refresh = true
-		err = r.Update(context.TODO(), storage)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		// Mark plan refresh as in-progress with durable condition
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     migapi.RefreshInProgress,
-			Status:   True,
-			Category: Advisory,
-			Message:  RefreshInProgressMessage,
-			Durable:  true,
-		})
-		plan.Spec.Refresh = false
-		return nil
-	}
-
-	// Case: Refresh is running
-	if refreshInProgress {
-		// Mark refresh as completed if Storage and Cluster refreshes are done.
-		if !srcCluster.Spec.Refresh && !dstCluster.Spec.Refresh && !storage.Spec.Refresh {
-			plan.Status.DeleteCondition(migapi.RefreshInProgress)
-		}
-	}
-
-	return nil
 }
 
 // Detect that a plan is been closed and ensure all its referenced

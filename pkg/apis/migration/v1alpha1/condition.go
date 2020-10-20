@@ -12,9 +12,8 @@ import (
 
 // Types
 const (
-	ReconcileFailed   = "ReconcileFailed"
-	RefreshInProgress = "RefreshInProgress"
-	Ready             = "Ready"
+	ReconcileFailed = "ReconcileFailed"
+	Ready           = "Ready"
 )
 
 // Status

@@ -27,8 +27,8 @@ var NoReQ = time.Duration(0)
 const (
 	Created                         = ""
 	Started                         = "Started"
-	Refresh                         = "Refresh"
-	EnsureRefreshed                 = "EnsureRefreshed"
+	StartRefresh                    = "StartRefresh"
+	WaitForRefresh                  = "WaitForRefresh"
 	Prepare                         = "Prepare"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
@@ -97,8 +97,8 @@ var StageItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
-		{phase: Refresh},
-		{phase: EnsureRefreshed},
+		{phase: StartRefresh},
+		{phase: WaitForRefresh},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
@@ -127,8 +127,8 @@ var FinalItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
-		{phase: Refresh},
-		{phase: EnsureRefreshed},
+		{phase: StartRefresh},
+		{phase: WaitForRefresh},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: PreBackupHooks},
@@ -262,18 +262,18 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case Refresh:
+	case StartRefresh:
 		t.Requeue = PollReQ
-		err = t.refreshPlan()
+		err = t.startRefresh()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case EnsureRefreshed:
+	case WaitForRefresh:
 		t.Requeue = PollReQ
-		refreshed := t.ensureRefreshed()
+		refreshed := t.waitForRefresh()
 		if refreshed {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)

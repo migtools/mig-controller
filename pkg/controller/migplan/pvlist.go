@@ -18,7 +18,7 @@ type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
-	if plan.Status.HasAnyCondition(Suspended, migapi.RefreshInProgress) {
+	if plan.Status.HasAnyCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
 		plan.Status.StageCondition(PvNoSupportedAction)
 		plan.Status.StageCondition(PvNoStorageClassSelection)
