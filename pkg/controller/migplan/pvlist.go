@@ -72,10 +72,13 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	plan.Status.SrcStorageClasses = srcStorageClasses
+
 	destStorageClasses, err := destMigCluster.GetStorageClasses(destClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	plan.Status.DestStorageClasses = destStorageClasses
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {

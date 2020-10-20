@@ -61,7 +61,6 @@ type MigClusterSpec struct {
 	URL                     string                `json:"url,omitempty"`
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 	CABundle                []byte                `json:"caBundle,omitempty"`
-	StorageClasses          []StorageClass        `json:"storageClasses,omitempty"`
 	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
 	Insecure                bool                  `json:"insecure,omitempty"`
 	RestartRestic           *bool                 `json:"restartRestic,omitempty"`
