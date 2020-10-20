@@ -138,15 +138,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if !cluster.Status.HasBlockerCondition() {
-		// Storage Classes
-		err = r.setStorageClasses(cluster)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
-	}
-
 	// Ready
 	cluster.Status.SetReady(
 		!cluster.Status.HasBlockerCondition(),
