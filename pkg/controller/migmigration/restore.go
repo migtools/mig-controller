@@ -46,6 +46,9 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[FinalRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
+	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -90,6 +93,8 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	newRestore.Labels[StageRestoreLabel] = t.UID()
 	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
+	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -246,10 +251,15 @@ func (t *Task) deleteRestores() error {
 		return liberr.Wrap(err)
 	}
 
+	migplan, err := t.Owner.GetPlan(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
+		k8sclient.MatchingLabels(migplan.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -271,7 +281,7 @@ func (t *Task) deleteMigrated() error {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
+		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 
 	for _, gvr := range GVRs {
@@ -312,7 +322,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigratedByLabel: string(t.Owner.UID),
+		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {

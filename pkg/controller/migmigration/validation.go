@@ -170,7 +170,8 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 			}
 		}
 	}
-	if hasCondition {
+	// Allow perform Rollback on finished Plan.
+	if hasCondition && !migration.Spec.Rollback {
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     HasFinalMigration,
 			Status:   True,

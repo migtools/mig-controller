@@ -40,6 +40,8 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	newBackup.Labels[InitialBackupLabel] = t.UID()
 	newBackup.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
+	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	delete(newBackup.Annotations, QuiesceAnnotation)
@@ -100,6 +102,8 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[StageBackupLabel] = t.UID()
 	newBackup.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
+	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
@@ -256,7 +260,7 @@ func (t *Task) deleteBackups() error {
 	list := velero.BackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
+		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		return liberr.Wrap(err)

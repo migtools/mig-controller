@@ -9,14 +9,10 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
-	"github.com/konveyor/mig-controller/pkg/settings"
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// Application settings.
-var Settings = &settings.Settings
 
 // Requeue
 var FastReQ = time.Duration(time.Millisecond * 100)
@@ -75,6 +71,7 @@ const (
 	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
 	Canceled                        = "Canceled"
+	Rollback                        = "Rollback"
 	Completed                       = "Completed"
 )
 
@@ -170,9 +167,6 @@ var CancelItinerary = Itinerary{
 		{phase: DeleteRestores},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: DeleteMigrated},
-		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
 		{phase: Canceled},
 		{phase: Completed},
 	},
@@ -182,6 +176,18 @@ var FailedItinerary = Itinerary{
 	Name: "Failed",
 	Steps: []Step{
 		{phase: MigrationFailed},
+		{phase: EnsureStagePodsDeleted, all: HasStagePods},
+		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
+		{phase: Completed},
+	},
+}
+
+var RollbackItinerary = Itinerary{
+	Name: "Rollback",
+	Steps: []Step{
+		{phase: Rollback},
+		{phase: DeleteBackups},
+		{phase: DeleteRestores},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
@@ -258,7 +264,7 @@ func (t *Task) Run() error {
 
 	// Run the current phase.
 	switch t.Phase {
-	case Created, Started:
+	case Created, Started, Rollback:
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -669,6 +675,10 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case Canceling:
+		// Skip directly to Completed if the Cancel was set on a Rollback migration.
+		if t.rollback() {
+			t.Phase = Completed
+		}
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceling,
 			Status:   True,
@@ -682,13 +692,7 @@ func (t *Task) Run() error {
 		}
 
 	case MigrationFailed:
-		if Settings.Migration.FailureRollback {
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		} else {
-			t.Phase = Completed
-		}
+		t.Phase = Completed
 
 	case DeleteMigrated:
 		err := t.deleteMigrated()
@@ -760,6 +764,8 @@ func (t *Task) init() error {
 		t.Itinerary = FailedItinerary
 	} else if t.canceled() {
 		t.Itinerary = CancelItinerary
+	} else if t.rollback() {
+		t.Itinerary = RollbackItinerary
 	} else if t.stage() {
 		t.Itinerary = StageItinerary
 	} else {
@@ -907,6 +913,11 @@ func (t *Task) failed() bool {
 // Get whether the migration is cancelled.
 func (t *Task) canceled() bool {
 	return t.Owner.Spec.Canceled || t.Owner.Status.HasAnyCondition(Canceled, Canceling)
+}
+
+// Get whether the migration is rollback.
+func (t *Task) rollback() bool {
+	return t.Owner.Spec.Rollback
 }
 
 // Get whether the migration is stage.
