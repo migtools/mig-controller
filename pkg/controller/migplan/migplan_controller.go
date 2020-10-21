@@ -342,6 +342,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 // and PV discovery and ensuring resources is not performed.
 func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	suspended := false
+
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -355,6 +356,11 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 			suspended = true
 			break
 		}
+	}
+
+	// If refresh requested on plan, temporarily un-suspend
+	if plan.Spec.Refresh == true {
+		suspended = false
 	}
 
 	if suspended {
