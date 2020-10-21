@@ -153,6 +153,7 @@ func (r ReconcileMigPlan) ensureRegistryHealth(plan *migapi.MigPlan) error {
 			Message: fmt.Sprintf("The Migration registry pod %s/%s is not in a healthy state on cluster %s",
 				unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName),
 		})
+		return fmt.Errorf("the Migration registry pod %s/%s is not in a healthy state on cluster %s", unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName)
 	}
 
 	return err
