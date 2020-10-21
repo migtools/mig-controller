@@ -95,14 +95,14 @@ func Test_Itineraries(t *testing.T) {
 			for _, phase := range step.Phases {
 				found := false
 				for _, finalPhase := range finalStep.Phases {
-					if phase.phase == finalPhase.phase {
+					if phase.Name == finalPhase.Name {
 						common.Steps = append(common.Steps, step)
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("'%s' is not contained within the final itinerary", phase.phase)
+					t.Errorf("'%s' is not contained within the final itinerary", phase.Name)
 				}
 			}
 		}

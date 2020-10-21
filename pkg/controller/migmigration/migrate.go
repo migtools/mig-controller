@@ -17,7 +17,6 @@ limitations under the License.
 package migmigration
 
 import (
-	"fmt"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -75,13 +74,6 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	migration.Status.Phase = task.Phase
 	migration.Status.Itinerary = task.Itinerary.Name
 
-	// Description
-	if description, ok := PhaseDescriptions[task.Phase]; ok {
-		migration.Status.PhaseDescription = description
-	} else {
-		migration.Status.PhaseDescription = ""
-	}
-
 	// Completed
 	if task.Phase == Completed {
 		migration.Status.DeleteCondition(Running)
@@ -99,15 +91,12 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return NoReQ, nil
 	}
 
-	// Running
-	n, total, step := task.Itinerary.progressReport(task.Phase)
-	message := fmt.Sprintf(RunningMessage, n, total)
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,
-		Reason:   step,
+		Reason:   task.Step,
 		Category: Advisory,
-		Message:  message,
+		Message:  PhaseDescriptions[task.Phase],
 	})
 
 	return task.Requeue, nil
