@@ -29,6 +29,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -536,7 +537,7 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 		return liberr.Wrap(err)
 	}
 	if foundDeployment != nil {
-		err := client.Delete(context.Background(), foundDeployment)
+		err := client.Delete(context.Background(), foundDeployment, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
 			return liberr.Wrap(err)
 		}
