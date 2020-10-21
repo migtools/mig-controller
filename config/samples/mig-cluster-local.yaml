@@ -9,3 +9,6 @@ spec:
   # [!] Change isHostCluster to 'false' if you want to use a clusterRef and serviceAccountSecretRef
   #     instead of using the mig-controller detected kubeconfig. Refer to mig-cluster-aws.yaml for an example.
   isHostCluster: true
+
+  # [!] Change refresh to 'true' to force a manual reconcile
+  refresh: false

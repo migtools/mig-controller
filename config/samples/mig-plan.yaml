@@ -22,3 +22,6 @@ spec:
   # [!] Change namespaces to adjust which OpenShift namespaces should be migrated from source to destination cluster
   namespaces:
   - nginx-example
+
+  # [!] Change refresh to 'true' to force a manual reconcile
+  refresh: false

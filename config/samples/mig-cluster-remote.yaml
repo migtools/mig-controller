@@ -15,3 +15,6 @@ spec:
   serviceAccountSecretRef:
     name: sa-token-remote
     namespace: openshift-config
+
+  # [!] Change refresh to 'true' to force a manual reconcile
+  refresh: false
