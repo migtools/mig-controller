@@ -18,14 +18,22 @@ func (r ReconcileMigPlan) ensureMigRegistries(plan *migapi.MigPlan) error {
 	var client k8sclient.Client
 	nEnsured := 0
 
-	if plan.Status.HasCriticalCondition() ||
-		plan.Status.HasAnyCondition(Suspended) {
-		plan.Status.StageCondition(RegistriesEnsured)
+	if plan.Status.HasCondition(StorageNotReady) {
+		plan.Status.DeleteCondition(RegistriesEnsured)
 		err := r.deleteImageRegistryResources(plan)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		return nil
 	}
+
+	if plan.Status.HasCriticalCondition() || plan.Status.HasAnyCondition(Suspended) {
+		// TODO: need to make sure that if plan is suspended due to final migration is complete
+		// 		we garbage collect the mig registry
+		plan.Status.StageCondition(RegistriesEnsured)
+		return nil
+	}
+
 	storage, err := plan.GetStorage(r)
 	if err != nil {
 		return liberr.Wrap(err)
