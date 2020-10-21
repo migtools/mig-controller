@@ -64,6 +64,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to cloud providers.
+	err = c.Watch(
+		&ProviderSource{
+			Client:   mgr.GetClient(),
+			Interval: time.Second * 30},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to Secrets referenced by MigStorage.
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
@@ -73,16 +83,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					return migref.GetRequests(a, migapi.MigStorage{})
 				}),
 		})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to cloud providers.
-	err = c.Watch(
-		&ProviderSource{
-			Client:   mgr.GetClient(),
-			Interval: time.Second * 30},
-		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -143,6 +143,9 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// End staging conditions.
 	storage.Status.EndStagingConditions()
+
+	// Mark as refreshed
+	storage.Spec.Refresh = false
 
 	// Apply changes.
 	storage.MarkReconciled()

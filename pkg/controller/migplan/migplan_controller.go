@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	"strconv"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -264,12 +265,20 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
 
+	// Mark as refreshed
+	plan.Spec.Refresh = false
+
 	// Apply changes.
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Timed requeue on Plan conflict.
+	if plan.Status.HasCondition(PlanConflict) {
+		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
 	// Done
@@ -333,6 +342,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 // and PV discovery and ensuring resources is not performed.
 func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	suspended := false
+
 	migrations, err := plan.ListMigrations(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -346,6 +356,11 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 			suspended = true
 			break
 		}
+	}
+
+	// If refresh requested on plan, temporarily un-suspend
+	if plan.Spec.Refresh == true {
+		suspended = false
 	}
 
 	if suspended {

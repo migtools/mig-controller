@@ -20,19 +20,14 @@ import (
 	"context"
 	"time"
 
-	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"github.com/konveyor/mig-controller/pkg/remote"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -60,10 +55,6 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	if err != nil {
 		return err
 	}
-
-	// Add reference to controller on ReconcileMigCluster object to be used
-	// for adding remote watches at a later time
-	r.Controller = c
 
 	// Watch for changes to MigCluster
 	err = c.Watch(
@@ -147,24 +138,6 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if !cluster.Status.HasBlockerCondition() {
-		// Remote Watch.
-		err = r.setupRemoteWatch(cluster)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
-
-		// Storage Classes
-		err = r.setStorageClasses(cluster)
-		if err != nil {
-			log.Trace(err)
-			return reconcile.Result{Requeue: true}, nil
-		}
-	} else {
-		r.shutdownRemoteWatch(cluster)
-	}
-
 	// Ready
 	cluster.Status.SetReady(
 		!cluster.Status.HasBlockerCondition(),
@@ -172,6 +145,9 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// End staging conditions.
 	cluster.Status.EndStagingConditions()
+
+	// Mark as refreshed
+	cluster.Spec.Refresh = false
 
 	// Apply changes.
 	cluster.MarkReconciled()
@@ -183,55 +159,4 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Done
 	return reconcile.Result{}, nil
-}
-
-// Setup remote watch.
-func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error {
-	nsName := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
-	}
-	remoteWatchMap := remote.GetWatchMap()
-	remoteWatchCluster := remoteWatchMap.Get(nsName)
-	if remoteWatchCluster != nil {
-		return nil
-	}
-
-	log.Info("Starting remote watch.", "cluster", cluster.Name)
-
-	var err error
-	var restCfg *rest.Config
-	if cluster.Spec.IsHostCluster {
-		restCfg, err = config.GetConfig()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-	} else {
-		restCfg, err = cluster.BuildRestConfig(r.Client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-	}
-
-	StartRemoteWatch(r, remote.ManagerConfig{
-		RemoteRestConfig: restCfg,
-		ParentNsName:     nsName,
-		ParentMeta:       cluster.GetObjectMeta(),
-		ParentObject:     cluster,
-	})
-
-	log.Info("Remote watch started.", "cluster", cluster.Name)
-
-	return nil
-}
-
-func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
-	log.Info("Stopping remote watch.", "cluster", cluster.Name)
-	nsName := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Name,
-	}
-
-	StopRemoteWatch(nsName)
-	log.Info("Stopped remote watch.", "cluster", cluster.Name)
 }

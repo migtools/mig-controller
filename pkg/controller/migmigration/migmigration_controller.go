@@ -167,11 +167,11 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	err = r.setOwnerReference(migration)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Re-queue (after) in seconds.
-	requeueAfter := time.Duration(0) // not re-queued.
+	requeueAfter := time.Duration(PollReQ)
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
@@ -190,7 +190,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
 			log.Trace(err)
-			return reconcile.Result{}, err
+			return reconcile.Result{Requeue: true}, err
 		}
 	}
 

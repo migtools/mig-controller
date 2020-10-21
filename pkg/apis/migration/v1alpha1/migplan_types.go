@@ -64,15 +64,18 @@ type MigPlanSpec struct {
 	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 	Closed            bool                  `json:"closed,omitempty"`
 	Hooks             []MigPlanHook         `json:"hooks,omitempty"`
+	Refresh           bool                  `json:"refresh,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
 	UnhealthyResources
 	Conditions
-	Incompatible      `json:",inline"`
-	ObservedDigest    string   `json:"observedDigest,omitempty"`
-	ExcludedResources []string `json:"excludedResources,omitempty"`
+	Incompatible       `json:",inline"`
+	ObservedDigest     string         `json:"observedDigest,omitempty"`
+	ExcludedResources  []string       `json:"excludedResources,omitempty"`
+	SrcStorageClasses  []StorageClass `json:"srcStorageClasses,omitempty"`
+	DestStorageClasses []StorageClass `json:"destStorageClasses,omitempty"`
 }
 
 // +genclient

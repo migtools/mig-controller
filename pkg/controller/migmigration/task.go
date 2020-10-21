@@ -27,6 +27,8 @@ var NoReQ = time.Duration(0)
 const (
 	Created                         = ""
 	Started                         = "Started"
+	StartRefresh                    = "StartRefresh"
+	WaitForRefresh                  = "WaitForRefresh"
 	Prepare                         = "Prepare"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
@@ -95,6 +97,8 @@ var StageItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
+		{phase: StartRefresh},
+		{phase: WaitForRefresh},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
@@ -123,6 +127,8 @@ var FinalItinerary = Itinerary{
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
+		{phase: StartRefresh},
+		{phase: WaitForRefresh},
 		{phase: Prepare},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: PreBackupHooks},
@@ -242,6 +248,7 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
+	t.Requeue = FastReQ
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
 	err := t.init()
@@ -255,7 +262,26 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case StartRefresh:
+		t.Requeue = PollReQ
+		err = t.startRefresh()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case WaitForRefresh:
+		t.Requeue = PollReQ
+		refreshed := t.waitForRefresh()
+		if refreshed {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+
 	case Prepare:
+		t.Requeue = PollReQ
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -298,14 +324,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureInitialBackup:
 		_, err := t.ensureInitialBackup()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -327,7 +352,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
 		err := t.annotateStageResources()
@@ -342,7 +367,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -351,7 +376,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -360,7 +385,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -378,7 +403,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case RestartRestic:
 		err := t.restartResticPods()
@@ -434,7 +459,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -456,7 +481,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
@@ -475,7 +500,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
@@ -488,7 +513,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case PreRestoreHooks:
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
@@ -501,14 +526,14 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureStageRestore:
 		_, err := t.ensureStageRestore()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -531,7 +556,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureStagePodsDeleted:
 		err := t.ensureStagePodsDeleted()
@@ -580,7 +605,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
@@ -594,7 +619,7 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -616,7 +641,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case PostRestoreHooks:
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
@@ -629,7 +654,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Requeue = NoReQ
+			t.Requeue = PollReQ
 		}
 	case Verification:
 		completed, err := t.VerificationCompleted()

@@ -1,10 +1,12 @@
 package migmigration
 
 import (
+	"context"
 	"fmt"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	health "github.com/konveyor/mig-controller/pkg/health"
 )
@@ -104,4 +106,48 @@ func (t *Task) reportHealthCondition() {
 			Message:  fmt.Sprintf(UnhealthyNamespacesMessage, destination),
 		})
 	}
+}
+
+// Start a refresh on MigPlan and attached resources
+func (t *Task) startRefresh() error {
+	plan := t.PlanResources.MigPlan
+	plan.Spec.Refresh = true
+	err := t.Client.Update(context.TODO(), plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	storage := t.PlanResources.MigStorage
+	storage.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), storage)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	srcCluster := t.PlanResources.SrcMigCluster
+	srcCluster.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), srcCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	destCluster := t.PlanResources.DestMigCluster
+	destCluster.Spec.Refresh = true
+	err = t.Client.Update(context.TODO(), destCluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	return nil
+}
+
+// Verify plan finished with refresh before migrating
+func (t *Task) waitForRefresh() bool {
+	if t.PlanResources.MigPlan.Spec.Refresh == true ||
+		t.PlanResources.MigStorage.Spec.Refresh == true ||
+		t.PlanResources.SrcMigCluster.Spec.Refresh == true ||
+		t.PlanResources.DestMigCluster.Spec.Refresh == true {
+		return false
+	}
+	return true
 }

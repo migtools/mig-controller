@@ -30,3 +30,6 @@ spec:
       namespace: openshift-config
       name: migstorage-creds
 
+  # [!] Change refresh to 'true' to force a manual reconcile
+  refresh: false
+

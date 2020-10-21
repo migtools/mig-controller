@@ -18,7 +18,7 @@ type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
 func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
-	if plan.Status.HasCondition(Suspended) {
+	if plan.Status.HasAnyCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
 		plan.Status.StageCondition(PvNoSupportedAction)
 		plan.Status.StageCondition(PvNoStorageClassSelection)
@@ -48,7 +48,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
-	client, err := srcMigCluster.GetClient(r)
+	srcClient, err := srcMigCluster.GetClient(r)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -62,8 +62,23 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
-	srcStorageClasses := srcMigCluster.Spec.StorageClasses
-	destStorageClasses := destMigCluster.Spec.StorageClasses
+	destClient, err := destMigCluster.GetClient(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Get StorageClasses
+	srcStorageClasses, err := srcMigCluster.GetStorageClasses(srcClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	plan.Status.SrcStorageClasses = srcStorageClasses
+
+	destStorageClasses, err := destMigCluster.GetStorageClasses(destClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	plan.Status.DestStorageClasses = destStorageClasses
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
@@ -79,11 +94,11 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 	// Build PV map.
-	pvMap, err := r.getPvMap(client)
+	pvMap, err := r.getPvMap(srcClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	claims, err := r.getClaims(client, plan)
+	claims, err := r.getClaims(srcClient, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

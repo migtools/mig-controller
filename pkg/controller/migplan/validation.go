@@ -607,14 +607,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(Suspended) {
 		return nil
 	}
-	destMigCluster, err := plan.GetDestinationCluster(r.Client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	if destMigCluster == nil {
-		return nil
-	}
-	for _, storageClass := range destMigCluster.Spec.StorageClasses {
+	for _, storageClass := range plan.Status.DestStorageClasses {
 		storageClasses[storageClass.Name] = storageClass.AccessModes
 	}
 

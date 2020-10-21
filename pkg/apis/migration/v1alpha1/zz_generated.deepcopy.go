@@ -427,13 +427,6 @@ func (in *MigClusterSpec) DeepCopyInto(out *MigClusterSpec) {
 		*out = make([]byte, len(*in))
 		copy(*out, *in)
 	}
-	if in.StorageClasses != nil {
-		in, out := &in.StorageClasses, &out.StorageClasses
-		*out = make([]StorageClass, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.RestartRestic != nil {
 		in, out := &in.RestartRestic, &out.RestartRestic
 		*out = new(bool)
@@ -808,6 +801,20 @@ func (in *MigPlanStatus) DeepCopyInto(out *MigPlanStatus) {
 		in, out := &in.ExcludedResources, &out.ExcludedResources
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.SrcStorageClasses != nil {
+		in, out := &in.SrcStorageClasses, &out.SrcStorageClasses
+		*out = make([]StorageClass, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.DestStorageClasses != nil {
+		in, out := &in.DestStorageClasses, &out.DestStorageClasses
+		*out = make([]StorageClass, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }
