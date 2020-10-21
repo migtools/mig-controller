@@ -142,7 +142,6 @@ const (
 	InvalidHookSANameMessage                          = "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'"
 	HookPhaseUnknownMessage                           = "The hook phase must be one of: PreRestore, PostRestore, PreBackup, PostBackup"
 	HookPhaseDuplicateMessage                         = "Only one hook may be specified per phase"
-	RefreshInProgressMessage                          = "Waiting for referenced `migstorage` and `migclusters` to finish reconciling"
 )
 
 // Valid AccessMode values
