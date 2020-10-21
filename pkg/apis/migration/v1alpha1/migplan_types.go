@@ -502,8 +502,8 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 			},
 		},
 		Selector: map[string]string{
-			"app":              name,
-			"deploymentconfig": name,
+			"app":        name,
+			"deployment": name,
 		},
 	}
 }
