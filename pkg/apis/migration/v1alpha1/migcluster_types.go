@@ -214,7 +214,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 		return err
 	}
 	for _, r := range dList.Items {
-		err = client.Delete(context.TODO(), &r)
+		err = client.Delete(context.TODO(), &r, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil && !k8serror.IsNotFound(err) {
 			return err
 		}
