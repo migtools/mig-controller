@@ -1,6 +1,7 @@
 package migdirect
 
 import (
+	"crypto/rsa"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -26,6 +27,7 @@ const (
 	DestinationPVCsCreated       = "DestinationPVCsCreated"
 	CreateStunnelConfig          = "CreateStunnelConfig"
 	CreateRsyncConfig            = "CreateRsyncConfig"
+	CreateRsyncRoute             = "CreateRsyncRoute"
 	// Do not initiate Rsync process unless we know stunnel is up and running
 	// and in a healthy state
 
@@ -34,16 +36,17 @@ const (
 	CreateStunnelPodOnSource        = "CreateStunnelPodOnSource"
 	EnsureStunnelPodOnSourceHealthy = "EnsureStunnelPodOnSourceHealthy"
 	//Next two phases are on destination
-	CreateRsyncTransferPod        = "CreateRsyncTransferPod"
-	EnsureRsyncTransferPodHealthy = "EnsureRsyncTransferPodHealthy"
-	CreateRsyncClientPods         = "CreateRsyncClientPods"
-	Verification                  = "Verification"
-	EnsureRsyncPodsDeleted        = "EnsureRsyncPodsDeleted"
-	EnsureRsyncPodsTerminated     = "EnsureRsyncPodsTerminated"
-	DeleteStunnelCerts            = "DeleteStunnelCerts"
-	DeleteRsyncSecret             = "DeleteRsyncSecret"
-	Completed                     = "Completed"
-	MigrationFailed               = "MigrationFailed"
+	CreateRsyncTransferPods         = "CreateRsyncTransferPods"
+	WaitForRsyncTransferPodsRunning = "WaitForRsyncTransferPodsRunning"
+	CreateStunnelClientPods         = "CreateStunnelClientPods"
+	WaitForStunnelClientPodsRunning = "WaitForStunnelClientPodsRunning"
+	CreateRsyncClientPods           = "CreateRsyncClientPods"
+	WaitForRsyncClientPodsCompleted = "WaitForRsyncClientPodsCompleted"
+	Verification                    = "Verification"
+	DeleteRsyncResources            = "DeleteRsyncResources"
+	EnsureRsyncPodsTerminated       = "EnsureRsyncPodsTerminated"
+	Completed                       = "Completed"
+	MigrationFailed                 = "MigrationFailed"
 )
 
 // Flags
@@ -92,8 +95,16 @@ var PVCItinerary = Itinerary{
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
 		{phase: DestinationPVCsCreated},
+		{phase: CreateRsyncRoute},
 		{phase: CreateRsyncConfig},
 		{phase: CreateStunnelConfig},
+		{phase: CreateRsyncTransferPods},
+		{phase: WaitForRsyncTransferPodsRunning},
+		{phase: CreateStunnelClientPods},
+		{phase: WaitForStunnelClientPodsRunning},
+		{phase: CreateRsyncClientPods},
+		{phase: WaitForRsyncClientPodsCompleted},
+		{phase: DeleteRsyncResources},
 		{phase: Completed},
 	},
 }
@@ -116,16 +127,24 @@ var FailedItinerary = Itinerary{
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log       logr.Logger
-	Client    k8sclient.Client
-	Owner     *migapi.MigDirect
-	Phase     string
-	Requeue   time.Duration
-	Itinerary Itinerary
-	Errors    []string
+	Log         logr.Logger
+	Client      k8sclient.Client
+	Owner       *migapi.MigDirect
+	SSHKeys     *sshKeys
+	RsyncRoutes map[string]string
+	Phase       string
+	Requeue     time.Duration
+	Itinerary   Itinerary
+	Errors      []string
+}
+
+type sshKeys struct {
+	PublicKey  *rsa.PublicKey
+	PrivateKey *rsa.PrivateKey
 }
 
 func (t *Task) init() error {
+	t.RsyncRoutes = make(map[string]string)
 	t.Requeue = FastReQ
 	if t.failed() {
 		t.Itinerary = FailedItinerary
@@ -195,6 +214,15 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case CreateRsyncRoute:
+		err := t.createRsyncTransferRoute()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case CreateRsyncConfig:
 		err := t.createRsyncConfig()
 		if err != nil {
@@ -206,6 +234,81 @@ func (t *Task) Run() error {
 		}
 	case CreateStunnelConfig:
 		err := t.createStunnelConfig()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CreateRsyncTransferPods:
+		err := t.createRsyncTransferPods()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case WaitForRsyncTransferPodsRunning:
+		running, err := t.areRsyncTransferPodsRunning()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if running {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+	case CreateStunnelClientPods:
+		err := t.createStunnelClientPods()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case WaitForStunnelClientPodsRunning:
+		running, err := t.areStunnelClientPodsRunning()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if running {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+	case CreateRsyncClientPods:
+		err := t.createRsyncClientPods()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case WaitForRsyncClientPodsCompleted:
+		completed, err := t.haveRsyncClientPodsCompleted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if completed {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+	case DeleteRsyncResources:
+		err := t.deleteRsyncResources()
 		if err != nil {
 			return liberr.Wrap(err)
 		}

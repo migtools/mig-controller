@@ -108,6 +108,11 @@ func (r *ReconcileMigDirect) Reconcile(request reconcile.Request) (reconcile.Res
 		return reconcile.Result{}, err
 	}
 
+	// Check if completed
+	if direct.Status.Phase == Completed {
+		return reconcile.Result{}, nil
+	}
+
 	// Begin staging conditions
 	direct.Status.BeginStagingConditions()
 
