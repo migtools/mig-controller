@@ -91,12 +91,16 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return NoReQ, nil
 	}
 
+	message := task.Phase
+	if val, found := PhaseDescriptions[task.Phase]; found {
+		message = val
+	}
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,
 		Reason:   task.Step,
 		Category: Advisory,
-		Message:  PhaseDescriptions[task.Phase],
+		Message:  message,
 	})
 
 	return task.Requeue, nil

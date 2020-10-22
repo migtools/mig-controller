@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -87,27 +86,32 @@ func TestReconcile(t *testing.T) {
 // but for not they are expected to be the identical.
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	stage := StageItinerary
-	common := Itinerary{}
+	common := []Phase{}
 
-	for i, step := range StageItinerary.Steps {
-		for _, finalStep := range FinalItinerary.Steps[i:] {
-			for _, phase := range step.Phases {
-				found := false
-				for _, finalPhase := range finalStep.Phases {
-					if phase.Name == finalPhase.Name {
-						common.Steps = append(common.Steps, step)
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("'%s' is not contained within the final itinerary", phase.Name)
-				}
-			}
+	stagePhases := []Phase{}
+	finalPhases := []Phase{}
+	for _, step := range StageItinerary.Steps {
+		for _, phase := range step.Phases {
+			stagePhases = append(stagePhases, phase)
 		}
 	}
-
-	g.Expect(reflect.DeepEqual(stage.Steps, common.Steps)).To(gomega.BeTrue())
-
+	for _, step := range FinalItinerary.Steps {
+		for _, phase := range step.Phases {
+			finalPhases = append(finalPhases, phase)
+		}
+	}
+	for i, stagePhase := range stagePhases {
+		found := false
+		for _, finalPhase := range finalPhases[i:] {
+			if stagePhase.Name == finalPhase.Name {
+				common = append(common, finalPhase)
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("%s is not contained in Final itinerary", stagePhase.Name)
+		}
+	}
+	g.Expect(reflect.DeepEqual(stagePhases, common)).To(gomega.BeTrue())
 }
