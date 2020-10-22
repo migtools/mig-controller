@@ -47,6 +47,18 @@ required = [
   version="kubernetes-1.13.0"
 
 [[constraint]]
+  name="github.com/konveyor/openshift-velero-plugin"
+  branch = "master"
+
+[[override]]
+  name = "github.com/containers/image"
+  version = "v5.5.1"
+
+[[override]]
+  name = "github.com/opencontainers/image-spec"
+  branch = "master"
+
+[[constraint]]
   name="github.com/vmware-tanzu/velero"
   branch = "konveyor-dev"
   source = "github.com/konveyor/velero.git"
