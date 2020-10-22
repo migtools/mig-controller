@@ -265,7 +265,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Category: Critical,
 			Message:  StorageNotReadyMessage,
 		})
-		// Image registry must cleaned up if deleted MigStorage is unready
 		return liberr.Wrap(r.deleteImageRegistryResources(plan))
 	}
 

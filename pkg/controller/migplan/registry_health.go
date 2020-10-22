@@ -68,54 +68,39 @@ func (r *registryHealth) run() {
 			for _, plan := range planList {
 				srcCluster, err := plan.GetSourceCluster(r.hostClient)
 				if err != nil {
-					log.Error(err, "unable to get source cluster, skipping mig registry health check")
 					continue
 				}
 
 				if !srcCluster.Status.IsReady() {
-					log.Info("Cannot check registry pod health, cluster is not ready",
-						"cluster name", srcCluster.Name,
-						"cluster namespace", srcCluster.Namespace,
-						"plan name", plan.Name,
-						"plan namespace", plan.Namespace)
 					continue
 				}
 
 				srcClient, err := srcCluster.GetClient(r.hostClient)
 				if err != nil {
-					log.Error(err, "unable to get source cluster client, skipping mig registry health check")
 					continue
 				}
 
 				destCluster, err := plan.GetDestinationCluster(r.hostClient)
 				if err != nil {
-					log.Error(err, "unable to get destination cluster, skipping mig registry health check")
 					continue
 				}
 
 				if !destCluster.Status.IsReady() {
-					log.Info("Cannot check registry pod health, cluster is not ready", destCluster.Name, plan.Name)
+					continue
 				}
 
 				destClient, err := destCluster.GetClient(r.hostClient)
 				if err != nil {
-					log.Info("Cannot check registry pod health, cluster is not ready",
-						"cluster name", srcCluster.Name,
-						"cluster namespace", srcCluster.Namespace,
-						"plan name", plan.Name,
-						"plan namespace", plan.Namespace)
 					continue
 				}
 
 				srcRegistryPods, err := getRegistryPods(&plan, srcClient)
 				if err != nil {
-					log.Error(err, "unable to get source registry pods, skipping mig registry health check")
 					continue
 				}
 
 				destRegistryPods, err := getRegistryPods(&plan, destClient)
 				if err != nil {
-					log.Error(err, "unable to get destination registry pods, skipping mig registry health check")
 					continue
 				}
 
