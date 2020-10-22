@@ -100,7 +100,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			planLabels: map[string]string{
 				migapi.MigplanMigrationFailed: "true",
 			},
-			Interval: time.Second * 5},
+			Interval: time.Second * 30},
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
