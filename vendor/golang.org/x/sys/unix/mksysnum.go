@@ -5,9 +5,8 @@
 // +build ignore
 
 // Generate system call table for DragonFly, NetBSD,
-// FreeBSD, OpenBSD or Darwin from master list
-// (for example, /usr/src/sys/kern/syscalls.master or
-// sys/syscall.h).
+// FreeBSD or OpenBSD from master list (for example,
+// /usr/src/sys/kern/syscalls.master or sys/syscall.h).
 package main
 
 import (
@@ -139,7 +138,7 @@ func main() {
 				text += format(name, num, proto)
 			}
 		case "freebsd":
-			if t.Match(`^([0-9]+)\s+\S+\s+(?:NO)?STD\s+({ \S+\s+(\w+).*)$`) {
+			if t.Match(`^([0-9]+)\s+\S+\s+(?:(?:NO)?STD|COMPAT10)\s+({ \S+\s+(\w+).*)$`) {
 				num, proto := t.sub[1], t.sub[2]
 				name := fmt.Sprintf("SYS_%s", t.sub[3])
 				text += format(name, num, proto)
@@ -160,12 +159,6 @@ func main() {
 				if compat == "" || compat == "13" || compat == "30" || compat == "50" {
 					text += fmt.Sprintf("	%s = %s;  // %s\n", name, num, proto)
 				}
-			}
-		case "darwin":
-			if t.Match(`^#define\s+SYS_(\w+)\s+([0-9]+)`) {
-				name, num := t.sub[1], t.sub[2]
-				name = strings.ToUpper(name)
-				text += fmt.Sprintf("	SYS_%s = %s;\n", name, num)
 			}
 		default:
 			fmt.Fprintf(os.Stderr, "unrecognized GOOS=%s\n", goos)
