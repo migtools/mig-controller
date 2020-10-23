@@ -324,6 +324,10 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	if !plan.Status.HasCondition(RegistriesHealthy) {
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Timed requeue on Plan conflict.
 	if plan.Status.HasCondition(PlanConflict) {
 		return reconcile.Result{RequeueAfter: time.Second * 10}, nil
