@@ -403,13 +403,27 @@ func (t *Task) ensureStagePodsFromRunning() error {
 	return nil
 }
 
-// Ensure the stage pods are Running.
-func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
+// Ensure the stage pods are Running on source cluster.
+func (t *Task) ensureSourceStagePodsStarted() (report PodStartReport, err error) {
 	client, err := t.getSourceClient()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
+	return t.stagePodReport(client)
+}
+
+// Ensure the stage pods are Running on destination cluster.
+func (t *Task) ensureDestinationStagePodsStarted() (report PodStartReport, err error) {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	return t.stagePodReport(client)
+}
+
+func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, err error) {
 	hasHealthyClaims := func(pod *corev1.Pod) (healthy bool) {
 		healthy = true
 		for _, vol := range pod.Spec.Volumes {
@@ -464,8 +478,16 @@ func (t *Task) ensureStagePodsStarted() (report PodStartReport, err error) {
 	if err != nil {
 		return
 	}
+
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != corev1.PodRunning {
+		ready := false
+		for _, c := range pod.Status.ContainerStatuses {
+			if c.Ready {
+				ready = true
+				break
+			}
+		}
+		if !ready {
 			if !hasHealthyClaims(&pod) {
 				report.failed = true
 			}
