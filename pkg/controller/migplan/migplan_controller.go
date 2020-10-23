@@ -45,12 +45,6 @@ var log = logging.WithName("plan")
 // Application settings.
 var Settings = &settings.Settings
 
-// Migctl state to Migplan label map
-var planStateLabels = map[string]string{
-	migctl.Running: migapi.MigplanMigrationRunning,
-	migctl.Failed:  migapi.MigplanMigrationFailed,
-}
-
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -501,59 +495,6 @@ func (r ReconcileMigPlan) ensureMigPlanFailedLabel(plan *migapi.MigPlan) error {
 	}
 
 	return nil
-}
-
-func (r *ReconcileMigPlan) AddUpdateMigrationStateToPlan(plan *migapi.MigPlan, state string) error {
-
-	migrationStateInstances := 0
-	needsUpdate := false
-	migrations, err := plan.ListMigrations(r)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Check if there are any associated migrations with the migplan for the given state (additional condition for failed state)
-	if state == migctl.Failed {
-		for _, m := range migrations {
-			if m.Status.HasCondition(state) || m.Status.HasCondition(migctl.PlanNotReady) {
-				migrationStateInstances++
-				break
-			}
-		}
-	} else {
-		for _, m := range migrations {
-			if m.Status.HasCondition(state) {
-				migrationStateInstances++
-				break
-			}
-		}
-	}
-
-	planLabel := planStateLabels[state]
-
-	switch {
-
-	case migrationStateInstances == 0 && plan.Labels != nil:
-		// No migrations associated with the Migplan for the given state
-		if _, found := plan.Labels[planLabel]; found {
-			delete(plan.Labels, planLabel)
-			needsUpdate = true
-		}
-
-	case migrationStateInstances > 0:
-		// Migplan is associated with migrations for the given state
-		if plan.Labels == nil {
-			plan.Labels = make(map[string]string)
-		}
-		plan.Labels[planLabel] = "true"
-		needsUpdate = true
-	}
-
-	if !needsUpdate {
-		return nil
-	}
-
-	return liberr.Wrap(r.Update(context.TODO(), plan))
 }
 
 // Update Status.ExcludedResources based on settings
