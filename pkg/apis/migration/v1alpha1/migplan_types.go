@@ -25,14 +25,15 @@ import (
 	"sort"
 	"strings"
 
-	appsv1 "github.com/openshift/api/apps/v1"
-	imagev1 "github.com/openshift/api/image/v1"
+	liberr "github.com/konveyor/controller/pkg/error"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
@@ -253,13 +254,16 @@ func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStora
 func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStorage, registrySecret *kapi.Secret) error {
 	credSecret, err := storage.GetBackupStorageCredSecret(client)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	if credSecret == nil {
 		return errors.New("Credentials secret not found.")
 	}
 	provider := storage.GetBackupStorageProvider()
-	provider.UpdateRegistrySecret(credSecret, registrySecret)
+	err = provider.UpdateRegistrySecret(credSecret, registrySecret)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
 }
 
@@ -288,93 +292,21 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 	return reflect.DeepEqual(a.Data, b.Data)
 }
 
-// Build a Registry ImageStream as desired for the source cluster.
-func (r *MigPlan) BuildRegistryImageStream(name string, registryImage string) (*imagev1.ImageStream, error) {
+// Build a Registry Deployment.
+func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name, dirName, registryImage string) *appsv1.Deployment {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
-	imagestream := &imagev1.ImageStream{
+	labels["migplan"] = string(r.UID)
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    labels,
 			Name:      name,
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryImageStream(imagestream, registryImage)
-	return imagestream, err
-}
-
-// Update a Registry ImageStream as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryImageStream(imagestream *imagev1.ImageStream, registryImage string) error {
-	imagestream.Spec = imagev1.ImageStreamSpec{
-		LookupPolicy: imagev1.ImageLookupPolicy{Local: false},
-		Tags: []imagev1.TagReference{
-			imagev1.TagReference{
-				Name: "2",
-				Annotations: map[string]string{
-					"openshift.io/imported-from": registryImage,
-				},
-				From: &kapi.ObjectReference{
-					Kind: "DockerImage",
-					Name: registryImage,
-				},
-				Generation:      nil,
-				ImportPolicy:    imagev1.TagImportPolicy{},
-				ReferencePolicy: imagev1.TagReferencePolicy{Type: ""},
-			},
-		},
-	}
-	return nil
-}
-
-// Get an existing registry ImageStream on the specifiedcluster.
-func (r *MigPlan) GetRegistryImageStream(client k8sclient.Client) (*imagev1.ImageStream, error) {
-	list := imagev1.ImageStreamList{}
-	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
-	err := client.List(
-		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
-	if err != nil {
-		return nil, err
-	}
-	if len(list.Items) > 0 {
-		return &list.Items[0], nil
-	}
-
-	return nil, nil
-}
-
-// Determine if two imagestreams are equal.
-// Returns `true` when equal.
-func (r *MigPlan) EqualsRegistryImageStream(a, b *imagev1.ImageStream) bool {
-	if len(a.Spec.Tags) != len(b.Spec.Tags) {
-		return false
-	}
-	for i, tag := range a.Spec.Tags {
-		if !(reflect.DeepEqual(tag.Name, b.Spec.Tags[i].Name) &&
-			reflect.DeepEqual(tag.From, b.Spec.Tags[i].From)) {
-			return false
-		}
-	}
-	return true
-}
-
-// Build a Registry DeploymentConfig.
-func (r *MigPlan) BuildRegistryDC(storage *MigStorage, proxySecret *kapi.Secret, name, dirName string, registryImage string) (*appsv1.DeploymentConfig, error) {
-	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
-	labels["app"] = name
-	deploymentconfig := &appsv1.DeploymentConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Name:      name,
-			Namespace: VeleroNamespace,
-		},
-	}
-	err := r.UpdateRegistryDC(storage, deploymentconfig, proxySecret, name, dirName, registryImage)
-	return deploymentconfig, err
+	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage)
+	return deployment
 }
 
 // Get registry proxy secret for registry DC
@@ -408,9 +340,8 @@ func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret,
 	return &list.Items[0], nil
 }
 
-// Update a Registry DeploymentConfig as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1.DeploymentConfig,
-	proxySecret *kapi.Secret, name, dirName string, registryImage string) error {
+// Update a Registry Deployment as desired for the specified cluster.
+func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment, proxySecret *kapi.Secret, name, dirName, registryImage string) {
 
 	envFrom := []kapi.EnvFromSource{}
 	// If Proxy secret exists, set env from it
@@ -424,32 +355,57 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 		}
 		envFrom = append(envFrom, source)
 	}
-	deploymentconfig.Spec = appsv1.DeploymentConfigSpec{
-		Replicas: 1,
-		Selector: map[string]string{
-			"app":              name,
-			"deploymentconfig": name,
-		},
-		Strategy: appsv1.DeploymentStrategy{Resources: kapi.ResourceRequirements{}},
-		Template: &kapi.PodTemplateSpec{
+
+	deployment.Spec = appsv1.DeploymentSpec{
+		Replicas: pointer.Int32Ptr(1),
+		Selector: metav1.SetAsLabelSelector(map[string]string{
+			"app":        name,
+			"deployment": name,
+			"migplan":    string(r.UID),
+		}),
+		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Time{},
 				Labels: map[string]string{
-					"app":              name,
-					"deploymentconfig": name,
+					"app":        name,
+					"deployment": name,
+					"migplan":    string(r.UID),
 				},
 			},
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{
 					kapi.Container{
-						EnvFrom: envFrom,
-						Image:   registryImage,
-						Name:    "registry",
+						EnvFrom:                  envFrom,
+						Image:                    registryImage,
+						Name:                     "registry",
+						TerminationMessagePolicy: kapi.TerminationMessageFallbackToLogsOnError,
 						Ports: []kapi.ContainerPort{
 							kapi.ContainerPort{
 								ContainerPort: 5000,
 								Protocol:      kapi.ProtocolTCP,
 							},
+						},
+						LivenessProbe: &kapi.Probe{
+							Handler: kapi.Handler{
+								HTTPGet: &kapi.HTTPGetAction{
+									Path: "/v2/_catalog?n=5",
+									Port: intstr.IntOrString{IntVal: 5000},
+								},
+							},
+							PeriodSeconds:       5,
+							TimeoutSeconds:      3,
+							InitialDelaySeconds: 15,
+						},
+						ReadinessProbe: &kapi.Probe{
+							Handler: kapi.Handler{
+								HTTPGet: &kapi.HTTPGetAction{
+									Path: "/v2/_catalog?n=5",
+									Port: intstr.IntOrString{IntVal: 5000},
+								},
+							},
+							PeriodSeconds:       5,
+							TimeoutSeconds:      3,
+							InitialDelaySeconds: 15,
 						},
 						Resources: kapi.ResourceRequirements{},
 						VolumeMounts: []kapi.VolumeMount{
@@ -468,22 +424,15 @@ func (r *MigPlan) UpdateRegistryDC(storage *MigStorage, deploymentconfig *appsv1
 				},
 			},
 		},
-		Test: false,
-		Triggers: appsv1.DeploymentTriggerPolicies{
-			appsv1.DeploymentTriggerPolicy{
-				Type: appsv1.DeploymentTriggerOnConfigChange,
-			},
-		},
 	}
 	provider := storage.GetBackupStorageProvider()
-	provider.UpdateRegistryDC(deploymentconfig, name, dirName)
-
-	return nil
+	provider.UpdateRegistryDeployment(deployment, name, dirName)
 }
 
-// Get an existing registry DeploymentConfig on the specifiedcluster.
-func (r *MigPlan) GetRegistryDC(client k8sclient.Client) (*appsv1.DeploymentConfig, error) {
-	list := appsv1.DeploymentConfigList{}
+// Get an existing registry Deployment on the specified cluster.
+//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
+func (r *MigPlan) GetRegistryDeployment(client k8sclient.Client) (*appsv1.Deployment, error) {
+	list := appsv1.DeploymentList{}
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	err := client.List(
@@ -500,27 +449,25 @@ func (r *MigPlan) GetRegistryDC(client k8sclient.Client) (*appsv1.DeploymentConf
 	return nil, nil
 }
 
-// Determine if two deploymentconfigs are equal.
+// Determine if two deployments are equal.
 // Returns `true` when equal.
-func (r *MigPlan) EqualsRegistryDC(a, b *appsv1.DeploymentConfig) bool {
+func (r *MigPlan) EqualsRegistryDeployment(a, b *appsv1.Deployment) bool {
 	if !(reflect.DeepEqual(a.Spec.Replicas, b.Spec.Replicas) &&
 		reflect.DeepEqual(a.Spec.Selector, b.Spec.Selector) &&
 		reflect.DeepEqual(a.Spec.Template.ObjectMeta, b.Spec.Template.ObjectMeta) &&
 		reflect.DeepEqual(a.Spec.Template.Spec.Volumes, b.Spec.Template.Spec.Volumes) &&
-		len(a.Spec.Template.Spec.Containers) == len(b.Spec.Template.Spec.Containers) &&
-		len(a.Spec.Triggers) == len(b.Spec.Triggers)) {
+		len(a.Spec.Template.Spec.Containers) == len(b.Spec.Template.Spec.Containers)) {
 		return false
 	}
 	for i, container := range a.Spec.Template.Spec.Containers {
 		if !(reflect.DeepEqual(container.Env, b.Spec.Template.Spec.Containers[i].Env) &&
 			reflect.DeepEqual(container.Name, b.Spec.Template.Spec.Containers[i].Name) &&
 			reflect.DeepEqual(container.Ports, b.Spec.Template.Spec.Containers[i].Ports) &&
+			reflect.DeepEqual(container.LivenessProbe, b.Spec.Template.Spec.Containers[i].LivenessProbe) &&
+			reflect.DeepEqual(container.ReadinessProbe, b.Spec.Template.Spec.Containers[i].ReadinessProbe) &&
+			reflect.DeepEqual(container.TerminationMessagePolicy, b.Spec.Template.Spec.Containers[i].TerminationMessagePolicy) &&
+			reflect.DeepEqual(container.Image, b.Spec.Template.Spec.Containers[i].Image) &&
 			reflect.DeepEqual(container.VolumeMounts, b.Spec.Template.Spec.Containers[i].VolumeMounts)) {
-			return false
-		}
-	}
-	for i, trigger := range a.Spec.Triggers {
-		if !reflect.DeepEqual(trigger, b.Spec.Triggers[i]) {
 			return false
 		}
 	}
@@ -528,7 +475,7 @@ func (r *MigPlan) EqualsRegistryDC(a, b *appsv1.DeploymentConfig) bool {
 }
 
 // Build a Registry Service as desired for the specified cluster.
-func (r *MigPlan) BuildRegistryService(name string) (*kapi.Service, error) {
+func (r *MigPlan) BuildRegistryService(name string) *kapi.Service {
 	labels := r.GetCorrelationLabels()
 	labels[MigrationRegistryLabel] = string(r.UID)
 	labels["app"] = name
@@ -539,12 +486,12 @@ func (r *MigPlan) BuildRegistryService(name string) (*kapi.Service, error) {
 			Namespace: VeleroNamespace,
 		},
 	}
-	err := r.UpdateRegistryService(service, name)
-	return service, err
+	r.UpdateRegistryService(service, name)
+	return service
 }
 
 // Update a Registry Service as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) error {
+func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 	service.Spec = kapi.ServiceSpec{
 		Ports: []kapi.ServicePort{
 			kapi.ServicePort{
@@ -555,14 +502,14 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) erro
 			},
 		},
 		Selector: map[string]string{
-			"app":              name,
-			"deploymentconfig": name,
+			"app":        name,
+			"deployment": name,
 		},
 	}
-	return nil
 }
 
 // Get an existing registry Service on the specifiedcluster.
+//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
 func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, error) {
 	list := kapi.ServiceList{}
 	labels := r.GetCorrelationLabels()

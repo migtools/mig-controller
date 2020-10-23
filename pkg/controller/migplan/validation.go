@@ -58,6 +58,7 @@ const (
 	PvLimitExceeded                            = "PvLimitExceeded"
 	StorageEnsured                             = "StorageEnsured"
 	RegistriesEnsured                          = "RegistriesEnsured"
+	RegistriesHealthy                          = "RegistriesHealthy"
 	PvsDiscovered                              = "PvsDiscovered"
 	Closed                                     = "Closed"
 	SourcePodsNotHealthy                       = "SourcePodsNotHealthy"
@@ -133,6 +134,7 @@ const (
 	NfsAccessCannotBeValidatedMessage                 = "NFS access cannot be validated on the destination cluster."
 	StorageEnsuredMessage                             = "The storage resources have been created."
 	RegistriesEnsuredMessage                          = "The migration registry resources have been created."
+	RegistriesHealthyMessage                          = "The Migration registries are in a healthy state"
 	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
 	ClosedMessage                                     = "The migration plan is closed."
 	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
@@ -164,6 +166,10 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	// Storage
 	err = r.validateStorage(plan)
 	if err != nil {
+		deleteErr := r.deleteImageRegistryResources(plan)
+		if deleteErr != nil {
+			return liberr.Wrap(deleteErr)
+		}
 		return liberr.Wrap(err)
 	}
 
@@ -259,7 +265,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Category: Critical,
 			Message:  StorageNotReadyMessage,
 		})
-		return nil
+		return liberr.Wrap(r.deleteImageRegistryResources(plan))
 	}
 
 	return nil

@@ -110,9 +110,12 @@ func (t *Task) reportHealthCondition() {
 
 // Start a refresh on MigPlan and attached resources
 func (t *Task) startRefresh() error {
-	plan := t.PlanResources.MigPlan
+	plan, err := t.Owner.GetPlan(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	plan.Spec.Refresh = true
-	err := t.Client.Update(context.TODO(), plan)
+	err = t.Client.Update(context.TODO(), plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

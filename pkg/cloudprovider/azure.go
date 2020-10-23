@@ -13,9 +13,9 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	appsv1 "github.com/openshift/api/apps/v1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
 )
 
@@ -120,8 +120,8 @@ func (p *AzureProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret
 	return nil
 }
 
-func (p *AzureProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
-	envVars := dc.Spec.Template.Spec.Containers[0].Env
+func (p *AzureProvider) UpdateRegistryDeployment(deployment *appsv1.Deployment, name, dirName string) {
+	envVars := deployment.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
 	}
@@ -148,7 +148,7 @@ func (p *AzureProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirN
 			},
 		},
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, azureEnvVars...)
+	deployment.Spec.Template.Spec.Containers[0].Env = append(envVars, azureEnvVars...)
 }
 
 func (p *AzureProvider) Validate(secret *kapi.Secret) []string {

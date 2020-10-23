@@ -29,8 +29,10 @@ import (
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -68,6 +70,32 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{},
 	)
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to deployment registry referenced by MigPlan that have running migrations
+	err = c.Watch(
+		&registryHealth{
+			hostClient: mgr.GetClient(),
+			planLabels: map[string]string{
+				migapi.MigplanMigrationRunning: "true",
+			},
+			Interval: time.Second * 5},
+		&handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to deployment registry referenced by MigPlan that have failed migrations
+	err = c.Watch(
+		&registryHealth{
+			hostClient: mgr.GetClient(),
+			planLabels: map[string]string{
+				migapi.MigplanMigrationFailed: "true",
+			},
+			Interval: time.Second * 30},
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -186,6 +214,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}()
 
+	// Ensure migration state labels are present on Migplan
+	err = r.ensureMigplanLabelsForMigMigrations(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
@@ -256,9 +291,16 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Migration Registry Health check
+	err = r.ensureRegistryHealth(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Ready
 	plan.Status.SetReady(
-		plan.Status.HasCondition(StorageEnsured, PvsDiscovered, RegistriesEnsured) &&
+		plan.Status.HasCondition(StorageEnsured, PvsDiscovered, RegistriesEnsured, RegistriesHealthy) &&
 			!plan.Status.HasBlockerCondition(),
 		ReadyMessage)
 
@@ -273,6 +315,10 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	if !plan.Status.HasCondition(RegistriesHealthy) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -375,9 +421,130 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	return nil
 }
 
+func (r *ReconcileMigPlan) ensureMigplanLabelsForMigMigrations(plan *migapi.MigPlan) error {
+	// ensure labels for migplan having running migrations
+	err := r.ensureMigPlanRunningLabel(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// ensure labels for migplan having failed migrations
+	err = r.ensureMigPlanFailedLabel(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) ensureMigPlanRunningLabel(plan *migapi.MigPlan) error {
+	runningMigMigration := 0
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	for _, m := range migrations {
+		if m.Status.HasCondition(migctl.Running) {
+			runningMigMigration++
+			break
+		}
+	}
+
+	if runningMigMigration > 0 {
+		// migplan has atleast 1 migmigration running
+		if plan.Labels == nil {
+			plan.Labels = make(map[string]string)
+		}
+		plan.Labels[migapi.MigplanMigrationRunning] = "true"
+		return nil
+	}
+	// no running migmigrations remove the label
+	if plan.Labels != nil {
+		delete(plan.Labels, migapi.MigplanMigrationRunning)
+	}
+
+	return nil
+}
+
+func (r ReconcileMigPlan) ensureMigPlanFailedLabel(plan *migapi.MigPlan) error {
+	failedMigMigration := 0
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	for _, m := range migrations {
+		if m.Status.HasCondition(migctl.Failed) || m.Status.HasCondition(migctl.PlanNotReady) {
+			failedMigMigration++
+			break
+		}
+	}
+
+	if failedMigMigration > 0 {
+		// migplan has atleast 1 migmigration running
+		if plan.Labels == nil {
+			plan.Labels = make(map[string]string)
+		}
+		plan.Labels[migapi.MigplanMigrationFailed] = "true"
+		return nil
+	}
+
+	// no failed migmigrations remove the label
+	if plan.Labels != nil {
+		delete(plan.Labels, migapi.MigplanMigrationFailed)
+	}
+
+	return nil
+}
+
 // Update Status.ExcludedResources based on settings
 func (r *ReconcileMigPlan) setExcludedResourceList(plan *migapi.MigPlan) error {
 	excludedResources := Settings.Plan.ExcludedResources
 	plan.Status.ExcludedResources = excludedResources
+	return nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryResourcesForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
+	secret, err := plan.GetRegistrySecret(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if secret != nil {
+		err := client.Delete(context.Background(), secret)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	err = r.deleteImageRegistryDeploymentForClient(client, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	foundService, err := plan.GetRegistryService(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundService != nil {
+		err := client.Delete(context.Background(), foundService)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclient.Client, plan *migapi.MigPlan) error {
+	plan.Status.Conditions.DeleteCondition(RegistriesEnsured)
+	foundDeployment, err := plan.GetRegistryDeployment(client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if foundDeployment != nil {
+		err := client.Delete(context.Background(), foundDeployment, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
 	return nil
 }

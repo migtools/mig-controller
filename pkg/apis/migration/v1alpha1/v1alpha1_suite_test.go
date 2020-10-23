@@ -20,11 +20,13 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
@@ -40,16 +42,24 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		golog.Fatal(err)
 	}
-
-	if cfg, err = t.Start(); err != nil {
-		golog.Fatal(err)
+	setupControlPlane := os.Getenv("SETUP_CONTROL_PLANE")
+	s, _ := strconv.ParseBool(setupControlPlane)
+	if s {
+		if cfg, err = t.Start(); err != nil {
+			golog.Fatal(err)
+		}
 	}
 
-	if c, err = client.New(cfg, client.Options{Scheme: scheme.Scheme}); err != nil {
-		golog.Fatal(err)
+	c = fake.NewFakeClient()
+	if s {
+		if c, err = client.New(cfg, client.Options{Scheme: scheme.Scheme}); err != nil {
+			golog.Fatal(err)
+		}
 	}
 
 	code := m.Run()
-	t.Stop()
+	if s {
+		t.Stop()
+	}
 	os.Exit(code)
 }

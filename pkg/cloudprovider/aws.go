@@ -7,9 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-
-	"github.com/google/uuid"
-
 	"strconv"
 	"time"
 
@@ -19,11 +16,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	appsv1 "github.com/openshift/api/apps/v1"
-	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	kapi "k8s.io/api/core/v1"
-
+	"github.com/google/uuid"
 	"github.com/konveyor/mig-controller/pkg/settings"
+	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	kapi "k8s.io/api/core/v1"
 )
 
 var Settings = &settings.Settings
@@ -131,20 +128,25 @@ func (p *AWSProvider) UpdateCloudSecret(secret, cloudSecret *kapi.Secret) error 
 }
 
 func (p *AWSProvider) UpdateRegistrySecret(secret, registrySecret *kapi.Secret) error {
+	caBundle := p.CustomCABundle
+	if p.CustomCABundle == nil {
+		// always make sure we have a uniform format of data stored in secret k8s API
+		caBundle = []byte{}
+	}
 	registrySecret.Data = map[string][]byte{
 		"access_key":    []byte(secret.Data[AwsAccessKeyId]),
 		"secret_key":    []byte(secret.Data[AwsSecretAccessKey]),
-		"ca_bundle.pem": p.CustomCABundle,
+		"ca_bundle.pem": caBundle,
 	}
 	return nil
 }
 
-func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirName string) {
+func (p *AWSProvider) UpdateRegistryDeployment(deployment *appsv1.Deployment, name, dirName string) {
 	region := p.Region
 	if region == "" {
 		region = AwsS3DefaultRegion
 	}
-	envVars := dc.Spec.Template.Spec.Containers[0].Env
+	envVars := deployment.Spec.Template.Spec.Containers[0].Env
 	if envVars == nil {
 		envVars = []kapi.EnvVar{}
 	}
@@ -192,18 +194,18 @@ func (p *AWSProvider) UpdateRegistryDC(dc *appsv1.DeploymentConfig, name, dirNam
 			Value: strconv.FormatBool(p.Insecure),
 		},
 	}
-	dc.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
+	deployment.Spec.Template.Spec.Containers[0].Env = append(envVars, s3EnvVars...)
 
 	if len(p.CustomCABundle) > 0 {
-		dc.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			dc.Spec.Template.Spec.Containers[0].VolumeMounts,
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
 			kapi.VolumeMount{
 				Name:      "registry-secret",
 				ReadOnly:  true,
 				MountPath: "/etc/ssl/certs/ca_bundle.pem",
 				SubPath:   "ca_bundle.pem",
 			})
-		dc.Spec.Template.Spec.Volumes = append(dc.Spec.Template.Spec.Volumes, kapi.Volume{
+		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, kapi.Volume{
 			Name: "registry-secret",
 			VolumeSource: kapi.VolumeSource{
 				Secret: &kapi.SecretVolumeSource{

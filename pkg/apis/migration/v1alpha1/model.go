@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
+
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,6 +15,11 @@ import (
 //
 // Convenience functions for managing the object model.
 ///
+
+const (
+	MigplanMigrationRunning = "migplan.migration.openshift.io/running"
+	MigplanMigrationFailed  = "migplan.migration.openshift.io/failed"
+)
 
 // List `open` MigPlans
 // Returns and empty list when none found.
@@ -24,6 +31,16 @@ func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 		return nil, err
 	}
 
+	return list.Items, err
+}
+
+// List MigPlans with labels
+// Returns and empty list when none found.
+func ListPlansWithLabels(client k8sclient.Client, labels map[string]string) ([]MigPlan, error) {
+	list := MigPlanList{}
+	err := client.List(context.TODO(), &k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(labels),
+	}, &list)
 	return list.Items, err
 }
 
