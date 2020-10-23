@@ -230,13 +230,15 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 				return liberr.Wrap(err)
 			}
 		}
-		if analytic.Spec.AnalyzeImageCount {
+		if analytic.Spec.AnalyzeImageCount && !isExcluded("imagestreams", excludedResources) {
 			err := r.analyzeImages(client, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 		}
-		if analytic.Spec.AnalyzePVCapacity {
+		if analytic.Spec.AnalyzePVCapacity && !(isExcluded("persistentvolumes", excludedResources) &&
+			isExcluded("persistentvolumeclaims", excludedResources)) {
+
 			err := r.analyzePVCapacity(client, &ns)
 			if err != nil {
 				return liberr.Wrap(err)
