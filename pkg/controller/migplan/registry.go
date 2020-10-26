@@ -260,7 +260,13 @@ func (r ReconcileMigPlan) ensureRegistryService(client k8sclient.Client, plan *m
 		return nil
 	}
 	plan.UpdateRegistryService(foundService, name)
-	err = client.Update(context.TODO(), foundService)
+	// need to delete and update because the version of controller-runtime
+	// client we are using does not support Patch yet.
+	err = client.Delete(context.Background(), foundService)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = client.Create(context.Background(), foundService)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

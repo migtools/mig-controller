@@ -43,6 +43,10 @@ func TestMain(m *testing.M) {
 		golog.Fatal(err)
 	}
 	setupControlPlane := os.Getenv("SETUP_CONTROL_PLANE")
+	if setupControlPlane == "" {
+		// default to false
+		setupControlPlane = "false"
+	}
 	s, _ := strconv.ParseBool(setupControlPlane)
 	if s {
 		if cfg, err = t.Start(); err != nil {
