@@ -1181,6 +1181,26 @@ func (t *Task) getBothClientsWithNamespaces() ([]compat.Client, [][]string, erro
 	return clientList, namespaceList, nil
 }
 
+// TODO: Remove progress report post UI changes for 1.4.0
+// Get a progress report.
+// Returns: phase, n, total.
+func (r Itinerary) progressReport(phaseName string) (int, int, string) {
+	n := 0
+	total := 0
+	currStep := ""
+	for j := 0; j < len(r.Steps); j++ {
+		for i, phase := range r.Steps[j].Phases {
+			if phase.Name == phaseName {
+				n = total + i + 1
+				currStep = r.Steps[j].Name
+			}
+		}
+		total += len(r.Steps[j].Phases)
+	}
+
+	return n, total, currStep
+}
+
 // GetStepForPhase returns which high level step current phase belongs to
 func (r *Itinerary) GetStepForPhase(phaseName string) string {
 	for _, step := range r.Steps {
