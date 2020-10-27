@@ -74,32 +74,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to deployment registry referenced by MigPlan that have running migrations
-	err = c.Watch(
-		&registryHealth{
-			hostClient: mgr.GetClient(),
-			planLabels: map[string]string{
-				migapi.MigplanMigrationRunning: "true",
-			},
-			Interval: time.Second * 5},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to deployment registry referenced by MigPlan that have failed migrations
-	err = c.Watch(
-		&registryHealth{
-			hostClient: mgr.GetClient(),
-			planLabels: map[string]string{
-				migapi.MigplanMigrationFailed: "true",
-			},
-			Interval: time.Second * 30},
-		&handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
 	// Watch for changes to MigClusters referenced by MigPlans
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
@@ -214,13 +188,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 	}()
 
-	// Ensure migration state labels are present on Migplan
-	err = r.ensureMigplanLabelsForMigMigrations(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
 	// Plan closed.
 	closed, err := r.handleClosed(plan)
 	if err != nil {
@@ -284,23 +251,9 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Migration Registry
-	err = r.ensureMigRegistries(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	// Migration Registry Health check
-	err = r.ensureRegistryHealth(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
 	// Ready
 	plan.Status.SetReady(
-		plan.Status.HasCondition(StorageEnsured, PvsDiscovered, RegistriesEnsured, RegistriesHealthy) &&
+		plan.Status.HasCondition(StorageEnsured, PvsDiscovered) &&
 			!plan.Status.HasBlockerCondition(),
 		ReadyMessage)
 
@@ -315,10 +268,6 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	if !plan.Status.HasCondition(RegistriesHealthy) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -416,82 +365,6 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 			Category: Advisory,
 			Message:  SuspendedMessage,
 		})
-	}
-
-	return nil
-}
-
-func (r *ReconcileMigPlan) ensureMigplanLabelsForMigMigrations(plan *migapi.MigPlan) error {
-	// ensure labels for migplan having running migrations
-	err := r.ensureMigPlanRunningLabel(plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// ensure labels for migplan having failed migrations
-	err = r.ensureMigPlanFailedLabel(plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	return nil
-}
-
-func (r ReconcileMigPlan) ensureMigPlanRunningLabel(plan *migapi.MigPlan) error {
-	runningMigMigration := 0
-	migrations, err := plan.ListMigrations(r)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	for _, m := range migrations {
-		if m.Status.HasCondition(migctl.Running) {
-			runningMigMigration++
-			break
-		}
-	}
-
-	if runningMigMigration > 0 {
-		// migplan has atleast 1 migmigration running
-		if plan.Labels == nil {
-			plan.Labels = make(map[string]string)
-		}
-		plan.Labels[migapi.MigplanMigrationRunning] = "true"
-		return nil
-	}
-	// no running migmigrations remove the label
-	if plan.Labels != nil {
-		delete(plan.Labels, migapi.MigplanMigrationRunning)
-	}
-
-	return nil
-}
-
-func (r ReconcileMigPlan) ensureMigPlanFailedLabel(plan *migapi.MigPlan) error {
-	failedMigMigration := 0
-	migrations, err := plan.ListMigrations(r)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	for _, m := range migrations {
-		if m.Status.HasCondition(migctl.Failed) || m.Status.HasCondition(migctl.PlanNotReady) {
-			failedMigMigration++
-			break
-		}
-	}
-
-	if failedMigMigration > 0 {
-		// migplan has atleast 1 migmigration running
-		if plan.Labels == nil {
-			plan.Labels = make(map[string]string)
-		}
-		plan.Labels[migapi.MigplanMigrationFailed] = "true"
-		return nil
-	}
-
-	// no failed migmigrations remove the label
-	if plan.Labels != nil {
-		delete(plan.Labels, migapi.MigplanMigrationFailed)
 	}
 
 	return nil

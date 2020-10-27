@@ -30,9 +30,6 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 	if storage == nil {
 		return nil
 	}
-	if !storage.Status.IsReady() {
-		return liberr.Wrap(r.deleteImageRegistryResources(plan))
-	}
 	clusters, err := r.planClusters(plan)
 	if err != nil {
 		return liberr.Wrap(err)

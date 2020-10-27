@@ -166,10 +166,6 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	// Storage
 	err = r.validateStorage(plan)
 	if err != nil {
-		deleteErr := r.deleteImageRegistryResources(plan)
-		if deleteErr != nil {
-			return liberr.Wrap(deleteErr)
-		}
 		return liberr.Wrap(err)
 	}
 
@@ -265,7 +261,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Category: Critical,
 			Message:  StorageNotReadyMessage,
 		})
-		return liberr.Wrap(r.deleteImageRegistryResources(plan))
 	}
 
 	return nil

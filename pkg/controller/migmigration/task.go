@@ -26,6 +26,7 @@ const (
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
 	Prepare                         = "Prepare"
+	CreateRegistries                = "CreateRegistries"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
 	PostBackupHooks                 = "PostBackupHooks"
@@ -50,6 +51,7 @@ const (
 	QuiesceApplications             = "QuiesceApplications"
 	EnsureQuiesced                  = "EnsureQuiesced"
 	UnQuiesceApplications           = "UnQuiesceApplications"
+	WaitForRegistriesReady          = "WaitForRegistriesReady"
 	EnsureStageBackup               = "EnsureStageBackup"
 	StageBackupCreated              = "StageBackupCreated"
 	StageBackupFailed               = "StageBackupFailed"
@@ -66,6 +68,7 @@ const (
 	EnsureStagePodsTerminated       = "EnsureStagePodsTerminated"
 	EnsureAnnotationsDeleted        = "EnsureAnnotationsDeleted"
 	EnsureMigratedDeleted           = "EnsureMigratedDeleted"
+	DeleteRegistries                = "DeleteRegistries"
 	DeleteMigrated                  = "DeleteMigrated"
 	DeleteBackups                   = "DeleteBackups"
 	DeleteRestores                  = "DeleteRestores"
@@ -98,6 +101,7 @@ var StageItinerary = Itinerary{
 		{phase: StartRefresh},
 		{phase: WaitForRefresh},
 		{phase: Prepare},
+		{phase: CreateRegistries},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
 		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
@@ -106,6 +110,7 @@ var StageItinerary = Itinerary{
 		{phase: AnnotateResources, any: HasPVs | HasISs},
 		{phase: RestartRestic, all: HasStagePods},
 		{phase: ResticRestarted, all: HasStagePods},
+		{phase: WaitForRegistriesReady},
 		{phase: QuiesceApplications, all: Quiesce},
 		{phase: EnsureQuiesced, all: Quiesce},
 		{phase: EnsureStageBackup, any: HasPVs | HasISs},
@@ -113,6 +118,7 @@ var StageItinerary = Itinerary{
 		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
 		{phase: EnsureStageRestore, any: HasPVs | HasISs},
 		{phase: StageRestoreCreated, any: HasPVs | HasISs},
+		{phase: DeleteRegistries},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureStagePodsTerminated, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
@@ -128,8 +134,10 @@ var FinalItinerary = Itinerary{
 		{phase: StartRefresh},
 		{phase: WaitForRefresh},
 		{phase: Prepare},
+		{phase: CreateRegistries},
 		{phase: EnsureCloudSecretPropagated},
 		{phase: PreBackupHooks},
+		{phase: WaitForRegistriesReady},
 		{phase: EnsureInitialBackup},
 		{phase: InitialBackupCreated},
 		{phase: EnsureStagePodsFromRunning, all: HasPVs},
@@ -155,6 +163,7 @@ var FinalItinerary = Itinerary{
 		{phase: EnsureFinalRestore},
 		{phase: FinalRestoreCreated},
 		{phase: PostRestoreHooks},
+		{phase: DeleteRegistries},
 		{phase: Verification, all: HasVerify},
 		{phase: Completed},
 	},
@@ -166,6 +175,7 @@ var CancelItinerary = Itinerary{
 		{phase: Canceling},
 		{phase: DeleteBackups},
 		{phase: DeleteRestores},
+		{phase: DeleteRegistries},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: Canceled},
@@ -177,6 +187,7 @@ var FailedItinerary = Itinerary{
 	Name: "Failed",
 	Steps: []Step{
 		{phase: MigrationFailed},
+		{phase: DeleteRegistries},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: Completed},
@@ -189,6 +200,7 @@ var RollbackItinerary = Itinerary{
 		{phase: Rollback},
 		{phase: DeleteBackups},
 		{phase: DeleteRestores},
+		{phase: DeleteRegistries},
 		{phase: EnsureStagePodsDeleted, all: HasStagePods},
 		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
 		{phase: DeleteMigrated},
@@ -271,12 +283,14 @@ func (t *Task) Run() error {
 		}
 	case StartRefresh:
 		t.Requeue = PollReQ
-		err = t.startRefresh()
+		started, err := t.startRefresh()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
+		if started {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case WaitForRefresh:
 		t.Requeue = PollReQ
@@ -300,6 +314,46 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+
+	case CreateRegistries:
+		t.Requeue = PollReQ
+		nEnsured, err := t.ensureMigRegistries()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if nEnsured == 2 {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+
+	case WaitForRegistriesReady:
+		t.Requeue = PollReQ
+		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if nEnsured == 2 && message == "" {
+			setMigRegistryHealthyCondition(t.Owner)
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+
+	case DeleteRegistries:
+		t.Requeue = PollReQ
+		err := t.deleteImageRegistryResources()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -552,16 +606,6 @@ func (t *Task) Run() error {
 		if restore == nil {
 			return errors.New("Restore not found")
 		}
-		report, err := t.ensureDestinationStagePodsStarted()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if report.failed {
-			t.fail(DestinationStagePodsFailed, report.reasons)
-			t.Requeue = NoReQ
-			break
-		}
-		t.Log.Info("all destination stage pods are ready")
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
 			t.setResticConditions(restore)
@@ -1041,8 +1085,8 @@ func (t *Task) getBothClusters() []*migapi.MigCluster {
 }
 
 // Get both source and destination clients.
-func (t *Task) getBothClients() ([]k8sclient.Client, error) {
-	list := []k8sclient.Client{}
+func (t *Task) getBothClients() ([]compat.Client, error) {
+	list := []compat.Client{}
 	for _, cluster := range t.getBothClusters() {
 		client, err := cluster.GetClient(t.Client)
 		if err != nil {
@@ -1055,7 +1099,7 @@ func (t *Task) getBothClients() ([]k8sclient.Client, error) {
 }
 
 // Get both source and destination clients with associated namespaces.
-func (t *Task) getBothClientsWithNamespaces() ([]k8sclient.Client, [][]string, error) {
+func (t *Task) getBothClientsWithNamespaces() ([]compat.Client, [][]string, error) {
 	clientList, err := t.getBothClients()
 	if err != nil {
 		return nil, nil, liberr.Wrap(err)
