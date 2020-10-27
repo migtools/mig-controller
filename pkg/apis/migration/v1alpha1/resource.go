@@ -164,7 +164,7 @@ func (r *MigHook) HasReconciled() bool {
 }
 
 // Direct
-func (r *MigDirect) GetCorrelationLabels() map[string]string {
+func (r *DirectVolumeMigration) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
 		PartOfLabel: Application,
@@ -172,19 +172,19 @@ func (r *MigDirect) GetCorrelationLabels() map[string]string {
 	}
 }
 
-func (r *MigDirect) GetCorrelationLabel() (string, string) {
+func (r *DirectVolumeMigration) GetCorrelationLabel() (string, string) {
 	return CorrelationLabel(r, r.UID)
 }
 
-func (r *MigDirect) GetNamespace() string {
+func (r *DirectVolumeMigration) GetNamespace() string {
 	return r.Namespace
 }
 
-func (r *MigDirect) GetName() string {
+func (r *DirectVolumeMigration) GetName() string {
 	return r.Name
 }
 
-func (r *MigDirect) MarkReconciled() {
+func (r *DirectVolumeMigration) MarkReconciled() {
 	uuid, _ := uuid.NewUUID()
 	if r.Annotations == nil {
 		r.Annotations = map[string]string{}
@@ -193,7 +193,7 @@ func (r *MigDirect) MarkReconciled() {
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
-func (r *MigDirect) HasReconciled() bool {
+func (r *DirectVolumeMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 

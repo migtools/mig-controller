@@ -22,17 +22,17 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// MigDirectSpec defines the desired state of MigDirect
-type MigDirectSpec struct {
+// DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
+type DirectVolumeMigrationSpec struct {
 	SrcMigClusterRef            *kapi.ObjectReference   `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef           *kapi.ObjectReference   `json:"destMigClusterRef,omitempty"`
 	PersistentVolumeClaims      []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
-	StorageClassMapping         map[string]string
-	CreateDestinationNamespaces bool `json:"createDestinationNamespaces,omitempty"`
+	StorageClassMapping         map[string]string       `json:"storageClassMapping,omitempty"`
+	CreateDestinationNamespaces bool                    `json:"createDestinationNamespaces,omitempty"`
 }
 
-// MigDirectStatus defines the observed state of MigDirect
-type MigDirectStatus struct {
+// DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
+type DirectVolumeMigrationStatus struct {
 	Conditions
 	ObservedDigest string       `json:"observedDigest"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
@@ -42,40 +42,41 @@ type MigDirectStatus struct {
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
-// MigDirectStatus
+// DirectVolumeMigrationStatus
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MigDirect is the Schema for the migdirects API
+// DirectVolumeMigration is the Schema for the direct pv migration API
+// +kubebuilder:resource:path=directvolumemigrations,shortName=dvm
 // +k8s:openapi-gen=true
-type MigDirect struct {
+type DirectVolumeMigration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MigDirectSpec   `json:"spec,omitempty"`
-	Status MigDirectStatus `json:"status,omitempty"`
+	Spec   DirectVolumeMigrationSpec   `json:"spec,omitempty"`
+	Status DirectVolumeMigrationStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MigDirectList contains a list of MigDirect
-type MigDirectList struct {
+// DirectVolumeMigrationList contains a list of DirectVolumeMigration
+type DirectVolumeMigrationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []MigDirect `json:"items"`
+	Items           []DirectVolumeMigration `json:"items"`
 }
 
-func (r *MigDirect) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
+func (r *DirectVolumeMigration) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
 	return GetCluster(client, r.Spec.SrcMigClusterRef)
 }
 
-func (r *MigDirect) GetDestinationCluster(client k8sclient.Client) (*MigCluster, error) {
+func (r *DirectVolumeMigration) GetDestinationCluster(client k8sclient.Client) (*MigCluster, error) {
 	return GetCluster(client, r.Spec.DestMigClusterRef)
 }
 
 // Add (de-duplicated) errors.
-func (r *MigDirect) AddErrors(errors []string) {
+func (r *DirectVolumeMigration) AddErrors(errors []string) {
 	m := map[string]bool{}
 	for _, e := range r.Status.Errors {
 		m[e] = true
@@ -88,11 +89,11 @@ func (r *MigDirect) AddErrors(errors []string) {
 	}
 }
 
-// HasErrors will notify about error presence on the MigDirect resource
-func (r *MigDirect) HasErrors() bool {
+// HasErrors will notify about error presence on the DirectVolumeMigration resource
+func (r *DirectVolumeMigration) HasErrors() bool {
 	return len(r.Status.Errors) > 0
 }
 
 func init() {
-	SchemeBuilder.Register(&MigDirect{}, &MigDirectList{})
+	SchemeBuilder.Register(&DirectVolumeMigration{}, &DirectVolumeMigrationList{})
 }

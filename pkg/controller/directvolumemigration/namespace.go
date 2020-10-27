@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"context"

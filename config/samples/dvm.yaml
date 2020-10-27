@@ -1,0 +1,21 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: DirectVolumeMigration
+metadata:
+  name: direct1
+  namespace: openshift-migration
+spec:
+  destMigClusterRef:
+    name: host
+    namespace: openshift-migration
+  persistentVolumeClaims:
+  - name: pvc-0
+    namespace: pvc-migrate-bmark-1
+  - name: pvc-0
+    namespace: pvc-migrate-bmark-2
+  - name: pvc-0
+    namespace: pvc-migrate-bmark-3
+  - name: pvc-1
+    namespace: pvc-migrate-bmark-3
+  srcMigClusterRef:
+    name: ocp3
+    namespace: openshift-migration

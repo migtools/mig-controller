@@ -4,12 +4,14 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: migdirects.migration.openshift.io
+  name: directvolumemigrations.migration.openshift.io
 spec:
   group: migration.openshift.io
   names:
-    kind: MigDirect
-    plural: migdirects
+    kind: DirectVolumeMigration
+    plural: directvolumemigrations
+    shortNames:
+    - dvm
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -28,6 +30,8 @@ spec:
           type: object
         spec:
           properties:
+            createDestinationNamespaces:
+              type: boolean
             destMigClusterRef:
               type: object
             persistentVolumeClaims:
@@ -35,6 +39,8 @@ spec:
                 type: object
               type: array
             srcMigClusterRef:
+              type: object
+            storageClassMapping:
               type: object
           type: object
         status:

@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileMigDirect) migrate(direct *migapi.MigDirect) (time.Duration, error) {
+func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration) (time.Duration, error) {
 	// Started
 	if direct.Status.StartTimestamp == nil {
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}

@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"context"
@@ -63,7 +63,7 @@ const (
 )
 
 // Validate the direct resource
-func (r ReconcileMigDirect) validate(direct *migapi.MigDirect) error {
+func (r ReconcileDirectVolumeMigration) validate(direct *migapi.DirectVolumeMigration) error {
 	err := r.validateSrcCluster(direct)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -79,7 +79,7 @@ func (r ReconcileMigDirect) validate(direct *migapi.MigDirect) error {
 	return nil
 }
 
-func (r ReconcileMigDirect) validateSrcCluster(direct *migapi.MigDirect) error {
+func (r ReconcileDirectVolumeMigration) validateSrcCluster(direct *migapi.DirectVolumeMigration) error {
 	ref := direct.Spec.SrcMigClusterRef
 
 	// Not Set
@@ -123,7 +123,7 @@ func (r ReconcileMigDirect) validateSrcCluster(direct *migapi.MigDirect) error {
 	return nil
 }
 
-func (r ReconcileMigDirect) validateDestCluster(direct *migapi.MigDirect) error {
+func (r ReconcileDirectVolumeMigration) validateDestCluster(direct *migapi.DirectVolumeMigration) error {
 	ref := direct.Spec.DestMigClusterRef
 
 	if !migref.RefSet(ref) {
@@ -178,7 +178,14 @@ func (r ReconcileMigDirect) validateDestCluster(direct *migapi.MigDirect) error 
 	return nil
 }
 
-func (r ReconcileMigDirect) validatePVCs(direct *migapi.MigDirect) error {
+// TODO: Validate that storage class mappings have valid storage class selections
+// Leaving as TODO because this is technically already validated from the
+// migplan, so not necessary from directvolumemigration controller to be fair
+func (r ReconcileDirectVolumeMigration) validateStorageClassMappings(direct *migapi.DirectVolumeMigration) error {
+	return nil
+}
+
+func (r ReconcileDirectVolumeMigration) validatePVCs(direct *migapi.DirectVolumeMigration) error {
 	allPVCs := direct.Spec.PersistentVolumeClaims
 
 	// Check if PVCs were set

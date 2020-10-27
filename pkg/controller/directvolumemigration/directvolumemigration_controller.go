@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package migdirect
+package directvolumemigration
 
 import (
 	"context"
@@ -39,7 +39,7 @@ var log = logging.WithName("direct")
 * business logic.  Delete these comments after modifying this file.*
  */
 
-// Add creates a new MigDirect Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new DirectVolumeMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -47,28 +47,28 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigDirect{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileDirectVolumeMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("migdirect-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("directvolumemigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to MigDirect
-	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.MigDirect{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to DirectVolumeMigration
+	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectVolumeMigration{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by MigDirect - change this for objects you create
+	// Uncomment watch a Deployment created by DirectVolumeMigration - change this for objects you create
 	/*err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &migrationv1alpha1.MigDirect{},
+		OwnerType:    &migrationv1alpha1.DirectVolumeMigration{},
 	})
 	if err != nil {
 		return err
@@ -77,26 +77,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileMigDirect{}
+var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 
-// ReconcileMigDirect reconciles a MigDirect object
-type ReconcileMigDirect struct {
+// ReconcileDirectVolumeMigration reconciles a DirectVolumeMigration object
+type ReconcileDirectVolumeMigration struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a MigDirect object and makes changes based on the state read
-// and what is in the MigDirect.Spec
+// Reconcile reads that state of the cluster for a DirectVolumeMigration object and makes changes based on the state read
+// and what is in the DirectVolumeMigration.Spec
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
 // a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migdirects,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=migdirects/status,verbs=get;update;patch
-func (r *ReconcileMigDirect) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the MigDirect instance
-	direct := &migrationv1alpha1.MigDirect{}
+// +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations,verbs=get;list;watch;create;update;patch;delete;
+// +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations/status,verbs=get;update;patch
+func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	// Fetch the DirectVolumeMigration instance
+	direct := &migrationv1alpha1.DirectVolumeMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, direct)
 	if err != nil {
 		if errors.IsNotFound(err) {

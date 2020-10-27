@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ type stunnelConfig struct {
 }
 
 // TODO: Parameterize this more to support custom
-// networking configs from migdirect spec
+// networking configs from directvolumemigration spec
 const stunnelClientConfigTemplate = `apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -164,9 +164,9 @@ func (t *Task) createStunnelConfig() error {
 		clientConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "migdirect-stunnel-config",
+				Name:      "directvolumemigration-stunnel-config",
 				Labels: map[string]string{
-					"app": "migdirect-rsync-transfer",
+					"app": "directvolumemigration-rsync-transfer",
 				},
 			},
 		}
@@ -178,9 +178,9 @@ func (t *Task) createStunnelConfig() error {
 		destConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "migdirect-stunnel-config",
+				Name:      "directvolumemigration-stunnel-config",
 				Labels: map[string]string{
-					"app": "migdirect-rsync-transfer",
+					"app": "directvolumemigration-rsync-transfer",
 				},
 			},
 		}
@@ -240,7 +240,7 @@ func (t *Task) setupCerts() error {
 		Province:           []string{"NC"},
 		Locality:           []string{"RDU"},
 		Organization:       []string{"Migration Engineering"},
-		OrganizationalUnit: []string{"IT"},
+		OrganizationalUnit: []string{"Engineering"},
 	}
 
 	certTemp := x509.Certificate{
@@ -295,9 +295,9 @@ func (t *Task) setupCerts() error {
 		srcSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "migdirect-stunnel-certs",
+				Name:      "directvolumemigration-stunnel-certs",
 				Labels: map[string]string{
-					"app": "migdirect-rsync-transfer",
+					"app": "directvolumemigration-rsync-transfer",
 				},
 			},
 			Data: map[string][]byte{
@@ -333,10 +333,10 @@ func (t *Task) createStunnelClientPods() error {
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "migdirect-rsync-transfer-svc",
+				Name:      "directvolumemigration-rsync-transfer-svc",
 				Namespace: ns,
 				Labels: map[string]string{
-					"app": "migdirect-rsync-transfer",
+					"app": "directvolumemigration-rsync-transfer",
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -349,9 +349,9 @@ func (t *Task) createStunnelClientPods() error {
 					},
 				},
 				Selector: map[string]string{
-					"app":     "migdirect-rsync-transfer",
+					"app":     "directvolumemigration-rsync-transfer",
 					"purpose": "stunnel",
-					"owner":   "migdirect",
+					"owner":   "directvolumemigration",
 				},
 				Type: corev1.ServiceTypeClusterIP,
 			},
@@ -362,7 +362,7 @@ func (t *Task) createStunnelClientPods() error {
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "migdirect-stunnel-config",
+							Name: "directvolumemigration-stunnel-config",
 						},
 					},
 				},
@@ -371,7 +371,7 @@ func (t *Task) createStunnelClientPods() error {
 				Name: "stunnel-certs",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "migdirect-stunnel-certs",
+						SecretName: "directvolumemigration-stunnel-certs",
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "tls.crt",
@@ -424,13 +424,13 @@ func (t *Task) createStunnelClientPods() error {
 		})
 
 		labels := map[string]string{
-			"app":     "migdirect-rsync-transfer",
-			"owner":   "migdirect",
+			"app":     "directvolumemigration-rsync-transfer",
+			"owner":   "directvolumemigration",
 			"purpose": "stunnel",
 		}
 		clientPod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "migdirect-stunnel-transfer",
+				Name:      "directvolumemigration-stunnel-transfer",
 				Namespace: ns,
 				Labels:    labels,
 			},
@@ -468,8 +468,8 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 	pvcMap := t.getPVCNamespaceMap()
 
 	selector := labels.SelectorFromSet(map[string]string{
-		"app":     "migdirect-rsync-transfer",
-		"owner":   "migdirect",
+		"app":     "directvolumemigration-rsync-transfer",
+		"owner":   "directvolumemigration",
 		"purpose": "stunnel",
 	})
 	for ns, _ := range pvcMap {

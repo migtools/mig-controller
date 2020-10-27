@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"crypto/rsa"
@@ -120,7 +120,7 @@ var FailedItinerary = Itinerary{
 // A task that provides the complete migration workflow.
 // Log - A controller's logger.
 // Client - A controller's (local) client.
-// Owner - A MigDirect resource.
+// Owner - A DirectVolumeMigration resource.
 // Phase - The task phase.
 // Requeue - The requeueAfter duration. 0 indicates no requeue.
 // Itinerary - The phase itinerary.
@@ -129,7 +129,7 @@ var FailedItinerary = Itinerary{
 type Task struct {
 	Log         logr.Logger
 	Client      k8sclient.Client
-	Owner       *migapi.MigDirect
+	Owner       *migapi.DirectVolumeMigration
 	SSHKeys     *sshKeys
 	RsyncRoutes map[string]string
 	Phase       string

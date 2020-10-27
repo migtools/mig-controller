@@ -1,4 +1,4 @@
-package migdirect
+package directvolumemigration
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func (t *Task) createDestinationPVCs() error {
 		}
 		err = destClient.Create(context.TODO(), &destPVC)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("PVC already exists on destination", pvc.Name)
+			t.Log.Info("PVC already exists on destination", "name", pvc.Name)
 		} else if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func (t *Task) createDestinationPVCs() error {
 }
 
 func (t *Task) getDestinationStorageClass(sourceStorageClass string) string {
-	// TODO: Set default
+	// TODO: Set sane default
 	defaultStorageClass := "gp2"
 	if destStorageClass, ok := t.Owner.Spec.StorageClassMapping[sourceStorageClass]; ok {
 		return destStorageClass
