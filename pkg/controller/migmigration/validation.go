@@ -239,20 +239,19 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}
-	message := ""
 	unHealthyClusterName := ""
 
 	plan, err := migration.GetPlan(c)
 	if err != nil {
-		return nEnsured, message, err
+		return 0, "", liberr.Wrap(err)
 	}
 	srcCluster, err := plan.GetSourceCluster(c)
 	if err != nil {
-		return nEnsured, message, err
+		return 0, "", liberr.Wrap(err)
 	}
 	destCluster, err := plan.GetDestinationCluster(c)
 	if err != nil {
-		return nEnsured, message, err
+		return 0, "", liberr.Wrap(err)
 	}
 
 	clusters := []*migapi.MigCluster{srcCluster, destCluster}
@@ -265,19 +264,19 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 
 		client, err := cluster.GetClient(c)
 		if err != nil {
-			return nEnsured, message, liberr.Wrap(err)
+			return nEnsured, "", liberr.Wrap(err)
 		}
 
 		registryPods, err := getRegistryPods(plan, client)
 		if err != nil {
 			log.Trace(err)
-			return nEnsured, message, liberr.Wrap(err)
+			return nEnsured, "", liberr.Wrap(err)
 		}
 
 		registryPodCount := len(registryPods.Items)
 		if registryPodCount < 1 {
 			unHealthyClusterName = cluster.ObjectMeta.Name
-			message = fmt.Sprintf("Migration Registry Pod is missing from cluster %s", unHealthyClusterName)
+			message := fmt.Sprintf("Migration Registry Pod is missing from cluster %s", unHealthyClusterName)
 			return nEnsured, message, nil
 		}
 
@@ -292,11 +291,12 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 	}
 
 	if nEnsured != 2 {
-		message = fmt.Sprintf("Migration Registry Pod %s/%s is in unhealthy state on cluster %s",
+		message := fmt.Sprintf("Migration Registry Pod %s/%s is in unhealthy state on cluster %s",
 			unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName)
+		return nEnsured, message, nil
 	}
 
-	return nEnsured, message, nil
+	return nEnsured, "", nil
 }
 
 func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
