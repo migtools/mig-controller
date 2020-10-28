@@ -90,9 +90,9 @@ func Test_Itineraries(t *testing.T) {
 	stage := StageItinerary
 	common := Itinerary{}
 
-	for i, step := range StageItinerary.Steps {
+	for _, step := range StageItinerary.Steps {
 		found := false
-		for _, finalStep := range FinalItinerary.Steps[i:] {
+		for _, finalStep := range FinalItinerary.Steps {
 			if step.phase == finalStep.phase {
 				common.Steps = append(common.Steps, step)
 				found = true
