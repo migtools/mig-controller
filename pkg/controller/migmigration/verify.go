@@ -9,6 +9,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	health "github.com/konveyor/mig-controller/pkg/health"
+	"k8s.io/apimachinery/pkg/api/errors"
 )
 
 // VerificationCompleted will determine when the verification should be stopped
@@ -109,39 +110,63 @@ func (t *Task) reportHealthCondition() {
 }
 
 // Start a refresh on MigPlan and attached resources
-func (t *Task) startRefresh() error {
+func (t *Task) startRefresh() (bool, error) {
+	started := false
+
 	plan, err := t.Owner.GetPlan(t.Client)
 	if err != nil {
-		return liberr.Wrap(err)
+		return started, liberr.Wrap(err)
 	}
 	plan.Spec.Refresh = true
 	err = t.Client.Update(context.TODO(), plan)
 	if err != nil {
-		return liberr.Wrap(err)
+		if errors.IsConflict(err) {
+			return started, nil
+		}
+		return started, liberr.Wrap(err)
 	}
 
-	storage := t.PlanResources.MigStorage
+	storage, err := plan.GetStorage(t.Client)
+	if err != nil {
+		return started, liberr.Wrap(err)
+	}
 	storage.Spec.Refresh = true
 	err = t.Client.Update(context.TODO(), storage)
 	if err != nil {
-		return liberr.Wrap(err)
+		if errors.IsConflict(err) {
+			return started, nil
+		}
+		return started, liberr.Wrap(err)
 	}
 
-	srcCluster := t.PlanResources.SrcMigCluster
+	srcCluster, err := plan.GetSourceCluster(t.Client)
+	if err != nil {
+		return started, liberr.Wrap(err)
+	}
 	srcCluster.Spec.Refresh = true
 	err = t.Client.Update(context.TODO(), srcCluster)
 	if err != nil {
-		return liberr.Wrap(err)
+		if errors.IsConflict(err) {
+			return started, nil
+		}
+		return started, liberr.Wrap(err)
 	}
 
-	destCluster := t.PlanResources.DestMigCluster
+	destCluster, err := plan.GetDestinationCluster(t.Client)
+	if err != nil {
+		return started, liberr.Wrap(err)
+	}
 	destCluster.Spec.Refresh = true
 	err = t.Client.Update(context.TODO(), destCluster)
 	if err != nil {
-		return liberr.Wrap(err)
+		if errors.IsConflict(err) {
+			return started, nil
+		}
+		return started, liberr.Wrap(err)
 	}
 
-	return nil
+	started = true
+	return started, nil
 }
 
 // Verify plan finished with refresh before migrating

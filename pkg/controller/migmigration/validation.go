@@ -1,9 +1,16 @@
 package migmigration
 
 import (
+	"context"
+	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	corev1 "k8s.io/api/core/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -20,6 +27,8 @@ const (
 	ResticErrors        = "ResticErrors"
 	ResticVerifyErrors  = "ResticVerifyErrors"
 	StageNoOp           = "StageNoOp"
+	RegistriesHealthy   = "RegistriesHealthy"
+	RegistriesUnhealthy = "RegistriesUnhealthy"
 )
 
 // Categories
@@ -59,6 +68,7 @@ const (
 	ResticErrorsMessage        = "There were errors found in %d Restic volume restores. See restore `%s` for details"
 	ResticVerifyErrorsMessage  = "There were verify errors found in %d Restic volume restores. See restore `%s` for details"
 	StageNoOpMessage           = "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated."
+	RegistriesHealthyMessage   = "The migration registries are healthy."
 )
 
 // Validate the plan resource.
@@ -72,6 +82,12 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 
 	// Final migration.
 	err = r.validateFinalMigration(plan, migration)
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
+
+	// Validate registries running.
+	err = r.validateRegistriesRunning(migration)
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
@@ -181,4 +197,130 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 	}
 
 	return nil
+}
+
+func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMigration) error {
+	// Run validation for registry health if registries have been created or are unhealthy.
+	// Validation starts running after phase 'WaitForRegistriesReady' sets 'RegistriesHealthy'.
+	if migration.Status.HasAnyCondition(RegistriesHealthy, RegistriesUnhealthy) {
+		nEnsured, message, err := ensureRegistryHealth(r.Client, migration)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if nEnsured != 2 {
+			migration.Status.DeleteCondition(RegistriesHealthy)
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     RegistriesUnhealthy,
+				Status:   True,
+				Category: migapi.Critical,
+				Message:  message,
+				Durable:  true,
+			})
+		} else if nEnsured == 2 {
+			migration.Status.DeleteCondition(RegistriesUnhealthy)
+			setMigRegistryHealthyCondition(migration)
+		}
+	}
+	return nil
+}
+
+func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
+	migration.Status.SetCondition(migapi.Condition{
+		Type:     RegistriesHealthy,
+		Status:   True,
+		Category: migapi.Required,
+		Message:  RegistriesHealthyMessage,
+		Durable:  true,
+	})
+}
+
+// Validate that migration registries on both source and dest clusters are healthy
+func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (int, string, error) {
+
+	nEnsured := 0
+	unHealthyPod := corev1.Pod{}
+	unHealthyClusterName := ""
+
+	plan, err := migration.GetPlan(c)
+	if err != nil {
+		return 0, "", liberr.Wrap(err)
+	}
+	srcCluster, err := plan.GetSourceCluster(c)
+	if err != nil {
+		return 0, "", liberr.Wrap(err)
+	}
+	destCluster, err := plan.GetDestinationCluster(c)
+	if err != nil {
+		return 0, "", liberr.Wrap(err)
+	}
+
+	clusters := []*migapi.MigCluster{srcCluster, destCluster}
+
+	for _, cluster := range clusters {
+
+		if !cluster.Status.IsReady() {
+			continue
+		}
+
+		client, err := cluster.GetClient(c)
+		if err != nil {
+			return nEnsured, "", liberr.Wrap(err)
+		}
+
+		registryPods, err := getRegistryPods(plan, client)
+		if err != nil {
+			log.Trace(err)
+			return nEnsured, "", liberr.Wrap(err)
+		}
+
+		registryPodCount := len(registryPods.Items)
+		if registryPodCount < 1 {
+			unHealthyClusterName = cluster.ObjectMeta.Name
+			message := fmt.Sprintf("Migration Registry Pod is missing from cluster %s", unHealthyClusterName)
+			return nEnsured, message, nil
+		}
+
+		registryStatusUnhealthy, podObj := isRegistryPodUnHealthy(registryPods)
+
+		if !registryStatusUnhealthy {
+			nEnsured++
+		} else {
+			unHealthyPod = podObj
+			unHealthyClusterName = cluster.ObjectMeta.Name
+		}
+	}
+
+	if nEnsured != 2 {
+		message := fmt.Sprintf("Migration Registry Pod %s/%s is in unhealthy state on cluster %s",
+			unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName)
+		return nEnsured, message, nil
+	}
+
+	return nEnsured, "", nil
+}
+
+func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
+	unHealthyPod := corev1.Pod{}
+	for _, registryPod := range registryPods.Items {
+		if !registryPod.Status.ContainerStatuses[0].Ready {
+			return true, registryPod
+		}
+	}
+	return false, unHealthyPod
+}
+
+func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
+
+	registryPodList := corev1.PodList{}
+	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
+		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+			"migplan": string(plan.UID),
+		}),
+	}, &registryPodList)
+
+	if err != nil {
+		log.Trace(err)
+		return corev1.PodList{}, err
+	}
+	return registryPodList, nil
 }
