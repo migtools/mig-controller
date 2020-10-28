@@ -44,7 +44,6 @@ const (
 	EnsureStagePodsFromOrphanedPVCs = "EnsureStagePodsFromOrphanedPVCs"
 	StagePodsCreated                = "StagePodsCreated"
 	SourceStagePodsFailed           = "SourceStagePodsFailed"
-	DestinationStagePodsFailed      = "DestinationStagePodsFailed"
 	RestartRestic                   = "RestartRestic"
 	ResticRestarted                 = "ResticRestarted"
 	QuiesceApplications             = "QuiesceApplications"
@@ -552,16 +551,6 @@ func (t *Task) Run() error {
 		if restore == nil {
 			return errors.New("Restore not found")
 		}
-		report, err := t.ensureDestinationStagePodsStarted()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if report.failed {
-			t.fail(DestinationStagePodsFailed, report.reasons)
-			t.Requeue = NoReQ
-			break
-		}
-		t.Log.Info("all destination stage pods are ready")
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
 			t.setResticConditions(restore)
