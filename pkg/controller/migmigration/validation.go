@@ -200,7 +200,8 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 }
 
 func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMigration) error {
-	// Run validation for registry health if registries have been created or are unhealthy
+	// Run validation for registry health if registries have been created or are unhealthy.
+	// Validation starts running after phase 'WaitForRegistriesReady' sets 'RegistriesHealthy'.
 	if migration.Status.HasAnyCondition(RegistriesHealthy, RegistriesUnhealthy) {
 		nEnsured, message, err := ensureRegistryHealth(r.Client, migration)
 		if err != nil {

@@ -331,6 +331,8 @@ func (t *Task) Run() error {
 
 	case WaitForRegistriesReady:
 		t.Requeue = PollReQ
+		// First registry health check happens here
+		// After this, registry health is continuously checked in validation.go
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
 			return liberr.Wrap(err)
