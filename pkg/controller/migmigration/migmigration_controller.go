@@ -183,6 +183,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// End staging conditions.
+	migration.Status.EndStagingConditions()
+
 	// Ensure that migrations run serially ordered by when created
 	// and grouped with stage migrations followed by final migrations.
 	// Reconcile of a migration not in the desired order will be postponed.
@@ -208,9 +211,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		migration.Status.Phase != Completed &&
 			!migration.Status.HasBlockerCondition(),
 		ReadyMessage)
-
-	// End staging conditions.
-	migration.Status.EndStagingConditions()
 
 	// Apply changes.
 	migration.MarkReconciled()
