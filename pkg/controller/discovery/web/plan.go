@@ -3,14 +3,15 @@ package web
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	auth "k8s.io/api/authorization/v1"
-	"k8s.io/api/core/v1"
-	"net/http"
-	"strings"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Plan route root.
@@ -454,12 +455,17 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 	}
 	for _, m := range list {
 		object := m.DecodeObject()
+		isOwned := false
 		for _, ref := range object.OwnerReferences {
-			if ref.Kind != migref.ToKind(backup) ||
-				ref.Name != backup.Name ||
-				m.Namespace != backup.Namespace {
-				continue
+			if ref.Kind == migref.ToKind(backup) &&
+				ref.Name == backup.Name &&
+				m.Namespace == backup.Namespace {
+				isOwned = true
+				break
 			}
+		}
+		if !isOwned {
+			continue
 		}
 		parent.Children = append(
 			parent.Children,
@@ -490,12 +496,17 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 	}
 	for _, m := range list {
 		object := m.DecodeObject()
+		isOwned := false
 		for _, ref := range object.OwnerReferences {
-			if ref.Kind != migref.ToKind(restore) ||
-				ref.Name != restore.Name ||
-				m.Namespace != restore.Namespace {
-				continue
+			if ref.Kind == migref.ToKind(restore) &&
+				ref.Name == restore.Name &&
+				m.Namespace == restore.Namespace {
+				isOwned = true
+				break
 			}
+		}
+		if !isOwned {
+			continue
 		}
 		parent.Children = append(
 			parent.Children,
