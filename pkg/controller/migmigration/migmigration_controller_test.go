@@ -86,32 +86,22 @@ func TestReconcile(t *testing.T) {
 // but for not they are expected to be the identical.
 func Test_Itineraries(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	common := []Phase{}
+	stage := StageItinerary
+	common := Itinerary{}
 
-	stagePhases := []Phase{}
-	finalPhases := []Phase{}
-	for _, step := range StageItinerary.Steps {
-		for _, phase := range step.Phases {
-			stagePhases = append(stagePhases, phase)
-		}
-	}
-	for _, step := range FinalItinerary.Steps {
-		for _, phase := range step.Phases {
-			finalPhases = append(finalPhases, phase)
-		}
-	}
-	for i, stagePhase := range stagePhases {
+	for _, phase := range StageItinerary.Phases {
 		found := false
-		for _, finalPhase := range finalPhases[i:] {
-			if stagePhase.Name == finalPhase.Name {
-				common = append(common, finalPhase)
+		for _, finalPhase := range FinalItinerary.Phases {
+			if phase.Name == finalPhase.Name {
+				common.Phases = append(common.Phases, phase)
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("%s is not contained in Final itinerary", stagePhase.Name)
+			t.Errorf("'%s' is not contained within the final itinerary", phase.Name)
 		}
 	}
-	g.Expect(reflect.DeepEqual(stagePhases, common)).To(gomega.BeTrue())
+
+	g.Expect(reflect.DeepEqual(stage.Phases, common.Phases)).To(gomega.BeTrue())
 }

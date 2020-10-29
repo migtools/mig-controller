@@ -92,18 +92,12 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return NoReQ, nil
 	}
 
-	// TODO: Remove progress report post UI changes for 1.4.0
-	n, total, _ := task.Itinerary.progressReport(task.Phase)
-	progressMessage := fmt.Sprintf("Phase: %d/%d", n, total)
-	message := task.Phase
-	if val, found := PhaseDescriptions[task.Phase]; found {
-		message = val
-	}
-	message = fmt.Sprintf("%s, %s", progressMessage, message)
+	phase, n, total := task.Itinerary.progressReport(task.Phase)
+	message := fmt.Sprintf("Phase: %d/%d", n, total)
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,
-		Reason:   task.Step,
+		Reason:   phase,
 		Category: Advisory,
 		Message:  message,
 	})
