@@ -61,6 +61,7 @@ const (
 	PostponedMessage           = "Postponed %d seconds to ensure migrations run serially and in order."
 	CanceledMessage            = "The migration has been canceled."
 	CancelInProgressMessage    = "The migration is being canceled."
+	RunningMessage             = "Step: %d/%d"
 	FailedMessage              = "The migration has failed.  See: Errors."
 	SucceededMessage           = "The migration has completed successfully."
 	UnhealthyNamespacesMessage = "'%s' cluster has unhealthy namespaces. See status.namespaces for details."
