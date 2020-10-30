@@ -18,6 +18,8 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +33,7 @@ import (
 
 	ocapi "github.com/openshift/api/apps/v1"
 	imgapi "github.com/openshift/api/image/v1"
+	"github.com/openshift/library-go/pkg/image/reference"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,6 +68,7 @@ type MigClusterSpec struct {
 	Insecure                bool                  `json:"insecure,omitempty"`
 	RestartRestic           *bool                 `json:"restartRestic,omitempty"`
 	Refresh                 bool                  `json:"refresh,omitempty"`
+	ExposedRegistryPath     string                `json:"exposedRegistryPath,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster
@@ -497,4 +501,90 @@ func (r *MigCluster) UpdateProvider(provider pvdr.Provider) {
 			p.ClusterResourceGroup = r.Spec.AzureResourceGroup
 		}
 	}
+}
+
+func (m *MigCluster) GetInternalRegistryPath(c k8sclient.Client) (string, error) {
+	client, err := m.GetClient(c)
+	if err != nil {
+		return "", err
+	}
+	isList := imgapi.ImageStreamList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.InNamespace("openshift"),
+		&isList)
+	if err == nil && len(isList.Items) > 0 {
+		if value := isList.Items[0].Status.DockerImageRepository; len(value) > 0 {
+			ref, err := reference.Parse(value)
+			if err == nil {
+				return ref.Registry, nil
+			}
+		}
+	}
+	if client.MajorVersion() != 1 {
+		return "", errors.New(fmt.Sprintf("server version %v.%v not supported. Must be 1.x", client.MajorVersion(), client.MinorVersion()))
+	}
+	if client.MinorVersion() < 7 {
+		return "", errors.New(fmt.Sprintf("Kubernetes version 1.%v not supported. Must be 1.7 or greater", client.MinorVersion()))
+	} else if client.MinorVersion() <= 11 {
+		registrySvc := kapi.Service{}
+		err := client.Get(
+			context.TODO(),
+			k8sclient.ObjectKey{
+				Namespace: "default",
+				Name:      "docker-registry",
+			},
+			&registrySvc)
+		if err != nil {
+			// Return empty registry host but no error; registry not found
+			return "", nil
+		}
+		internalRegistry := registrySvc.Spec.ClusterIP + ":" + strconv.Itoa(int(registrySvc.Spec.Ports[0].Port))
+		return internalRegistry, nil
+	} else {
+		config := kapi.ConfigMap{}
+		err := client.Get(
+			context.TODO(),
+			k8sclient.ObjectKey{
+				Namespace: "openshift-apiserver",
+				Name:      "config",
+			},
+			&config)
+		if err != nil {
+			return "", err
+		}
+		serverConfig := apiServerConfig{}
+		err = json.Unmarshal([]byte(config.Data["config.yaml"]), &serverConfig)
+		if err != nil {
+			return "", err
+		}
+		internalRegistry := serverConfig.ImagePolicyConfig.InternalRegistryHostname
+		if len(internalRegistry) == 0 {
+			return "", nil
+		}
+		return internalRegistry, nil
+	}
+}
+
+func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
+	if len(m.Spec.ExposedRegistryPath) > 0 {
+		return m.Spec.ExposedRegistryPath, nil
+	} else if !m.Spec.IsHostCluster {
+		// not host cluster and no path specified, return empty path
+		return "", nil
+	}
+	return m.GetInternalRegistryPath(c)
+}
+
+type routingConfig struct {
+	Subdomain string `json:"subdomain"`
+}
+type imagePolicyConfig struct {
+	InternalRegistryHostname string `json:"internalRegistryHostname"`
+}
+
+// apiServerConfig stores configuration information about the current cluster
+type apiServerConfig struct {
+	ImagePolicyConfig imagePolicyConfig `json:"imagePolicyConfig"`
+	RoutingConfig     routingConfig     `json:"routingConfig"`
 }

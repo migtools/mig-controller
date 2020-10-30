@@ -4,10 +4,10 @@ import (
 	"context"
 	"strconv"
 
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
-
+	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -187,6 +187,27 @@ func GetSecret(client k8sclient.Client, ref *kapi.ObjectReference) (*kapi.Secret
 		} else {
 			return nil, err
 		}
+	}
+
+	return &object, err
+}
+
+// Get a referenced ImageStream.
+// Returns `nil` when the reference cannot be resolved.
+func GetImageStream(client k8sclient.Client, ref *kapi.ObjectReference) (*imagev1.ImageStream, error) {
+	if ref == nil {
+		return nil, nil
+	}
+	object := imagev1.ImageStream{}
+	err := client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: ref.Namespace,
+			Name:      ref.Name,
+		},
+		&object)
+	if err != nil {
+		return nil, err
 	}
 
 	return &object, err

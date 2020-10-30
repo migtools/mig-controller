@@ -1,0 +1,18 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: DirectImageMigration
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: directimagemigration-sample
+spec:
+  srcMigClusterRef:
+    name: migcluster-local
+    namespace: openshift-migration
+
+  destMigClusterRef:
+    name: migcluster-remote
+    namespace: openshift-migration
+
+  namespaces:
+  - nginx-example
+

@@ -17,12 +17,23 @@ import (
 const (
 	ReconcileFailed = "ReconcileFailed"
 	Ready           = "Ready"
+	Running         = "Running"
+	Failed          = "Failed"
+	Succeeded       = "Succeeded"
 )
 
 // Status
 const (
 	True  = "True"
 	False = "False"
+)
+
+// Reasons
+const (
+	NotFound    = "NotFound"
+	NotSet      = "NotSet"
+	NotDistinct = "NotDistinct"
+	NotReady    = "NotReady"
 )
 
 // Category
