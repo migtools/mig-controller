@@ -9,11 +9,11 @@ all: test manager
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+	go test -tags "${BUILDTAGS}" ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.com/konveyor/mig-controller/cmd/manager
+	go build -tags "${BUILDTAGS}" -o bin/manager github.com/konveyor/mig-controller/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config after login as mig controller SA
 run: generate fmt vet
@@ -53,7 +53,7 @@ fmt:
 
 # Run go vet against code
 vet:
-	go vet ./pkg/... ./cmd/...
+	go vet -tags "${BUILDTAGS}" ./pkg/... ./cmd/...
 
 # Generate code
 generate: conversion-gen

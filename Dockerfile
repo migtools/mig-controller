@@ -6,9 +6,10 @@ WORKDIR /go/src/github.com/konveyor/mig-controller
 COPY pkg/    pkg/
 COPY cmd/    cmd/
 COPY vendor/ vendor/
+ENV BUILDTAGS containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp exclude_graphdriver_overlay
 
 # Build
-RUN CGO_ENABLED=1 GOOS=linux go build -a -o manager github.com/konveyor/mig-controller/cmd/manager
+RUN CGO_ENABLED=1 GOOS=linux go build -tags "$BUILDTAGS" -a -o manager github.com/konveyor/mig-controller/cmd/manager
 
 # Copy the controller-manager into a thin image
 FROM registry.access.redhat.com/ubi8-minimal

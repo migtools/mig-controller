@@ -266,6 +266,74 @@ func (r *MigMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
+// DirectImageMigration
+func (r *DirectImageMigration) GetCorrelationLabels() map[string]string {
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		PartOfLabel: Application,
+		key:         value,
+	}
+}
+
+func (r *DirectImageMigration) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
+}
+
+func (r *DirectImageMigration) GetNamespace() string {
+	return r.Namespace
+}
+
+func (r *DirectImageMigration) GetName() string {
+	return r.Name
+}
+
+func (r *DirectImageMigration) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
+	r.Status.ObservedDigest = digest(r.Spec)
+}
+
+func (r *DirectImageMigration) HasReconciled() bool {
+	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
+// DirectImageStreamMigration
+func (r *DirectImageStreamMigration) GetCorrelationLabels() map[string]string {
+	key, value := r.GetCorrelationLabel()
+	return map[string]string{
+		PartOfLabel: Application,
+		key:         value,
+	}
+}
+
+func (r *DirectImageStreamMigration) GetCorrelationLabel() (string, string) {
+	return CorrelationLabel(r, r.UID)
+}
+
+func (r *DirectImageStreamMigration) GetNamespace() string {
+	return r.Namespace
+}
+
+func (r *DirectImageStreamMigration) GetName() string {
+	return r.Name
+}
+
+func (r *DirectImageStreamMigration) MarkReconciled() {
+	uuid, _ := uuid.NewUUID()
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[TouchAnnotation] = uuid.String()
+	r.Status.ObservedDigest = digest(r.Spec)
+}
+
+func (r *DirectImageStreamMigration) HasReconciled() bool {
+	return r.Status.ObservedDigest == digest(r.Spec)
+}
+
 //
 // Generate a sha256 hex-digest for an object.
 func digest(object interface{}) string {
