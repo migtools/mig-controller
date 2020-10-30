@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"github.com/konveyor/mig-controller/pkg/controller/directpvmigrationprogress"
 	"github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery"
 	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
@@ -44,6 +45,7 @@ var CamControllers = []AddFunction{
 	migplan.Add,
 	miganalytic.Add,
 	directvolumemigration.Add,
+	directpvmigrationprogress.Add,
 }
 
 //
