@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"github.com/konveyor/controller/pkg/logging"
 	"github.com/onsi/gomega"
 	"os"
@@ -18,7 +19,7 @@ func init() {
 
 func UID() string {
 	uid++
-	return string(uid)
+	return fmt.Sprint(uid)
 }
 
 func TestModels(t *testing.T) {
