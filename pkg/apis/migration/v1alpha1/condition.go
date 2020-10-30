@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 )
 
 // Types
@@ -356,4 +359,17 @@ func (r *Conditions) SetReconcileFailed(err error) {
 		Items:    []string{err.Error()},
 	})
 	r.EndStagingConditions()
+}
+
+func (r *Conditions) RecordEvents(obj runtime.Object, recorder record.EventRecorder) {
+	for _, cond := range r.List {
+		eventType := ""
+		switch cond.Category {
+		case Critical, Warn, Error:
+			eventType = kapi.EventTypeWarning
+		default:
+			eventType = kapi.EventTypeNormal
+		}
+		recorder.Event(obj, cond.Reason, eventType, cond.Message)
+	}
 }

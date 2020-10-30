@@ -26,6 +26,7 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -44,7 +45,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migstorage_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -95,12 +96,14 @@ var _ reconcile.Reconciler = &ReconcileMigStorage{}
 // ReconcileMigStorage reconciles a MigStorage object
 type ReconcileMigStorage struct {
 	client.Client
+	record.EventRecorder
 	scheme *runtime.Scheme
 }
 
 func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("storage", request)
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
@@ -115,6 +118,8 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", storage.Status.Conditions)
+		storage.Status.Conditions.RecordEvents(storage, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -139,7 +144,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	// Ready
 	storage.Status.SetReady(
 		!storage.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The storage is ready.")
 
 	// End staging conditions.
 	storage.Status.EndStagingConditions()

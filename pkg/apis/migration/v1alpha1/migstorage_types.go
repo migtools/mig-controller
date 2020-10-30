@@ -206,12 +206,12 @@ func (r *MigStorage) GetVolumeSnapshotProvider() pvdr.Provider {
 	return provider
 }
 
-// Get the backup credentials secret.
+// Get the backup credentials secret. If the secret is not found it returns nil
 func (r *MigStorage) GetBackupStorageCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	return r.Spec.BackupStorageConfig.GetCredSecret(client)
 }
 
-// Get the backup credentials secret.
+// Get the backup credentials secret. If the secret is not found it returns nil
 func (r *MigStorage) GetVolumeSnapshotCredSecret(client k8sclient.Client) (*kapi.Secret, error) {
 	if r.Spec.VolumeSnapshotProvider != "" {
 		return r.Spec.VolumeSnapshotConfig.GetCredSecret(client)
