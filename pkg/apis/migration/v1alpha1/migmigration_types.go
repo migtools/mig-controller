@@ -45,7 +45,7 @@ type MigMigrationStatus struct {
 	ObservedDigest string       `json:"observedDigest,omitempty"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
-	Pipeline       []*Step      `json:"pipeline"`
+	Pipeline       []*Step      `json:"pipeline,omitempty"`
 	Itinerary      string       `json:"itinerary,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
 }
