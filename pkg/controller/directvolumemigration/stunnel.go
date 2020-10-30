@@ -24,8 +24,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//const oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
-
 type stunnelConfig struct {
 	Name        string
 	Namespace   string
