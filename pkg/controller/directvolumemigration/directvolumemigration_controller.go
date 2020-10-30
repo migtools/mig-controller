@@ -34,11 +34,6 @@ import (
 
 var log = logging.WithName("direct")
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new DirectVolumeMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -64,15 +59,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by DirectVolumeMigration - change this for objects you create
-	/*err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &migrationv1alpha1.DirectVolumeMigration{},
-	})
-	if err != nil {
-		return err
-	}*/
+	// TODO: Modify this to watch the proper list of resources
 
 	return nil
 }
@@ -87,7 +74,6 @@ type ReconcileDirectVolumeMigration struct {
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigration object and makes changes based on the state read
 // and what is in the DirectVolumeMigration.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
 // a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
