@@ -167,30 +167,45 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	pvrs := t.getPodVolumeRestoresForRestore(restore)
 
 	getPodVolumeRestoresProgress := func(pvrList *velero.PodVolumeRestoreList) (progress []string) {
+		getDuration := func(pvr *velero.PodVolumeRestore) (duration string) {
+			if pvr.Status.StartTimestamp != nil {
+				if pvr.Status.CompletionTimestamp == nil {
+					duration = fmt.Sprintf(" (%s)",
+						time.Now().Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
+				} else {
+					duration = fmt.Sprintf(" (%s)",
+						pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
+				}
+			}
+			return
+		}
+
 		m, keys, msg := make(map[string]string), make([]string, 0), ""
+
 		for _, pvr := range pvrList.Items {
 			switch pvr.Status.Phase {
 			case velero.PodVolumeRestorePhaseInProgress:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: %s out of %s restored (%s)",
+					"PodVolumeRestore %s/%s: %s out of %s restored%s",
 					pvr.Namespace,
 					pvr.Name,
 					bytesToSI(pvr.Status.Progress.BytesDone),
 					bytesToSI(pvr.Status.Progress.TotalBytes),
-					time.Now().Sub(pvr.Status.StartTimestamp.Time))
+					getDuration(&pvr))
 			case velero.PodVolumeRestorePhaseCompleted:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Completed, %s restored (%s)",
+					"PodVolumeRestore %s/%s: Completed, %s out of %s restored%s",
 					pvr.Namespace,
 					pvr.Name,
+					bytesToSI(pvr.Status.Progress.BytesDone),
 					bytesToSI(pvr.Status.Progress.TotalBytes),
-					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
+					getDuration(&pvr))
 			case velero.PodVolumeRestorePhaseFailed:
 				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Failed, (%s)",
+					"PodVolumeRestore %s/%s: Failed%s",
 					pvr.Namespace,
 					pvr.Name,
-					pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time))
+					getDuration(&pvr))
 			default:
 				msg = fmt.Sprintf(
 					"PodVolumeRestore %s/%s: Waiting for ongoing volume restore(s) to complete",
@@ -241,22 +256,26 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 			getPodVolumeRestoresProgress(pvrs)...)
 	case velero.RestorePhaseFailed:
 		completed = true
-		reasons = append(
-			reasons,
-			fmt.Sprintf(
-				"Restore: %s/%s failed.",
-				restore.Namespace,
-				restore.Name))
+		message := fmt.Sprintf(
+			"Restore: %s/%s failed.",
+			restore.Namespace,
+			restore.Name)
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
+			getPodVolumeRestoresProgress(pvrs)...)
 	case velero.RestorePhasePartiallyFailed:
 		completed = true
-		reasons = append(
-			reasons,
+		message := fmt.Sprintf(
 			fmt.Sprintf(
 				"Restore: %s/%s partially failed.",
 				restore.Namespace,
 				restore.Name))
-		reasons = append(
-			reasons,
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
 	case velero.RestorePhaseFailedValidation:
 		reasons = restore.Status.ValidationErrors
@@ -268,7 +287,8 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 				restore.Name))
 		completed = true
 	}
-	t.Progress = progress
+
+	t.setProgress(progress)
 	return completed, reasons
 }
 

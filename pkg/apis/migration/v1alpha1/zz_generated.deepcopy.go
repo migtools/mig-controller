@@ -54,11 +54,6 @@ func (in *BackupStorageConfig) DeepCopy() *BackupStorageConfig {
 func (in *Condition) DeepCopyInto(out *Condition) {
 	*out = *in
 	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
-	if in.Progress != nil {
-		in, out := &in.Progress, &out.Progress
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]string, len(*in))

@@ -273,7 +273,6 @@ type Task struct {
 	Annotations     map[string]string
 	BackupResources mapset.Set
 	Phase           string
-	Progress        []string
 	Requeue         time.Duration
 	Itinerary       Itinerary
 	Errors          []string
@@ -858,6 +857,7 @@ func (t *Task) init() error {
 		})
 	}
 	return nil
+
 }
 
 func (t *Task) initPipeline() {
@@ -873,6 +873,8 @@ func (t *Task) initPipeline() {
 		currentStep.Phase = t.Phase
 		if desc, found := PhaseDescriptions[t.Phase]; found {
 			currentStep.Message = desc
+		} else {
+			currentStep.Message = ""
 		}
 	}
 }
@@ -891,6 +893,8 @@ func (t *Task) updatePipeline(prevStep string) {
 		currentStep.Phase = t.Phase
 		if desc, found := PhaseDescriptions[t.Phase]; found {
 			currentStep.Message = desc
+		} else {
+			currentStep.Message = ""
 		}
 		if t.Phase == Completed {
 			currentStep.MarkCompleted()

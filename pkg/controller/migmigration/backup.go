@@ -142,7 +142,7 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 	return &list
 }
 
-// Get an existing Backup on the source cluster.of course it's possible but then we need to somehow store only the ns/pvb in another array sort it, then match the status etc
+// Get an existing Backup on the source cluster.
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -172,30 +172,45 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	pvbs := t.getPodVolumeBackupsForBackup(backup)
 
 	getPodVolumeBackupsProgress := func(pvbList *velero.PodVolumeBackupList) (progress []string) {
+		getDuration := func(pvb *velero.PodVolumeBackup) (duration string) {
+			if pvb.Status.StartTimestamp != nil {
+				if pvb.Status.CompletionTimestamp == nil {
+					duration = fmt.Sprintf(" (%s)",
+						time.Now().Sub(pvb.Status.StartTimestamp.Time).Round(time.Second))
+				} else {
+					duration = fmt.Sprintf(" (%s)",
+						pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time).Round(time.Second))
+				}
+			}
+			return
+		}
+
 		m, keys, msg := make(map[string]string), make([]string, 0), ""
+
 		for _, pvb := range pvbList.Items {
 			switch pvb.Status.Phase {
 			case velero.PodVolumeBackupPhaseInProgress:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: %s out of %s backed up (%s)",
+					"PodVolumeBackup %s/%s: %s out of %s backed up%s",
 					pvb.Namespace,
 					pvb.Name,
 					bytesToSI(pvb.Status.Progress.BytesDone),
 					bytesToSI(pvb.Status.Progress.TotalBytes),
-					time.Now().Sub(pvb.Status.StartTimestamp.Time))
+					getDuration(&pvb))
 			case velero.PodVolumeBackupPhaseCompleted:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: Completed, %s backed up (%s)",
+					"PodVolumeBackup %s/%s: Completed, %s out of %s backed up%s",
 					pvb.Namespace,
 					pvb.Name,
+					bytesToSI(pvb.Status.Progress.BytesDone),
 					bytesToSI(pvb.Status.Progress.TotalBytes),
-					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
+					getDuration(&pvb))
 			case velero.PodVolumeBackupPhaseFailed:
 				msg = fmt.Sprintf(
-					"PodVolumeBackup %s/%s: Failed (%s)",
+					"PodVolumeBackup %s/%s: Failed%s",
 					pvb.Namespace,
 					pvb.Name,
-					pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time))
+					getDuration(&pvb))
 			default:
 				msg = fmt.Sprintf(
 					"PodVolumeBackup %s/%s: Waiting for ongoing volume backup(s) to complete",
@@ -246,22 +261,25 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailed:
 		completed = true
-		reasons = append(
-			reasons,
-			fmt.Sprintf(
-				"Backup: %s/%s failed.",
-				backup.Namespace,
-				backup.Name))
+		message := fmt.Sprintf(
+			"Backup: %s/%s failed.",
+			backup.Namespace,
+			backup.Name)
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhasePartiallyFailed:
 		completed = true
-		reasons = append(
-			reasons,
-			fmt.Sprintf(
-				"Backup: %s/%s partially failed.",
-				backup.Namespace,
-				backup.Name))
-		reasons = append(
-			reasons,
+		message := fmt.Sprintf(
+			"Backup: %s/%s partially failed.",
+			backup.Namespace,
+			backup.Name)
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
 			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailedValidation:
 		reasons = backup.Status.ValidationErrors
@@ -274,7 +292,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		completed = true
 	}
 
-	t.Progress = progress
+	t.setProgress(progress)
 	return completed, reasons
 }
 
@@ -411,7 +429,7 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 				backup.Name,
 			))
 	}
-	t.Progress = progress
+	t.setProgress(progress)
 	return false, err
 }
 
