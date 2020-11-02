@@ -42,6 +42,7 @@ type DirectPVMigrationProgressStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DirectPVMigrationProgress is the Schema for the directpvmigrationprogresses API
+// +kubebuilder:resource:path=directpvmigrationprogresses,shortName=dvmp
 // +k8s:openapi-gen=true
 type DirectPVMigrationProgress struct {
 	metav1.TypeMeta   `json:",inline"`

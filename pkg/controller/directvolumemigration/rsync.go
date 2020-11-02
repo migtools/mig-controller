@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 	"text/template"
@@ -654,35 +655,86 @@ func (t *Task) createRsyncClientPods() error {
 	return nil
 }
 
+// Create rsync PV progress CR on destination cluster
+func (t *Task) createPVProgressCR() error {
+	// Get client for destination
+	dstClient, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+
+	pvcMap := t.getPVCNamespaceMap()
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			dvp := v1alpha1.DirectPVMigrationProgress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Namespace: ns,
+				},
+				Spec: v1alpha1.DirectPVMigrationProgressSpec{
+					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
+					PodRef: &corev1.ObjectReference{
+						Namespace: ns,
+						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					},
+				},
+				Status: v1alpha1.DirectPVMigrationProgressStatus{},
+			}
+			err = dstClient.Create(context.TODO(), &dvp)
+			if k8serror.IsAlreadyExists(err) {
+				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvp.Namespace, "name", dvp.Name)
+			} else if err != nil {
+				return err
+			}
+			t.Log.Info("Rsync client progress CR created", "name", dvp.Name, "namespace", dvp.Namespace)
+		}
+
+	}
+	return nil
+}
+
 func (t *Task) haveRsyncClientPodsCompleted() (bool, error) {
 	// Get client for destination
-	srcClient, err := t.getSourceClient()
+	dstClient, err := t.getDestinationClient()
 	if err != nil {
 		return false, err
 	}
-	selector := labels.SelectorFromSet(map[string]string{
-		"app":                   "directvolumemigration-rsync-transfer",
-		"directvolumemigration": "rsync-client",
-	})
+
+	t.Owner.Status.RunningPods = []*corev1.ObjectReference{}
+	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
+	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
+
 	pvcMap := t.getPVCNamespaceMap()
-	for ns, _ := range pvcMap {
-		pods := corev1.PodList{}
-		err = srcClient.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&pods)
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodSucceeded {
-				return false, nil
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			dvp := v1alpha1.DirectPVMigrationProgress{}
+			err = dstClient.Get(context.TODO(), types.NamespacedName{
+				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+				Namespace: ns,
+			}, &dvp)
+			if err != nil {
+				// todo, need to start thinking about collecting this error and reporting other CR's progress
+				return false, err
+			}
+			objRef := &corev1.ObjectReference{
+				Namespace: ns,
+				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+			}
+			switch {
+			case dvp.Status.PodPhase == corev1.PodRunning:
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, objRef)
+			case dvp.Status.PodPhase == corev1.PodFailed:
+				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
+			case dvp.Status.PodPhase == corev1.PodSucceeded:
+				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
 			}
 		}
 	}
+
+	if len(t.Owner.Status.RunningPods) > 0 {
+		return false, nil
+	}
+
 	return true, nil
 }
 

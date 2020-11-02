@@ -40,6 +40,7 @@ const (
 	WaitForRsyncTransferPodsRunning = "WaitForRsyncTransferPodsRunning"
 	CreateStunnelClientPods         = "CreateStunnelClientPods"
 	WaitForStunnelClientPodsRunning = "WaitForStunnelClientPodsRunning"
+	CreatePVProgressCRs             = "CreatePVProgressCRs"
 	CreateRsyncClientPods           = "CreateRsyncClientPods"
 	WaitForRsyncClientPodsCompleted = "WaitForRsyncClientPodsCompleted"
 	Verification                    = "Verification"
@@ -284,6 +285,15 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
+		}
+	case CreatePVProgressCRs:
+		err := t.createPVProgressCR()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
 		}
 	case CreateRsyncClientPods:
 		err := t.createRsyncClientPods()

@@ -49,15 +49,27 @@ spec:
               items:
                 type: string
               type: array
+            failedPods:
+              items:
+                type: object
+              type: array
             itinerary:
               type: string
             observedDigest:
               type: string
             phase:
               type: string
+            runningPods:
+              items:
+                type: object
+              type: array
             startTimestamp:
               format: date-time
               type: string
+            successfulPods:
+              items:
+                type: object
+              type: array
           required:
           - observedDigest
           type: object

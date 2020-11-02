@@ -558,6 +558,39 @@ func (in *DirectVolumeMigrationStatus) DeepCopyInto(out *DirectVolumeMigrationSt
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.SuccessfulPods != nil {
+		in, out := &in.SuccessfulPods, &out.SuccessfulPods
+		*out = make([]*v1.ObjectReference, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(v1.ObjectReference)
+				**out = **in
+			}
+		}
+	}
+	if in.FailedPods != nil {
+		in, out := &in.FailedPods, &out.FailedPods
+		*out = make([]*v1.ObjectReference, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(v1.ObjectReference)
+				**out = **in
+			}
+		}
+	}
+	if in.RunningPods != nil {
+		in, out := &in.RunningPods, &out.RunningPods
+		*out = make([]*v1.ObjectReference, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(v1.ObjectReference)
+				**out = **in
+			}
+		}
+	}
 	return
 }
 
