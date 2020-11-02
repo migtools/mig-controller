@@ -174,7 +174,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message: fmt.Sprintf("Empty `saToken` found in `serviceAccountSecretRef` secret,"+
+			Message: fmt.Sprintf("The `saToken` found in `serviceAccountSecretRef` secret is empty,"+
 				" subject: %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace,
 				cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
