@@ -26,6 +26,7 @@ import (
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -45,7 +46,8 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder:
+		mgr.GetRecorder("migcluster_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -96,6 +98,8 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	k8sclient.Client
+	record.EventRecorder
+
 	scheme     *runtime.Scheme
 	Controller controller.Controller
 }
@@ -103,6 +107,7 @@ type ReconcileMigCluster struct {
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("cluster", request)
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
@@ -117,6 +122,8 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", cluster.Status.Conditions)
+		cluster.Status.Conditions.RecordEvents(cluster, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -141,7 +148,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	// Ready
 	cluster.Status.SetReady(
 		!cluster.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The cluster is ready.")
 
 	// End staging conditions.
 	cluster.Status.EndStagingConditions()

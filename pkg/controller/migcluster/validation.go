@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -42,19 +43,6 @@ const (
 const (
 	True  = migapi.True
 	False = migapi.False
-)
-
-// Messages
-const (
-	ReadyMessage                = "The cluster is ready."
-	MissingURLMessage           = "The `url` is required when `isHostCluster` is false."
-	CaBundleMessage             = "The `caBundle` is required for self-signed APIserver certificates"
-	InvalidSaSecretRefMessage   = "The `serviceAccountSecretRef` must reference a `secret`."
-	InvalidSaTokenMessage       = "The `saToken` not found in `serviceAccountSecretRef` secret."
-	TestConnectFailedMessage    = "Test connect failed. %s: %s"
-	MalformedURLMessage         = "The `url` is malformed."
-	InvalidURLSchemeMessage     = "The `url` scheme must be 'http' or 'https'."
-	SaTokenNotPrivilegedMessage = "The `saToken` has insufficient privileges."
 )
 
 // Validate the asset collection resource.
@@ -99,7 +87,7 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  MissingURLMessage,
+			Message:  "The `spec.URL` is required for non-host cluster.",
 		})
 		return nil
 	}
@@ -110,7 +98,7 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 			Status:   True,
 			Reason:   Malformed,
 			Category: Critical,
-			Message:  MalformedURLMessage,
+			Message:  "The `spec.URL` is malformed.",
 		})
 		return nil
 	}
@@ -120,7 +108,7 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 			Status:   True,
 			Reason:   InvalidScheme,
 			Category: Critical,
-			Message:  InvalidURLSchemeMessage,
+			Message:  "The `url` scheme is invalid, must be: (http|https).",
 		})
 		return nil
 	}
@@ -142,7 +130,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidSaSecretRefMessage,
+			Message:  "The `serviceAccountSecretRef` must reference a `secret`.",
 		})
 		return nil
 	}
@@ -159,7 +147,9 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidSaSecretRefMessage,
+			Message: fmt.Sprintf("The `serviceAccountSecretRef` must reference a valid `secret`,"+
+				" subject: %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace,
+				cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -172,7 +162,9 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidSaTokenMessage,
+			Message: fmt.Sprintf("The `saToken` not found in `serviceAccountSecretRef` secret,"+
+				" subject: %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace,
+				cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -182,7 +174,9 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidSaTokenMessage,
+			Message: fmt.Sprintf("The `saToken` found in `serviceAccountSecretRef` secret is empty,"+
+				" subject: %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace,
+				cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -206,15 +200,15 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		helpText := ""
 		if strings.Contains(err.Error(), "x509") &&
 			len(cluster.Spec.CABundle) == 0 && !cluster.Spec.Insecure {
-			helpText = CaBundleMessage
+			helpText = "The `caBundle` is required for self-signed API server certificates."
 		}
-		message := fmt.Sprintf(TestConnectFailedMessage, helpText, err)
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     TestConnectFailed,
 			Status:   True,
 			Reason:   ConnectFailed,
 			Category: Critical,
-			Message:  message,
+			Message:  fmt.Sprintf("Test connect failed. %s", helpText),
+			Items:    []string{err.Error()},
 		})
 		return nil
 	}
@@ -267,13 +261,14 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	if !migrationSar.Status.Allowed || !veleroSar.Status.Allowed {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     SaTokenNotPrivileged,
 			Status:   True,
 			Reason:   Unauthorized,
 			Category: Critical,
-			Message:  SaTokenNotPrivilegedMessage,
+			Message:  fmt.Sprintf("The `saToken` has insufficient privileges."),
 		})
 	}
 	return nil
