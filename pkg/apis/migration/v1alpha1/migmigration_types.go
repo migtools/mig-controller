@@ -45,8 +45,55 @@ type MigMigrationStatus struct {
 	ObservedDigest string       `json:"observedDigest,omitempty"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`
+	Pipeline       []*Step      `json:"pipeline,omitempty"`
 	Itinerary      string       `json:"itinerary,omitempty"`
 	Errors         []string     `json:"errors,omitempty"`
+}
+
+// FindStep find step by name
+func (s *MigMigrationStatus) FindStep(stepName string) *Step {
+	for _, step := range s.Pipeline {
+		if step.Name == stepName {
+			return step
+		}
+	}
+	return nil
+}
+
+// AddStep adds a new step to the pipeline
+func (s *MigMigrationStatus) AddStep(step *Step) {
+	found := s.FindStep(step.Name)
+	if found == nil {
+		s.Pipeline = append(
+			s.Pipeline,
+			step,
+		)
+	}
+}
+
+// ReflectPipeline reflects pipeline
+func (s *MigMigrationStatus) ReflectPipeline() {
+	for _, step := range s.Pipeline {
+		if step.MarkedCompleted() {
+			step.Phase = ""
+			step.Message = "Completed"
+			step.Progress = []string{}
+		}
+		if step.Failed {
+			step.Message = "Failed"
+		}
+	}
+}
+
+// Step defines a task in a step of migration
+type Step struct {
+	Timed
+
+	Name     string   `json:"name"`
+	Phase    string   `json:"phase,omitempty"`
+	Message  string   `json:"message,omitempty"`
+	Progress []string `json:"progress,omitempty"`
+	Failed   bool     `json:"failed,omitempty"`
 }
 
 // +genclient

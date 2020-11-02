@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -90,20 +89,19 @@ func Test_Itineraries(t *testing.T) {
 	stage := StageItinerary
 	common := Itinerary{}
 
-	for _, step := range StageItinerary.Steps {
+	for _, phase := range StageItinerary.Phases {
 		found := false
-		for _, finalStep := range FinalItinerary.Steps {
-			if step.phase == finalStep.phase {
-				common.Steps = append(common.Steps, step)
+		for _, finalPhase := range FinalItinerary.Phases {
+			if phase.Name == finalPhase.Name {
+				common.Phases = append(common.Phases, phase)
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Errorf("'%s' is not contained within the final itinerary", step.phase)
+			t.Errorf("'%s' is not contained within the final itinerary", phase.Name)
 		}
 	}
 
-	g.Expect(reflect.DeepEqual(stage.Steps, common.Steps)).To(gomega.BeTrue())
-
+	g.Expect(reflect.DeepEqual(stage.Phases, common.Phases)).To(gomega.BeTrue())
 }

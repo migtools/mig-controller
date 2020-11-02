@@ -44,6 +44,7 @@ const (
 	EnsureStagePodsFromTemplates    = "EnsureStagePodsFromTemplates"
 	EnsureStagePodsFromOrphanedPVCs = "EnsureStagePodsFromOrphanedPVCs"
 	StagePodsCreated                = "StagePodsCreated"
+	StagePodsFailed                 = "StagePodsFailed"
 	SourceStagePodsFailed           = "SourceStagePodsFailed"
 	RestartRestic                   = "RestartRestic"
 	ResticRestarted                 = "ResticRestarted"
@@ -87,132 +88,145 @@ const (
 	HasISs       = 0x10 // Only when ISs migrated
 )
 
+// Migration steps
+const (
+	StepPrepare      = "Prepare"
+	StepBackup       = "Backup"
+	StepStageBackup  = "StageBackup"
+	StepStageRestore = "StageRestore"
+	StepRestore      = "Restore"
+	StepFinal        = "Final"
+)
+
+// Itinerary defines itinerary
 type Itinerary struct {
-	Name  string
-	Steps []Step
+	Name   string
+	Phases []Phase
 }
 
 var StageItinerary = Itinerary{
 	Name: "Stage",
-	Steps: []Step{
-		{phase: Created},
-		{phase: Started},
-		{phase: StartRefresh},
-		{phase: WaitForRefresh},
-		{phase: Prepare},
-		{phase: CreateRegistries},
-		{phase: EnsureCloudSecretPropagated},
-		{phase: EnsureStagePodsFromRunning, all: HasPVs},
-		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
-		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
-		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, any: HasPVs | HasISs},
-		{phase: RestartRestic, all: HasStagePods},
-		{phase: ResticRestarted, all: HasStagePods},
-		{phase: WaitForRegistriesReady},
-		{phase: QuiesceApplications, all: Quiesce},
-		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, any: HasPVs | HasISs},
-		{phase: StageBackupCreated, any: HasPVs | HasISs},
-		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
-		{phase: EnsureStageRestore, any: HasPVs | HasISs},
-		{phase: StageRestoreCreated, any: HasPVs | HasISs},
-		{phase: DeleteRegistries},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: Completed},
+	Phases: []Phase{
+		{Name: Created, Step: StepPrepare},
+		{Name: Started, Step: StepPrepare},
+		{Name: StartRefresh, Step: StepPrepare},
+		{Name: WaitForRefresh, Step: StepPrepare},
+		{Name: Prepare, Step: StepPrepare},
+		{Name: CreateRegistries, Step: StepPrepare},
+		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
+		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
+		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs},
+		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
+		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
+		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
+		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
+		{Name: WaitForRegistriesReady, Step: StepStageBackup},
+		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
+		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
+		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: StageBackupCreated, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: EnsureStageRestore, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: StageRestoreCreated, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureStagePodsTerminated, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: Completed, Step: StepFinal},
 	},
 }
 
 var FinalItinerary = Itinerary{
 	Name: "Final",
-	Steps: []Step{
-		{phase: Created},
-		{phase: Started},
-		{phase: StartRefresh},
-		{phase: WaitForRefresh},
-		{phase: Prepare},
-		{phase: CreateRegistries},
-		{phase: EnsureCloudSecretPropagated},
-		{phase: PreBackupHooks},
-		{phase: WaitForRegistriesReady},
-		{phase: EnsureInitialBackup},
-		{phase: InitialBackupCreated},
-		{phase: EnsureStagePodsFromRunning, all: HasPVs},
-		{phase: EnsureStagePodsFromTemplates, all: HasPVs},
-		{phase: EnsureStagePodsFromOrphanedPVCs, all: HasPVs},
-		{phase: StagePodsCreated, all: HasStagePods},
-		{phase: AnnotateResources, any: HasPVs | HasISs},
-		{phase: RestartRestic, all: HasStagePods},
-		{phase: ResticRestarted, all: HasStagePods},
-		{phase: QuiesceApplications, all: Quiesce},
-		{phase: EnsureQuiesced, all: Quiesce},
-		{phase: EnsureStageBackup, any: HasPVs | HasISs},
-		{phase: StageBackupCreated, any: HasPVs | HasISs},
-		{phase: EnsureStageBackupReplicated, any: HasPVs | HasISs},
-		{phase: EnsureStageRestore, any: HasPVs | HasISs},
-		{phase: StageRestoreCreated, any: HasPVs | HasISs},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureStagePodsTerminated, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: EnsureInitialBackupReplicated},
-		{phase: PostBackupHooks},
-		{phase: PreRestoreHooks},
-		{phase: EnsureFinalRestore},
-		{phase: FinalRestoreCreated},
-		{phase: PostRestoreHooks},
-		{phase: DeleteRegistries},
-		{phase: Verification, all: HasVerify},
-		{phase: Completed},
+	Phases: []Phase{
+		{Name: Created, Step: StepPrepare},
+		{Name: Started, Step: StepPrepare},
+		{Name: StartRefresh, Step: StepPrepare},
+		{Name: WaitForRefresh, Step: StepPrepare},
+		{Name: Prepare, Step: StepPrepare},
+		{Name: CreateRegistries, Step: StepPrepare},
+		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
+		{Name: WaitForRegistriesReady, Step: StepPrepare},
+		{Name: PreBackupHooks, Step: StepBackup},
+		{Name: EnsureInitialBackup, Step: StepBackup},
+		{Name: InitialBackupCreated, Step: StepBackup},
+		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
+		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs},
+		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
+		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
+		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
+		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
+		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
+		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
+		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: StageBackupCreated, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: EnsureStageRestore, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: StageRestoreCreated, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: EnsureStagePodsDeleted, Step: StepStageRestore, all: HasStagePods},
+		{Name: EnsureStagePodsTerminated, Step: StepStageRestore, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepRestore, any: HasPVs | HasISs},
+		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
+		{Name: PostBackupHooks, Step: StepRestore},
+		{Name: PreRestoreHooks, Step: StepRestore},
+		{Name: EnsureFinalRestore, Step: StepRestore},
+		{Name: FinalRestoreCreated, Step: StepRestore},
+		{Name: PostRestoreHooks, Step: StepRestore},
+		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: Verification, Step: StepFinal, all: HasVerify},
+		{Name: Completed, Step: StepFinal},
 	},
 }
 
 var CancelItinerary = Itinerary{
 	Name: "Cancel",
-	Steps: []Step{
-		{phase: Canceling},
-		{phase: DeleteBackups},
-		{phase: DeleteRestores},
-		{phase: DeleteRegistries},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: Canceled},
-		{phase: Completed},
+	Phases: []Phase{
+		{Name: Canceling, Step: StepFinal},
+		{Name: DeleteBackups, Step: StepFinal},
+		{Name: DeleteRestores, Step: StepFinal},
+		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: Canceled, Step: StepFinal},
+		{Name: Completed, Step: StepFinal},
 	},
 }
 
 var FailedItinerary = Itinerary{
 	Name: "Failed",
-	Steps: []Step{
-		{phase: MigrationFailed},
-		{phase: DeleteRegistries},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: Completed},
+	Phases: []Phase{
+		{Name: MigrationFailed, Step: StepFinal},
+		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: Completed, Step: StepFinal},
 	},
 }
 
 var RollbackItinerary = Itinerary{
 	Name: "Rollback",
-	Steps: []Step{
-		{phase: Rollback},
-		{phase: DeleteBackups},
-		{phase: DeleteRestores},
-		{phase: DeleteRegistries},
-		{phase: EnsureStagePodsDeleted, all: HasStagePods},
-		{phase: EnsureAnnotationsDeleted, any: HasPVs | HasISs},
-		{phase: DeleteMigrated},
-		{phase: EnsureMigratedDeleted},
-		{phase: UnQuiesceApplications, all: Quiesce},
-		{phase: Completed},
+	Phases: []Phase{
+		{Name: Rollback, Step: StepFinal},
+		{Name: DeleteBackups, Step: StepFinal},
+		{Name: DeleteRestores, Step: StepFinal},
+		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: DeleteMigrated, Step: StepFinal},
+		{Name: EnsureMigratedDeleted, Step: StepFinal},
+		{Name: UnQuiesceApplications, Step: StepFinal, all: Quiesce},
+		{Name: Completed, Step: StepFinal},
 	},
 }
 
-// Step
-type Step struct {
+// Phase defines phase in the migration
+type Phase struct {
 	// A phase name.
-	phase string
+	Name string
+	// High level Step this phase belongs to
+	Step string
 	// Step included when ALL flags evaluate true.
 	all uint8
 	// Step included when ANY flag evaluates true.
@@ -221,17 +235,17 @@ type Step struct {
 
 // Get a progress report.
 // Returns: phase, n, total.
-func (r Itinerary) progressReport(phase string) (string, int, int) {
+func (r Itinerary) progressReport(phaseName string) (string, int, int) {
 	n := 0
-	total := len(r.Steps)
-	for i, step := range r.Steps {
-		if step.phase == phase {
+	total := len(r.Phases)
+	for i, phase := range r.Phases {
+		if phase.Name == phaseName {
 			n = i + 1
 			break
 		}
 	}
 
-	return phase, n, total
+	return phaseName, n, total
 }
 
 // A Velero task that provides the complete backup & restore workflow.
@@ -257,6 +271,7 @@ type Task struct {
 	Requeue         time.Duration
 	Itinerary       Itinerary
 	Errors          []string
+	Step            string
 }
 
 // Run the task.
@@ -273,6 +288,8 @@ func (t *Task) Run() error {
 	if err != nil {
 		return err
 	}
+
+	defer t.updatePipeline(t.Step)
 
 	// Run the current phase.
 	switch t.Phase {
@@ -749,7 +766,7 @@ func (t *Task) Run() error {
 
 	case MigrationFailed:
 		t.Phase = Completed
-
+		t.Step = StepFinal
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
@@ -828,8 +845,12 @@ func (t *Task) init() error {
 		t.Itinerary = FinalItinerary
 	}
 	if t.Owner.Status.Itinerary != t.Itinerary.Name {
-		t.Phase = t.Itinerary.Steps[0].phase
+		t.Phase = t.Itinerary.Phases[0].Name
 	}
+
+	t.Step = t.Itinerary.GetStepForPhase(t.Phase)
+
+	t.initPipeline()
 
 	hasImageStreams, err := t.hasImageStreams()
 	if err != nil {
@@ -848,11 +869,57 @@ func (t *Task) init() error {
 	return nil
 }
 
+func (t *Task) initPipeline() {
+	for _, phase := range FinalItinerary.Phases {
+		t.Owner.Status.AddStep(&migapi.Step{
+			Name:    phase.Step,
+			Message: "Not started",
+		})
+	}
+	currentStep := t.Owner.Status.FindStep(t.Step)
+	if currentStep != nil {
+		currentStep.MarkStarted()
+		currentStep.Phase = t.Phase
+		if desc, found := PhaseDescriptions[t.Phase]; found {
+			currentStep.Message = desc
+		}
+	}
+}
+
+func (t *Task) updatePipeline(prevStep string) {
+	oldStep := t.Owner.Status.FindStep(prevStep)
+	currentStep := t.Owner.Status.FindStep(t.Step)
+	if oldStep != nil && oldStep != currentStep {
+		oldStep.MarkCompleted()
+		if t.failed() {
+			oldStep.Failed = true
+		}
+	}
+	if currentStep != nil {
+		currentStep.MarkStarted()
+		currentStep.Phase = t.Phase
+		if desc, found := PhaseDescriptions[t.Phase]; found {
+			currentStep.Message = desc
+		}
+		if t.Phase == Completed {
+			currentStep.MarkCompleted()
+		}
+	}
+	t.Owner.Status.ReflectPipeline()
+}
+
+func (t *Task) setProgress(progress []string) {
+	currentStep := t.Owner.Status.FindStep(t.Step)
+	if currentStep != nil {
+		currentStep.Progress = progress
+	}
+}
+
 // Advance the task to the next phase.
 func (t *Task) next() error {
 	current := -1
-	for i, step := range t.Itinerary.Steps {
-		if step.phase != t.Phase {
+	for i, phase := range t.Itinerary.Phases {
+		if phase.Name != t.Phase {
 			continue
 		}
 		current = i
@@ -860,10 +927,11 @@ func (t *Task) next() error {
 	}
 	if current == -1 {
 		t.Phase = Completed
+		t.Step = StepFinal
 		return nil
 	}
-	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
-		next := t.Itinerary.Steps[n]
+	for n := current + 1; n < len(t.Itinerary.Phases); n++ {
+		next := t.Itinerary.Phases[n]
 		flag, err := t.allFlags(next)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -878,32 +946,34 @@ func (t *Task) next() error {
 		if !flag {
 			continue
 		}
-		t.Phase = next.phase
+		t.Phase = next.Name
+		t.Step = next.Step
 		return nil
 	}
 	t.Phase = Completed
+	t.Step = StepFinal
 	return nil
 }
 
 // Evaluate `all` flags.
-func (t *Task) allFlags(step Step) (bool, error) {
-	if step.all&HasPVs != 0 && !t.hasPVs() {
+func (t *Task) allFlags(phase Phase) (bool, error) {
+	if phase.all&HasPVs != 0 && !t.hasPVs() {
 		return false, nil
 	}
-	if step.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
+	if phase.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
 		return false, nil
 	}
-	if step.all&Quiesce != 0 && !t.quiesce() {
+	if phase.all&Quiesce != 0 && !t.quiesce() {
 		return false, nil
 	}
-	if step.all&HasVerify != 0 && !t.hasVerify() {
+	if phase.all&HasVerify != 0 && !t.hasVerify() {
 		return false, nil
 	}
 	hasImageStream, err := t.hasImageStreams()
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if step.all&HasISs != 0 && hasImageStream {
+	if phase.all&HasISs != 0 && hasImageStream {
 		return false, nil
 	}
 
@@ -911,27 +981,27 @@ func (t *Task) allFlags(step Step) (bool, error) {
 }
 
 // Evaluate `any` flags.
-func (t *Task) anyFlags(step Step) (bool, error) {
-	if step.any&HasPVs != 0 && t.hasPVs() {
+func (t *Task) anyFlags(phase Phase) (bool, error) {
+	if phase.any&HasPVs != 0 && t.hasPVs() {
 		return true, nil
 	}
-	if step.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
+	if phase.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
 		return true, nil
 	}
-	if step.any&Quiesce != 0 && t.quiesce() {
+	if phase.any&Quiesce != 0 && t.quiesce() {
 		return true, nil
 	}
-	if step.any&HasVerify != 0 && t.hasVerify() {
+	if phase.any&HasVerify != 0 && t.hasVerify() {
 		return true, nil
 	}
 	hasImageStream, err := t.hasImageStreams()
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if step.any&HasISs != 0 && hasImageStream {
+	if phase.any&HasISs != 0 && hasImageStream {
 		return true, nil
 	}
-	return step.any == uint8(0), nil
+	return phase.any == uint8(0), nil
 }
 
 // Phase fail.
@@ -947,6 +1017,7 @@ func (t *Task) fail(nextPhase string, reasons []string) {
 		Durable:  true,
 	})
 	t.Phase = nextPhase
+	t.Step = StepFinal
 }
 
 // Add errors.
@@ -1108,4 +1179,14 @@ func (t *Task) getBothClientsWithNamespaces() ([]compat.Client, [][]string, erro
 	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
 
 	return clientList, namespaceList, nil
+}
+
+// GetStepForPhase returns which high level step current phase belongs to
+func (r *Itinerary) GetStepForPhase(phaseName string) string {
+	for _, phase := range r.Phases {
+		if phaseName == phase.Name {
+			return phase.Step
+		}
+	}
+	return ""
 }
