@@ -97,6 +97,7 @@ var _ reconcile.Reconciler = &ReconcileMigStorage{}
 type ReconcileMigStorage struct {
 	client.Client
 	record.EventRecorder
+
 	scheme *runtime.Scheme
 }
 
