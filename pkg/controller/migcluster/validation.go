@@ -99,7 +99,7 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 			Status:   True,
 			Reason:   Malformed,
 			Category: Critical,
-			Message:  "The `spec.URL` is malformed.`",
+			Message:  "The `spec.URL` is malformed.",
 		})
 		return nil
 	}
@@ -148,7 +148,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `serviceAccountSecretRef` must reference a valid `secret`, subject %s", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
+			Message:  fmt.Sprintf("The `serviceAccountSecretRef` must reference a valid `secret`, subject %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -161,7 +161,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `saToken` not found in `serviceAccountSecretRef` secret, subject %s", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
+			Message:  fmt.Sprintf("The `saToken` not found in `serviceAccountSecretRef` secret, subject %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -171,7 +171,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  fmt.Sprintf("Empty `saToken` found in `serviceAccountSecretRef` secret, subject %s", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
+			Message:  fmt.Sprintf("Empty `saToken` found in `serviceAccountSecretRef` secret, subject %s.", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -195,7 +195,7 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		helpText := ""
 		if strings.Contains(err.Error(), "x509") &&
 			len(cluster.Spec.CABundle) == 0 && !cluster.Spec.Insecure {
-			helpText = "The `caBundle` is required for self-signed APIserver certificates"
+			helpText = "The `caBundle` is required for self-signed APIserver certificates."
 		}
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     TestConnectFailed,
