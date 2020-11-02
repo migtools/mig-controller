@@ -32,6 +32,8 @@ spec:
           properties:
             createDestinationNamespaces:
               type: boolean
+            deleteProgressReportingCRs:
+              type: boolean
             destMigClusterRef:
               type: object
             persistentVolumeClaims:

@@ -54,11 +54,6 @@ const (
 	InvalidPod        = "InvalidPod"
 )
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new DirectPVMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -143,7 +138,7 @@ func (r *ReconcileDirectPVMigrationProgress) Reconcile(request reconcile.Request
 	// Begin staging conditions.
 	pvProgress.Status.BeginStagingConditions()
 
-	err = r.reportContainerStatus(pvProgress, "rsync")
+	err = r.reportContainerStatus(pvProgress, "rsync-client")
 	if err != nil {
 		return reconcile.Result{Requeue: true}, liberr.Wrap(err)
 	}
@@ -162,13 +157,12 @@ func (r *ReconcileDirectPVMigrationProgress) Reconcile(request reconcile.Request
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if pvProgress.Status.PodPhase == kapi.PodFailed || pvProgress.Status.PodPhase == kapi.PodRunning {
-		// if the condition is Failed or Running poll
-		return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+	if !pvProgress.Status.IsReady() {
+		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// the pod condition is Complete
-	return reconcile.Result{}, nil
+	// we will requeue this every 5 seconds
+	return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 
 	// at this point assume that the container is running
 	//pipe, err := r.ProgressPipe(pvProgress)
@@ -277,6 +271,9 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 		// TODO: report failure
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 0:
 		// succeeded dont ever requeue
+		pvProgress.Status.PodPhase = kapi.PodSucceeded
+	case pod.Status.Phase == kapi.PodSucceeded:
+		// Its possible for the succeeded pod to not have containerStatuses at all
 		pvProgress.Status.PodPhase = kapi.PodSucceeded
 	}
 

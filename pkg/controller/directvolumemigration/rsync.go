@@ -604,7 +604,7 @@ func (t *Task) createRsyncClientPods() error {
 				},
 			})
 			containers = append(containers, corev1.Container{
-				Name:  fmt.Sprintf("rsync-client-%s", vol),
+				Name:  "rsync-client",
 				Image: "quay.io/konveyor/rsync-transfer:latest",
 				Env: []corev1.EnvVar{
 					{
@@ -670,6 +670,7 @@ func (t *Task) createPVProgressCR() error {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,
+					// TODO @alpatel, add owner references
 				},
 				Spec: v1alpha1.DirectPVMigrationProgressSpec{
 					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
@@ -693,11 +694,11 @@ func (t *Task) createPVProgressCR() error {
 	return nil
 }
 
-func (t *Task) haveRsyncClientPodsCompleted() (bool, error) {
+func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	// Get client for destination
 	dstClient, err := t.getDestinationClient()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	t.Owner.Status.RunningPods = []*corev1.ObjectReference{}
@@ -714,7 +715,7 @@ func (t *Task) haveRsyncClientPodsCompleted() (bool, error) {
 			}, &dvp)
 			if err != nil {
 				// todo, need to start thinking about collecting this error and reporting other CR's progress
-				return false, err
+				return false, false, err
 			}
 			objRef := &corev1.ObjectReference{
 				Namespace: ns,
@@ -731,11 +732,16 @@ func (t *Task) haveRsyncClientPodsCompleted() (bool, error) {
 		}
 	}
 
+	// wait for all the running pods to completed before returning failures
 	if len(t.Owner.Status.RunningPods) > 0 {
-		return false, nil
+		return false, false, nil
 	}
 
-	return true, nil
+	if len(t.Owner.Status.FailedPods) > 0 {
+		return false, true, nil
+	}
+
+	return true, false, nil
 }
 
 // Delete rsync resources
@@ -756,6 +762,15 @@ func (t *Task) deleteRsyncResources() error {
 	}
 
 	err = t.findAndDeleteResources(destClient)
+	if err != nil {
+		return err
+	}
+
+	if !t.Owner.Spec.DeleteProgressReportingCRs {
+		return nil
+	}
+
+	err = t.deleteProgressReportingDRs(destClient)
 	if err != nil {
 		return err
 	}
@@ -870,6 +885,25 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		// Delete configmaps
 		for _, cm := range cmList.Items {
 			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) deleteProgressReportingDRs(client compat.Client) error {
+	pvcMap := t.getPVCNamespaceMap()
+
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			err := client.Delete(context.TODO(), &v1alpha1.DirectPVMigrationProgress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Namespace: ns,
+				},
+			}, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}

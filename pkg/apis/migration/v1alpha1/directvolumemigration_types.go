@@ -29,6 +29,7 @@ type DirectVolumeMigrationSpec struct {
 	PersistentVolumeClaims      []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
 	StorageClassMapping         map[string]string       `json:"storageClassMapping,omitempty"`
 	CreateDestinationNamespaces bool                    `json:"createDestinationNamespaces,omitempty"`
+	DeleteProgressReportingCRs  bool                    `json:"deleteProgressReportingCRs,omitempty"`
 }
 
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration

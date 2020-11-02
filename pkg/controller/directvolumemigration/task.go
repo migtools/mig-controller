@@ -99,6 +99,7 @@ var PVCItinerary = Itinerary{
 		{phase: CreateRsyncRoute},
 		{phase: CreateRsyncConfig},
 		{phase: CreateStunnelConfig},
+		{phase: CreatePVProgressCRs},
 		{phase: CreateRsyncTransferPods},
 		{phase: WaitForRsyncTransferPodsRunning},
 		{phase: CreateStunnelClientPods},
@@ -305,9 +306,12 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case WaitForRsyncClientPodsCompleted:
-		completed, err := t.haveRsyncClientPodsCompleted()
+		completed, failed, err := t.haveRsyncClientPodsCompletedOrFailed()
 		if err != nil {
 			return liberr.Wrap(err)
+		}
+		if failed {
+			t.fail(MigrationFailed, []string{"One or more pods are in error state"})
 		}
 		if completed {
 			t.Requeue = NoReQ

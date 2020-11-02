@@ -10,6 +10,8 @@ spec:
   names:
     kind: DirectPVMigrationProgress
     plural: directpvmigrationprogresses
+    shortNames:
+    - dvmp
   scope: Namespaced
   validation:
     openAPIV3Schema:
