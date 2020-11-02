@@ -45,10 +45,6 @@ const (
 	False = migapi.False
 )
 
-// Messages
-const (
-	CaBundleMessage             = "The `caBundle` is required for self-signed APIserver certificates"
-)
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
@@ -152,7 +148,7 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `serviceAccountSecretRef` must reference a `secret`, subject %s", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
+			Message:  fmt.Sprintf("The `serviceAccountSecretRef` must reference a valid `secret`, subject %s", path.Join(cluster.Spec.ServiceAccountSecretRef.Namespace, cluster.Spec.ServiceAccountSecretRef.Name)),
 		})
 		return nil
 	}
@@ -199,14 +195,15 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		helpText := ""
 		if strings.Contains(err.Error(), "x509") &&
 			len(cluster.Spec.CABundle) == 0 && !cluster.Spec.Insecure {
-			helpText = CaBundleMessage
+			helpText = "The `caBundle` is required for self-signed APIserver certificates"
 		}
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     TestConnectFailed,
 			Status:   True,
 			Reason:   ConnectFailed,
 			Category: Critical,
-			Message:  fmt.Sprintf("Test connect failed. %s: %s", helpText, err),
+			Message:  fmt.Sprintf("Test connect failed. %s", helpText),
+			Items:    []string{err.Error()},
 		})
 		return nil
 	}
@@ -260,21 +257,13 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 		return liberr.Wrap(err)
 	}
 
-	invalidSarGrp := ""
-	switch {
-	case !migrationSar.Status.Allowed:
-		invalidSarGrp = "migration.openshift.io"
-	case !veleroSar.Status.Allowed:
-		invalidSarGrp = "velero.io"
-	}
-
 	if !migrationSar.Status.Allowed || !veleroSar.Status.Allowed {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     SaTokenNotPrivileged,
 			Status:   True,
 			Reason:   Unauthorized,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `saToken` has insufficient privileges in %s group.", invalidSarGrp),
+			Message:  fmt.Sprintf("The `saToken` has insufficient privileges in either `migration.openshift.io` or `velero.io` group."),
 		})
 	}
 	return nil

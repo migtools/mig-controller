@@ -98,8 +98,9 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 // ReconcileMigCluster reconciles a MigCluster object
 type ReconcileMigCluster struct {
 	k8sclient.Client
-	scheme     *runtime.Scheme
 	record.EventRecorder
+
+	scheme     *runtime.Scheme
 	Controller controller.Controller
 }
 
