@@ -27,6 +27,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/imagescheme"
 	"github.com/konveyor/mig-controller/pkg/webhook"
 	appsv1 "github.com/openshift/api/apps/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -80,6 +81,10 @@ func main() {
 	}
 	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add OpenShift apps APIs to scheme")
+		os.Exit(1)
+	}
+	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add OpenShift route APIs to scheme")
 		os.Exit(1)
 	}
 	if err := clusterregv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
