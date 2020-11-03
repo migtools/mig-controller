@@ -19,7 +19,6 @@ package migmigration
 // PhaseDescriptions are human readable strings that describe a phase
 var PhaseDescriptions = map[string]string{
 	Started:                         "Migration started.",
-	Prepare:                         "Preparing for migration.",
 	StartRefresh:                    "Starting refresh on MigPlan, MigStorage and MigCluster resources",
 	WaitForRefresh:                  "Waiting for refresh of MigPlan, MigStorage and MigCluster resources to complete",
 	EnsureCloudSecretPropagated:     "Ensuring Velero has latest Replication Repository storage credentials.",
