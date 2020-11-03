@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -53,7 +54,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migplan_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -157,12 +158,15 @@ var _ reconcile.Reconciler = &ReconcileMigPlan{}
 // ReconcileMigPlan reconciles a MigPlan object
 type ReconcileMigPlan struct {
 	client.Client
+	record.EventRecorder
+
 	scheme *runtime.Scheme
 }
 
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("plan", request)
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
@@ -177,6 +181,8 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", plan.Status.Conditions)
+		plan.Status.Conditions.RecordEvents(plan, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -255,7 +261,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.Status.SetReady(
 		plan.Status.HasCondition(StorageEnsured, PvsDiscovered) &&
 			!plan.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The migration plan is ready.")
 
 	// End staging conditions.
 	plan.Status.EndStagingConditions()
@@ -289,7 +295,7 @@ func (r *ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
 	}
 
 	plan.MarkReconciled()
-	plan.Status.SetReady(false, ReadyMessage)
+	plan.Status.SetReady(false, "The migration plan is ready.")
 	err := r.Update(context.TODO(), plan)
 	if err != nil {
 		return closed, err
@@ -319,7 +325,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 		Type:     Closed,
 		Status:   True,
 		Category: Advisory,
-		Message:  ClosedMessage,
+		Message:  "The migration plan is closed.",
 	})
 	// Apply changes.
 	plan.MarkReconciled()
@@ -363,7 +369,8 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 			Type:     Suspended,
 			Status:   True,
 			Category: Advisory,
-			Message:  SuspendedMessage,
+			Message: "The migrations plan is in suspended state; Limited validation enforced; PV discovery and " +
+				"resource reconciliation suspended.",
 		})
 	}
 

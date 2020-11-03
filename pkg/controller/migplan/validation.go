@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"path"
 	"reflect"
 	"strings"
 
@@ -101,49 +102,11 @@ const (
 
 // Messages
 const (
-	ReadyMessage                                      = "The migration plan is ready."
-	SuspendedMessage                                  = "Limited validation; PV discovery and resource reconciliation suspended."
-	InvalidSourceClusterRefMessage                    = "The `srcMigClusterRef` must reference a `migcluster`."
-	InvalidDestinationClusterRefMessage               = "The `dstMigClusterRef` must reference a `migcluster`."
-	InvalidStorageRefMessage                          = "The `migStorageRef` must reference a `migstorage`."
-	SourceClusterNotReadyMessage                      = "The referenced `srcMigClusterRef` does not have a `Ready` condition."
-	DestinationClusterNotReadyMessage                 = "The referenced `dstMigClusterRef` does not have a `Ready` condition."
-	StorageNotReadyMessage                            = "The referenced `migStorageRef` does not have a `Ready` condition."
-	NsListEmptyMessage                                = "The `namespaces` list may not be empty."
-	InvalidDestinationClusterMessage                  = "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same."
-	NsGVKsIncompatible                                = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
-	NsNotFoundOnSourceClusterMessage                  = "Namespaces [] not found on the source cluster."
-	NsNotFoundOnDestinationClusterMessage             = "Namespaces [] not found on the destination cluster."
-	NsLimitExceededMessage                            = "Namespace limit: %d exceeded, found:%d."
-	PodLimitExceededMessage                           = "Pod limit: %d exceeded, found: %d."
-	SourceClusterProxySecretMisconfiguredMessage      = "Source cluster proxy secret is misconfigured"
-	DestinationClusterProxySecretMisconfiguredMessage = "Destination cluster proxy secret is misconfigured"
-	PlanConflictMessage                               = "The plan is in conflict with []."
-	PvInvalidActionMessage                            = "PV in `persistentVolumes` [] has an unsupported `action`."
-	PvNoSupportedActionMessage                        = "PV in `persistentVolumes` [] with no `SupportedActions`."
-	PvInvalidStorageClassMessage                      = "PV in `persistentVolumes` [] has an unsupported `storageClass`."
-	PvInvalidAccessModeMessage                        = "PV in `persistentVolumes` [] has an invalid `accessMode`."
-	PvNoStorageClassSelectionMessage                  = "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static persistent volumes exist in the destination cluster."
-	PvWarnNoCephAvailableMessage                      = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
-	PvWarnAccessModeUnavailableMessage                = "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class"
-	PvInvalidCopyMethodMessage                        = "PV in `persistentVolumes` [] has an invalid `copyMethod`."
-	PvNoCopyMethodSelectionMessage                    = "PV in `persistentVolumes` [] has no `Selected.CopyMethod`."
-	PvWarnCopyMethodSnapshotMessage                   = "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen storage class is compatible with the source volume's storage type for Snapshot support."
-	PvLimitExceededMessage                            = "PV limit: %d exceeded, found: %d."
-	NfsNotAccessibleMessage                           = "NFS servers [] not accessible on the destination cluster."
-	NfsAccessCannotBeValidatedMessage                 = "NFS access cannot be validated on the destination cluster."
-	StorageEnsuredMessage                             = "The storage resources have been created."
-	RegistriesEnsuredMessage                          = "The migration registry resources have been created."
-	RegistriesHealthyMessage                          = "The Migration registries are in a healthy state"
-	PvsDiscoveredMessage                              = "The `persistentVolumes` list has been updated with discovered PVs."
-	ClosedMessage                                     = "The migration plan is closed."
-	SourcePodsNotHealthyMessage                       = "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details."
-	InvalidHookRefMessage                             = "One or more referenced hooks do not exist."
-	HookNotReadyMessage                               = "One or more referenced hooks are not ready."
-	InvalidHookNSNameMessage                          = "The executionNamespace specified is invalid, DNS-1123 label regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'."
-	InvalidHookSANameMessage                          = "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'"
-	HookPhaseUnknownMessage                           = "The hook phase must be one of: PreRestore, PostRestore, PreBackup, PostBackup"
-	HookPhaseDuplicateMessage                         = "Only one hook may be specified per phase"
+	NsGVKsIncompatible           = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
+	PvWarnNoCephAvailableMessage = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
+	PvLimitExceededMessage       = "PV limit: %d exceeded, found: %d."
+	StorageEnsuredMessage        = "The storage resources have been created."
+	PvsDiscoveredMessage         = "The `persistentVolumes` list has been updated with discovered PVs."
 )
 
 // Valid AccessMode values
@@ -231,7 +194,7 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidStorageRefMessage,
+			Message:  "The `spec.migStorageRef` must reference a valid `migstorage`.",
 		})
 		return nil
 	}
@@ -248,7 +211,8 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidStorageRefMessage,
+			Message: fmt.Sprintf("The `spec.migStorageRef` must reference a valid `migstorage`, subject: %s.",
+				path.Join(plan.Spec.MigStorageRef.Namespace, plan.Spec.MigStorageRef.Name)),
 		})
 		return nil
 	}
@@ -259,7 +223,8 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 			Type:     StorageNotReady,
 			Status:   True,
 			Category: Critical,
-			Message:  StorageNotReadyMessage,
+			Message: fmt.Sprintf("The referenced `migStorageRef` does not have a `Ready` condition, subject: %s.",
+				path.Join(plan.Spec.MigStorageRef.Namespace, plan.Spec.MigStorageRef.Namespace)),
 		})
 	}
 
@@ -274,19 +239,18 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 			Type:     NsListEmpty,
 			Status:   True,
 			Category: Critical,
-			Message:  NsListEmptyMessage,
+			Message:  "The `namespaces` list may not be empty.",
 		})
 		return nil
 	}
 	limit := Settings.Plan.NsLimit
 	if count > limit {
-		message := fmt.Sprintf(NsLimitExceededMessage, limit, count)
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsLimitExceeded,
 			Status:   True,
 			Reason:   LimitExceeded,
 			Category: Critical,
-			Message:  message,
+			Message:  fmt.Sprintf("Namespace limit: %d exceeded, found:%d.", limit, count),
 		})
 		return nil
 	}
@@ -329,13 +293,12 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 		count += len(list.Items)
 	}
 	if count > limit {
-		message := fmt.Sprintf(PodLimitExceededMessage, limit, count)
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PodLimitExceeded,
 			Status:   True,
 			Reason:   LimitExceeded,
 			Category: Warn,
-			Message:  message,
+			Message:  fmt.Sprintf("Pod limit: %d exceeded, found: %d.", limit, count),
 		})
 	}
 
@@ -353,7 +316,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidSourceClusterRefMessage,
+			Message:  "The `srcMigClusterRef` must reference a valid `migcluster`.",
 		})
 		return nil
 	}
@@ -370,7 +333,8 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidSourceClusterRefMessage,
+			Message: fmt.Sprintf("The `srcMigClusterRef` must reference a valid `migcluster`, subject: %s.",
+				path.Join(plan.Spec.SrcMigClusterRef.Namespace, plan.Spec.SrcMigClusterRef.Name)),
 		})
 		return nil
 	}
@@ -381,7 +345,8 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 			Type:     SourceClusterNotReady,
 			Status:   True,
 			Category: Critical,
-			Message:  SourceClusterNotReadyMessage,
+			Message: fmt.Sprintf("The referenced `srcMigClusterRef` does not have a `Ready` condition, subject: %s",
+				path.Join(plan.Spec.SrcMigClusterRef.Namespace, plan.Spec.SrcMigClusterRef.Name)),
 		})
 		return nil
 	}
@@ -400,7 +365,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidDestinationClusterRefMessage,
+			Message:  "The `dstMigClusterRef` must reference a valid `migcluster`.",
 		})
 		return nil
 	}
@@ -412,7 +377,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Status:   True,
 			Reason:   NotDistinct,
 			Category: Critical,
-			Message:  InvalidDestinationClusterMessage,
+			Message:  "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same.",
 		})
 		return nil
 	}
@@ -429,7 +394,8 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidDestinationClusterRefMessage,
+			Message: fmt.Sprintf("The `dstMigClusterRef` must reference a valid `migcluster`, subject: %s.",
+				path.Join(plan.Spec.DestMigClusterRef.Namespace, plan.Spec.DestMigClusterRef.Name)),
 		})
 		return nil
 	}
@@ -440,7 +406,8 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Type:     DestinationClusterNotReady,
 			Status:   True,
 			Category: Critical,
-			Message:  DestinationClusterNotReadyMessage,
+			Message: fmt.Sprintf("The referenced `dstMigClusterRef` does not have a `Ready` condition, subject: %s",
+				path.Join(plan.Spec.DestMigClusterRef.Namespace, plan.Spec.DestMigClusterRef.Name)),
 		})
 		return nil
 	}
@@ -506,7 +473,7 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  NsNotFoundOnSourceClusterMessage,
+			Message:  "Namespaces [] not found on the source cluster.",
 			Items:    notFound,
 		})
 		return nil
@@ -553,7 +520,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  NsNotFoundOnDestinationClusterMessage,
+			Message:  "Namespaces [] not found on the destination cluster.",
 			Items:    notFound,
 		})
 		return nil
@@ -583,7 +550,7 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   Conflict,
 			Category: Error,
-			Message:  PlanConflictMessage,
+			Message:  "The migration plan is in conflict with [].",
 			Items:    list,
 		})
 	}
@@ -680,7 +647,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
-			Message:  PvInvalidActionMessage,
+			Message:  "PV in `persistentVolumes` [] has an unsupported `action`.",
 			Items:    invalidAction,
 		})
 	}
@@ -689,7 +656,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvNoSupportedAction,
 			Status:   True,
 			Category: Warn,
-			Message:  PvNoSupportedActionMessage,
+			Message:  "PV in `persistentVolumes` [] with no `SupportedActions`.",
 			Items:    unsupported,
 		})
 	}
@@ -699,7 +666,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotDone,
 			Category: Error,
-			Message:  PvInvalidStorageClassMessage,
+			Message:  "PV in `persistentVolumes` [] has an unsupported `storageClass`.",
 			Items:    invalidStorageClass,
 		})
 	}
@@ -708,7 +675,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvInvalidAccessMode,
 			Status:   True,
 			Category: Error,
-			Message:  PvInvalidAccessModeMessage,
+			Message:  "PV in `persistentVolumes` [] has an invalid `accessMode`.",
 			Items:    invalidAccessMode,
 		})
 	}
@@ -717,8 +684,9 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvNoStorageClassSelection,
 			Status:   True,
 			Category: Warn,
-			Message:  PvNoStorageClassSelectionMessage,
-			Items:    missingStorageClass,
+			Message: "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static" +
+				" persistent volumes exist in the destination cluster.",
+			Items: missingStorageClass,
 		})
 	}
 	if len(unavailableAccessMode) > 0 {
@@ -726,7 +694,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvWarnAccessModeUnavailable,
 			Status:   True,
 			Category: Warn,
-			Message:  PvWarnAccessModeUnavailableMessage,
+			Message:  "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class.",
 			Items:    unavailableAccessMode,
 		})
 	}
@@ -735,7 +703,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvNoCopyMethodSelection,
 			Status:   True,
 			Category: Error,
-			Message:  PvNoCopyMethodSelectionMessage,
+			Message:  "PV in `persistentVolumes` [] has no `Selected.CopyMethod`.",
 			Items:    missingCopyMethod,
 		})
 	}
@@ -744,7 +712,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvInvalidCopyMethod,
 			Status:   True,
 			Category: Error,
-			Message:  PvInvalidCopyMethodMessage,
+			Message:  "PV in `persistentVolumes` [] has an invalid `copyMethod`.",
 			Items:    invalidCopyMethod,
 		})
 	}
@@ -753,8 +721,9 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 			Type:     PvWarnCopyMethodSnapshot,
 			Status:   True,
 			Category: Warn,
-			Message:  PvWarnCopyMethodSnapshotMessage,
-			Items:    warnCopyMethodSnapshot,
+			Message: "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen " +
+				"storage class is compatible with the source volume's storage type for Snapshot support.",
+			Items: warnCopyMethodSnapshot,
 		})
 	}
 
@@ -832,7 +801,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 			Status:   True,
 			Reason:   Conflict,
 			Category: Critical,
-			Message:  SourceClusterProxySecretMisconfiguredMessage,
+			Message:  "Source cluster proxy secret is misconfigured, more than one instances found.",
 		})
 		return nil
 	}
@@ -842,7 +811,7 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 			Status:   True,
 			Reason:   KeyNotFound,
 			Category: Critical,
-			Message:  SourceClusterProxySecretMisconfiguredMessage,
+			Message:  "Source cluster proxy secret is misconfigured, secret has invalid keys.",
 		})
 	}
 	return nil
@@ -894,7 +863,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 			Status:   True,
 			Reason:   Conflict,
 			Category: Critical,
-			Message:  DestinationClusterProxySecretMisconfiguredMessage,
+			Message:  "Destination cluster proxy secret is misconfigured, more than one instances found.",
 		})
 		return nil
 	}
@@ -904,7 +873,7 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 			Status:   True,
 			Reason:   KeyNotFound,
 			Category: Critical,
-			Message:  DestinationClusterProxySecretMisconfiguredMessage,
+			Message:  "Destination cluster proxy secret is misconfigured, secret has invalid keys.",
 		})
 	}
 	return nil
@@ -969,7 +938,7 @@ func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   NotHealthy,
 			Category: Warn,
-			Message:  SourcePodsNotHealthyMessage,
+			Message:  "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details.",
 		})
 	}
 
@@ -996,7 +965,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 				Status:   True,
 				Reason:   NotFound,
 				Category: Critical,
-				Message:  InvalidHookRefMessage,
+				Message:  "One or more referenced hooks do not exist.",
 			})
 			return nil
 		} else if err != nil {
@@ -1010,7 +979,8 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
-				Message:  InvalidHookSANameMessage,
+				Message: "The serviceAccount specified is invalid, DNS-1123 subdomain regex used for validation" +
+					" is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'",
 			})
 		}
 
@@ -1021,7 +991,8 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 				Status:   True,
 				Reason:   NotSet,
 				Category: Critical,
-				Message:  InvalidHookNSNameMessage,
+				Message: "The executionNamespace specified is invalid, DNS-1123 label regex used for validation" +
+					" is '[a-z0-9]([-a-z0-9]*[a-z0-9])?'.",
 			})
 		}
 
@@ -1031,7 +1002,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 				Type:     HookNotReady,
 				Status:   True,
 				Category: Critical,
-				Message:  HookNotReadyMessage,
+				Message:  "One or more referenced hooks are not ready.",
 			})
 			return nil
 		}
@@ -1050,7 +1021,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 				Type:     HookPhaseUnknown,
 				Status:   True,
 				Category: Critical,
-				Message:  HookPhaseUnknown,
+				Message:  "One or more referenced hooks are in an unknown phase.",
 			})
 			return nil
 		}
@@ -1061,10 +1032,10 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 		preBackupCount > 1 ||
 		postBackupCount > 1 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     HookPhaseDuplicateMessage,
+			Type:     HookPhaseDuplicate,
 			Status:   True,
 			Category: Critical,
-			Message:  HookPhaseDuplicateMessage,
+			Message:  "Only one hook may be specified per phase.",
 		})
 		return nil
 	}
@@ -1208,7 +1179,7 @@ func (r *NfsValidation) validate() error {
 			Type:     NfsNotAccessible,
 			Status:   True,
 			Category: Warn,
-			Message:  NfsNotAccessibleMessage,
+			Message:  "NFS servers [] not accessible on the destination cluster.",
 			Items:    notAccessible,
 		})
 	}
@@ -1246,7 +1217,7 @@ func (r *NfsValidation) findPod() error {
 			Status:   True,
 			Category: Error,
 			Reason:   NotFound,
-			Message:  NfsAccessCannotBeValidatedMessage,
+			Message:  "NFS access cannot be validated on the destination cluster.",
 		})
 		return nil
 	}
