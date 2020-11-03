@@ -23,6 +23,9 @@ var NoReQ = time.Duration(0)
 const (
 	Created                         = ""
 	Started                         = "Started"
+	CleanStaleAnnotations           = "CleanStaleAnnotations"
+	CleanStaleStagePods             = "CleanStaleStagePods"
+	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
 	CreateRegistries                = "CreateRegistries"
@@ -110,9 +113,9 @@ var StageItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: EnsureAnnotationsDeleted, Step: StepPrepare},
-		{Name: EnsureStagePodsDeleted, Step: StepPrepare},
-		{Name: EnsureStagePodsTerminated, Step: StepPrepare},
+		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleStagePods, Step: StepPrepare},
+		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
@@ -145,9 +148,9 @@ var FinalItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: EnsureAnnotationsDeleted, Step: StepPrepare},
-		{Name: EnsureStagePodsDeleted, Step: StepPrepare},
-		{Name: EnsureStagePodsTerminated, Step: StepPrepare},
+		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleStagePods, Step: StepPrepare},
+		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: WaitForRegistriesReady, Step: StepPrepare},
@@ -624,7 +627,7 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case EnsureStagePodsDeleted:
+	case EnsureStagePodsDeleted, CleanStaleStagePods:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -632,7 +635,7 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case EnsureStagePodsTerminated:
+	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -644,7 +647,7 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case EnsureAnnotationsDeleted:
+	case EnsureAnnotationsDeleted, CleanStaleAnnotations:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {
