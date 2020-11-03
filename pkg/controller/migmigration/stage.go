@@ -147,7 +147,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	podList := corev1.PodList{}
-	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
+	options := k8sclient.MatchingLabels(t.stagePodLabels())
 	err := client.List(context.TODO(), options, &podList)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -506,25 +506,27 @@ func (t *Task) ensureStagePodsDeleted() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
-	for _, client := range clients {
-		podList := corev1.PodList{}
-		err := client.List(context.TODO(), options, &podList)
-		if err != nil {
-			return err
-		}
-		for _, pod := range podList.Items {
-			// Delete
-			err := client.Delete(context.TODO(), &pod)
-			if err != nil && !k8serr.IsNotFound(err) {
-				return liberr.Wrap(err)
+	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(namespace)
+		for _, client := range clients {
+			podList := corev1.PodList{}
+			err := client.List(context.TODO(), options, &podList)
+			if err != nil {
+				return err
 			}
-			log.Info(
-				"Stage pod deleted.",
-				"ns",
-				pod.Namespace,
-				"name",
-				pod.Name)
+			for _, pod := range podList.Items {
+				// Delete
+				err := client.Delete(context.TODO(), &pod)
+				if err != nil && !k8serr.IsNotFound(err) {
+					return liberr.Wrap(err)
+				}
+				log.Info(
+					"Stage pod deleted.",
+					"ns",
+					pod.Namespace,
+					"name",
+					pod.Name)
+			}
 		}
 	}
 
@@ -543,19 +545,21 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodFailed:    true,
 		corev1.PodUnknown:   true,
 	}
-	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
-	for _, client := range clients {
-		podList := corev1.PodList{}
-		err := client.List(context.TODO(), options, &podList)
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range podList.Items {
-			// looks like it's terminated
-			if terminatedPhases[pod.Status.Phase] {
-				continue
+	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(namespace)
+		for _, client := range clients {
+			podList := corev1.PodList{}
+			err := client.List(context.TODO(), options, &podList)
+			if err != nil {
+				return false, err
 			}
-			return false, nil
+			for _, pod := range podList.Items {
+				// looks like it's terminated
+				if terminatedPhases[pod.Status.Phase] {
+					continue
+				}
+				return false, nil
+			}
 		}
 	}
 	t.Owner.Status.DeleteCondition(StagePodsCreated)
@@ -563,7 +567,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 }
 
 // Label applied to all stage pods for easy cleanup
-func (t *Task) stagePodIdentifierLabel() map[string]string {
+func (t *Task) stagePodCleanupLabel() map[string]string {
 	return map[string]string{StagePodLabel: migapi.True}
 }
 
@@ -584,8 +588,8 @@ func (t *Task) stagePodLabels() map[string]string {
 	labels[IncludedInStageBackupLabel] = t.UID()
 
 	// merge label indicating this is a stage pod for later cleanup purposes
-	stagePodIdentifierLabel := t.stagePodIdentifierLabel()
-	for labelName, labelValue := range stagePodIdentifierLabel {
+	stagePodCleanupLabel := t.stagePodCleanupLabel()
+	for labelName, labelValue := range stagePodCleanupLabel {
 		labels[labelName] = labelValue
 	}
 
