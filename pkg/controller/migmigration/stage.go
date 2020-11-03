@@ -502,31 +502,52 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 
 // Ensure the stage pods have been deleted.
 func (t *Task) ensureStagePodsDeleted() error {
-	clients, err := t.getBothClients()
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(namespace)
-		for _, client := range clients {
-			podList := corev1.PodList{}
-			err := client.List(context.TODO(), options, &podList)
-			if err != nil {
-				return err
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Clean up source cluster namespaces
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
+		podList := corev1.PodList{}
+		err := srcClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return err
+		}
+		for _, pod := range podList.Items {
+			err := srcClient.Delete(context.TODO(), &pod)
+			if err != nil && !k8serr.IsNotFound(err) {
+				return liberr.Wrap(err)
 			}
-			for _, pod := range podList.Items {
-				// Delete
-				err := client.Delete(context.TODO(), &pod)
-				if err != nil && !k8serr.IsNotFound(err) {
-					return liberr.Wrap(err)
-				}
-				log.Info(
-					"Stage pod deleted.",
-					"ns",
-					pod.Namespace,
-					"name",
-					pod.Name)
+			log.Info(
+				"Stage pod deleted.",
+				"ns", pod.Namespace,
+				"name", pod.Name)
+		}
+	}
+
+	// Clean up destination cluster namespaces
+	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
+		podList := corev1.PodList{}
+		err := destClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return err
+		}
+		for _, pod := range podList.Items {
+			err := destClient.Delete(context.TODO(), &pod)
+			if err != nil && !k8serr.IsNotFound(err) {
+				return liberr.Wrap(err)
 			}
+			log.Info(
+				"Stage pod deleted.",
+				"ns", pod.Namespace,
+				"name", pod.Name)
 		}
 	}
 
@@ -535,7 +556,11 @@ func (t *Task) ensureStagePodsDeleted() error {
 
 // Ensure the deleted stage pods have finished terminating
 func (t *Task) ensureStagePodsTerminated() (bool, error) {
-	clients, err := t.getBothClients()
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -545,23 +570,39 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodFailed:    true,
 		corev1.PodUnknown:   true,
 	}
-	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(namespace)
-		for _, client := range clients {
-			podList := corev1.PodList{}
-			err := client.List(context.TODO(), options, &podList)
-			if err != nil {
-				return false, err
+
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
+		podList := corev1.PodList{}
+		err := srcClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		for _, pod := range podList.Items {
+			// Check if Pod phase is one of 'terminatedPhases'
+			if terminatedPhases[pod.Status.Phase] {
+				continue
 			}
-			for _, pod := range podList.Items {
-				// looks like it's terminated
-				if terminatedPhases[pod.Status.Phase] {
-					continue
-				}
-				return false, nil
-			}
+			return false, nil
 		}
 	}
+
+	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
+		podList := corev1.PodList{}
+		err := destClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		for _, pod := range podList.Items {
+			// Check if Pod phase is one of 'terminatedPhases'
+			if terminatedPhases[pod.Status.Phase] {
+				continue
+			}
+			return false, nil
+		}
+	}
+
 	t.Owner.Status.DeleteCondition(StagePodsCreated)
 	return true, nil
 }
