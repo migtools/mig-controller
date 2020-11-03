@@ -35,6 +35,7 @@ type DirectPVMigrationProgressSpec struct {
 type DirectPVMigrationProgressStatus struct {
 	Conditions
 	PodPhase       kapi.PodPhase `json:"phase,omitempty"`
+	LogMessage     string        `json:"logMessage,omitempty"`
 	ObservedDigest string        `json:"observedDigest,omitempty"`
 }
 

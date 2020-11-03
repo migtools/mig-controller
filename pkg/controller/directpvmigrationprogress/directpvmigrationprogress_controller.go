@@ -17,9 +17,12 @@ limitations under the License.
 package directpvmigrationprogress
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"k8s.io/client-go/kubernetes"
 	"path"
+	"strings"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -265,6 +268,12 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 	case containerStatus.Ready:
 		// report pod running and return
 		pvProgress.Status.PodPhase = kapi.PodRunning
+		numberOfLogLines := int64(10)
+		logLines, err := r.GetPodLogs(cluster, podRef, &numberOfLogLines, false)
+		if err != nil {
+			return err
+		}
+		pvProgress.Status.LogMessage = strings.Join(logLines, "\n")
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
 		// pod has a failure, report last failure reason
 		pvProgress.Status.PodPhase = kapi.PodFailed
@@ -294,4 +303,36 @@ func (r *ReconcileDirectPVMigrationProgress) Pod(cluster *migapi.MigCluster, pod
 		return nil, err
 	}
 	return pod, nil
+}
+
+func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) ([]string, error) {
+	logs := []string{}
+	config, err := cluster.BuildRestConfig(r.Client)
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	req := clientset.CoreV1().Pods(podReference.Namespace).GetLogs(podReference.Name, &kapi.PodLogOptions{
+		TailLines: tailLines,
+		Previous:  previous,
+		Container: "rsync-client",
+	})
+	readCloser, err := req.Stream()
+	if err != nil {
+		return nil, err
+	}
+
+	defer readCloser.Close()
+
+	scanner := bufio.NewScanner(readCloser)
+	for scanner.Scan() {
+		line := scanner.Text()
+		logs = append(logs, line)
+	}
+	return logs, nil
 }
