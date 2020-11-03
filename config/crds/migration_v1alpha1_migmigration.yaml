@@ -79,6 +79,25 @@ spec:
               type: string
             phase:
               type: string
+            pipeline:
+              items:
+                properties:
+                  failed:
+                    type: boolean
+                  message:
+                    type: string
+                  name:
+                    type: string
+                  phase:
+                    type: string
+                  progress:
+                    items:
+                      type: string
+                    type: array
+                required:
+                - name
+                type: object
+              type: array
             startTimestamp:
               format: date-time
               type: string
