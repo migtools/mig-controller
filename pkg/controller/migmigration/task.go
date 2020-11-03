@@ -23,9 +23,11 @@ var NoReQ = time.Duration(0)
 const (
 	Created                         = ""
 	Started                         = "Started"
+	CleanStaleAnnotations           = "CleanStaleAnnotations"
+	CleanStaleStagePods             = "CleanStaleStagePods"
+	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
-	Prepare                         = "Prepare"
 	CreateRegistries                = "CreateRegistries"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
@@ -111,7 +113,9 @@ var StageItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: Prepare, Step: StepPrepare},
+		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleStagePods, Step: StepPrepare},
+		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
@@ -144,7 +148,9 @@ var FinalItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: Prepare, Step: StepPrepare},
+		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleStagePods, Step: StepPrepare},
+		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: WaitForRegistriesReady, Step: StepPrepare},
@@ -199,7 +205,6 @@ var FailedItinerary = Itinerary{
 	Phases: []Phase{
 		{Name: MigrationFailed, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: Completed, Step: StepFinal},
 	},
@@ -212,7 +217,7 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteBackups, Step: StepFinal},
 		{Name: DeleteRestores, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal},
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: DeleteMigrated, Step: StepFinal},
 		{Name: EnsureMigratedDeleted, Step: StepFinal},
@@ -316,21 +321,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-
-	case Prepare:
-		t.Requeue = PollReQ
-		err := t.ensureStagePodsDeleted()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		err = t.deleteAnnotations()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-
 	case CreateRegistries:
 		t.Requeue = PollReQ
 		nEnsured, err := t.ensureMigRegistries()
@@ -637,7 +627,7 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case EnsureStagePodsDeleted:
+	case EnsureStagePodsDeleted, CleanStaleStagePods:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -645,7 +635,7 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case EnsureStagePodsTerminated:
+	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -657,7 +647,7 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case EnsureAnnotationsDeleted:
+	case EnsureAnnotationsDeleted, CleanStaleAnnotations:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {

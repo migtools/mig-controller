@@ -19,9 +19,14 @@ package migmigration
 // PhaseDescriptions are human readable strings that describe a phase
 var PhaseDescriptions = map[string]string{
 	Started:                         "Migration started.",
-	Prepare:                         "Preparing for migration.",
 	StartRefresh:                    "Starting refresh on MigPlan, MigStorage and MigCluster resources",
 	WaitForRefresh:                  "Waiting for refresh of MigPlan, MigStorage and MigCluster resources to complete",
+	CleanStaleAnnotations:           "Removing leftover migration annotations and labels from PVs, PVCs, Pods, ImageStreams, and Namespaces. Annotations and labels provide migration instructions to Velero, Velero Plugins and Restic.",
+	CleanStaleStagePods:             "Deleting any leftover stage Pods.",
+	WaitForStaleStagePodsTerminated: "Waiting for leftover stage Pod deletion to finish.",
+	CreateRegistries:                "Creating migration registries on source and target clusters.",
+	WaitForRegistriesReady:          "Waiting for migration registries on source and target clusters to become healthy.",
+	DeleteRegistries:                "Deleting migration registries on source and target clusters.",
 	EnsureCloudSecretPropagated:     "Ensuring Velero has latest Replication Repository storage credentials.",
 	PreBackupHooks:                  "Waiting for user-defined pre-backup hooks to complete.",
 	PostBackupHooks:                 "Waiting for user-defined post-backup hooks to complete.",

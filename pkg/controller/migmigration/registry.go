@@ -296,6 +296,7 @@ func (t *Task) ensureRegistryService(client k8sclient.Client, secret *kapi.Secre
 
 func (t *Task) deleteImageRegistryResources() error {
 	t.Owner.Status.Conditions.DeleteCondition(RegistriesHealthy)
+	t.Owner.Status.Conditions.DeleteCondition(RegistriesUnhealthy)
 
 	plan := t.PlanResources.MigPlan
 	if plan == nil {

@@ -502,29 +502,52 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 
 // Ensure the stage pods have been deleted.
 func (t *Task) ensureStagePodsDeleted() error {
-	clients, err := t.getBothClients()
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
-	for _, client := range clients {
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Clean up source cluster namespaces
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
 		podList := corev1.PodList{}
-		err := client.List(context.TODO(), options, &podList)
+		err := srcClient.List(context.TODO(), options, &podList)
 		if err != nil {
 			return err
 		}
 		for _, pod := range podList.Items {
-			// Delete
-			err := client.Delete(context.TODO(), &pod)
+			err := srcClient.Delete(context.TODO(), &pod)
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
 			log.Info(
 				"Stage pod deleted.",
-				"ns",
-				pod.Namespace,
-				"name",
-				pod.Name)
+				"ns", pod.Namespace,
+				"name", pod.Name)
+		}
+	}
+
+	// Clean up destination cluster namespaces
+	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
+		podList := corev1.PodList{}
+		err := destClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return err
+		}
+		for _, pod := range podList.Items {
+			err := destClient.Delete(context.TODO(), &pod)
+			if err != nil && !k8serr.IsNotFound(err) {
+				return liberr.Wrap(err)
+			}
+			log.Info(
+				"Stage pod deleted.",
+				"ns", pod.Namespace,
+				"name", pod.Name)
 		}
 	}
 
@@ -533,7 +556,11 @@ func (t *Task) ensureStagePodsDeleted() error {
 
 // Ensure the deleted stage pods have finished terminating
 func (t *Task) ensureStagePodsTerminated() (bool, error) {
-	clients, err := t.getBothClients()
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -543,25 +570,53 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodFailed:    true,
 		corev1.PodUnknown:   true,
 	}
-	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
-	for _, client := range clients {
+
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
 		podList := corev1.PodList{}
-		err := client.List(context.TODO(), options, &podList)
+		err := srcClient.List(context.TODO(), options, &podList)
 		if err != nil {
-			return false, err
+			return false, liberr.Wrap(err)
 		}
 		for _, pod := range podList.Items {
-			// looks like it's terminated
+			// Check if Pod phase is one of 'terminatedPhases'
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
 			return false, nil
 		}
 	}
+
+	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
+		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
+		podList := corev1.PodList{}
+		err := destClient.List(context.TODO(), options, &podList)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		for _, pod := range podList.Items {
+			// Check if Pod phase is one of 'terminatedPhases'
+			if terminatedPhases[pod.Status.Phase] {
+				continue
+			}
+			return false, nil
+		}
+	}
+
 	t.Owner.Status.DeleteCondition(StagePodsCreated)
 	return true, nil
 }
 
+// Label applied to all stage pods for easy cleanup
+func (t *Task) stagePodCleanupLabel() map[string]string {
+	return map[string]string{StagePodLabel: migapi.True}
+}
+
+// Build map of all stage pod labels
+// 1. MigPlan correlation label
+// 2. MigMigration correlation label
+// 3. IncludedInStageBackup label
+// 4. StagePodIdentifier label
 func (t *Task) stagePodLabels() map[string]string {
 	labels := t.Owner.GetCorrelationLabels()
 	migplanLabels := t.PlanResources.MigPlan.GetCorrelationLabels()
@@ -572,6 +627,12 @@ func (t *Task) stagePodLabels() map[string]string {
 	}
 
 	labels[IncludedInStageBackupLabel] = t.UID()
+
+	// merge label indicating this is a stage pod for later cleanup purposes
+	stagePodCleanupLabel := t.stagePodCleanupLabel()
+	for labelName, labelValue := range stagePodCleanupLabel {
+		labels[labelName] = labelValue
+	}
 
 	return labels
 }
