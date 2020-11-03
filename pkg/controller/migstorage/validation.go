@@ -82,7 +82,8 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
-			Message:  fmt.Sprintf("The `spec.BackupStorageProvider` must be: (aws|gcp|azure), provider %s", storage.Spec.BackupStorageProvider),
+			Message: fmt.Sprintf("The `spec.BackupStorageProvider` must be: (aws|gcp|azure),"+
+				" provider %s", storage.Spec.BackupStorageProvider),
 		})
 		return nil
 	}
@@ -112,8 +113,9 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`, subject %s",
-				path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace, storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
+			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`, "+
+				"subject: %s.", path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace,
+				storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
 		})
 		return nil
 	}
@@ -126,8 +128,9 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
-			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`, subject %s, []",
-				path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace, storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
+			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`,"+
+				" subject: %s, [].", path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace,
+				storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
 			Items: fields,
 		})
 		return nil
@@ -142,8 +145,9 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 				Status:   True,
 				Reason:   TestFailed,
 				Category: Critical,
-				Message:  fmt.Sprintf("The `backupStorageConfig` settings [] not provided in secret %s not valid.", path.Join(secret.Namespace, secret.Name)),
-				Items:    []string{err.Error()},
+				Message: fmt.Sprintf("The `backupStorageConfig` settings [] not provided in "+
+					"secret %s not valid.", path.Join(secret.Namespace, secret.Name)),
+				Items: []string{err.Error()},
 			})
 		}
 	}
@@ -170,7 +174,8 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotSupported,
 				Category: Critical,
-				Message:  fmt.Sprintf("The `volumeSnapshotProvider` must be: (aws|gcp|azure)., provider: %s", storage.Spec.VolumeSnapshotProvider),
+				Message: fmt.Sprintf("The `volumeSnapshotProvider` must be: (aws|gcp|azure).,"+
+					" provider: %s", storage.Spec.VolumeSnapshotProvider),
 			})
 			return nil
 		}
@@ -194,8 +199,8 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotFound,
 				Category: Critical,
-				Message: fmt.Sprintf("The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`. subject %s", path.Join(
-					storage.Spec.VolumeSnapshotConfig.CredsSecretRef.Namespace,
+				Message: fmt.Sprintf("The `volumeSnapshotConfig.credsSecretRef` must reference a `secret`."+
+					" subject: %s", path.Join(storage.Spec.VolumeSnapshotConfig.CredsSecretRef.Namespace,
 					storage.Spec.VolumeSnapshotConfig.CredsSecretRef.Namespace)),
 			})
 			return nil
@@ -209,8 +214,9 @@ func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigSt
 				Status:   True,
 				Reason:   NotSupported,
 				Category: Critical,
-				Message:  fmt.Sprintf("The `volumeSnapshotConfig` settings [] in secret %s not valid.", path.Join(secret.Namespace, secret.Name)),
-				Items:    fields,
+				Message: fmt.Sprintf("The `volumeSnapshotConfig` settings [] in secret %s not valid.",
+					path.Join(secret.Namespace, secret.Name)),
+				Items: fields,
 			})
 			return nil
 		}
