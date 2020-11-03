@@ -612,7 +612,16 @@ func (t *Task) createRsyncClientPods() error {
 						Value: "changeme",
 					},
 				},
-				Command: []string{"rsync", "-aPvvHh", "--delete", "--port", "2222", "--log-file", "/dev/stdout", fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
+				Command: []string{"rsync",
+					"--archive",
+					"--hard-links",
+					"--human",
+					"--partial",
+					"--delete",
+					"--port", "2222",
+					"--log-file", "/dev/stdout",
+					"--info=COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2",
+					fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          "rsync-client",
