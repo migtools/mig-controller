@@ -147,7 +147,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	podList := corev1.PodList{}
-	options := k8sclient.MatchingLabels(t.stagePodLabels())
+	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
 	err := client.List(context.TODO(), options, &podList)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -506,7 +506,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
+	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
 	for _, client := range clients {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -543,7 +543,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodFailed:    true,
 		corev1.PodUnknown:   true,
 	}
-	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
+	options := k8sclient.MatchingLabels(t.stagePodIdentifierLabel())
 	for _, client := range clients {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -562,6 +562,16 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 	return true, nil
 }
 
+// Label applied to all stage pods for easy cleanup
+func (t *Task) stagePodIdentifierLabel() map[string]string {
+	return map[string]string{StagePodLabel: migapi.True}
+}
+
+// Build map of all stage pod labels
+// 1. MigPlan correlation label
+// 2. MigMigration correlation label
+// 3. IncludedInStageBackup label
+// 4. StagePodIdentifier label
 func (t *Task) stagePodLabels() map[string]string {
 	labels := t.Owner.GetCorrelationLabels()
 	migplanLabels := t.PlanResources.MigPlan.GetCorrelationLabels()
@@ -572,6 +582,12 @@ func (t *Task) stagePodLabels() map[string]string {
 	}
 
 	labels[IncludedInStageBackupLabel] = t.UID()
+
+	// merge label indicating this is a stage pod for later cleanup purposes
+	stagePodIdentifierLabel := t.stagePodIdentifierLabel()
+	for labelName, labelValue := range stagePodIdentifierLabel {
+		labels[labelName] = labelValue
+	}
 
 	return labels
 }

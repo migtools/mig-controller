@@ -25,7 +25,6 @@ const (
 	Started                         = "Started"
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
-	Prepare                         = "Prepare"
 	CreateRegistries                = "CreateRegistries"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
@@ -111,7 +110,9 @@ var StageItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: Prepare, Step: StepPrepare},
+		{Name: EnsureAnnotationsDeleted, Step: StepPrepare},
+		{Name: EnsureStagePodsDeleted, Step: StepPrepare},
+		{Name: EnsureStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
@@ -144,7 +145,9 @@ var FinalItinerary = Itinerary{
 		{Name: Started, Step: StepPrepare},
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
-		{Name: Prepare, Step: StepPrepare},
+		{Name: EnsureAnnotationsDeleted, Step: StepPrepare},
+		{Name: EnsureStagePodsDeleted, Step: StepPrepare},
+		{Name: EnsureStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: WaitForRegistriesReady, Step: StepPrepare},
@@ -199,7 +202,6 @@ var FailedItinerary = Itinerary{
 	Phases: []Phase{
 		{Name: MigrationFailed, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: Completed, Step: StepFinal},
 	},
@@ -212,7 +214,7 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteBackups, Step: StepFinal},
 		{Name: DeleteRestores, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
+		{Name: EnsureStagePodsDeleted, Step: StepFinal},
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: DeleteMigrated, Step: StepFinal},
 		{Name: EnsureMigratedDeleted, Step: StepFinal},
@@ -316,21 +318,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-
-	case Prepare:
-		t.Requeue = PollReQ
-		err := t.ensureStagePodsDeleted()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		err = t.deleteAnnotations()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-
 	case CreateRegistries:
 		t.Requeue = PollReQ
 		nEnsured, err := t.ensureMigRegistries()

@@ -69,6 +69,9 @@ const (
 	// to allow migplan restored resources rollback
 	// The value is Task.PlanResources.MigPlan.UID
 	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
+	// Identifies Pod as a stage pod to allow
+	// for cleanup at migration start and rollback
+	StagePodLabel = "migration.openshift.io/is-stage-pod" // always true
 )
 
 // Set of Service Accounts.
