@@ -473,6 +473,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		return
 	}
 	podList := corev1.PodList{}
+	// Following line still uses MigMigration-based correlation labels since it is not part of rollback process
 	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
 	err = client.List(context.TODO(), options, &podList)
 	if err != nil {
@@ -505,7 +506,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
+	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
 	for _, client := range clients {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -542,7 +543,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodFailed:    true,
 		corev1.PodUnknown:   true,
 	}
-	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
+	options := k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels())
 	for _, client := range clients {
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), options, &podList)
@@ -563,6 +564,13 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 
 func (t *Task) stagePodLabels() map[string]string {
 	labels := t.Owner.GetCorrelationLabels()
+	migplanLabels := t.PlanResources.MigPlan.GetCorrelationLabels()
+
+	// merge original migmigration correlation labels with migplan correlation label
+	for labelName, labelValue := range migplanLabels {
+		labels[labelName] = labelValue
+	}
+
 	labels[IncludedInStageBackupLabel] = t.UID()
 
 	return labels
