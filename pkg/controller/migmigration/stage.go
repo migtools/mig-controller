@@ -542,6 +542,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 				pod.Name)
 		}
 	}
+
 	return nil
 }
 
@@ -569,7 +570,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			return false, err
+			return false, nil
 		}
 	}
 	t.Owner.Status.DeleteCondition(StagePodsCreated)

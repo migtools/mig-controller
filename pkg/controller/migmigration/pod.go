@@ -2,7 +2,6 @@ package migmigration
 
 import (
 	"context"
-	"fmt"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -89,7 +88,6 @@ func (t *Task) restartResticPods() error {
 
 // Determine if restic pod is running.
 func (t *Task) haveResticPodsStarted() (bool, error) {
-	progress := []string{}
 	// Verify restic restart is needed before proceeding
 	runRestart, err := t.shouldResticRestart()
 	if err != nil {
@@ -130,29 +128,20 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	restarted := true
+
 	for _, pod := range list.Items {
-		if pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning {
-			restarted = false
-			progress = append(
-				progress,
-				fmt.Sprintf(
-					"Restic Pod %s/%s: Not running yet",
-					pod.Namespace,
-					pod.Name))
+		if pod.DeletionTimestamp != nil {
+			return false, nil
+		}
+		if pod.Status.Phase != corev1.PodRunning {
+			return false, nil
 		}
 	}
 	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
-		restarted = false
-		progress = append(
-			progress,
-			fmt.Sprintf(
-				"Restic DaemonSet %s/%s: Desired number of pods not ready yet",
-				ds.Namespace,
-				ds.Name))
+		return false, nil
 	}
 
-	return restarted, nil
+	return true, nil
 }
 
 // Find all velero pods on the specified cluster.
