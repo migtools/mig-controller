@@ -339,6 +339,7 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+
 	case CreateRegistries:
 		t.Requeue = PollReQ
 		nEnsured, err := t.ensureMigRegistries()
@@ -501,8 +502,29 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case RestartVelero:
+		err := t.restartVeleroPods()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = PollReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case WaitForResticReady:
 		started, err := t.haveResticPodsStarted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if started {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+	case WaitForVeleroReady:
+		started, err := t.haveVeleroPodsStarted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
