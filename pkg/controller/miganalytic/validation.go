@@ -38,13 +38,6 @@ const (
 	False = migapi.False
 )
 
-// Messages
-const (
-	ReadyMessage          = "The analytic is ready."
-	InvalidPlanRefMessage = "The referenced plan does not exist."
-	PostponedMessage      = "Waiting %d seconds for referenced MigPlan to become ready."
-)
-
 // Validate the analytic resource.
 func (r ReconcileMigAnalytic) validate(analytic *migapi.MigAnalytic) error {
 	err := r.validatePlan(analytic)
@@ -71,7 +64,7 @@ func (r ReconcileMigAnalytic) validatePlan(analytic *migapi.MigAnalytic) error {
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidPlanRefMessage,
+			Message:  fmt.Sprintf("The referenced plan does not exist."),
 		})
 		return nil
 	} else if err != nil {
@@ -85,7 +78,7 @@ func (r ReconcileMigAnalytic) validatePlan(analytic *migapi.MigAnalytic) error {
 			Status:   True,
 			Reason:   TestFailed,
 			Category: Critical,
-			Message:  fmt.Sprintf(PostponedMessage, RequeueInterval),
+			Message:  fmt.Sprintf("Waiting %d seconds for referenced MigPlan to become ready.", RequeueInterval),
 		})
 		return nil
 	} else if err != nil {
