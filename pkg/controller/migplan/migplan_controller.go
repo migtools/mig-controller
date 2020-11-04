@@ -324,6 +324,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	plan.Status.SetCondition(migapi.Condition{
 		Type:     Closed,
 		Status:   True,
+		Reason:   ClosedState,
 		Category: Advisory,
 		Message:  "The migration plan is closed.",
 	})
@@ -368,6 +369,7 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     Suspended,
 			Status:   True,
+			Reason:   SuspendedState,
 			Category: Advisory,
 			Message: "The migrations plan is in suspended state; Limited validation enforced; PV discovery and " +
 				"resource reconciliation suspended.",

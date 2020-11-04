@@ -82,31 +82,33 @@ const (
 
 // Reasons
 const (
-	NotSet        = "NotSet"
-	NotFound      = "NotFound"
-	KeyNotFound   = "KeyNotFound"
-	NotDistinct   = "NotDistinct"
-	LimitExceeded = "LimitExceeded"
-	NotDone       = "NotDone"
-	Done          = "Done"
-	Conflict      = "Conflict"
-	NotHealthy    = "NotHealthy"
-	Incorrect     = "Incorrect"
+	Duplicate      = "Duplicate"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	KeyNotFound    = "KeyNotFound"
+	NotDistinct    = "NotDistinct"
+	LimitExceeded  = "LimitExceeded"
+	NotDone        = "NotDone"
+	NotSupported   = "NotSupported"
+	ErrorsDetected = "ErrorsDetected"
+	Missing        = "Missing"
+	NotAvailable   = "NotAvailable"
+	NotAccessible  = "NotAccessible"
+	NotCompatible  = "NotCompatible"
+	Done           = "Done"
+	Conflict       = "Conflict"
+	NotHealthy     = "NotHealthy"
+	NotReady       = "NotReady"
+	Incorrect      = "Incorrect"
+	SuspendedState = "SuspendedState"
+	ClosedState    = "ClosedState"
+	UnknownPhase   = "UnknownPhase"
 )
 
 // Statuses
 const (
 	True  = migapi.True
 	False = migapi.False
-)
-
-// Messages
-const (
-	NsGVKsIncompatible           = "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details"
-	PvWarnNoCephAvailableMessage = "Ceph is not available on destination. If this is desired, please install the rook operator. The following PVs will use the default storage class instead: []"
-	PvLimitExceededMessage       = "PV limit: %d exceeded, found: %d."
-	StorageEnsuredMessage        = "The storage resources have been created."
-	PvsDiscoveredMessage         = "The `persistentVolumes` list has been updated with discovered PVs."
 )
 
 // Valid AccessMode values
@@ -222,9 +224,10 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageNotReady,
 			Status:   True,
+			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `migStorageRef` does not have a `Ready` condition, subject: %s.",
-				path.Join(plan.Spec.MigStorageRef.Namespace, plan.Spec.MigStorageRef.Namespace)),
+				path.Join(plan.Spec.MigStorageRef.Namespace, plan.Spec.MigStorageRef.Name)),
 		})
 	}
 
@@ -238,6 +241,7 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsListEmpty,
 			Status:   True,
+			Reason:   NotFound,
 			Category: Critical,
 			Message:  "The `namespaces` list may not be empty.",
 		})
@@ -344,6 +348,7 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     SourceClusterNotReady,
 			Status:   True,
+			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `srcMigClusterRef` does not have a `Ready` condition, subject: %s",
 				path.Join(plan.Spec.SrcMigClusterRef.Namespace, plan.Spec.SrcMigClusterRef.Name)),
@@ -405,6 +410,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     DestinationClusterNotReady,
 			Status:   True,
+			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `dstMigClusterRef` does not have a `Ready` condition, subject: %s",
 				path.Join(plan.Spec.DestMigClusterRef.Namespace, plan.Spec.DestMigClusterRef.Name)),
@@ -655,6 +661,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoSupportedAction,
 			Status:   True,
+			Reason:   NotSupported,
 			Category: Warn,
 			Message:  "PV in `persistentVolumes` [] with no `SupportedActions`.",
 			Items:    unsupported,
@@ -674,6 +681,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAccessMode,
 			Status:   True,
+			Reason:   ErrorsDetected,
 			Category: Error,
 			Message:  "PV in `persistentVolumes` [] has an invalid `accessMode`.",
 			Items:    invalidAccessMode,
@@ -683,6 +691,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoStorageClassSelection,
 			Status:   True,
+			Reason:   NotFound,
 			Category: Warn,
 			Message: "PV in `persistentVolumes` [] has no `Selected.StorageClass`. Make sure that the necessary static" +
 				" persistent volumes exist in the destination cluster.",
@@ -693,6 +702,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvWarnAccessModeUnavailable,
 			Status:   True,
+			Reason:   NotAvailable,
 			Category: Warn,
 			Message:  "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class.",
 			Items:    unavailableAccessMode,
@@ -702,6 +712,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoCopyMethodSelection,
 			Status:   True,
+			Reason:   NotFound,
 			Category: Error,
 			Message:  "PV in `persistentVolumes` [] has no `Selected.CopyMethod`.",
 			Items:    missingCopyMethod,
@@ -711,6 +722,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidCopyMethod,
 			Status:   True,
+			Reason:   ErrorsDetected,
 			Category: Error,
 			Message:  "PV in `persistentVolumes` [] has an invalid `copyMethod`.",
 			Items:    invalidCopyMethod,
@@ -720,6 +732,7 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvWarnCopyMethodSnapshot,
 			Status:   True,
+			Reason:   NotCompatible,
 			Category: Warn,
 			Message: "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen " +
 				"storage class is compatible with the source volume's storage type for Snapshot support.",
@@ -1001,6 +1014,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     HookNotReady,
 				Status:   True,
+				Reason:   NotReady,
 				Category: Critical,
 				Message:  "One or more referenced hooks are not ready.",
 			})
@@ -1020,6 +1034,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     HookPhaseUnknown,
 				Status:   True,
+				Reason:   UnknownPhase,
 				Category: Critical,
 				Message:  "One or more referenced hooks are in an unknown phase.",
 			})
@@ -1034,6 +1049,7 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     HookPhaseDuplicate,
 			Status:   True,
+			Reason:   Duplicate,
 			Category: Critical,
 			Message:  "Only one hook may be specified per phase.",
 		})
@@ -1178,6 +1194,7 @@ func (r *NfsValidation) validate() error {
 		r.Plan.Status.SetCondition(migapi.Condition{
 			Type:     NfsNotAccessible,
 			Status:   True,
+			Reason:   NotAccessible,
 			Category: Warn,
 			Message:  "NFS servers [] not accessible on the destination cluster.",
 			Items:    notAccessible,

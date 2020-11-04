@@ -88,7 +88,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   Done,
 			Category: migapi.Required,
-			Message:  PvsDiscoveredMessage,
+			Message:  "The `persistentVolumes` list has been updated with discovered PVs.",
 		})
 		plan.Spec.PersistentVolumes.EndPvStaging()
 		return nil
@@ -154,7 +154,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		Status:   True,
 		Reason:   Done,
 		Category: migapi.Required,
-		Message:  PvsDiscoveredMessage,
+		Message:  "The `persistentVolumes` list has been updated with discovered PVs.",
 	})
 
 	plan.Spec.PersistentVolumes.EndPvStaging()
@@ -163,13 +163,12 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	limit := Settings.Plan.PvLimit
 	count := len(plan.Spec.PersistentVolumes.List)
 	if count > limit {
-		message := fmt.Sprintf(PvLimitExceededMessage, limit, count)
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvLimitExceeded,
 			Status:   True,
 			Reason:   LimitExceeded,
 			Category: Warn,
-			Message:  message,
+			Message:  fmt.Sprintf("PV limit: %d exceeded, found: %d.", limit, count),
 		})
 	}
 
@@ -373,9 +372,11 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 				plan.Status.SetCondition(migapi.Condition{
 					Type:     PvWarnNoCephAvailable,
 					Status:   True,
+					Reason:   NotAvailable,
 					Category: Warn,
-					Message:  PvWarnNoCephAvailableMessage,
-					Items:    []string{pv.Name},
+					Message: "Ceph is not available on destination. If this is desired, please install the rook" +
+						" operator. The following PVs will use the default storage class instead: []",
+					Items: []string{pv.Name},
 				})
 			} else {
 				existingWarnCondition.Items = append(existingWarnCondition.Items, pv.Name)
