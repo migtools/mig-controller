@@ -24,8 +24,8 @@ const (
 	Created                         = ""
 	Started                         = "Started"
 	CleanStaleAnnotations           = "CleanStaleAnnotations"
-	CleanStaleStagePods             = "CleanStaleStagePods"
 	CleanStaleVeleroCRs             = "CleanStaleVeleroCRs"
+	CleanStaleStagePods             = "CleanStaleStagePods"
 	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
@@ -49,8 +49,10 @@ const (
 	StagePodsCreated                = "StagePodsCreated"
 	StagePodsFailed                 = "StagePodsFailed"
 	SourceStagePodsFailed           = "SourceStagePodsFailed"
+	RestartVelero                   = "RestartVelero"
+	WaitForVeleroReady              = "WaitForVeleroReady"
 	RestartRestic                   = "RestartRestic"
-	ResticRestarted                 = "ResticRestarted"
+	WaitForResticReady              = "WaitForResticReady"
 	QuiesceApplications             = "QuiesceApplications"
 	EnsureQuiesced                  = "EnsureQuiesced"
 	UnQuiesceApplications           = "UnQuiesceApplications"
@@ -115,6 +117,8 @@ var StageItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
+		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
@@ -124,8 +128,9 @@ var StageItinerary = Itinerary{
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
 		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
-		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
+		{Name: RestartRestic, Step: StepStageBackup},
+		{Name: WaitForResticReady, Step: StepStageBackup},
+		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: WaitForRegistriesReady, Step: StepStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
@@ -150,6 +155,8 @@ var FinalItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
+		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
@@ -163,8 +170,9 @@ var FinalItinerary = Itinerary{
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
 		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
-		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
+		{Name: RestartRestic, Step: StepStageBackup},
+		{Name: WaitForResticReady, Step: StepStageBackup},
+		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
@@ -321,6 +329,15 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		}
+	case CleanStaleVeleroCRs:
+		t.Requeue = PollReQ
+		err := t.deletePendingVeleroCRs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
 		}
 	case CreateRegistries:
 		t.Requeue = PollReQ
@@ -484,7 +501,7 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case ResticRestarted:
+	case WaitForResticReady:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
 			return liberr.Wrap(err)

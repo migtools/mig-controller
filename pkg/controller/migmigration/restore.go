@@ -397,10 +397,11 @@ func (t *Task) deleteCorrelatedRestores() error {
 
 // Delete pending Velero Restores in the controller namespace to empty
 // the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingRestores() error {
+func (t *Task) deletePendingRestores() (int, error) {
+	nDeleted := 0
 	client, err := t.getDestinationClient()
 	if err != nil {
-		return liberr.Wrap(err)
+		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.RestoreList{}
@@ -409,7 +410,7 @@ func (t *Task) deletePendingRestores() error {
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
 	if err != nil {
-		return liberr.Wrap(err)
+		return 0, liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
 		// Skip delete unless "New" or "InProgress"
@@ -419,19 +420,21 @@ func (t *Task) deletePendingRestores() error {
 		}
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
-			return liberr.Wrap(err)
+			return nDeleted, liberr.Wrap(err)
 		}
+		nDeleted++
 	}
 
-	return nil
+	return nDeleted, nil
 }
 
 // Delete pending Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingPVRs() error {
+func (t *Task) deletePendingPVRs() (int, error) {
+	nDeleted := 0
 	client, err := t.getDestinationClient()
 	if err != nil {
-		return liberr.Wrap(err)
+		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.PodVolumeRestoreList{}
@@ -440,7 +443,7 @@ func (t *Task) deletePendingPVRs() error {
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
 	if err != nil {
-		return liberr.Wrap(err)
+		return 0, liberr.Wrap(err)
 	}
 	for _, pvr := range list.Items {
 		// Skip delete unless "New" or "InProgress"
@@ -450,11 +453,12 @@ func (t *Task) deletePendingPVRs() error {
 		}
 		err = client.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
-			return liberr.Wrap(err)
+			return nDeleted, liberr.Wrap(err)
 		}
+		nDeleted++
 	}
 
-	return nil
+	return nDeleted, nil
 }
 
 func (t *Task) deleteMigrated() error {

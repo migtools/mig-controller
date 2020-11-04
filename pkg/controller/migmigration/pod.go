@@ -15,8 +15,25 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Determine if restic should restart
+// Determine if velero should restart based on:
+// 1. if we deleted pending Velero CRs
+func (t *Task) shouldVeleroRestart() bool {
+	if t.Owner.Status.HasCondition(PendingVeleroCRsDeleted) {
+		return true
+	}
+	return false
+}
+
+// Determine if restic should restart based on:
+// 1. if we deleted pending Velero CRs
+// 2. if k8s version requires mount propagation workaround.
 func (t *Task) shouldResticRestart() (bool, error) {
+	// 1. Check if we deleted pending Velero CRs, need to do restic restart.
+	if t.Owner.Status.HasCondition(PendingVeleroCRsDeleted) {
+		return true, nil
+	}
+
+	// 2. Check if k8s version requires mount propagation workaround
 	client, err := t.getSourceClient()
 	if err != nil {
 		return false, liberr.Wrap(err)
@@ -51,35 +68,36 @@ func (t *Task) restartResticPods() error {
 		return nil
 	}
 
-	client, err := t.getSourceClient()
+	clients, err := t.getBothClients()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	list := corev1.PodList{}
-	selector := labels.SelectorFromSet(map[string]string{
-		"name": "restic",
-	})
-	err = client.List(
-		context.TODO(),
-		&k8sclient.ListOptions{
-			Namespace:     migapi.VeleroNamespace,
-			LabelSelector: selector,
-		},
-		&list)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	for _, pod := range list.Items {
-		if pod.Status.Phase != corev1.PodRunning {
-			continue
-		}
-		err = client.Delete(
+	for _, client := range clients {
+		list := corev1.PodList{}
+		selector := labels.SelectorFromSet(map[string]string{
+			"name": "restic",
+		})
+		err = client.List(
 			context.TODO(),
-			&pod)
+			&k8sclient.ListOptions{
+				Namespace:     migapi.VeleroNamespace,
+				LabelSelector: selector,
+			},
+			&list)
 		if err != nil {
 			return liberr.Wrap(err)
+		}
+
+		for _, pod := range list.Items {
+			if pod.Status.Phase != corev1.PodRunning {
+				continue
+			}
+			err = client.Delete(
+				context.TODO(),
+				&pod)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	}
 
@@ -97,48 +115,141 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return true, nil
 	}
 
-	client, err := t.getSourceClient()
+	clients, err := t.getBothClients()
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
 
-	list := corev1.PodList{}
-	ds := appsv1.DaemonSet{}
-	selector := labels.SelectorFromSet(map[string]string{
-		"name": "restic",
-	})
-	err = client.List(
-		context.TODO(),
-		&k8sclient.ListOptions{
-			Namespace:     migapi.VeleroNamespace,
-			LabelSelector: selector,
-		},
-		&list)
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
+	for _, client := range clients {
+		list := corev1.PodList{}
+		ds := appsv1.DaemonSet{}
+		selector := labels.SelectorFromSet(map[string]string{
+			"name": "restic",
+		})
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     migapi.VeleroNamespace,
+				LabelSelector: selector,
+			},
+			&list)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
 
-	err = client.Get(
-		context.TODO(),
-		types.NamespacedName{
-			Name:      "restic",
-			Namespace: migapi.VeleroNamespace,
-		},
-		&ds)
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      "restic",
+				Namespace: migapi.VeleroNamespace,
+			},
+			&ds)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
 
-	for _, pod := range list.Items {
-		if pod.DeletionTimestamp != nil {
+		for _, pod := range list.Items {
+			if pod.DeletionTimestamp != nil {
+				return false, nil
+			}
+			if pod.Status.Phase != corev1.PodRunning {
+				return false, nil
+			}
+		}
+		if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
 			return false, nil
 		}
-		if pod.Status.Phase != corev1.PodRunning {
-			return false, nil
+	}
+
+	return true, nil
+}
+
+// Delete the running Velero pods.
+// Needed to stop any pending tasks after Velero CR deletion
+func (t *Task) restartVeleroPods() error {
+	runRestart := t.shouldVeleroRestart()
+	if !runRestart {
+		return nil
+	}
+
+	// Delete Velero Pods on both clusters
+	clusters := t.getBothClusters()
+	for _, cluster := range clusters {
+		veleroPods, err := t.findVeleroPods(cluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		clusterClient, err := cluster.GetClient(t.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		for _, pod := range veleroPods {
+			if pod.Status.Phase != corev1.PodRunning {
+				continue
+			}
+			err = clusterClient.Delete(
+				context.TODO(),
+				&pod)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	}
-	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
-		return false, nil
+	return nil
+}
+
+// Determine if Velero Pod is running.
+func (t *Task) haveVeleroPodsStarted() (bool, error) {
+	// Verify Velero restart is needed before continuing check
+	runRestart := t.shouldVeleroRestart()
+	if !runRestart {
+		return true, nil
+	}
+
+	clients, err := t.getBothClients()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+
+	for _, client := range clients {
+		list := corev1.PodList{}
+		deployment := appsv1.Deployment{}
+		selector := labels.SelectorFromSet(map[string]string{
+			"component": "velero",
+		})
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     migapi.VeleroNamespace,
+				LabelSelector: selector,
+			},
+			&list)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      "velero",
+				Namespace: migapi.VeleroNamespace,
+			},
+			&deployment)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		for _, pod := range list.Items {
+			if pod.DeletionTimestamp != nil {
+				return false, nil
+			}
+			if pod.Status.Phase != corev1.PodRunning {
+				return false, nil
+			}
+		}
+		if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
+			return false, nil
+		}
 	}
 
 	return true, nil
