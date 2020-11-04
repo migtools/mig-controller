@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -121,6 +122,26 @@ func (t *Task) getStageBackup() (*velero.Backup, error) {
 	return t.getBackup(labels)
 }
 
+func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVolumeBackupList {
+	list := velero.PodVolumeBackupList{}
+	backupAssociationLabel := map[string]string{
+		velero.BackupNameLabel: backup.Name,
+	}
+	client, err := t.getSourceClient()
+	if err != nil {
+		log.Trace(err)
+		return &list
+	}
+	err = client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(backupAssociationLabel),
+		&list)
+	if err != nil {
+		log.Trace(err)
+	}
+	return &list
+}
+
 // Get an existing Backup on the source cluster.
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	client, err := t.getSourceClient()
@@ -143,28 +164,123 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 }
 
 // Get whether a backup has completed on the source cluster.
-func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
+func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	completed := false
 	reasons := []string{}
+	progress := []string{}
+
+	pvbs := t.getPodVolumeBackupsForBackup(backup)
+
+	getPodVolumeBackupsProgress := func(pvbList *velero.PodVolumeBackupList) (progress []string) {
+		getDuration := func(pvb *velero.PodVolumeBackup) (duration string) {
+			if pvb.Status.StartTimestamp != nil {
+				if pvb.Status.CompletionTimestamp == nil {
+					duration = fmt.Sprintf(" (%s)",
+						time.Now().Sub(pvb.Status.StartTimestamp.Time).Round(time.Second))
+				} else {
+					duration = fmt.Sprintf(" (%s)",
+						pvb.Status.CompletionTimestamp.Sub(pvb.Status.StartTimestamp.Time).Round(time.Second))
+				}
+			}
+			return
+		}
+
+		m, keys, msg := make(map[string]string), make([]string, 0), ""
+
+		for _, pvb := range pvbList.Items {
+			switch pvb.Status.Phase {
+			case velero.PodVolumeBackupPhaseInProgress:
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: %s out of %s backed up%s",
+					pvb.Namespace,
+					pvb.Name,
+					bytesToSI(pvb.Status.Progress.BytesDone),
+					bytesToSI(pvb.Status.Progress.TotalBytes),
+					getDuration(&pvb))
+			case velero.PodVolumeBackupPhaseCompleted:
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Completed, %s out of %s backed up%s",
+					pvb.Namespace,
+					pvb.Name,
+					bytesToSI(pvb.Status.Progress.BytesDone),
+					bytesToSI(pvb.Status.Progress.TotalBytes),
+					getDuration(&pvb))
+			case velero.PodVolumeBackupPhaseFailed:
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Failed%s",
+					pvb.Namespace,
+					pvb.Name,
+					getDuration(&pvb))
+			default:
+				msg = fmt.Sprintf(
+					"PodVolumeBackup %s/%s: Waiting for ongoing volume backup(s) to complete",
+					pvb.Namespace,
+					pvb.Name)
+			}
+			m[pvb.Namespace+"/"+pvb.Name] = msg
+			keys = append(keys, pvb.Namespace+"/"+pvb.Name)
+		}
+		// sort the progress array to maintain order everytime it's updated
+		sort.Strings(keys)
+		for _, k := range keys {
+			progress = append(progress, m[k])
+		}
+		return
+	}
+
 	switch backup.Status.Phase {
+	case velero.BackupPhaseNew:
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Not started yet",
+				backup.Namespace,
+				backup.Name))
+	case velero.BackupPhaseInProgress:
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: %d out of estimated total of %d objects backed up",
+				backup.Namespace,
+				backup.Name,
+				backup.Status.Progress.ItemsBackedUp,
+				backup.Status.Progress.TotalItems))
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseCompleted:
 		completed = true
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Completed",
+				backup.Namespace,
+				backup.Name))
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailed:
 		completed = true
-		reasons = append(
-			reasons,
-			fmt.Sprintf(
-				"Backup: %s/%s failed.",
-				backup.Namespace,
-				backup.Name))
+		message := fmt.Sprintf(
+			"Backup: %s/%s failed.",
+			backup.Namespace,
+			backup.Name)
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhasePartiallyFailed:
 		completed = true
-		reasons = append(
-			reasons,
-			fmt.Sprintf(
-				"Backup: %s/%s partially failed.",
-				backup.Namespace,
-				backup.Name))
+		message := fmt.Sprintf(
+			"Backup: %s/%s partially failed.",
+			backup.Namespace,
+			backup.Name)
+		reasons = append(reasons, message)
+		progress = append(progress, message)
+		progress = append(
+			progress,
+			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseFailedValidation:
 		reasons = backup.Status.ValidationErrors
 		reasons = append(
@@ -176,6 +292,7 @@ func (t Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		completed = true
 	}
 
+	t.setProgress(progress)
 	return completed, reasons
 }
 
@@ -286,6 +403,7 @@ func (t *Task) deleteBackups() error {
 
 // Determine whether backups are replicated by velero on the destination cluster.
 func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
+	progress := []string{}
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return false, err
@@ -303,8 +421,15 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 	}
 	if k8serrors.IsNotFound(err) {
 		err = nil
+		progress = append(
+			progress,
+			fmt.Sprintf(
+				"Backup %s/%s: Not replicated",
+				backup.Namespace,
+				backup.Name,
+			))
 	}
-
+	t.setProgress(progress)
 	return false, err
 }
 
@@ -351,4 +476,21 @@ func findPVVerify(pvList migapi.PersistentVolumes, pvName string) bool {
 		}
 	}
 	return false
+}
+
+// converts raw 'bytes' to nearest possible SI unit
+// with a precision of 2 decimal digits
+func bytesToSI(bytes int64) string {
+	const baseUnit = 1000
+	if bytes < baseUnit {
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+	const siUnits = "kMGTPE"
+	div, exp := int64(baseUnit), 0
+	for n := bytes / baseUnit; n >= baseUnit; n /= baseUnit {
+		div *= baseUnit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB",
+		float64(bytes)/float64(div), siUnits[exp])
 }

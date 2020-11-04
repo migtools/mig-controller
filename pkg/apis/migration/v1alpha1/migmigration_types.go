@@ -77,7 +77,6 @@ func (s *MigMigrationStatus) ReflectPipeline() {
 		if step.MarkedCompleted() {
 			step.Phase = ""
 			step.Message = "Completed"
-			step.Progress = []string{}
 		}
 		if step.Failed {
 			step.Message = "Failed"
