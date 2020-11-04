@@ -25,6 +25,7 @@ const (
 	Started                         = "Started"
 	CleanStaleAnnotations           = "CleanStaleAnnotations"
 	CleanStaleStagePods             = "CleanStaleStagePods"
+	CleanStaleVeleroCRs             = "CleanStaleVeleroCRs"
 	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
@@ -778,14 +779,14 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case DeleteBackups:
-		if err := t.deleteBackups(); err != nil {
+		if err := t.deleteCorrelatedBackups(); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
 	case DeleteRestores:
-		if err := t.deleteRestores(); err != nil {
+		if err := t.deleteCorrelatedRestores(); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {

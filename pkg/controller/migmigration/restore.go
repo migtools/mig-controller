@@ -365,7 +365,8 @@ func (t *Task) updateNamespaceMapping(restore *velero.Restore) {
 	}
 }
 
-func (t *Task) deleteRestores() error {
+// Delete all Velero Restores correlated with the running MigPlan
+func (t *Task) deleteCorrelatedRestores() error {
 	client, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -386,6 +387,68 @@ func (t *Task) deleteRestores() error {
 	}
 	for _, restore := range list.Items {
 		err = client.Delete(context.TODO(), &restore)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return nil
+}
+
+// Delete pending Velero Restores in the controller namespace to empty
+// the work queue for next migration. Does _not_ filter on correlation labels.
+func (t *Task) deletePendingRestores() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	list := velero.RestoreList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.InNamespace(migapi.VeleroNamespace),
+		&list)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, restore := range list.Items {
+		// Skip delete unless "New" or "InProgress"
+		if restore.Status.Phase != velero.RestorePhaseNew &&
+			restore.Status.Phase != velero.RestorePhaseInProgress {
+			continue
+		}
+		err = client.Delete(context.TODO(), &restore)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return nil
+}
+
+// Delete pending Velero PodVolumeRestores in the controller namespace to empty
+// the work queue for next migration. Does _not_ filter on correlation labels.
+func (t *Task) deletePendingPVRs() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	list := velero.PodVolumeRestoreList{}
+	err = client.List(
+		context.TODO(),
+		k8sclient.InNamespace(migapi.VeleroNamespace),
+		&list)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, pvr := range list.Items {
+		// Skip delete unless "New" or "InProgress"
+		if pvr.Status.Phase != velero.PodVolumeRestorePhaseNew &&
+			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress {
+			continue
+		}
+		err = client.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
