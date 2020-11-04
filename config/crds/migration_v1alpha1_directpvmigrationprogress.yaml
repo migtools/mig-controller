@@ -37,6 +37,12 @@ spec:
           type: object
         status:
           properties:
+            lastObservedProgressPercent:
+              type: string
+            lastObservedTransferRate:
+              type: string
+            logMessage:
+              type: string
             observedDigest:
               type: string
             phase:

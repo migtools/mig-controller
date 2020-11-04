@@ -34,9 +34,11 @@ type DirectPVMigrationProgressSpec struct {
 // DirectPVMigrationProgressStatus defines the observed state of DirectPVMigrationProgress
 type DirectPVMigrationProgressStatus struct {
 	Conditions
-	PodPhase       kapi.PodPhase `json:"phase,omitempty"`
-	LogMessage     string        `json:"logMessage,omitempty"`
-	ObservedDigest string        `json:"observedDigest,omitempty"`
+	PodPhase                    kapi.PodPhase `json:"phase,omitempty"`
+	LogMessage                  string        `json:"logMessage,omitempty"`
+	ObservedDigest              string        `json:"observedDigest,omitempty"`
+	LastObservedProgressPercent string        `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string        `json:"lastObservedTransferRate,omitempty"`
 }
 
 // +genclient

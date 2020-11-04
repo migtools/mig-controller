@@ -22,6 +22,7 @@ import (
 	"io"
 	"k8s.io/client-go/kubernetes"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -274,6 +275,14 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 			return err
 		}
 		pvProgress.Status.LogMessage = logMessage
+		percentProgress := r.GetProgressPercent(logMessage)
+		if percentProgress != "" {
+			pvProgress.Status.LastObservedProgressPercent = percentProgress
+		}
+		transferRate := r.GetTransferRate(logMessage)
+		if transferRate != "" {
+			pvProgress.Status.LastObservedTransferRate = transferRate
+		}
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
 		// pod has a failure, report last failure reason
 		pvProgress.Status.PodPhase = kapi.PodFailed
@@ -334,6 +343,24 @@ func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigClust
 	defer readCloser.Close()
 
 	return parseLogs(readCloser)
+}
+
+func (r *ReconcileDirectPVMigrationProgress) GetProgressPercent(message string) string {
+	return GetLastMatch(`\d+\%`, message)
+}
+
+func (r *ReconcileDirectPVMigrationProgress) GetTransferRate(message string) string {
+	// Transfer Rate
+	return GetLastMatch(`\d+\.\w*\/s`, message)
+}
+
+func GetLastMatch(regex string, message string) string {
+	r := regexp.MustCompile(regex)
+	matches := r.FindAllString(message, -1)
+	if matches != nil && len(matches) > 0 {
+		return matches[len(matches)-1]
+	}
+	return ""
 }
 
 func parseLogs(reader io.Reader) (string, error) {
