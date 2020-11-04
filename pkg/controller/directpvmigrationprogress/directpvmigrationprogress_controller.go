@@ -17,9 +17,9 @@ limitations under the License.
 package directpvmigrationprogress
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"k8s.io/client-go/kubernetes"
 	"path"
 	"strings"
@@ -269,11 +269,11 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 		// report pod running and return
 		pvProgress.Status.PodPhase = kapi.PodRunning
 		numberOfLogLines := int64(10)
-		logLines, err := r.GetPodLogs(cluster, podRef, &numberOfLogLines, false)
+		logMessage, err := r.GetPodLogs(cluster, podRef, &numberOfLogLines, false)
 		if err != nil {
 			return err
 		}
-		pvProgress.Status.LogMessage = strings.Join(logLines, "\n")
+		pvProgress.Status.LogMessage = logMessage
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
 		// pod has a failure, report last failure reason
 		pvProgress.Status.PodPhase = kapi.PodFailed
@@ -284,6 +284,10 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 	case pod.Status.Phase == kapi.PodSucceeded:
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		pvProgress.Status.PodPhase = kapi.PodSucceeded
+	case pod.Status.Phase == kapi.PodFailed:
+		// Its possible for the succeeded pod to not have containerStatuses at all
+		pvProgress.Status.PodPhase = kapi.PodFailed
+		pvProgress.Status.LogMessage = containerStatus.State.Terminated.Message
 	}
 
 	return nil
@@ -305,16 +309,16 @@ func (r *ReconcileDirectPVMigrationProgress) Pod(cluster *migapi.MigCluster, pod
 	return pod, nil
 }
 
-func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) ([]string, error) {
-	logs := []string{}
+func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) (string, error) {
+
 	config, err := cluster.BuildRestConfig(r.Client)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	req := clientset.CoreV1().Pods(podReference.Namespace).GetLogs(podReference.Name, &kapi.PodLogOptions{
@@ -324,15 +328,29 @@ func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigClust
 	})
 	readCloser, err := req.Stream()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	defer readCloser.Close()
 
-	scanner := bufio.NewScanner(readCloser)
-	for scanner.Scan() {
-		line := scanner.Text()
-		logs = append(logs, line)
+	return parseLogs(readCloser)
+}
+
+func parseLogs(reader io.Reader) (string, error) {
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, reader)
+	if err != nil {
+		return "", err
 	}
-	return logs, nil
+	data := strings.Split(buf.String(), "\\n\\r")
+	logLines := []string{}
+	for _, line := range data {
+		l := strings.Trim(line, "\\r")
+		l = strings.Trim(l, "\\n")
+		l = strings.TrimSpace(l)
+		l = strings.ReplaceAll(l, "\\r", "")
+		l = strings.ReplaceAll(l, "\\", "")
+		logLines = append(logLines, l)
+	}
+	return strings.Join(logLines, "\n"), nil
 }

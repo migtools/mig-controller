@@ -612,10 +612,11 @@ func (t *Task) createRsyncClientPods() error {
 						Value: "changeme",
 					},
 				},
+				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 				Command: []string{"rsync",
 					"--archive",
 					"--hard-links",
-					"--human",
+					"--human-readable",
 					"--partial",
 					"--delete",
 					"--port", "2222",
@@ -646,7 +647,7 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Volumes:       volumes,
 					Containers:    containers,
 				},
@@ -704,8 +705,7 @@ func (t *Task) createPVProgressCR() error {
 }
 
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
-	// Get client for destination
-	dstClient, err := t.getDestinationClient()
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return false, false, err
 	}
@@ -717,11 +717,11 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			dvp := v1alpha1.DirectPVMigrationProgress{}
-			err = dstClient.Get(context.TODO(), types.NamespacedName{
+			pod := corev1.Pod{}
+			err = srcClient.Get(context.TODO(), types.NamespacedName{
 				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 				Namespace: ns,
-			}, &dvp)
+			}, &pod)
 			if err != nil {
 				// todo, need to start thinking about collecting this error and reporting other CR's progress
 				return false, false, err
@@ -731,11 +731,11 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 			}
 			switch {
-			case dvp.Status.PodPhase == corev1.PodRunning:
+			case pod.Status.Phase == corev1.PodRunning:
 				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, objRef)
-			case dvp.Status.PodPhase == corev1.PodFailed:
+			case pod.Status.Phase == corev1.PodFailed:
 				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
-			case dvp.Status.PodPhase == corev1.PodSucceeded:
+			case pod.Status.Phase == corev1.PodSucceeded:
 				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
 			}
 		}

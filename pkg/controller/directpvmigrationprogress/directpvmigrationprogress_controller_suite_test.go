@@ -17,9 +17,7 @@ limitations under the License.
 package directpvmigrationprogress
 
 import (
-	stdlog "log"
 	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -27,7 +25,6 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -35,18 +32,18 @@ import (
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
-	t := &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
-	}
+	//t := &envtest.Environment{
+	//	CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crds")},
+	//}
 	apis.AddToScheme(scheme.Scheme)
-
-	var err error
-	if cfg, err = t.Start(); err != nil {
-		stdlog.Fatal(err)
-	}
+	//
+	//var err error
+	//if cfg, err = t.Start(); err != nil {
+	//	stdlog.Fatal(err)
+	//}
 
 	code := m.Run()
-	t.Stop()
+	//t.Stop()
 	os.Exit(code)
 }
 
