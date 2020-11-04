@@ -268,7 +268,7 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 	case containerStatus.Ready:
 		// report pod running and return
 		pvProgress.Status.PodPhase = kapi.PodRunning
-		numberOfLogLines := int64(10)
+		numberOfLogLines := int64(5)
 		logMessage, err := r.GetPodLogs(cluster, podRef, &numberOfLogLines, false)
 		if err != nil {
 			return err
@@ -342,14 +342,16 @@ func parseLogs(reader io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data := strings.Split(buf.String(), "\\n\\r")
+	data := strings.Split(buf.String(), "\n")
 	logLines := []string{}
 	for _, line := range data {
-		l := strings.Trim(line, "\\r")
-		l = strings.Trim(l, "\\n")
-		l = strings.TrimSpace(l)
-		l = strings.ReplaceAll(l, "\\r", "")
-		l = strings.ReplaceAll(l, "\\", "")
+		l := strings.TrimSpace(line)
+		if l == "" {
+			continue
+		}
+		if len(l) > 60 {
+			l = l[:60]
+		}
 		logLines = append(logLines, l)
 	}
 	return strings.Join(logLines, "\n"), nil

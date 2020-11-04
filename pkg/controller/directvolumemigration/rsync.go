@@ -746,11 +746,17 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 		return false, false, nil
 	}
 
+	// we have failed pods, fail the itinerary
 	if len(t.Owner.Status.FailedPods) > 0 {
 		return false, true, nil
 	}
 
-	return true, false, nil
+	// all the pods have succeeded
+	if len(t.Owner.Status.SuccessfulPods) == len(t.Owner.Spec.PersistentVolumeClaims) {
+		return true, false, nil
+	}
+
+	return false, false, nil
 }
 
 // Delete rsync resources
