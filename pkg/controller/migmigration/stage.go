@@ -493,7 +493,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			progress = append(
 				progress,
 				fmt.Sprintf(
-					"Stage Pod %s/%s: Not running. Phase %s",
+					"Pod %s/%s: Not running. Phase %s",
 					pod.Namespace,
 					pod.Name,
 					pod.Status.Phase))
