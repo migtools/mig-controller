@@ -109,7 +109,7 @@ func (t *Task) reportHealthCondition() {
 	}
 }
 
-// Start a refresh on MigPlan and attached resources
+// Start a refresh on MigPlan
 func (t *Task) startRefresh() (bool, error) {
 	started := false
 
@@ -126,55 +126,13 @@ func (t *Task) startRefresh() (bool, error) {
 		return started, liberr.Wrap(err)
 	}
 
-	storage, err := plan.GetStorage(t.Client)
-	if err != nil {
-		return started, liberr.Wrap(err)
-	}
-	storage.Spec.Refresh = true
-	err = t.Client.Update(context.TODO(), storage)
-	if err != nil {
-		if errors.IsConflict(err) {
-			return started, nil
-		}
-		return started, liberr.Wrap(err)
-	}
-
-	srcCluster, err := plan.GetSourceCluster(t.Client)
-	if err != nil {
-		return started, liberr.Wrap(err)
-	}
-	srcCluster.Spec.Refresh = true
-	err = t.Client.Update(context.TODO(), srcCluster)
-	if err != nil {
-		if errors.IsConflict(err) {
-			return started, nil
-		}
-		return started, liberr.Wrap(err)
-	}
-
-	destCluster, err := plan.GetDestinationCluster(t.Client)
-	if err != nil {
-		return started, liberr.Wrap(err)
-	}
-	destCluster.Spec.Refresh = true
-	err = t.Client.Update(context.TODO(), destCluster)
-	if err != nil {
-		if errors.IsConflict(err) {
-			return started, nil
-		}
-		return started, liberr.Wrap(err)
-	}
-
 	started = true
 	return started, nil
 }
 
 // Verify plan finished with refresh before migrating
 func (t *Task) waitForRefresh() bool {
-	if t.PlanResources.MigPlan.Spec.Refresh == true ||
-		t.PlanResources.MigStorage.Spec.Refresh == true ||
-		t.PlanResources.SrcMigCluster.Spec.Refresh == true ||
-		t.PlanResources.DestMigCluster.Spec.Refresh == true {
+	if t.PlanResources.MigPlan.Spec.Refresh == true {
 		return false
 	}
 	return true
