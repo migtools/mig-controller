@@ -23,6 +23,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -41,7 +42,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("mighook_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -69,12 +70,15 @@ var _ reconcile.Reconciler = &ReconcileMigHook{}
 // ReconcileMigHook reconciles a MigHook object
 type ReconcileMigHook struct {
 	client.Client
+	record.EventRecorder
+
 	scheme *runtime.Scheme
 }
 
 func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("hook", request)
 
 	// Fetch the MigHook instance
 	hook := &migapi.MigHook{}
@@ -89,6 +93,8 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", hook.Status.Conditions)
+		hook.Status.Conditions.RecordEvents(hook, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -113,7 +119,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Ready
 	hook.Status.SetReady(
 		!hook.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The hook is ready.")
 
 	// End staging conditions.
 	hook.Status.EndStagingConditions()

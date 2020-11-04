@@ -37,16 +37,6 @@ const (
 	False = migapi.False
 )
 
-// Messages
-const (
-	ReadyMessage                = "The hook is ready."
-	InvalidTargetClusterMessage = "Only 'source' and 'destination' are accepted as values for spec.targetCluster."
-	InvalidImageMessage         = "The image name specified in spec.Image is invalid."
-	InvalidPlaybookDataMessage  = "Spec.Playbook should contain a base64 encoded playbook."
-	InvalidAnsibleHookMessage   = "An Ansible Playbook must be specified when spec.custom is false."
-	InvalidCustomHookMessage    = "An Ansible Playbook must not be specified when spec.custom is true."
-)
-
 // Validate the hook resource.
 func (r ReconcileMigHook) validate(hook *migapi.MigHook) error {
 	err := r.validateImage(hook)
@@ -77,7 +67,7 @@ func (r ReconcileMigHook) validateImage(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidImageMessage,
+			Message:  "The image name specified in spec.Image is invalid.",
 		})
 	}
 	return nil
@@ -90,7 +80,7 @@ func (r ReconcileMigHook) validateTargetCluster(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidTargetClusterMessage,
+			Message:  "Only 'source' and 'destination' are accepted as values for spec.targetCluster.",
 		})
 	}
 	return nil
@@ -103,7 +93,7 @@ func (r ReconcileMigHook) validatePlaybookData(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidPlaybookDataMessage,
+			Message:  "Spec.Playbook should contain a base64 encoded playbook.",
 		})
 	}
 	return nil
@@ -116,7 +106,7 @@ func (r ReconcileMigHook) validateCustom(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidCustomHookMessage,
+			Message:  "An Ansible Playbook must not be specified when spec.custom is true.",
 		})
 	} else if !hook.Spec.Custom && hook.Spec.Playbook == "" {
 		hook.Status.SetCondition(migapi.Condition{
@@ -124,7 +114,7 @@ func (r ReconcileMigHook) validateCustom(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidAnsibleHookMessage,
+			Message:  "An Ansible Playbook must be specified when spec.custom is false.",
 		})
 	}
 	return nil
