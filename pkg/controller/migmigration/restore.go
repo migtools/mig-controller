@@ -175,23 +175,25 @@ func (t Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 // Set warning conditions on migmigration if there were restic errors
 func (t *Task) setResticConditions(restore *velero.Restore) {
 	if len(restore.Status.PodVolumeRestoreErrors) > 0 {
-		message := fmt.Sprintf(ResticErrorsMessage, len(restore.Status.PodVolumeRestoreErrors), restore.Name)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     ResticErrors,
 			Status:   True,
+			Reason:   ErrorsDetected,
 			Category: migapi.Warn,
-			Message:  message,
-			Durable:  true,
+			Message: fmt.Sprintf("There were errors found in %d Restic volume restores. See restore `%s` for details",
+				len(restore.Status.PodVolumeRestoreErrors), restore.Name),
+			Durable: true,
 		})
 	}
 	if len(restore.Status.PodVolumeRestoreVerifyErrors) > 0 {
-		message := fmt.Sprintf(ResticVerifyErrorsMessage, len(restore.Status.PodVolumeRestoreVerifyErrors), restore.Name)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     ResticVerifyErrors,
 			Status:   True,
+			Reason:   ErrorsDetected,
 			Category: migapi.Warn,
-			Message:  message,
-			Durable:  true,
+			Message: fmt.Sprintf("There were verify errors found in %d Restic volume restores. See restore `%s` for details",
+				len(restore.Status.PodVolumeRestoreVerifyErrors), restore.Name),
+			Durable: true,
 		})
 	}
 }

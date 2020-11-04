@@ -25,6 +25,12 @@ const (
 	False = "False"
 )
 
+// Reasons
+const (
+	ReadyState           = "ReadyState"
+	ReconcileFailedState = "ReconciledFailedState"
+)
+
 // Category
 // Critical - Errors that block Reconcile() and the `Ready` condition.
 // Error - Errors that block the `Ready` condition.
@@ -329,6 +335,7 @@ func (r *Conditions) SetReady(ready bool, message string) {
 		r.SetCondition(Condition{
 			Type:     Ready,
 			Status:   True,
+			Reason:   ReadyState,
 			Category: Required,
 			Message:  message,
 		})
@@ -354,6 +361,7 @@ func (r *Conditions) SetReconcileFailed(err error) {
 	r.SetCondition(Condition{
 		Type:     ReconcileFailed,
 		Status:   True,
+		Reason:   ReconcileFailedState,
 		Category: Critical,
 		Message:  "Reconcile failed: []. See controller logs for details.",
 		Items:    []string{err.Error()},
