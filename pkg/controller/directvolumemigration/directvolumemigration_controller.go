@@ -59,7 +59,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectPVMigrationProgress{}},
+	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectVolumeMigrationProgress{}},
 		&handler.EnqueueRequestsFromMapFunc{
 			ToRequests: handler.ToRequestsFunc(GetDVMRefFromDPMP),
 		})

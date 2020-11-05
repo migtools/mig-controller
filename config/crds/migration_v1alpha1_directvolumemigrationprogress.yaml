@@ -4,14 +4,14 @@ metadata:
   creationTimestamp: null
   labels:
     controller-tools.k8s.io: "1.0"
-  name: directpvmigrationprogresses.migration.openshift.io
+  name: directvolumemigrationprogresses.migration.openshift.io
 spec:
   group: migration.openshift.io
   names:
-    kind: DirectPVMigrationProgress
-    plural: directpvmigrationprogresses
+    kind: DirectVolumeMigrationProgress
+    plural: directvolumemigrationprogresses
     shortNames:
-    - dvmp
+    - dmvp
   scope: Namespaced
   validation:
     openAPIV3Schema:

@@ -676,20 +676,20 @@ func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			dvp := v1alpha1.DirectPVMigrationProgress{
+			dvp := v1alpha1.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,
 					// TODO @alpatel, add owner references
 				},
-				Spec: v1alpha1.DirectPVMigrationProgressSpec{
+				Spec: v1alpha1.DirectVolumeMigrationProgressSpec{
 					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
 					PodRef: &corev1.ObjectReference{
 						Namespace: ns,
 						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					},
 				},
-				Status: v1alpha1.DirectPVMigrationProgressStatus{},
+				Status: v1alpha1.DirectVolumeMigrationProgressStatus{},
 			}
 			err = dstClient.Create(context.TODO(), &dvp)
 			if k8serror.IsAlreadyExists(err) {
@@ -913,7 +913,7 @@ func (t *Task) deleteProgressReportingDRs(client compat.Client) error {
 
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			err := client.Delete(context.TODO(), &v1alpha1.DirectPVMigrationProgress{
+			err := client.Delete(context.TODO(), &v1alpha1.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,

@@ -58,7 +58,7 @@ const (
 	InvalidPod        = "InvalidPod"
 )
 
-// Add creates a new DirectPVMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// Add creates a new DirectVolumeMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -66,7 +66,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileDirectPVMigrationProgress{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileDirectVolumeMigrationProgress{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -77,17 +77,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to DirectPVMigrationProgress
-	err = c.Watch(&source.Kind{Type: &migapi.DirectPVMigrationProgress{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to DirectVolumeMigrationProgress
+	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by DirectPVMigrationProgress - change this for objects you create
+	// Uncomment watch a Deployment created by DirectVolumeMigrationProgress - change this for objects you create
 	//err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
 	//	IsController: true,
-	//	OwnerType:    &migrationv1alpha1.DirectPVMigrationProgress{},
+	//	OwnerType:    &migrationv1alpha1.DirectVolumeMigrationProgress{},
 	//})
 	//if err != nil {
 	//	return err
@@ -96,28 +96,28 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-var _ reconcile.Reconciler = &ReconcileDirectPVMigrationProgress{}
+var _ reconcile.Reconciler = &ReconcileDirectVolumeMigrationProgress{}
 
-// ReconcileDirectPVMigrationProgress reconciles a DirectPVMigrationProgress object
-type ReconcileDirectPVMigrationProgress struct {
+// ReconcileDirectVolumeMigrationProgress reconciles a DirectVolumeMigrationProgress object
+type ReconcileDirectVolumeMigrationProgress struct {
 	client.Client
 	scheme *runtime.Scheme
 }
 
-// Reconcile reads that state of the cluster for a DirectPVMigrationProgress object and makes changes based on the state read
-// and what is in the DirectPVMigrationProgress.Spec
+// Reconcile reads that state of the cluster for a DirectVolumeMigrationProgress object and makes changes based on the state read
+// and what is in the DirectVolumeMigrationProgress.Spec
 // TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
 // a Deployment as an example
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=directpvmigrationprogresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=migration.openshift.io,resources=directpvmigrationprogresses/status,verbs=get;update;patch
-func (r *ReconcileDirectPVMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+// +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses/status,verbs=get;update;patch
+func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	// Fetch the DirectPVMigrationProgress instance
-	pvProgress := &migapi.DirectPVMigrationProgress{}
+	// Fetch the DirectVolumeMigrationProgress instance
+	pvProgress := &migapi.DirectVolumeMigrationProgress{}
 	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -183,7 +183,7 @@ func (r *ReconcileDirectPVMigrationProgress) Reconcile(request reconcile.Request
 	//fmt.Println(pipe)
 }
 
-func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *migapi.DirectPVMigrationProgress, containerName string) error {
+func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgress *migapi.DirectVolumeMigrationProgress, containerName string) error {
 	podRef := pvProgress.Spec.PodRef
 	ref := pvProgress.Spec.ClusterRef
 
@@ -302,7 +302,7 @@ func (r *ReconcileDirectPVMigrationProgress) reportContainerStatus(pvProgress *m
 	return nil
 }
 
-func (r *ReconcileDirectPVMigrationProgress) Pod(cluster *migapi.MigCluster, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
+func (r *ReconcileDirectVolumeMigrationProgress) Pod(cluster *migapi.MigCluster, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
 	cli, err := cluster.GetClient(r)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -318,7 +318,7 @@ func (r *ReconcileDirectPVMigrationProgress) Pod(cluster *migapi.MigCluster, pod
 	return pod, nil
 }
 
-func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) (string, error) {
+func (r *ReconcileDirectVolumeMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) (string, error) {
 
 	config, err := cluster.BuildRestConfig(r.Client)
 	if err != nil {
@@ -345,11 +345,11 @@ func (r *ReconcileDirectPVMigrationProgress) GetPodLogs(cluster *migapi.MigClust
 	return parseLogs(readCloser)
 }
 
-func (r *ReconcileDirectPVMigrationProgress) GetProgressPercent(message string) string {
+func (r *ReconcileDirectVolumeMigrationProgress) GetProgressPercent(message string) string {
 	return GetLastMatch(`\d+\%`, message)
 }
 
-func (r *ReconcileDirectPVMigrationProgress) GetTransferRate(message string) string {
+func (r *ReconcileDirectVolumeMigrationProgress) GetTransferRate(message string) string {
 	// Transfer Rate
 	return GetLastMatch(`\d+\.\w*\/s`, message)
 }

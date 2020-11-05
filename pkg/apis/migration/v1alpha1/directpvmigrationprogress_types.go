@@ -25,14 +25,14 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// DirectPVMigrationProgressSpec defines the desired state of DirectPVMigrationProgress
-type DirectPVMigrationProgressSpec struct {
+// DirectVolumeMigrationProgressSpec defines the desired state of DirectVolumeMigrationProgress
+type DirectVolumeMigrationProgressSpec struct {
 	ClusterRef *kapi.ObjectReference `json:"clusterRef,omitempty"`
 	PodRef     *kapi.ObjectReference `json:"podRef,omitempty"`
 }
 
-// DirectPVMigrationProgressStatus defines the observed state of DirectPVMigrationProgress
-type DirectPVMigrationProgressStatus struct {
+// DirectVolumeMigrationProgressStatus defines the observed state of DirectVolumeMigrationProgress
+type DirectVolumeMigrationProgressStatus struct {
 	Conditions
 	PodPhase                    kapi.PodPhase `json:"phase,omitempty"`
 	LogMessage                  string        `json:"logMessage,omitempty"`
@@ -44,18 +44,18 @@ type DirectPVMigrationProgressStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DirectPVMigrationProgress is the Schema for the directpvmigrationprogresses API
-// +kubebuilder:resource:path=directpvmigrationprogresses,shortName=dvmp
+// DirectVolumeMigrationProgress is the Schema for the directvolumemigrationprogresses API
+// +kubebuilder:resource:path=directvolumemigrationprogresses,shortName=dmvp
 // +k8s:openapi-gen=true
-type DirectPVMigrationProgress struct {
+type DirectVolumeMigrationProgress struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DirectPVMigrationProgressSpec   `json:"spec,omitempty"`
-	Status DirectPVMigrationProgressStatus `json:"status,omitempty"`
+	Spec   DirectVolumeMigrationProgressSpec   `json:"spec,omitempty"`
+	Status DirectVolumeMigrationProgressStatus `json:"status,omitempty"`
 }
 
-func (d *DirectPVMigrationProgress) MarkReconciled() {
+func (d *DirectVolumeMigrationProgress) MarkReconciled() {
 	u, _ := uuid.NewUUID()
 	if d.Annotations == nil {
 		d.Annotations = map[string]string{}
@@ -66,13 +66,13 @@ func (d *DirectPVMigrationProgress) MarkReconciled() {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DirectPVMigrationProgressList contains a list of DirectPVMigrationProgress
-type DirectPVMigrationProgressList struct {
+// DirectVolumeMigrationProgressList contains a list of DirectVolumeMigrationProgress
+type DirectVolumeMigrationProgressList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []DirectPVMigrationProgress `json:"items"`
+	Items           []DirectVolumeMigrationProgress `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&DirectPVMigrationProgress{}, &DirectPVMigrationProgressList{})
+	SchemeBuilder.Register(&DirectVolumeMigrationProgress{}, &DirectVolumeMigrationProgressList{})
 }

@@ -1,5 +1,5 @@
 apiVersion: migration.openshift.io/v1alpha1
-kind: DirectPVMigrationProgress
+kind: DirectVolumeMigrationProgress
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
