@@ -106,11 +106,8 @@ type ReconcileDirectVolumeMigrationProgress struct {
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigrationProgress object and makes changes based on the state read
 // and what is in the DirectVolumeMigrationProgress.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  The scaffolding writes
-// a Deployment as an example
+
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses/status,verbs=get;update;patch
 func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -167,20 +164,6 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 
 	// we will requeue this every 5 seconds
 	return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-
-	// at this point assume that the container is running
-	//pipe, err := r.ProgressPipe(pvProgress)
-	//if err != nil {
-	//	return reconcile.Result{}, err
-	//}
-
-	//progress, err := r.ProgressPipe(pvProgress)
-	////err := r.ReportProgress(progress)
-	//if err != nil {
-	//	return reconcile.Result{}, err
-	//}
-	//
-	//fmt.Println(pipe)
 }
 
 func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgress *migapi.DirectVolumeMigrationProgress, containerName string) error {

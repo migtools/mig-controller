@@ -785,7 +785,7 @@ func (t *Task) deleteRsyncResources() error {
 		return nil
 	}
 
-	err = t.deleteProgressReportingDRs(destClient)
+	err = t.deleteProgressReportingCRs(destClient)
 	if err != nil {
 		return err
 	}
@@ -908,7 +908,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 	return nil
 }
 
-func (t *Task) deleteProgressReportingDRs(client compat.Client) error {
+func (t *Task) deleteProgressReportingCRs(client compat.Client) error {
 	pvcMap := t.getPVCNamespaceMap()
 
 	for ns, vols := range pvcMap {
