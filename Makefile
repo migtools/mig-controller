@@ -2,6 +2,7 @@
 IMG ?= quay.io/ocpmigrate/mig-controller:latest
 GOOS ?= `go env GOOS`
 KUBECONFIG_POSTFIX ?= mig-controller
+BUILDTAGS ?= containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp exclude_graphdriver_overlay
 
 ci: all
 
