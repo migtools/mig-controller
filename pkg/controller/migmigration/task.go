@@ -25,6 +25,7 @@ const (
 	Started                         = "Started"
 	CleanStaleAnnotations           = "CleanStaleAnnotations"
 	CleanStaleVeleroCRs             = "CleanStaleVeleroCRs"
+	CleanStaleResticCRs             = "CleanStaleResticCRs"
 	CleanStaleStagePods             = "CleanStaleStagePods"
 	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
@@ -117,6 +118,7 @@ var StageItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleResticCRs, Step: StepPrepare},
 		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
 		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
@@ -155,6 +157,7 @@ var FinalItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleResticCRs, Step: StepPrepare},
 		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
 		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
@@ -330,16 +333,24 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-	case CleanStaleVeleroCRs:
+	case CleanStaleResticCRs:
 		t.Requeue = PollReQ
-		err := t.deletePendingVeleroCRs()
+		err := t.deleteStaleResticCRs()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-
+	case CleanStaleVeleroCRs:
+		t.Requeue = PollReQ
+		err := t.deleteStaleVeleroCRs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case CreateRegistries:
 		t.Requeue = PollReQ
 		nEnsured, err := t.ensureMigRegistries()

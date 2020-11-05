@@ -15,15 +15,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Determine if velero should restart based on:
-// 1. if we deleted pending Velero CRs
-func (t *Task) shouldVeleroRestart() bool {
-	if t.Owner.Status.HasCondition(PendingVeleroCRsDeleted) {
-		return true
-	}
-	return false
-}
-
 // Determine if restic should restart
 func (t *Task) shouldResticRestart() (bool, error) {
 	client, err := t.getSourceClient()
@@ -156,8 +147,8 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 // Delete the running Velero pods.
 // Needed to stop any pending tasks after Velero CR deletion
 func (t *Task) restartVeleroPods() error {
-	runRestart := t.shouldVeleroRestart()
-	if !runRestart {
+	// Exit early if no stale CRs were deleted
+	if !t.Owner.Status.HasCondition(StaleVeleroCRsDeleted) {
 		return nil
 	}
 
@@ -190,8 +181,7 @@ func (t *Task) restartVeleroPods() error {
 // Determine if Velero Pod is running.
 func (t *Task) haveVeleroPodsStarted() (bool, error) {
 	// Verify Velero restart is needed before continuing check
-	runRestart := t.shouldVeleroRestart()
-	if !runRestart {
+	if !t.Owner.Status.HasCondition(StaleVeleroCRsDeleted) {
 		return true, nil
 	}
 
@@ -241,6 +231,8 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 		}
 	}
 
+	// Remove the condition notifying the user that Velero will be restarted
+	t.Owner.Status.DeleteCondition(StaleVeleroCRsDeleted)
 	return true, nil
 }
 

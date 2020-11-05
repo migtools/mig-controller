@@ -14,6 +14,7 @@ import (
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -395,17 +396,17 @@ func (t *Task) deleteCorrelatedRestores() error {
 	return nil
 }
 
-// Delete pending Velero Restores in the controller namespace to empty
-// the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingRestores() (int, error) {
+// Delete stale Velero Restores in the controller namespace to empty
+// the work queue for next migration.
+func (t *Task) deleteStaleRestores() (int, error) {
 	nDeleted := 0
-	client, err := t.getDestinationClient()
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.RestoreList{}
-	err = client.List(
+	err = destClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -413,12 +414,29 @@ func (t *Task) deletePendingRestores() (int, error) {
 		return 0, liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
-		// Skip delete unless "New" or "InProgress"
+		// Skip delete unless phase is "", "New" or "InProgress"
 		if restore.Status.Phase != velero.RestorePhaseNew &&
-			restore.Status.Phase != velero.RestorePhaseInProgress {
+			restore.Status.Phase != velero.RestorePhaseInProgress &&
+			restore.Status.Phase != "" {
 			continue
 		}
-		err = client.Delete(context.TODO(), &restore)
+		// Skip if missing a migmigration correlation label (only delete our own CRs)
+		// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
+		corrKey, _ := t.Owner.GetCorrelationLabel()
+		migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
+		if !ok {
+			continue
+		}
+		// Skip if correlation label points to an existing, running migration
+		isRunning, err := t.migrationUIDisRunning(migMigrationUID)
+		if err != nil {
+			return nDeleted, liberr.Wrap(err)
+		}
+		if isRunning {
+			continue
+		}
+		// Delete the Restore
+		err = destClient.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
 		}
@@ -428,17 +446,17 @@ func (t *Task) deletePendingRestores() (int, error) {
 	return nDeleted, nil
 }
 
-// Delete pending Velero PodVolumeRestores in the controller namespace to empty
-// the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingPVRs() (int, error) {
+// Delete stale Velero PodVolumeRestores in the controller namespace to empty
+// the work queue for next migration.
+func (t *Task) deleteStalePVRs() (int, error) {
 	nDeleted := 0
-	client, err := t.getDestinationClient()
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.PodVolumeRestoreList{}
-	err = client.List(
+	err = destClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -446,12 +464,52 @@ func (t *Task) deletePendingPVRs() (int, error) {
 		return 0, liberr.Wrap(err)
 	}
 	for _, pvr := range list.Items {
-		// Skip delete unless "New" or "InProgress"
+		// Skip delete unless phase is "", "New" or "InProgress"
 		if pvr.Status.Phase != velero.PodVolumeRestorePhaseNew &&
-			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress {
+			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress &&
+			pvr.Status.Phase != "" {
 			continue
 		}
-		err = client.Delete(context.TODO(), &pvr)
+
+		// Skip delete if PVR is associated with running migration
+		pvrHasRunningMigration := false
+		for _, ownerRef := range pvr.OwnerReferences {
+			if ownerRef.Kind != "Restore" {
+				continue
+			}
+			restore := velero.Restore{}
+			err := destClient.Get(
+				context.TODO(),
+				types.NamespacedName{
+					Namespace: migapi.VeleroNamespace,
+					Name:      ownerRef.Name,
+				},
+				&restore,
+			)
+			if err != nil {
+				return nDeleted, liberr.Wrap(err)
+			}
+			// Skip delete if missing a migmigration correlation label (only delete our own CRs)
+			// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
+			corrKey, _ := t.Owner.GetCorrelationLabel()
+			migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
+			if !ok {
+				continue
+			}
+			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
+			if err != nil {
+				return nDeleted, liberr.Wrap(err)
+			}
+			if isRunning {
+				pvrHasRunningMigration = true
+			}
+		}
+		if pvrHasRunningMigration == true {
+			continue
+		}
+
+		// Delete the PVR
+		err = destClient.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
 		}

@@ -402,55 +402,95 @@ func (t *Task) deleteCorrelatedBackups() error {
 	return nil
 }
 
-// Delete all pending Velero Resources, set condition indicating
-// Velero/Restic restart needed if anything was deleted.
-func (t *Task) deletePendingVeleroCRs() error {
+// Delete stale Velero Backups/Restores, set condition indicating
+// Velero restart should be performed later if anything was deleted.
+func (t *Task) deleteStaleVeleroCRs() error {
 	totalDeleted := 0
-	nDeleted, err := t.deletePendingBackups()
+	nBackupsDeleted, err := t.deleteStaleBackups()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	totalDeleted += nDeleted
-	nDeleted, err = t.deletePendingPVBs()
+	totalDeleted += nBackupsDeleted
+	nRestoresDeleted, err := t.deleteStaleRestores()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	totalDeleted += nDeleted
-	nDeleted, err = t.deletePendingRestores()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	totalDeleted += nDeleted
-	nDeleted, err = t.deletePendingPVRs()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	totalDeleted += nDeleted
+	totalDeleted += nRestoresDeleted
 
 	if totalDeleted > 0 {
 		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     PendingVeleroCRsDeleted,
+			Type:     StaleVeleroCRsDeleted,
 			Status:   True,
 			Category: migapi.Required,
-			Message: fmt.Sprintf("Deleted %v pending Velero Resources. "+
-				"Velero and Restic will restart.", totalDeleted),
+			Message: fmt.Sprintf("Deleted stale Velero CRs: %v Backups,  %v Restores. "+
+				"Velero will be restarted.", nBackupsDeleted, nRestoresDeleted),
 			Durable: true,
 		})
 	}
 	return nil
 }
 
-// Delete pending Velero Backups in the controller namespace to empty
-// the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingBackups() (int, error) {
+// Delete stale Restic CRs, set condition indicating
+// Restic Pod restarts may be needed, but we leave this up to the user.
+func (t *Task) deleteStaleResticCRs() error {
+	totalDeleted := 0
+	pvbsDeleted, err := t.deleteStalePVBs()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	totalDeleted += pvbsDeleted
+	pvrsDeleted, err := t.deleteStalePVRs()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	totalDeleted += pvrsDeleted
+
+	if totalDeleted > 0 {
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     StaleResticCRsDeleted,
+			Status:   True,
+			Category: migapi.Required,
+			Message: fmt.Sprintf("Deleted stale Restic CRs: "+
+				"%v PodVolumeBackusp,  %v PodVolumeRestores. "+
+				"Manual Restic Pod restart may be required if Restic is stuck.", pvbsDeleted, pvrsDeleted),
+			Durable: true,
+		})
+	}
+	return nil
+}
+
+func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
+	corrKey, _ := t.Owner.GetCorrelationLabel()
+	corrLabel := map[string]string{corrKey: migrationUID}
+	migrationList := migapi.MigMigrationList{}
+	err := t.Client.List(
+		context.TODO(),
+		k8sclient.MatchingLabels(corrLabel),
+		&migrationList,
+	)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	migrationIsRunning := false
+	for _, migration := range migrationList.Items {
+		if migration.Status.Phase != Completed {
+			migrationIsRunning = true
+		}
+	}
+	return migrationIsRunning, nil
+}
+
+// Delete stale Velero Backups in the controller namespace to empty
+// the work queue for next migration.
+func (t *Task) deleteStaleBackups() (int, error) {
 	nDeleted := 0
-	client, err := t.getDestinationClient()
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.BackupList{}
-	err = client.List(
+	err = srcClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -458,9 +498,25 @@ func (t *Task) deletePendingBackups() (int, error) {
 		return 0, liberr.Wrap(err)
 	}
 	for _, backup := range list.Items {
-		// Skip delete unless "New" or "InProgress"
+		// Skip delete unless phase is "", "New" or "InProgress"
 		if backup.Status.Phase != velero.BackupPhaseNew &&
-			backup.Status.Phase != velero.BackupPhaseInProgress {
+			backup.Status.Phase != velero.BackupPhaseInProgress &&
+			backup.Status.Phase != "" {
+			continue
+		}
+		// Skip if missing a migmigration correlation label (only delete our own CRs)
+		// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
+		corrKey, _ := t.Owner.GetCorrelationLabel()
+		migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
+		if !ok {
+			continue
+		}
+		// Skip if correlation label points to an existing, running migration
+		isRunning, err := t.migrationUIDisRunning(migMigrationUID)
+		if err != nil {
+			return nDeleted, liberr.Wrap(err)
+		}
+		if isRunning {
 			continue
 		}
 		// Submit a request to remove backup assets from storage
@@ -474,13 +530,13 @@ func (t *Task) deletePendingBackups() (int, error) {
 				BackupName: backup.Name,
 			},
 		}
-		err := client.Create(context.TODO(), deleteBackupRequest)
+		err = srcClient.Create(context.TODO(), deleteBackupRequest)
 		if err != nil {
 			return nDeleted, liberr.Wrap(err)
 		}
 		// Also delete the backup CR directly
 		// This should work since backup is still in-progress.
-		err = client.Delete(context.TODO(), &backup)
+		err = srcClient.Delete(context.TODO(), &backup)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
 		}
@@ -490,17 +546,17 @@ func (t *Task) deletePendingBackups() (int, error) {
 	return nDeleted, err
 }
 
-// Delete pending Velero PodVolumeBackups in the controller namespace to empty
-// the work queue for next migration. Does _not_ filter on correlation labels.
-func (t *Task) deletePendingPVBs() (int, error) {
+// Delete stale Velero PodVolumeBackups in the controller namespace to empty
+// the work queue for next migration.
+func (t *Task) deleteStalePVBs() (int, error) {
 	nDeleted := 0
-	client, err := t.getDestinationClient()
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.PodVolumeBackupList{}
-	err = client.List(
+	err = srcClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -508,12 +564,51 @@ func (t *Task) deletePendingPVBs() (int, error) {
 		return 0, liberr.Wrap(err)
 	}
 	for _, pvb := range list.Items {
-		// Skip delete unless "New" or "InProgress"
+		// Skip delete unless phase is "", "New" or "InProgress"
 		if pvb.Status.Phase != velero.PodVolumeBackupPhaseNew &&
-			pvb.Status.Phase != velero.PodVolumeBackupPhaseInProgress {
+			pvb.Status.Phase != velero.PodVolumeBackupPhaseInProgress &&
+			pvb.Status.Phase != "" {
 			continue
 		}
-		err = client.Delete(context.TODO(), &pvb)
+		// Skip delete if PVB is associated with running migration
+		pvbHasRunningMigration := false
+		for _, ownerRef := range pvb.OwnerReferences {
+			if ownerRef.Kind != "Backup" {
+				continue
+			}
+			backup := velero.Backup{}
+			err := srcClient.Get(
+				context.TODO(),
+				types.NamespacedName{
+					Namespace: migapi.VeleroNamespace,
+					Name:      ownerRef.Name,
+				},
+				&backup,
+			)
+			if err != nil {
+				return nDeleted, liberr.Wrap(err)
+			}
+			// Skip delete if missing a migmigration correlation label (only delete our own CRs)
+			// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
+			corrKey, _ := t.Owner.GetCorrelationLabel()
+			migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
+			if !ok {
+				continue
+			}
+			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
+			if err != nil {
+				return nDeleted, liberr.Wrap(err)
+			}
+			if isRunning {
+				pvbHasRunningMigration = true
+			}
+		}
+		if pvbHasRunningMigration == true {
+			continue
+		}
+
+		// Delete the PVB
+		err = srcClient.Delete(context.TODO(), &pvb)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
 		}

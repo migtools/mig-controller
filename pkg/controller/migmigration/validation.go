@@ -15,21 +15,22 @@ import (
 
 // Types
 const (
-	UnhealthyNamespaces     = "UnhealthyNamespaces"
-	InvalidPlanRef          = "InvalidPlanRef"
-	PlanNotReady            = "PlanNotReady"
-	PlanClosed              = "PlanClosed"
-	HasFinalMigration       = "HasFinalMigration"
-	Postponed               = "Postponed"
-	Running                 = "Running"
-	Succeeded               = "Succeeded"
-	Failed                  = "Failed"
-	ResticErrors            = "ResticErrors"
-	ResticVerifyErrors      = "ResticVerifyErrors"
-	StageNoOp               = "StageNoOp"
-	RegistriesHealthy       = "RegistriesHealthy"
-	RegistriesUnhealthy     = "RegistriesUnhealthy"
-	PendingVeleroCRsDeleted = "PendingVeleroCRsDeleted"
+	UnhealthyNamespaces   = "UnhealthyNamespaces"
+	InvalidPlanRef        = "InvalidPlanRef"
+	PlanNotReady          = "PlanNotReady"
+	PlanClosed            = "PlanClosed"
+	HasFinalMigration     = "HasFinalMigration"
+	Postponed             = "Postponed"
+	Running               = "Running"
+	Succeeded             = "Succeeded"
+	Failed                = "Failed"
+	ResticErrors          = "ResticErrors"
+	ResticVerifyErrors    = "ResticVerifyErrors"
+	StageNoOp             = "StageNoOp"
+	RegistriesHealthy     = "RegistriesHealthy"
+	RegistriesUnhealthy   = "RegistriesUnhealthy"
+	StaleVeleroCRsDeleted = "PendingVeleroCRsDeleted"
+	StaleResticCRsDeleted = "PendingVeleroCRsDeleted"
 )
 
 // Categories
