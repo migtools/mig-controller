@@ -1,0 +1,14 @@
+apiVersion: migration.openshift.io/v1alpha1
+kind: DirectVolumeMigrationProgress
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: directvolumemigrationprogress-sample
+spec:
+  # Add fields here
+  clusterRef:
+    name: host
+    namespace: openshift-migration
+  podRef:
+    name: rsync-sample-client
+    namespace: pvc-migrate-client
