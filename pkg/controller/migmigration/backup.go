@@ -451,7 +451,7 @@ func (t *Task) deleteStaleResticCRs() error {
 			Status:   True,
 			Category: migapi.Required,
 			Message: fmt.Sprintf("Deleted stale Restic CRs: "+
-				"%v PodVolumeBackusp,  %v PodVolumeRestores. "+
+				"%v PodVolumeBackups,  %v PodVolumeRestores. "+
 				"Manual Restic Pod restart may be required if Restic is stuck.", pvbsDeleted, pvrsDeleted),
 			Durable: true,
 		})
