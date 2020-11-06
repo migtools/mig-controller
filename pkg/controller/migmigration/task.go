@@ -29,6 +29,8 @@ const (
 	StartRefresh                    = "StartRefresh"
 	WaitForRefresh                  = "WaitForRefresh"
 	CreateRegistries                = "CreateRegistries"
+	CreateDirectImageMigration      = "CreateDirectImageMigration"
+	DirectImageMigrationStarted     = "DirectImageMigrationStarted"
 	EnsureCloudSecretPropagated     = "EnsureCloudSecretPropagated"
 	PreBackupHooks                  = "PreBackupHooks"
 	PostBackupHooks                 = "PostBackupHooks"
@@ -83,16 +85,22 @@ const (
 
 // Flags
 const (
-	Quiesce      = 0x01 // Only when QuiescePods (true).
-	HasStagePods = 0x02 // Only when stage pods created.
-	HasPVs       = 0x04 // Only when PVs migrated.
-	HasVerify    = 0x08 // Only when the plan has enabled verification
-	HasISs       = 0x10 // Only when ISs migrated
+	Quiesce        = 0x001 // Only when QuiescePods (true).
+	HasStagePods   = 0x002 // Only when stage pods created.
+	HasPVs         = 0x004 // Only when PVs migrated.
+	HasVerify      = 0x008 // Only when the plan has enabled verification
+	HasISs         = 0x010 // Only when ISs migrated
+	DirectImage    = 0x020 // Only when using direct image migration
+	IndirectImage  = 0x040 // Only when using indirect image migration
+	DirectVolume   = 0x080 // Only when using direct volume migration
+	IndirectVolume = 0x100 // Only when using indirect volume migration
+	HasStageBackup = 0x200 // True when stage backup is needed
 )
 
 // Migration steps
 const (
 	StepPrepare      = "Prepare"
+	StepDirectImage  = "DirectImage"
 	StepBackup       = "Backup"
 	StepStageBackup  = "StageBackup"
 	StepStageRestore = "StageRestore"
@@ -116,27 +124,29 @@ var StageItinerary = Itinerary{
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
-		{Name: CreateRegistries, Step: StepPrepare},
+		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
-		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs},
-		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
+		{Name: CreateDirectImageMigration, Step: StepDirectImage, all: DirectImage},
+		{Name: DirectImageMigrationStarted, Step: StepDirectImage, all: DirectImage},
+		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
+		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
+		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
-		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: AnnotateResources, Step: StepStageBackup, all: HasStageBackup},
 		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
 		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
-		{Name: WaitForRegistriesReady, Step: StepStageBackup},
+		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
-		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: StageBackupCreated, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: EnsureStageRestore, Step: StepStageRestore, any: HasPVs | HasISs},
-		{Name: StageRestoreCreated, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
+		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
+		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
+		{Name: EnsureStageRestore, Step: StepStageRestore, all: HasStageBackup},
+		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: DeleteRegistries, Step: StepFinal},
 		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepFinal, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, all: HasStageBackup},
 		{Name: Completed, Step: StepFinal},
 	},
 }
@@ -151,29 +161,31 @@ var FinalItinerary = Itinerary{
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
-		{Name: CreateRegistries, Step: StepPrepare},
+		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: WaitForRegistriesReady, Step: StepPrepare},
+		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage},
+		{Name: CreateDirectImageMigration, Step: StepDirectImage, all: DirectImage},
+		{Name: DirectImageMigrationStarted, Step: StepDirectImage, all: DirectImage},
 		{Name: PreBackupHooks, Step: StepBackup},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
-		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
-		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs},
-		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
+		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
+		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
+		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
-		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
+		{Name: AnnotateResources, Step: StepStageBackup, all: HasStageBackup},
 		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
 		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
-		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: StageBackupCreated, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: EnsureStageRestore, Step: StepStageRestore, any: HasPVs | HasISs},
-		{Name: StageRestoreCreated, Step: StepStageRestore, any: HasPVs | HasISs},
+		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
+		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
+		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
+		{Name: EnsureStageRestore, Step: StepStageRestore, all: HasStageBackup},
+		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: EnsureStagePodsDeleted, Step: StepStageRestore, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepStageRestore, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepRestore, any: HasPVs | HasISs},
+		{Name: EnsureAnnotationsDeleted, Step: StepRestore, all: HasStageBackup},
 		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
 		{Name: PostBackupHooks, Step: StepRestore},
 		{Name: PreRestoreHooks, Step: StepRestore},
@@ -194,7 +206,7 @@ var CancelItinerary = Itinerary{
 		{Name: DeleteRestores, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
 		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, all: HasStageBackup},
 		{Name: Canceled, Step: StepFinal},
 		{Name: Completed, Step: StepFinal},
 	},
@@ -205,7 +217,7 @@ var FailedItinerary = Itinerary{
 	Phases: []Phase{
 		{Name: MigrationFailed, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, all: HasStageBackup},
 		{Name: Completed, Step: StepFinal},
 	},
 }
@@ -218,7 +230,7 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteRestores, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
 		{Name: EnsureStagePodsDeleted, Step: StepFinal},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
+		{Name: EnsureAnnotationsDeleted, Step: StepFinal, all: HasStageBackup},
 		{Name: DeleteMigrated, Step: StepFinal},
 		{Name: EnsureMigratedDeleted, Step: StepFinal},
 		{Name: UnQuiesceApplications, Step: StepFinal, all: Quiesce},
@@ -233,9 +245,9 @@ type Phase struct {
 	// High level Step this phase belongs to
 	Step string
 	// Step included when ALL flags evaluate true.
-	all uint8
+	all uint16
 	// Step included when ANY flag evaluates true.
-	any uint8
+	any uint16
 }
 
 // Get a progress report.
@@ -362,6 +374,16 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 
+	case CreateDirectImageMigration:
+		// FIXME: currently a placefiller
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case DirectImageMigrationStarted:
+		// FIXME: currently a placefiller
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
@@ -847,7 +869,8 @@ func (t *Task) init() error {
 		return err
 	}
 
-	if t.stage() && (!t.hasPVs() && !hasImageStreams) {
+	anyPVs, _ := t.hasPVs()
+	if t.stage() && (!anyPVs && !hasImageStreams) {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StageNoOp,
 			Status:   True,
@@ -952,7 +975,8 @@ func (t *Task) next() error {
 
 // Evaluate `all` flags.
 func (t *Task) allFlags(phase Phase) (bool, error) {
-	if phase.all&HasPVs != 0 && !t.hasPVs() {
+	anyPVs, moveSnapshotPVs := t.hasPVs()
+	if phase.all&HasPVs != 0 && !anyPVs {
 		return false, nil
 	}
 	if phase.all&HasStagePods != 0 && !t.Owner.Status.HasCondition(StagePodsCreated) {
@@ -971,13 +995,29 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&HasISs != 0 && hasImageStream {
 		return false, nil
 	}
+	if phase.all&DirectImage != 0 && !t.directImageMigration() {
+		return false, nil
+	}
+	if phase.all&IndirectImage != 0 && !t.indirectImageMigration() {
+		return false, nil
+	}
+	if phase.all&DirectVolume != 0 && !t.directVolumeMigration() {
+		return false, nil
+	}
+	if phase.all&IndirectVolume != 0 && !t.indirectVolumeMigration() {
+		return false, nil
+	}
+	if phase.all&HasStageBackup != 0 && !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		return false, nil
+	}
 
 	return true, nil
 }
 
 // Evaluate `any` flags.
 func (t *Task) anyFlags(phase Phase) (bool, error) {
-	if phase.any&HasPVs != 0 && t.hasPVs() {
+	anyPVs, moveSnapshotPVs := t.hasPVs()
+	if phase.any&HasPVs != 0 && anyPVs {
 		return true, nil
 	}
 	if phase.any&HasStagePods != 0 && t.Owner.Status.HasCondition(StagePodsCreated) {
@@ -996,7 +1036,22 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&HasISs != 0 && hasImageStream {
 		return true, nil
 	}
-	return phase.any == uint8(0), nil
+	if phase.any&DirectImage != 0 && t.directImageMigration() {
+		return true, nil
+	}
+	if phase.any&IndirectImage != 0 && t.indirectImageMigration() {
+		return true, nil
+	}
+	if phase.any&DirectVolume != 0 && t.directVolumeMigration() {
+		return true, nil
+	}
+	if phase.any&IndirectVolume != 0 && t.indirectVolumeMigration() {
+		return true, nil
+	}
+	if phase.any&HasStageBackup != 0 && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		return true, nil
+	}
+	return phase.any == uint16(0), nil
 }
 
 // Phase fail.
@@ -1109,13 +1164,19 @@ func (t *Task) getPVCs() map[k8sclient.ObjectKey]migapi.PV {
 }
 
 // Get whether the associated plan lists not skipped PVs.
-func (t *Task) hasPVs() bool {
+// First return value is PVs overall, and second is limited to Move or snapshot copy PVs
+func (t *Task) hasPVs() (bool, bool) {
+	var anyPVs bool
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
+		if pv.Selection.Action == migapi.PvMoveAction ||
+			pv.Selection.Action == migapi.PvCopyAction && pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
+			return true, true
+		}
 		if pv.Selection.Action != migapi.PvSkipAction {
-			return true
+			anyPVs = true
 		}
 	}
-	return false
+	return anyPVs, false
 }
 
 // Get whether the associated plan has imagestreams to be migrated
@@ -1142,6 +1203,31 @@ func (t *Task) hasImageStreams() (bool, error) {
 // Get whether the verification is desired
 func (t *Task) hasVerify() bool {
 	return t.Owner.Spec.Verify
+}
+
+// Returns true if the IndirectImageMigration override on the plan is set (plan is configured not to do direct migration)
+func (t *Task) indirectImageMigration() bool {
+	return t.PlanResources.MigPlan.Spec.IndirectImageMigration
+}
+
+// Returns true if the IndirectImageMigration override on the plan is not set (plan is configured to do direct migration)
+func (t *Task) directImageMigration() bool {
+	return !t.indirectImageMigration()
+}
+
+// Returns true if the IndirectVolumeMigration override on the plan is set (plan is configured not to do direct migration)
+func (t *Task) indirectVolumeMigration() bool {
+	return t.PlanResources.MigPlan.Spec.IndirectVolumeMigration
+}
+
+// Returns true if the IndirectVolumeMigration override on the plan is not set (plan is configured to do direct migration)
+func (t *Task) directVolumeMigration() bool {
+	return !t.indirectVolumeMigration()
+}
+
+// Returns true if the migration requires a stage backup
+func (t *Task) hasStageBackup(hasIS, anyPVs, moveSnapshotPVs bool) bool {
+	return hasIS && t.indirectImageMigration() || (anyPVs && t.indirectVolumeMigration()) || moveSnapshotPVs
 }
 
 // Get both source and destination clusters.
