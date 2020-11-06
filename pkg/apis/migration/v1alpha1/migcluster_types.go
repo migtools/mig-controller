@@ -75,6 +75,7 @@ type MigClusterSpec struct {
 type MigClusterStatus struct {
 	Conditions
 	ObservedDigest string `json:"observedDigest,omitempty"`
+	RegistryPath   string `json:"registryPath,omitempty"`
 }
 
 // +genclient
@@ -564,6 +565,15 @@ func (m *MigCluster) GetInternalRegistryPath(c k8sclient.Client) (string, error)
 		}
 		return internalRegistry, nil
 	}
+}
+
+func (m *MigCluster) SetRegistryPath(c k8sclient.Client) error {
+	newRegistryPath, err := m.GetRegistryPath(c)
+	if err != nil {
+		return err
+	}
+	m.Status.RegistryPath = newRegistryPath
+	return nil
 }
 
 func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {

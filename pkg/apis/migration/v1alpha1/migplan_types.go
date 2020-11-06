@@ -58,14 +58,16 @@ type MigPlanHook struct {
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
-	PersistentVolumes `json:",inline"`
-	Namespaces        []string              `json:"namespaces,omitempty"`
-	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
-	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
-	MigStorageRef     *kapi.ObjectReference `json:"migStorageRef,omitempty"`
-	Closed            bool                  `json:"closed,omitempty"`
-	Hooks             []MigPlanHook         `json:"hooks,omitempty"`
-	Refresh           bool                  `json:"refresh,omitempty"`
+	PersistentVolumes       `json:",inline"`
+	Namespaces              []string              `json:"namespaces,omitempty"`
+	SrcMigClusterRef        *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef       *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+	MigStorageRef           *kapi.ObjectReference `json:"migStorageRef,omitempty"`
+	Closed                  bool                  `json:"closed,omitempty"`
+	Hooks                   []MigPlanHook         `json:"hooks,omitempty"`
+	Refresh                 bool                  `json:"refresh,omitempty"`
+	IndirectImageMigration  bool                  `json:"indirectImageMigration,omitempty"`
+	IndirectVolumeMigration bool                  `json:"indirectVolumeMigration,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
