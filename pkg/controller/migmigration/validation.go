@@ -302,8 +302,10 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
 	unHealthyPod := corev1.Pod{}
 	for _, registryPod := range registryPods.Items {
-		if !registryPod.Status.ContainerStatuses[0].Ready {
-			return true, registryPod
+		for _, containerStatus := range registryPod.Status.ContainerStatuses {
+			if !containerStatus.Ready {
+				return true, registryPod
+			}
 		}
 	}
 	return false, unHealthyPod
