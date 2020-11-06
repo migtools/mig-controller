@@ -19,12 +19,12 @@ manager: generate fmt vet
 # Run against the configured Kubernetes cluster in ~/.kube/config after login as mig controller SA
 run: generate fmt vet
 	./hack/controller-sa-login.sh
-	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} go run ./cmd/manager/main.go
+	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} go run -tags "${BUILDTAGS}" ./cmd/manager/main.go
 
 
 # Run against the configured Kubernetes cluster in ~/.kube/config, skip login to mig-controller SA
 run-skip-sa-login: generate fmt vet
-	go run ./cmd/manager/main.go
+	go run -tags "${BUILDTAGS}" ./cmd/manager/main.go
 
 tilt:
 	 IMG=${IMG} TEMPLATE=${TEMPLATE} tilt up --hud=false --no-browser --file tools/tilt/Tiltfile
