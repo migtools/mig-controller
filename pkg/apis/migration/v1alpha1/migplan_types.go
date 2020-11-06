@@ -362,6 +362,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 			"app":        name,
 			"deployment": name,
 			"migplan":    string(r.UID),
+			MigrationRegistryLabel: string(r.UID),
 		}),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -370,6 +371,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 					"app":        name,
 					"deployment": name,
 					"migplan":    string(r.UID),
+					MigrationRegistryLabel: string(r.UID),
 				},
 			},
 			Spec: kapi.PodSpec{
