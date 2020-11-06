@@ -316,7 +316,7 @@ func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1
 	registryPodList := corev1.PodList{}
 	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
 		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
-			"migration-registry": string(plan.UID),
+			MigrationRegistryLabel: string(plan.UID),
 		}),
 	}, &registryPodList)
 

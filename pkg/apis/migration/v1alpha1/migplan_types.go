@@ -359,18 +359,18 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 	deployment.Spec = appsv1.DeploymentSpec{
 		Replicas: pointer.Int32Ptr(1),
 		Selector: metav1.SetAsLabelSelector(map[string]string{
-			"app":        name,
-			"deployment": name,
-			"migplan":    string(r.UID),
+			"app":                  name,
+			"deployment":           name,
+			"migplan":              string(r.UID),
 			MigrationRegistryLabel: string(r.UID),
 		}),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Time{},
 				Labels: map[string]string{
-					"app":        name,
-					"deployment": name,
-					"migplan":    string(r.UID),
+					"app":                  name,
+					"deployment":           name,
+					"migplan":              string(r.UID),
 					MigrationRegistryLabel: string(r.UID),
 				},
 			},
