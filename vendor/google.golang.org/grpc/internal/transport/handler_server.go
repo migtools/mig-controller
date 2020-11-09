@@ -39,6 +39,10 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+<<<<<<< HEAD
+	"google.golang.org/grpc/internal/grpcutil"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/stats"
@@ -57,7 +61,11 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats sta
 	}
 	contentType := r.Header.Get("Content-Type")
 	// TODO: do we assume contentType is lowercase? we did before
+<<<<<<< HEAD
+	contentSubtype, validContentType := grpcutil.ContentSubtype(contentType)
+=======
 	contentSubtype, validContentType := contentSubtype(contentType)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if !validContentType {
 		return nil, errors.New("invalid gRPC request content-type")
 	}
@@ -112,11 +120,18 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request, stats sta
 // at this point to be speaking over HTTP/2, so it's able to speak valid
 // gRPC.
 type serverHandlerTransport struct {
+<<<<<<< HEAD
+	rw         http.ResponseWriter
+	req        *http.Request
+	timeoutSet bool
+	timeout    time.Duration
+=======
 	rw               http.ResponseWriter
 	req              *http.Request
 	timeoutSet       bool
 	timeout          time.Duration
 	didCommonHeaders bool
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	headerMD metadata.MD
 
@@ -186,8 +201,16 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 	ht.writeStatusMu.Lock()
 	defer ht.writeStatusMu.Unlock()
 
+<<<<<<< HEAD
+	headersWritten := s.updateHeaderSent()
+	err := ht.do(func() {
+		if !headersWritten {
+			ht.writePendingHeaders(s)
+		}
+=======
 	err := ht.do(func() {
 		ht.writeCommonHeaders(s)
+>>>>>>> cbc9bb05... fixup add vendor back
 
 		// And flush, in case no header or body has been sent yet.
 		// This forces a separation of headers and trailers if this is the
@@ -227,13 +250,33 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 
 	if err == nil { // transport has not been closed
 		if ht.stats != nil {
+<<<<<<< HEAD
+			// Note: The trailer fields are compressed with hpack after this call returns.
+			// No WireLength field is set here.
+			ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{
+				Trailer: s.trailer.Copy(),
+			})
+=======
 			ht.stats.HandleRPC(s.Context(), &stats.OutTrailer{})
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	ht.Close()
 	return err
 }
 
+<<<<<<< HEAD
+// writePendingHeaders sets common and custom headers on the first
+// write call (Write, WriteHeader, or WriteStatus)
+func (ht *serverHandlerTransport) writePendingHeaders(s *Stream) {
+	ht.writeCommonHeaders(s)
+	ht.writeCustomHeaders(s)
+}
+
+// writeCommonHeaders sets common headers on the first write
+// call (Write, WriteHeader, or WriteStatus).
+func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
+=======
 // writeCommonHeaders sets common headers on the first write
 // call (Write, WriteHeader, or WriteStatus).
 func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
@@ -242,6 +285,7 @@ func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
 	}
 	ht.didCommonHeaders = true
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	h := ht.rw.Header()
 	h["Date"] = nil // suppress Date to make tests happy; TODO: restore
 	h.Set("Content-Type", ht.contentType)
@@ -260,9 +304,36 @@ func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
 	}
 }
 
+<<<<<<< HEAD
+// writeCustomHeaders sets custom headers set on the stream via SetHeader
+// on the first write call (Write, WriteHeader, or WriteStatus).
+func (ht *serverHandlerTransport) writeCustomHeaders(s *Stream) {
+	h := ht.rw.Header()
+
+	s.hdrMu.Lock()
+	for k, vv := range s.header {
+		if isReservedHeader(k) {
+			continue
+		}
+		for _, v := range vv {
+			h.Add(k, encodeMetadataHeader(k, v))
+		}
+	}
+
+	s.hdrMu.Unlock()
+}
+
+func (ht *serverHandlerTransport) Write(s *Stream, hdr []byte, data []byte, opts *Options) error {
+	headersWritten := s.updateHeaderSent()
+	return ht.do(func() {
+		if !headersWritten {
+			ht.writePendingHeaders(s)
+		}
+=======
 func (ht *serverHandlerTransport) Write(s *Stream, hdr []byte, data []byte, opts *Options) error {
 	return ht.do(func() {
 		ht.writeCommonHeaders(s)
+>>>>>>> cbc9bb05... fixup add vendor back
 		ht.rw.Write(hdr)
 		ht.rw.Write(data)
 		ht.rw.(http.Flusher).Flush()
@@ -270,6 +341,18 @@ func (ht *serverHandlerTransport) Write(s *Stream, hdr []byte, data []byte, opts
 }
 
 func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
+<<<<<<< HEAD
+	if err := s.SetHeader(md); err != nil {
+		return err
+	}
+
+	headersWritten := s.updateHeaderSent()
+	err := ht.do(func() {
+		if !headersWritten {
+			ht.writePendingHeaders(s)
+		}
+
+=======
 	err := ht.do(func() {
 		ht.writeCommonHeaders(s)
 		h := ht.rw.Header()
@@ -283,13 +366,23 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 				h.Add(k, v)
 			}
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 		ht.rw.WriteHeader(200)
 		ht.rw.(http.Flusher).Flush()
 	})
 
 	if err == nil {
 		if ht.stats != nil {
+<<<<<<< HEAD
+			// Note: The header fields are compressed with hpack after this call returns.
+			// No WireLength field is set here.
+			ht.stats.HandleRPC(s.Context(), &stats.OutHeader{
+				Header:      md.Copy(),
+				Compression: s.sendCompress,
+			})
+=======
 			ht.stats.HandleRPC(s.Context(), &stats.OutHeader{})
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return err
@@ -334,7 +427,11 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 		Addr: ht.RemoteAddr(),
 	}
 	if req.TLS != nil {
+<<<<<<< HEAD
+		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS, CommonAuthInfo: credentials.CommonAuthInfo{SecurityLevel: credentials.PrivacyAndIntegrity}}
+=======
 		pr.AuthInfo = credentials.TLSInfo{State: *req.TLS}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	s.ctx = peer.NewContext(ctx, pr)

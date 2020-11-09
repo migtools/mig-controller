@@ -5,4 +5,8 @@
 package gin
 
 // Version is the current gin framework's version.
+<<<<<<< HEAD
+const Version = "v1.6.3"
+=======
 const Version = "v1.4.0"
+>>>>>>> cbc9bb05... fixup add vendor back

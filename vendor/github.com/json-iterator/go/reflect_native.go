@@ -432,6 +432,21 @@ func (codec *base64Codec) Decode(ptr unsafe.Pointer, iter *Iterator) {
 }
 
 func (codec *base64Codec) Encode(ptr unsafe.Pointer, stream *Stream) {
+<<<<<<< HEAD
+	if codec.sliceType.UnsafeIsNil(ptr) {
+		stream.WriteNil()
+		return
+	}
+	src := *((*[]byte)(ptr))
+	encoding := base64.StdEncoding
+	stream.writeByte('"')
+	if len(src) != 0 {
+		size := encoding.EncodedLen(len(src))
+		buf := make([]byte, size)
+		encoding.Encode(buf, src)
+		stream.buf = append(stream.buf, buf...)
+	}
+=======
 	src := *((*[]byte)(ptr))
 	if len(src) == 0 {
 		stream.WriteNil()
@@ -443,6 +458,7 @@ func (codec *base64Codec) Encode(ptr unsafe.Pointer, stream *Stream) {
 	buf := make([]byte, size)
 	encoding.Encode(buf, src)
 	stream.buf = append(stream.buf, buf...)
+>>>>>>> cbc9bb05... fixup add vendor back
 	stream.writeByte('"')
 }
 

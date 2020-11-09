@@ -1,5 +1,8 @@
 package system
 
+<<<<<<< HEAD
+import "golang.org/x/sys/unix"
+=======
 import (
 	"syscall"
 	"unsafe"
@@ -29,11 +32,41 @@ func Llistxattr(path string, dest []byte) (size int, err error) {
 
 	return size, nil
 }
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // Returns a []byte slice if the xattr is set and nil otherwise
 // Requires path and its attribute as arguments
 func Lgetxattr(path string, attr string) ([]byte, error) {
 	var sz int
+<<<<<<< HEAD
+	// Start with a 128 length byte array
+	dest := make([]byte, 128)
+	sz, errno := unix.Lgetxattr(path, attr, dest)
+
+	switch {
+	case errno == unix.ENODATA:
+		return nil, errno
+	case errno == unix.ENOTSUP:
+		return nil, errno
+	case errno == unix.ERANGE:
+		// 128 byte array might just not be good enough,
+		// A dummy buffer is used to get the real size
+		// of the xattrs on disk
+		sz, errno = unix.Lgetxattr(path, attr, []byte{})
+		if errno != nil {
+			return nil, errno
+		}
+		dest = make([]byte, sz)
+		sz, errno = unix.Lgetxattr(path, attr, dest)
+		if errno != nil {
+			return nil, errno
+		}
+	case errno != nil:
+		return nil, errno
+	}
+	return dest[:sz], nil
+}
+=======
 	pathBytes, err := syscall.BytePtrFromString(path)
 	if err != nil {
 		return nil, err
@@ -97,3 +130,4 @@ func Lsetxattr(path string, attr string, data []byte, flags int) error {
 	}
 	return nil
 }
+>>>>>>> cbc9bb05... fixup add vendor back

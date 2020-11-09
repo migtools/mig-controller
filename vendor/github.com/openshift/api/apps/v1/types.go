@@ -120,7 +120,11 @@ const (
 
 // CustomDeploymentStrategyParams are the input to the Custom deployment strategy.
 type CustomDeploymentStrategyParams struct {
+<<<<<<< HEAD
+	// Image specifies a container image which can carry out a deployment.
+=======
 	// Image specifies a Docker image which can carry out a deployment.
+>>>>>>> cbc9bb05... fixup add vendor back
 	Image string `json:"image,omitempty" protobuf:"bytes,1,opt,name=image"`
 	// Environment holds the environment which will be given to the container for Image.
 	Environment []corev1.EnvVar `json:"environment,omitempty" protobuf:"bytes,2,rep,name=environment"`
@@ -225,7 +229,11 @@ type ExecNewPodHook struct {
 	// Env is a set of environment variables to supply to the hook pod's container.
 	Env []corev1.EnvVar `json:"env,omitempty" protobuf:"bytes,2,rep,name=env"`
 	// ContainerName is the name of a container in the deployment pod template
+<<<<<<< HEAD
+	// whose container image will be used for the hook pod's container.
+=======
 	// whose Docker image will be used for the hook pod's container.
+>>>>>>> cbc9bb05... fixup add vendor back
 	ContainerName string `json:"containerName" protobuf:"bytes,3,opt,name=containerName"`
 	// Volumes is a list of named volumes from the pod template which should be
 	// copied to the hook pod. Volumes names not found in pod spec are ignored.
@@ -264,7 +272,11 @@ type DeploymentTriggerType string
 
 const (
 	// DeploymentTriggerOnImageChange will create new deployments in response to updated tags from
+<<<<<<< HEAD
+	// a container image repository.
+=======
 	// a Docker image repository.
+>>>>>>> cbc9bb05... fixup add vendor back
 	DeploymentTriggerOnImageChange DeploymentTriggerType = "ImageChange"
 	// DeploymentTriggerOnConfigChange will create new deployments in response to changes to
 	// the ControllerTemplate of a DeploymentConfig.

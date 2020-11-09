@@ -97,7 +97,11 @@ func NewXfrmStat() (XfrmStat, error) {
 
 // NewXfrmStat reads the xfrm_stat statistics from the 'proc' filesystem.
 func (fs FS) NewXfrmStat() (XfrmStat, error) {
+<<<<<<< HEAD
+	file, err := os.Open(fs.proc.Path("net/xfrm_stat"))
+=======
 	file, err := os.Open(fs.Path("net/xfrm_stat"))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return XfrmStat{}, err
 	}

@@ -8,7 +8,11 @@ const (
 	// "BucketAlreadyExists".
 	//
 	// The requested bucket name is not available. The bucket namespace is shared
+<<<<<<< HEAD
+	// by all users of the system. Select a different name and try again.
+=======
 	// by all users of the system. Please select a different name and try again.
+>>>>>>> cbc9bb05... fixup add vendor back
 	ErrCodeBucketAlreadyExists = "BucketAlreadyExists"
 
 	// ErrCodeBucketAlreadyOwnedByYou for service response error code

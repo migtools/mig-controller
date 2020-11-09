@@ -68,7 +68,11 @@ func ParseTraceID(tid string) (trace.TraceID, bool) {
 		return trace.TraceID{}, false
 	}
 	b, err := hex.DecodeString(tid)
+<<<<<<< HEAD
+	if err != nil || len(b) > 16 {
+=======
 	if err != nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return trace.TraceID{}, false
 	}
 	var traceID trace.TraceID
@@ -90,7 +94,11 @@ func ParseSpanID(sid string) (spanID trace.SpanID, ok bool) {
 		return trace.SpanID{}, false
 	}
 	b, err := hex.DecodeString(sid)
+<<<<<<< HEAD
+	if err != nil || len(b) > 8 {
+=======
 	if err != nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return trace.SpanID{}, false
 	}
 	start := 8 - len(b)

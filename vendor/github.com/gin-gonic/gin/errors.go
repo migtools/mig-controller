@@ -5,9 +5,15 @@
 package gin
 
 import (
+<<<<<<< HEAD
+	"fmt"
+	"reflect"
+	"strings"
+=======
 	"bytes"
 	"fmt"
 	"reflect"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	"github.com/gin-gonic/gin/internal/json"
 )
@@ -158,7 +164,11 @@ func (a errorMsgs) String() string {
 	if len(a) == 0 {
 		return ""
 	}
+<<<<<<< HEAD
+	var buffer strings.Builder
+=======
 	var buffer bytes.Buffer
+>>>>>>> cbc9bb05... fixup add vendor back
 	for i, msg := range a {
 		fmt.Fprintf(&buffer, "Error #%02d: %s\n", i+1, msg.Err)
 		if msg.Meta != nil {

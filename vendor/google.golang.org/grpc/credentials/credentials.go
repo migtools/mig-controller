@@ -24,6 +24,15 @@ package credentials // import "google.golang.org/grpc/credentials"
 
 import (
 	"context"
+<<<<<<< HEAD
+	"errors"
+	"fmt"
+	"net"
+
+	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc/attributes"
+	"google.golang.org/grpc/internal"
+=======
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -34,6 +43,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/credentials/internal"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // PerRPCCredentials defines the common interface for the credentials which need to
@@ -45,7 +55,12 @@ type PerRPCCredentials interface {
 	// context. If a status code is returned, it will be used as the status
 	// for the RPC. uri is the URI of the entry point for the request.
 	// When supported by the underlying implementation, ctx can be used for
+<<<<<<< HEAD
+	// timeout and cancellation. Additionally, RequestInfo data will be
+	// available via ctx to this call.
+=======
 	// timeout and cancellation.
+>>>>>>> cbc9bb05... fixup add vendor back
 	// TODO(zhaoq): Define the set of the qualified keys instead of leaving
 	// it as an arbitrary string.
 	GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error)
@@ -54,6 +69,53 @@ type PerRPCCredentials interface {
 	RequireTransportSecurity() bool
 }
 
+<<<<<<< HEAD
+// SecurityLevel defines the protection level on an established connection.
+//
+// This API is experimental.
+type SecurityLevel int
+
+const (
+	// Invalid indicates an invalid security level.
+	// The zero SecurityLevel value is invalid for backward compatibility.
+	Invalid SecurityLevel = iota
+	// NoSecurity indicates a connection is insecure.
+	NoSecurity
+	// IntegrityOnly indicates a connection only provides integrity protection.
+	IntegrityOnly
+	// PrivacyAndIntegrity indicates a connection provides both privacy and integrity protection.
+	PrivacyAndIntegrity
+)
+
+// String returns SecurityLevel in a string format.
+func (s SecurityLevel) String() string {
+	switch s {
+	case NoSecurity:
+		return "NoSecurity"
+	case IntegrityOnly:
+		return "IntegrityOnly"
+	case PrivacyAndIntegrity:
+		return "PrivacyAndIntegrity"
+	}
+	return fmt.Sprintf("invalid SecurityLevel: %v", int(s))
+}
+
+// CommonAuthInfo contains authenticated information common to AuthInfo implementations.
+// It should be embedded in a struct implementing AuthInfo to provide additional information
+// about the credentials.
+//
+// This API is experimental.
+type CommonAuthInfo struct {
+	SecurityLevel SecurityLevel
+}
+
+// GetCommonAuthInfo returns the pointer to CommonAuthInfo struct.
+func (c *CommonAuthInfo) GetCommonAuthInfo() *CommonAuthInfo {
+	return c
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // ProtocolInfo provides information regarding the gRPC wire protocol version,
 // security protocol, security protocol version in use, server name, etc.
 type ProtocolInfo struct {
@@ -61,13 +123,26 @@ type ProtocolInfo struct {
 	ProtocolVersion string
 	// SecurityProtocol is the security protocol in use.
 	SecurityProtocol string
+<<<<<<< HEAD
+	// SecurityVersion is the security protocol version.  It is a static version string from the
+	// credentials, not a value that reflects per-connection protocol negotiation.  To retrieve
+	// details about the credentials used for a connection, use the Peer's AuthInfo field instead.
+	//
+	// Deprecated: please use Peer.AuthInfo.
+=======
 	// SecurityVersion is the security protocol version.
+>>>>>>> cbc9bb05... fixup add vendor back
 	SecurityVersion string
 	// ServerName is the user-configured server name.
 	ServerName string
 }
 
 // AuthInfo defines the common interface for the auth information the users are interested in.
+<<<<<<< HEAD
+// A struct that implements AuthInfo should embed CommonAuthInfo by including additional
+// information about the credentials in it.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type AuthInfo interface {
 	AuthType() string
 }
@@ -79,6 +154,20 @@ var ErrConnDispatched = errors.New("credentials: rawConn is dispatched out of gR
 // TransportCredentials defines the common interface for all the live gRPC wire
 // protocols and supported transport security protocols (e.g., TLS, SSL).
 type TransportCredentials interface {
+<<<<<<< HEAD
+	// ClientHandshake does the authentication handshake specified by the
+	// corresponding authentication protocol on rawConn for clients. It returns
+	// the authenticated connection and the corresponding auth information
+	// about the connection.  The auth information should embed CommonAuthInfo
+	// to return additional information about the credentials. Implementations
+	// must use the provided context to implement timely cancellation.  gRPC
+	// will try to reconnect if the error returned is a temporary error
+	// (io.EOF, context.DeadlineExceeded or err.Temporary() == true).  If the
+	// returned error is a wrapper error, implementations should make sure that
+	// the error implements Temporary() to have the correct retry behaviors.
+	// Additionally, ClientHandshakeInfo data will be available via the context
+	// passed to this call.
+=======
 	// ClientHandshake does the authentication handshake specified by the corresponding
 	// authentication protocol on rawConn for clients. It returns the authenticated
 	// connection and the corresponding auth information about the connection.
@@ -87,12 +176,18 @@ type TransportCredentials interface {
 	// (io.EOF, context.DeadlineExceeded or err.Temporary() == true).
 	// If the returned error is a wrapper error, implementations should make sure that
 	// the error implements Temporary() to have the correct retry behaviors.
+>>>>>>> cbc9bb05... fixup add vendor back
 	//
 	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ClientHandshake(context.Context, string, net.Conn) (net.Conn, AuthInfo, error)
 	// ServerHandshake does the authentication handshake for servers. It returns
 	// the authenticated connection and the corresponding auth information about
+<<<<<<< HEAD
+	// the connection. The auth information should embed CommonAuthInfo to return additional information
+	// about the credentials.
+=======
 	// the connection.
+>>>>>>> cbc9bb05... fixup add vendor back
 	//
 	// If the returned net.Conn is closed, it MUST close the net.Conn provided.
 	ServerHandshake(net.Conn) (net.Conn, AuthInfo, error)
@@ -125,6 +220,87 @@ type Bundle interface {
 	NewWithMode(mode string) (Bundle, error)
 }
 
+<<<<<<< HEAD
+// RequestInfo contains request data attached to the context passed to GetRequestMetadata calls.
+//
+// This API is experimental.
+type RequestInfo struct {
+	// The method passed to Invoke or NewStream for this RPC. (For proto methods, this has the format "/some.Service/Method")
+	Method string
+	// AuthInfo contains the information from a security handshake (TransportCredentials.ClientHandshake, TransportCredentials.ServerHandshake)
+	AuthInfo AuthInfo
+}
+
+// requestInfoKey is a struct to be used as the key when attaching a RequestInfo to a context object.
+type requestInfoKey struct{}
+
+// RequestInfoFromContext extracts the RequestInfo from the context if it exists.
+//
+// This API is experimental.
+func RequestInfoFromContext(ctx context.Context) (ri RequestInfo, ok bool) {
+	ri, ok = ctx.Value(requestInfoKey{}).(RequestInfo)
+	return
+}
+
+// ClientHandshakeInfo holds data to be passed to ClientHandshake. This makes
+// it possible to pass arbitrary data to the handshaker from gRPC, resolver,
+// balancer etc. Individual credential implementations control the actual
+// format of the data that they are willing to receive.
+//
+// This API is experimental.
+type ClientHandshakeInfo struct {
+	// Attributes contains the attributes for the address. It could be provided
+	// by the gRPC, resolver, balancer etc.
+	Attributes *attributes.Attributes
+}
+
+// clientHandshakeInfoKey is a struct used as the key to store
+// ClientHandshakeInfo in a context.
+type clientHandshakeInfoKey struct{}
+
+// ClientHandshakeInfoFromContext returns the ClientHandshakeInfo struct stored
+// in ctx.
+//
+// This API is experimental.
+func ClientHandshakeInfoFromContext(ctx context.Context) ClientHandshakeInfo {
+	chi, _ := ctx.Value(clientHandshakeInfoKey{}).(ClientHandshakeInfo)
+	return chi
+}
+
+// CheckSecurityLevel checks if a connection's security level is greater than or equal to the specified one.
+// It returns success if 1) the condition is satisified or 2) AuthInfo struct does not implement GetCommonAuthInfo() method
+// or 3) CommonAuthInfo.SecurityLevel has an invalid zero value. For 2) and 3), it is for the purpose of backward-compatibility.
+//
+// This API is experimental.
+func CheckSecurityLevel(ctx context.Context, level SecurityLevel) error {
+	type internalInfo interface {
+		GetCommonAuthInfo() *CommonAuthInfo
+	}
+	ri, _ := RequestInfoFromContext(ctx)
+	if ri.AuthInfo == nil {
+		return errors.New("unable to obtain SecurityLevel from context")
+	}
+	if ci, ok := ri.AuthInfo.(internalInfo); ok {
+		// CommonAuthInfo.SecurityLevel has an invalid value.
+		if ci.GetCommonAuthInfo().SecurityLevel == Invalid {
+			return nil
+		}
+		if ci.GetCommonAuthInfo().SecurityLevel < level {
+			return fmt.Errorf("requires SecurityLevel %v; connection has %v", level, ci.GetCommonAuthInfo().SecurityLevel)
+		}
+	}
+	// The condition is satisfied or AuthInfo struct does not implement GetCommonAuthInfo() method.
+	return nil
+}
+
+func init() {
+	internal.NewRequestInfoContext = func(ctx context.Context, ri RequestInfo) context.Context {
+		return context.WithValue(ctx, requestInfoKey{}, ri)
+	}
+	internal.NewClientHandshakeInfoContext = func(ctx context.Context, chi ClientHandshakeInfo) context.Context {
+		return context.WithValue(ctx, clientHandshakeInfoKey{}, chi)
+	}
+=======
 // TLSInfo contains the auth information for a TLS authenticated connection.
 // It implements the AuthInfo interface.
 type TLSInfo struct {
@@ -260,10 +436,16 @@ func NewServerTLSFromFile(certFile, keyFile string) (TransportCredentials, error
 		return nil, err
 	}
 	return NewTLS(&tls.Config{Certificates: []tls.Certificate{cert}}), nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ChannelzSecurityInfo defines the interface that security protocols should implement
 // in order to provide security info to channelz.
+<<<<<<< HEAD
+//
+// This API is experimental.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type ChannelzSecurityInfo interface {
 	GetSecurityValue() ChannelzSecurityValue
 }
@@ -271,10 +453,17 @@ type ChannelzSecurityInfo interface {
 // ChannelzSecurityValue defines the interface that GetSecurityValue() return value
 // should satisfy. This interface should only be satisfied by *TLSChannelzSecurityValue
 // and *OtherChannelzSecurityValue.
+<<<<<<< HEAD
+//
+// This API is experimental.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type ChannelzSecurityValue interface {
 	isChannelzSecurityValue()
 }
 
+<<<<<<< HEAD
+=======
 // TLSChannelzSecurityValue defines the struct that TLS protocol should return
 // from GetSecurityValue(), containing security info like cipher and certificate used.
 type TLSChannelzSecurityValue struct {
@@ -284,15 +473,23 @@ type TLSChannelzSecurityValue struct {
 	RemoteCertificate []byte
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // OtherChannelzSecurityValue defines the struct that non-TLS protocol should return
 // from GetSecurityValue(), which contains protocol specific security info. Note
 // the Value field will be sent to users of channelz requesting channel info, and
 // thus sensitive info should better be avoided.
+<<<<<<< HEAD
+//
+// This API is experimental.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type OtherChannelzSecurityValue struct {
 	ChannelzSecurityValue
 	Name  string
 	Value proto.Message
 }
+<<<<<<< HEAD
+=======
 
 var cipherSuiteLookup = map[uint16]string{
 	tls.TLS_RSA_WITH_RC4_128_SHA:                "TLS_RSA_WITH_RC4_128_SHA",
@@ -334,3 +531,4 @@ func cloneTLSConfig(cfg *tls.Config) *tls.Config {
 
 	return cfg.Clone()
 }
+>>>>>>> cbc9bb05... fixup add vendor back

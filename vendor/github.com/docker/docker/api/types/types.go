@@ -39,6 +39,10 @@ type ImageInspect struct {
 	Author          string
 	Config          *container.Config
 	Architecture    string
+<<<<<<< HEAD
+	Variant         string `json:",omitempty"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Os              string
 	OsVersion       string `json:",omitempty"`
 	Size            int64
@@ -177,6 +181,10 @@ type Info struct {
 	NEventsListener    int
 	KernelVersion      string
 	OperatingSystem    string
+<<<<<<< HEAD
+	OSVersion          string
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	OSType             string
 	Architecture       string
 	IndexServerAddress string

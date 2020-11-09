@@ -2,7 +2,11 @@ Zapr :zap:
 ==========
 
 A [logr](https://github.com/go-logr/logr) implementation using
+<<<<<<< HEAD
+[Zap](https://github.com/uber-go/zap).
+=======
 [Zap](go.uber.org/zap).
+>>>>>>> cbc9bb05... fixup add vendor back
 
 Usage
 -----
@@ -13,7 +17,11 @@ import (
 
     "go.uber.org/zap"
     "github.com/go-logr/logr"
+<<<<<<< HEAD
+    "github.com/go-logr/zapr"
+=======
     "github.com/directxman12/zapr"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 func main() {

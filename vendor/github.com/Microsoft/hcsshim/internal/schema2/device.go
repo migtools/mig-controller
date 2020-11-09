@@ -9,6 +9,12 @@
 
 package hcsschema
 
+<<<<<<< HEAD
+type Device struct {
+
+	//  The interface class guid of the device to assign to container.
+	InterfaceClassGuid string `json:"InterfaceClassGuid,omitempty"`
+=======
 type DeviceType string
 
 const (
@@ -24,4 +30,5 @@ type Device struct {
 	InterfaceClassGuid string `json:"InterfaceClassGuid,omitempty"`
 	//  The location path of the device to assign to the container.  Only used when Type is DeviceInstance.
 	LocationPath string `json:"LocationPath,omitempty"`
+>>>>>>> cbc9bb05... fixup add vendor back
 }

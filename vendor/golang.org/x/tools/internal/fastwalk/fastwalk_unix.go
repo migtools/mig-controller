@@ -66,7 +66,11 @@ func readDir(dirName string, fn func(dirName, entName string, typ os.FileMode) e
 			continue
 		}
 		if err := fn(dirName, name, typ); err != nil {
+<<<<<<< HEAD
+			if err == ErrSkipFiles {
+=======
 			if err == SkipFiles {
+>>>>>>> cbc9bb05... fixup add vendor back
 				skipFiles = true
 				continue
 			}
@@ -76,8 +80,14 @@ func readDir(dirName string, fn func(dirName, entName string, typ os.FileMode) e
 }
 
 func parseDirEnt(buf []byte) (consumed int, name string, typ os.FileMode) {
+<<<<<<< HEAD
+	// golang.org/issue/37269
+	dirent := &syscall.Dirent{}
+	copy((*[unsafe.Sizeof(syscall.Dirent{})]byte)(unsafe.Pointer(dirent))[:], buf)
+=======
 	// golang.org/issue/15653
 	dirent := (*syscall.Dirent)(unsafe.Pointer(&buf[0]))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if v := unsafe.Offsetof(dirent.Reclen) + unsafe.Sizeof(dirent.Reclen); uintptr(len(buf)) < v {
 		panic(fmt.Sprintf("buf size of %d smaller than dirent header size %d", len(buf), v))
 	}

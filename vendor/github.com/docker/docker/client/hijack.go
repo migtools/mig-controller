@@ -24,7 +24,11 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 	}
 
 	apiPath := cli.getAPIPath(ctx, path, query)
+<<<<<<< HEAD
+	req, err := http.NewRequest(http.MethodPost, apiPath, bodyEncoded)
+=======
 	req, err := http.NewRequest("POST", apiPath, bodyEncoded)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return types.HijackedResponse{}, err
 	}
@@ -40,7 +44,11 @@ func (cli *Client) postHijacked(ctx context.Context, path string, query url.Valu
 
 // DialHijack returns a hijacked connection with negotiated protocol proto.
 func (cli *Client) DialHijack(ctx context.Context, url, proto string, meta map[string][]string) (net.Conn, error) {
+<<<<<<< HEAD
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+=======
 	req, err := http.NewRequest("POST", url, nil)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +95,11 @@ func (cli *Client) setupHijackConn(ctx context.Context, req *http.Request, proto
 
 	// Server hijacks the connection, error 'connection closed' expected
 	resp, err := clientconn.Do(req)
+<<<<<<< HEAD
+
+	//nolint:staticcheck // ignore SA1019 for connecting to old (pre go1.8) daemons
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != httputil.ErrPersistEOF {
 		if err != nil {
 			return nil, err

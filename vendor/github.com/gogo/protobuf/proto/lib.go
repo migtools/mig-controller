@@ -948,6 +948,21 @@ func isProto3Zero(v reflect.Value) bool {
 	return false
 }
 
+<<<<<<< HEAD
+const (
+	// ProtoPackageIsVersion3 is referenced from generated protocol buffer files
+	// to assert that that code is compatible with this version of the proto package.
+	GoGoProtoPackageIsVersion3 = true
+
+	// ProtoPackageIsVersion2 is referenced from generated protocol buffer files
+	// to assert that that code is compatible with this version of the proto package.
+	GoGoProtoPackageIsVersion2 = true
+
+	// ProtoPackageIsVersion1 is referenced from generated protocol buffer files
+	// to assert that that code is compatible with this version of the proto package.
+	GoGoProtoPackageIsVersion1 = true
+)
+=======
 // ProtoPackageIsVersion2 is referenced from generated protocol buffer files
 // to assert that that code is compatible with this version of the proto package.
 const GoGoProtoPackageIsVersion2 = true
@@ -955,6 +970,7 @@ const GoGoProtoPackageIsVersion2 = true
 // ProtoPackageIsVersion1 is referenced from generated protocol buffer files
 // to assert that that code is compatible with this version of the proto package.
 const GoGoProtoPackageIsVersion1 = true
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // InternalMessageInfo is a type used internally by generated .pb.go files.
 // This type is not intended to be used by non-generated code.

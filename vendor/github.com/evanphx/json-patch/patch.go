@@ -202,10 +202,13 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 			return false
 		}
 
+<<<<<<< HEAD
+=======
 		if len(n.doc) != len(o.doc) {
 			return false
 		}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 		for k, v := range n.doc {
 			ov, ok := o.doc[k]
 
@@ -213,10 +216,13 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 				return false
 			}
 
+<<<<<<< HEAD
+=======
 			if (v == nil) != (ov == nil) {
 				return false
 			}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 			if v == nil && ov == nil {
 				continue
 			}
@@ -392,17 +398,25 @@ func (d *partialDoc) add(key string, val *lazyNode) error {
 }
 
 func (d *partialDoc) get(key string) (*lazyNode, error) {
+<<<<<<< HEAD
+	return (*d)[key], nil
+=======
 	v, ok := (*d)[key]
 	if !ok {
 		return v, errors.Wrapf(ErrMissing, "unable to get nonexistent key: %s", key)
 	}
 	return v, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (d *partialDoc) remove(key string) error {
 	_, ok := (*d)[key]
 	if !ok {
+<<<<<<< HEAD
+		return errors.Wrapf(ErrMissing, "Unable to remove nonexistent key: %s", key)
+=======
 		return errors.Wrapf(ErrMissing, "unable to remove nonexistent key: %s", key)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	delete(*d, key)
@@ -441,6 +455,16 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 		return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 	}
 
+<<<<<<< HEAD
+	if SupportNegativeIndices {
+		if idx < -len(ary) {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+
+		if idx < 0 {
+			idx += len(ary)
+		}
+=======
 	if idx < 0 {
 		if !SupportNegativeIndices {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
@@ -449,6 +473,7 @@ func (d *partialArray) add(key string, val *lazyNode) error {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 		}
 		idx += len(ary)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	copy(ary[0:idx], cur[0:idx])
@@ -485,6 +510,16 @@ func (d *partialArray) remove(key string) error {
 		return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 	}
 
+<<<<<<< HEAD
+	if SupportNegativeIndices {
+		if idx < -len(cur) {
+			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
+		}
+
+		if idx < 0 {
+			idx += len(cur)
+		}
+=======
 	if idx < 0 {
 		if !SupportNegativeIndices {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
@@ -493,6 +528,7 @@ func (d *partialArray) remove(key string) error {
 			return errors.Wrapf(ErrInvalidIndex, "Unable to access invalid index: %d", idx)
 		}
 		idx += len(cur)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	ary := make([]*lazyNode, len(cur)-1)
@@ -624,7 +660,11 @@ func (p Patch) test(doc *container, op Operation) error {
 	}
 
 	val, err := con.get(key)
+<<<<<<< HEAD
+	if err != nil {
+=======
 	if err != nil && errors.Cause(err) != ErrMissing {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return errors.Wrapf(err, "error in test for path: '%s'", path)
 	}
 

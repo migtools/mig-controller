@@ -25,7 +25,14 @@ import (
 
 // PreparedMsg is responsible for creating a Marshalled and Compressed object.
 //
+<<<<<<< HEAD
+// Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
+=======
 // This API is EXPERIMENTAL.
+>>>>>>> cbc9bb05... fixup add vendor back
 type PreparedMsg struct {
 	// Struct for preparing msg before sending them
 	encodedData []byte

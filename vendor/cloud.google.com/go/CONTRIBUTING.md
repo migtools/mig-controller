@@ -1,5 +1,53 @@
 # Contributing
 
+<<<<<<< HEAD
+1. [File an issue](https://github.com/googleapis/google-cloud-go/issues/new/choose).
+   The issue will be used to discuss the bug or feature and should be created
+   before sending a CL.
+
+1. [Install Go](https://golang.org/dl/).
+    1. Ensure that your `GOBIN` directory (by default `$(go env GOPATH)/bin`)
+    is in your `PATH`.
+    1. Check it's working by running `go version`.
+        * If it doesn't work, check the install location, usually
+        `/usr/local/go`, is on your `PATH`.
+
+1. Sign one of the
+[contributor license agreements](#contributor-license-agreements) below.
+
+1. Clone the repo:
+    `git clone https://github.com/googleapis/google-cloud-go`
+
+1. Change into the checked out source:
+    `cd google-cloud-go`
+
+1. Fork the repo.
+
+1. Set your fork as a remote:
+    `git remote add fork git@github.com:GITHUB_USERNAME/google-cloud-go.git`
+
+1. Make changes, commit to your fork.
+
+   Commit messages should follow the
+   [Conventional Commits Style](https://www.conventionalcommits.org). The scope
+   portion should always be filled with the name of the package affected by the
+   changes being made. For example:
+   ```
+   feat(functions): add gophers codelab
+   ```
+
+1. Send a pull request with your changes.
+
+   To minimize friction, consider setting `Allow edits from maintainers` on the
+   PR, which will enable project committers and automation to update your PR.
+
+1. A maintainer will review the pull request and make comments.
+
+   Prefer adding additional commits over amending and force-pushing since it can
+   be difficult to follow code reviews when the commit history changes.
+
+   Commits will be squashed when they're merged.
+=======
 1. Sign one of the contributor license agreements below.
 1. `go get golang.org/x/review/git-codereview` to install the code reviewing
 tool.
@@ -30,6 +78,7 @@ your change in Gerrit.
     detector will cause CI/CD to fail. If your breaking change is acceptable
     in some way, add BREAKING_CHANGE_ACCEPTABLE=<reason> to cause the
     detector not to be run and to make it clear why that is acceptable.
+>>>>>>> cbc9bb05... fixup add vendor back
 
 ## Integration Tests
 

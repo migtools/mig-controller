@@ -189,6 +189,11 @@ type Marshaler interface {
 // prefixed by a varint-encoded length.
 func (p *Buffer) EncodeMessage(pb Message) error {
 	siz := Size(pb)
+<<<<<<< HEAD
+	sizVar := SizeVarint(uint64(siz))
+	p.grow(siz + sizVar)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	p.EncodeVarint(uint64(siz))
 	return p.Marshal(pb)
 }

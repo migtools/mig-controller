@@ -5,11 +5,19 @@ go:
   - 1.9.x
   - 1.10.x
   - 1.11.x
+<<<<<<< HEAD
+  - 1.12.x
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 script:
   - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d .)
   - diff -u <(echo -n) <(golint $(go list -e ./...))
+<<<<<<< HEAD
+  - go tool vet . || go vet .
+=======
   - go tool vet .
+>>>>>>> cbc9bb05... fixup add vendor back
   - go test -v -race ./...
 install:
   - go get golang.org/x/lint/golint

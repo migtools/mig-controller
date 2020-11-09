@@ -326,7 +326,11 @@ func backtrace(s, t []interface{}, p string, i int, j int, matrix [][]int) []Ope
 			return append([]Operation{op}, backtrace(s, t, p, i-1, j-1, matrix)...)
 		}
 
+<<<<<<< HEAD
+		p2, _ := handleValues(s[i-1], t[j-1], makePath(p, i-1), []Operation{})
+=======
 		p2, _ := handleValues(s[j-1], t[j-1], makePath(p, i-1), []Operation{})
+>>>>>>> cbc9bb05... fixup add vendor back
 		return append(p2, backtrace(s, t, p, i-1, j-1, matrix)...)
 	}
 	if i > 0 && j > 0 && matrix[i-1][j-1] == matrix[i][j] {

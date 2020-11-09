@@ -105,7 +105,18 @@ func huffmanDecode(buf *bytes.Buffer, maxLen int, v []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// incomparable is a zero-width, non-comparable type. Adding it to a struct
+// makes that struct also non-comparable, and generally doesn't add
+// any size (as long as it's first).
+type incomparable [0]func()
+
 type node struct {
+	_ incomparable
+
+=======
+type node struct {
+>>>>>>> cbc9bb05... fixup add vendor back
 	// children is non-nil for internal nodes
 	children *[256]*node
 

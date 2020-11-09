@@ -27,7 +27,10 @@ var (
 	_ HTMLRender = HTMLDebug{}
 	_ HTMLRender = HTMLProduction{}
 	_ Render     = YAML{}
+<<<<<<< HEAD
+=======
 	_ Render     = MsgPack{}
+>>>>>>> cbc9bb05... fixup add vendor back
 	_ Render     = Reader{}
 	_ Render     = AsciiJSON{}
 	_ Render     = ProtoBuf{}

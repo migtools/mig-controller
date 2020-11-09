@@ -324,7 +324,10 @@ const (
 	CAP_AUDIT_WRITE                             = 0x1d
 	CAP_BLOCK_SUSPEND                           = 0x24
 	CAP_BPF                                     = 0x27
+<<<<<<< HEAD
+=======
 	CAP_CHECKPOINT_RESTORE                      = 0x28
+>>>>>>> cbc9bb05... fixup add vendor back
 	CAP_CHOWN                                   = 0x0
 	CAP_DAC_OVERRIDE                            = 0x1
 	CAP_DAC_READ_SEARCH                         = 0x2
@@ -333,7 +336,11 @@ const (
 	CAP_IPC_LOCK                                = 0xe
 	CAP_IPC_OWNER                               = 0xf
 	CAP_KILL                                    = 0x5
+<<<<<<< HEAD
+	CAP_LAST_CAP                                = 0x27
+=======
 	CAP_LAST_CAP                                = 0x28
+>>>>>>> cbc9bb05... fixup add vendor back
 	CAP_LEASE                                   = 0x1c
 	CAP_LINUX_IMMUTABLE                         = 0x9
 	CAP_MAC_ADMIN                               = 0x21
@@ -651,8 +658,13 @@ const (
 	FAN_DELETE                                  = 0x200
 	FAN_DELETE_SELF                             = 0x400
 	FAN_DENY                                    = 0x2
+<<<<<<< HEAD
+	FAN_DIR_MODIFY                              = 0x80000
+	FAN_ENABLE_AUDIT                            = 0x40
+=======
 	FAN_ENABLE_AUDIT                            = 0x40
 	FAN_EVENT_INFO_TYPE_DFID                    = 0x3
+>>>>>>> cbc9bb05... fixup add vendor back
 	FAN_EVENT_INFO_TYPE_DFID_NAME               = 0x2
 	FAN_EVENT_INFO_TYPE_FID                     = 0x1
 	FAN_EVENT_METADATA_LEN                      = 0x18
@@ -680,17 +692,24 @@ const (
 	FAN_OPEN_EXEC_PERM                          = 0x40000
 	FAN_OPEN_PERM                               = 0x10000
 	FAN_Q_OVERFLOW                              = 0x4000
+<<<<<<< HEAD
+	FAN_REPORT_FID                              = 0x200
+=======
 	FAN_REPORT_DFID_NAME                        = 0xc00
 	FAN_REPORT_DIR_FID                          = 0x400
 	FAN_REPORT_FID                              = 0x200
 	FAN_REPORT_NAME                             = 0x800
+>>>>>>> cbc9bb05... fixup add vendor back
 	FAN_REPORT_TID                              = 0x100
 	FAN_UNLIMITED_MARKS                         = 0x20
 	FAN_UNLIMITED_QUEUE                         = 0x10
 	FD_CLOEXEC                                  = 0x1
 	FD_SETSIZE                                  = 0x400
 	FF0                                         = 0x0
+<<<<<<< HEAD
+=======
 	FIDEDUPERANGE                               = 0xc0189436
+>>>>>>> cbc9bb05... fixup add vendor back
 	FSCRYPT_KEY_DESCRIPTOR_SIZE                 = 0x8
 	FSCRYPT_KEY_DESC_PREFIX                     = "fscrypt:"
 	FSCRYPT_KEY_DESC_PREFIX_SIZE                = 0x8
@@ -1512,6 +1531,8 @@ const (
 	PARITY_DEFAULT                              = 0x0
 	PARITY_NONE                                 = 0x1
 	PARMRK                                      = 0x8
+<<<<<<< HEAD
+=======
 	PERF_ATTR_SIZE_VER0                         = 0x40
 	PERF_ATTR_SIZE_VER1                         = 0x48
 	PERF_ATTR_SIZE_VER2                         = 0x50
@@ -1598,6 +1619,7 @@ const (
 	PERF_RECORD_MISC_SWITCH_OUT_PREEMPT         = 0x4000
 	PERF_RECORD_MISC_USER                       = 0x2
 	PERF_SAMPLE_BRANCH_PLM_ALL                  = 0x7
+>>>>>>> cbc9bb05... fixup add vendor back
 	PIPEFS_MAGIC                                = 0x50495045
 	PPC_CMM_MAGIC                               = 0xc7571590
 	PPPIOCGNPMODE                               = 0xc008744c
@@ -1984,7 +2006,10 @@ const (
 	RTPROT_EIGRP                                = 0xc0
 	RTPROT_GATED                                = 0x8
 	RTPROT_ISIS                                 = 0xbb
+<<<<<<< HEAD
+=======
 	RTPROT_KEEPALIVED                           = 0x12
+>>>>>>> cbc9bb05... fixup add vendor back
 	RTPROT_KERNEL                               = 0x2
 	RTPROT_MROUTED                              = 0x11
 	RTPROT_MRT                                  = 0xa
@@ -2175,7 +2200,10 @@ const (
 	SO_EE_ORIGIN_TXSTATUS                       = 0x4
 	SO_EE_ORIGIN_TXTIME                         = 0x6
 	SO_EE_ORIGIN_ZEROCOPY                       = 0x5
+<<<<<<< HEAD
+=======
 	SO_EE_RFC4884_FLAG_INVALID                  = 0x1
+>>>>>>> cbc9bb05... fixup add vendor back
 	SO_GET_FILTER                               = 0x1a
 	SO_NO_CHECK                                 = 0xb
 	SO_PEERNAME                                 = 0x1c
@@ -2449,6 +2477,8 @@ const (
 	WCONTINUED                                  = 0x8
 	WDIOC_SETPRETIMEOUT                         = 0xc0045708
 	WDIOC_SETTIMEOUT                            = 0xc0045706
+<<<<<<< HEAD
+=======
 	WDIOF_ALARMONLY                             = 0x400
 	WDIOF_CARDRESET                             = 0x20
 	WDIOF_EXTERN1                               = 0x4
@@ -2466,6 +2496,7 @@ const (
 	WDIOS_ENABLECARD                            = 0x2
 	WDIOS_TEMPPANIC                             = 0x4
 	WDIOS_UNKNOWN                               = -0x1
+>>>>>>> cbc9bb05... fixup add vendor back
 	WEXITED                                     = 0x4
 	WIN_ACKMEDIACHANGE                          = 0xdb
 	WIN_CHECKPOWERMODE1                         = 0xe5

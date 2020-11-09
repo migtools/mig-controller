@@ -106,6 +106,8 @@ func IoctlGetRTCTime(fd int) (*RTCTime, error) {
 	return &value, err
 }
 
+<<<<<<< HEAD
+=======
 // IoctlGetWatchdogInfo fetches information about a watchdog device from the
 // Linux watchdog API. For more information, see:
 // https://www.kernel.org/doc/html/latest/watchdog/watchdog-api.html.
@@ -115,12 +117,15 @@ func IoctlGetWatchdogInfo(fd int) (*WatchdogInfo, error) {
 	return &value, err
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func IoctlGetRTCWkAlrm(fd int) (*RTCWkAlrm, error) {
 	var value RTCWkAlrm
 	err := ioctl(fd, RTC_WKALM_RD, uintptr(unsafe.Pointer(&value)))
 	return &value, err
 }
 
+<<<<<<< HEAD
+=======
 // IoctlFileCloneRange performs an FICLONERANGE ioctl operation to clone the
 // range of data conveyed in value to the file associated with the file
 // descriptor destFd. See the ioctl_ficlonerange(2) man page for details.
@@ -153,6 +158,7 @@ func IoctlWatchdogKeepalive(fd int) error {
 	return ioctl(fd, WDIOC_KEEPALIVE, 0)
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 //sys	Linkat(olddirfd int, oldpath string, newdirfd int, newpath string, flags int) (err error)
 
 func Link(oldpath string, newpath string) (err error) {

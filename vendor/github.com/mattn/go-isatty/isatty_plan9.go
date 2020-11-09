@@ -8,7 +8,11 @@ import (
 
 // IsTerminal returns true if the given file descriptor is a terminal.
 func IsTerminal(fd uintptr) bool {
+<<<<<<< HEAD
+	path, err := syscall.Fd2path(int(fd))
+=======
 	path, err := syscall.Fd2path(fd)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return false
 	}

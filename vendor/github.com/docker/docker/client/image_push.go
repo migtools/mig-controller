@@ -25,6 +25,17 @@ func (cli *Client) ImagePush(ctx context.Context, image string, options types.Im
 		return nil, errors.New("cannot push a digest reference")
 	}
 
+<<<<<<< HEAD
+	name := reference.FamiliarName(ref)
+	query := url.Values{}
+	if !options.All {
+		ref = reference.TagNameOnly(ref)
+		if tagged, ok := ref.(reference.Tagged); ok {
+			query.Set("tag", tagged.Tag())
+		}
+	}
+
+=======
 	tag := ""
 	name := reference.FamiliarName(ref)
 
@@ -35,6 +46,7 @@ func (cli *Client) ImagePush(ctx context.Context, image string, options types.Im
 	query := url.Values{}
 	query.Set("tag", tag)
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	resp, err := cli.tryImagePush(ctx, name, query, options.RegistryAuth)
 	if errdefs.IsUnauthorized(err) && options.PrivilegeFunc != nil {
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()

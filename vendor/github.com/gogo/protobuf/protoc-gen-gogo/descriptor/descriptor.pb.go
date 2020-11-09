@@ -18,7 +18,11 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
+<<<<<<< HEAD
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+=======
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+>>>>>>> cbc9bb05... fixup add vendor back
 
 type FieldDescriptorProto_Type int32
 
@@ -1364,8 +1368,13 @@ type FileOptions struct {
 	// determining the namespace.
 	PhpNamespace *string `protobuf:"bytes,41,opt,name=php_namespace,json=phpNamespace" json:"php_namespace,omitempty"`
 	// Use this option to change the namespace of php generated metadata classes.
+<<<<<<< HEAD
+	// Default is empty. When this option is empty, the proto file name will be
+	// used for determining the namespace.
+=======
 	// Default is empty. When this option is empty, the proto file name will be used
 	// for determining the namespace.
+>>>>>>> cbc9bb05... fixup add vendor back
 	PhpMetadataNamespace *string `protobuf:"bytes,44,opt,name=php_metadata_namespace,json=phpMetadataNamespace" json:"php_metadata_namespace,omitempty"`
 	// Use this option to change the package of ruby generated classes. Default
 	// is empty. When this option is not set, the package name will be used for
@@ -1615,7 +1624,11 @@ type MessageOptions struct {
 	//
 	// Implementations may choose not to generate the map_entry=true message, but
 	// use a native map in the target language to hold the keys and values.
+<<<<<<< HEAD
+	// The reflection APIs in such implementations still need to work as
+=======
 	// The reflection APIs in such implementions still need to work as
+>>>>>>> cbc9bb05... fixup add vendor back
 	// if the field is a repeated message field.
 	//
 	// NOTE: Do not set the option in .proto files. Always use the maps syntax
@@ -2363,7 +2376,11 @@ type SourceCodeInfo struct {
 	//   beginning of the "extend" block and is shared by all extensions within
 	//   the block.
 	// - Just because a location's span is a subset of some other location's span
+<<<<<<< HEAD
+	//   does not mean that it is a descendant.  For example, a "group" defines
+=======
 	//   does not mean that it is a descendent.  For example, a "group" defines
+>>>>>>> cbc9bb05... fixup add vendor back
 	//   both a type and a field in a single declaration.  Thus, the locations
 	//   corresponding to the type and field and their components will overlap.
 	// - Code which tries to interpret locations should probably be designed to

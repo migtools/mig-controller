@@ -3,8 +3,13 @@ package s3
 import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/request"
+<<<<<<< HEAD
+	"github.com/aws/aws-sdk-go/internal/s3shared/arn"
+	"github.com/aws/aws-sdk-go/internal/s3shared/s3err"
+=======
 	"github.com/aws/aws-sdk-go/internal/s3err"
 	"github.com/aws/aws-sdk-go/service/s3/internal/arn"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 func init() {
@@ -69,6 +74,11 @@ type copySourceSSECustomerKeyGetter interface {
 	getCopySourceSSECustomerKey() string
 }
 
+<<<<<<< HEAD
+// endpointARNGetter is an accessor interface to grab the
+// the field corresponding to an endpoint ARN input.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type endpointARNGetter interface {
 	getEndpointARN() (arn.Resource, error)
 	hasEndpointARN() bool

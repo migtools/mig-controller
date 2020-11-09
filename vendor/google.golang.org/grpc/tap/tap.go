@@ -17,7 +17,16 @@
  */
 
 // Package tap defines the function handles which are executed on the transport
+<<<<<<< HEAD
+// layer of gRPC-Go and related information.
+//
+// Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
+=======
 // layer of gRPC-Go and related information. Everything here is EXPERIMENTAL.
+>>>>>>> cbc9bb05... fixup add vendor back
 package tap
 
 import (

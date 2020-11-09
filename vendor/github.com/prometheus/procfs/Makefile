@@ -14,6 +14,10 @@
 include Makefile.common
 
 %/.unpacked: %.ttar
+<<<<<<< HEAD
+	@echo ">> extracting fixtures"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	./ttar -C $(dir $*) -x -f $*.ttar
 	touch $@
 

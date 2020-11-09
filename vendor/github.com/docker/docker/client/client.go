@@ -252,7 +252,12 @@ func (cli *Client) DaemonHost() string {
 
 // HTTPClient returns a copy of the HTTP client bound to the server
 func (cli *Client) HTTPClient() *http.Client {
+<<<<<<< HEAD
+	c := *cli.client
+	return &c
+=======
 	return &*cli.client
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ParseHostURL parses a url string, validates the string is a host url, and

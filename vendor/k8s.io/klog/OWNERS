@@ -1,5 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
+<<<<<<< HEAD
+reviewers:
+  - jayunit100
+  - hoegaarden
+  - andyxning
+  - neolit123
+  - pohly
+  - yagonobre
+  - vincepri
+  - detiber
+=======
 
+>>>>>>> cbc9bb05... fixup add vendor back
 approvers:
   - dims
   - thockin

@@ -9,6 +9,10 @@ message PluginSpec {
 	string remote = 2;
 	repeated PluginPrivilege privileges = 3;
 	bool disabled = 4;
+<<<<<<< HEAD
+	repeated string env = 5;
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // PluginPrivilege describes a permission the user has to accept

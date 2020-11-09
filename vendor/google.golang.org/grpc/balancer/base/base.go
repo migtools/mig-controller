@@ -37,6 +37,24 @@ import (
 
 // PickerBuilder creates balancer.Picker.
 type PickerBuilder interface {
+<<<<<<< HEAD
+	// Build returns a picker that will be used by gRPC to pick a SubConn.
+	Build(info PickerBuildInfo) balancer.Picker
+}
+
+// PickerBuildInfo contains information needed by the picker builder to
+// construct a picker.
+type PickerBuildInfo struct {
+	// ReadySCs is a map from all ready SubConns to the Addresses used to
+	// create them.
+	ReadySCs map[balancer.SubConn]SubConnInfo
+}
+
+// SubConnInfo contains information about a SubConn created by the base
+// balancer.
+type SubConnInfo struct {
+	Address resolver.Address // the address used to create this SubConn
+=======
 	// Build takes a slice of ready SubConns, and returns a picker that will be
 	// used by gRPC to pick a SubConn.
 	Build(readySCs map[resolver.Address]balancer.SubConn) balancer.Picker
@@ -46,6 +64,7 @@ type PickerBuilder interface {
 // built by this builder will use the picker builder to build pickers.
 func NewBalancerBuilder(name string, pb PickerBuilder) balancer.Builder {
 	return NewBalancerBuilderWithConfig(name, pb, Config{})
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Config contains the config info about the base balancer builder.
@@ -54,8 +73,13 @@ type Config struct {
 	HealthCheck bool
 }
 
+<<<<<<< HEAD
+// NewBalancerBuilder returns a base balancer builder configured by the provided config.
+func NewBalancerBuilder(name string, pb PickerBuilder, config Config) balancer.Builder {
+=======
 // NewBalancerBuilderWithConfig returns a base balancer builder configured by the provided config.
 func NewBalancerBuilderWithConfig(name string, pb PickerBuilder, config Config) balancer.Builder {
+>>>>>>> cbc9bb05... fixup add vendor back
 	return &baseBuilder{
 		name:          name,
 		pickerBuilder: pb,

@@ -10,6 +10,10 @@ import (
 	"strings"
 
 	"github.com/containers/image/v5/docker/reference"
+<<<<<<< HEAD
+	"github.com/containers/image/v5/internal/rootless"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"github.com/containers/image/v5/types"
 	"github.com/containers/storage/pkg/homedir"
 	"github.com/ghodss/yaml"
@@ -30,6 +34,15 @@ const builtinRegistriesDirPath = "/etc/containers/registries.d"
 // userRegistriesDirPath is the path to the per user registries.d.
 var userRegistriesDir = filepath.FromSlash(".config/containers/registries.d")
 
+<<<<<<< HEAD
+// defaultUserDockerDir is the default sigstore directory for unprivileged user
+var defaultUserDockerDir = filepath.FromSlash(".local/share/containers/sigstore")
+
+// defaultDockerDir is the default sigstore directory for root
+var defaultDockerDir = "/var/lib/containers/sigstore"
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // registryConfiguration is one of the files in registriesDirPath configuring lookaside locations, or the result of merging them all.
 // NOTE: Keep this in sync with docs/registries.d.md!
 type registryConfiguration struct {
@@ -45,11 +58,26 @@ type registryNamespace struct {
 }
 
 // signatureStorageBase is an "opaque" type representing a lookaside Docker signature storage.
+<<<<<<< HEAD
+// Users outside of this file should use SignatureStorageBaseURL and signatureStorageURL below.
+type signatureStorageBase *url.URL
+
+// SignatureStorageBaseURL reads configuration to find an appropriate signature storage URL for ref, for write access if “write”.
+// the usage of the BaseURL is defined under docker/distribution registries—separate storage of docs/signature-protocols.md
+// Warning: This function only exposes configuration in registries.d;
+// just because this function returns an URL does not mean that the URL will be used by c/image/docker (e.g. if the registry natively supports X-R-S-S).
+func SignatureStorageBaseURL(sys *types.SystemContext, ref types.ImageReference, write bool) (*url.URL, error) {
+	dr, ok := ref.(dockerReference)
+	if !ok {
+		return nil, errors.Errorf("ref must be a dockerReference")
+	}
+=======
 // Users outside of this file should use configuredSignatureStorageBase and signatureStorageURL below.
 type signatureStorageBase *url.URL // The only documented value is nil, meaning storage is not supported.
 
 // configuredSignatureStorageBase reads configuration to find an appropriate signature storage URL for ref, for write access if “write”.
 func configuredSignatureStorageBase(sys *types.SystemContext, ref dockerReference, write bool) (signatureStorageBase, error) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	// FIXME? Loading and parsing the config could be cached across calls.
 	dirPath := registriesDirPath(sys)
 	logrus.Debugf(`Using registries.d directory %s for sigstore configuration`, dirPath)
@@ -58,6 +86,25 @@ func configuredSignatureStorageBase(sys *types.SystemContext, ref dockerReferenc
 		return nil, err
 	}
 
+<<<<<<< HEAD
+	topLevel := config.signatureTopLevel(dr, write)
+	var url *url.URL
+	if topLevel != "" {
+		url, err = url.Parse(topLevel)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid signature storage URL %s", topLevel)
+		}
+	} else {
+		// returns default directory if no sigstore specified in configuration file
+		url = builtinDefaultSignatureStorageDir(rootless.GetRootlessEUID())
+		logrus.Debugf(" No signature storage configuration found for %s, using built-in default %s", dr.PolicyConfigurationIdentity(), url.String())
+	}
+	// NOTE: Keep this in sync with docs/signature-protocols.md!
+	// FIXME? Restrict to explicitly supported schemes?
+	repo := reference.Path(dr.ref) // Note that this is without a tag or digest.
+	if path.Clean(repo) != repo {  // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
+		return nil, errors.Errorf("Unexpected path elements in Docker reference %s for signature storage", dr.ref.String())
+=======
 	topLevel := config.signatureTopLevel(ref, write)
 	if topLevel == "" {
 		return nil, nil
@@ -72,6 +119,7 @@ func configuredSignatureStorageBase(sys *types.SystemContext, ref dockerReferenc
 	repo := reference.Path(ref.ref) // Note that this is without a tag or digest.
 	if path.Clean(repo) != repo {   // Coverage: This should not be reachable because /./ and /../ components are not valid in docker references
 		return nil, errors.Errorf("Unexpected path elements in Docker reference %s for signature storage", ref.ref.String())
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	url.Path = url.Path + "/" + repo
 	return url, nil
@@ -93,6 +141,17 @@ func registriesDirPath(sys *types.SystemContext) string {
 	return systemRegistriesDirPath
 }
 
+<<<<<<< HEAD
+// builtinDefaultSignatureStorageDir returns default signature storage URL as per euid
+func builtinDefaultSignatureStorageDir(euid int) *url.URL {
+	if euid != 0 {
+		return &url.URL{Scheme: "file", Path: filepath.Join(homedir.Get(), defaultUserDockerDir)}
+	}
+	return &url.URL{Scheme: "file", Path: defaultDockerDir}
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // loadAndMergeConfig loads configuration files in dirPath
 func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 	mergedConfig := registryConfiguration{Docker: map[string]registryNamespace{}}
@@ -149,7 +208,11 @@ func loadAndMergeConfig(dirPath string) (*registryConfiguration, error) {
 }
 
 // config.signatureTopLevel returns an URL string configured in config for ref, for write access if “write”.
+<<<<<<< HEAD
+// (the top level of the storage, namespaced by repo.FullName etc.), or "" if nothing has been configured.
+=======
 // (the top level of the storage, namespaced by repo.FullName etc.), or "" if no signature storage should be used.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (config *registryConfiguration) signatureTopLevel(ref dockerReference, write bool) string {
 	if config.Docker != nil {
 		// Look for a full match.
@@ -178,7 +241,10 @@ func (config *registryConfiguration) signatureTopLevel(ref dockerReference, writ
 			return url
 		}
 	}
+<<<<<<< HEAD
+=======
 	logrus.Debugf(" No signature storage configuration found for %s", ref.PolicyConfigurationIdentity())
+>>>>>>> cbc9bb05... fixup add vendor back
 	return ""
 }
 
@@ -196,6 +262,12 @@ func (ns registryNamespace) signatureTopLevel(write bool) string {
 	return ""
 }
 
+<<<<<<< HEAD
+// signatureStorageURL returns an URL usable for accessing signature index in base with known manifestDigest.
+// base is not nil from the caller
+// NOTE: Keep this in sync with docs/signature-protocols.md!
+func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest, index int) *url.URL {
+=======
 // signatureStorageURL returns an URL usable for acessing signature index in base with known manifestDigest, or nil if not applicable.
 // Returns nil iff base == nil.
 // NOTE: Keep this in sync with docs/signature-protocols.md!
@@ -203,6 +275,7 @@ func signatureStorageURL(base signatureStorageBase, manifestDigest digest.Digest
 	if base == nil {
 		return nil
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	url := *base
 	url.Path = fmt.Sprintf("%s@%s=%s/signature-%d", url.Path, manifestDigest.Algorithm(), manifestDigest.Hex(), index+1)
 	return &url

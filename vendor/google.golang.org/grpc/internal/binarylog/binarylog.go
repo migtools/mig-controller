@@ -25,6 +25,10 @@ import (
 	"os"
 
 	"google.golang.org/grpc/grpclog"
+<<<<<<< HEAD
+	"google.golang.org/grpc/internal/grpcutil"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // Logger is the global binary logger. It can be used to get binary logger for
@@ -34,11 +38,20 @@ type Logger interface {
 }
 
 // binLogger is the global binary logger for the binary. One of this should be
+<<<<<<< HEAD
+// built at init time from the configuration (environment variable or flags).
+=======
 // built at init time from the configuration (environment varialbe or flags).
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // It is used to get a methodLogger for each individual method.
 var binLogger Logger
 
+<<<<<<< HEAD
+var grpclogLogger = grpclog.Component("binarylog")
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // SetLogger sets the binarg logger.
 //
 // Only call this at init time.
@@ -98,7 +111,11 @@ func (l *logger) setDefaultMethodLogger(ml *methodLoggerConfig) error {
 // New methodLogger with same service overrides the old one.
 func (l *logger) setServiceMethodLogger(service string, ml *methodLoggerConfig) error {
 	if _, ok := l.services[service]; ok {
+<<<<<<< HEAD
+		return fmt.Errorf("conflicting service rules for service %v found", service)
+=======
 		return fmt.Errorf("conflicting rules for service %v found", service)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if l.services == nil {
 		l.services = make(map[string]*methodLoggerConfig)
@@ -112,10 +129,17 @@ func (l *logger) setServiceMethodLogger(service string, ml *methodLoggerConfig) 
 // New methodLogger with same method overrides the old one.
 func (l *logger) setMethodMethodLogger(method string, ml *methodLoggerConfig) error {
 	if _, ok := l.blacklist[method]; ok {
+<<<<<<< HEAD
+		return fmt.Errorf("conflicting blacklist rules for method %v found", method)
+	}
+	if _, ok := l.methods[method]; ok {
+		return fmt.Errorf("conflicting method rules for method %v found", method)
+=======
 		return fmt.Errorf("conflicting rules for method %v found", method)
 	}
 	if _, ok := l.methods[method]; ok {
 		return fmt.Errorf("conflicting rules for method %v found", method)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if l.methods == nil {
 		l.methods = make(map[string]*methodLoggerConfig)
@@ -127,10 +151,17 @@ func (l *logger) setMethodMethodLogger(method string, ml *methodLoggerConfig) er
 // Set blacklist method for "-service/method".
 func (l *logger) setBlacklist(method string) error {
 	if _, ok := l.blacklist[method]; ok {
+<<<<<<< HEAD
+		return fmt.Errorf("conflicting blacklist rules for method %v found", method)
+	}
+	if _, ok := l.methods[method]; ok {
+		return fmt.Errorf("conflicting method rules for method %v found", method)
+=======
 		return fmt.Errorf("conflicting rules for method %v found", method)
 	}
 	if _, ok := l.methods[method]; ok {
 		return fmt.Errorf("conflicting rules for method %v found", method)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if l.blacklist == nil {
 		l.blacklist = make(map[string]struct{})
@@ -146,9 +177,15 @@ func (l *logger) setBlacklist(method string) error {
 // Each methodLogger returned by this method is a new instance. This is to
 // generate sequence id within the call.
 func (l *logger) getMethodLogger(methodName string) *MethodLogger {
+<<<<<<< HEAD
+	s, m, err := grpcutil.ParseMethod(methodName)
+	if err != nil {
+		grpclogLogger.Infof("binarylogging: failed to parse %q: %v", methodName, err)
+=======
 	s, m, err := parseMethodName(methodName)
 	if err != nil {
 		grpclog.Infof("binarylogging: failed to parse %q: %v", methodName, err)
+>>>>>>> cbc9bb05... fixup add vendor back
 		return nil
 	}
 	if ml, ok := l.methods[s+"/"+m]; ok {

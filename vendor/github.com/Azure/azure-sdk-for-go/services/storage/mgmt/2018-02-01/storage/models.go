@@ -29,6 +29,8 @@ import (
 // The package's fully qualified name.
 const fqdn = "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
 
+<<<<<<< HEAD
+=======
 // AccessTier enumerates the values for access tier.
 type AccessTier string
 
@@ -498,6 +500,7 @@ func PossibleUsageUnitValues() []UsageUnit {
 	return []UsageUnit{Bytes, BytesPerSecond, Count, CountsPerSecond, Percent, Seconds}
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Account the storage account.
 type Account struct {
 	autorest.Response `json:"-"`
@@ -635,8 +638,13 @@ func (a *Account) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// AccountCheckNameAvailabilityParameters the parameters used to check the availability of the storage account
+// name.
+=======
 // AccountCheckNameAvailabilityParameters the parameters used to check the availability of the storage
 // account name.
+>>>>>>> cbc9bb05... fixup add vendor back
 type AccountCheckNameAvailabilityParameters struct {
 	// Name - The storage account name.
 	Name *string `json:"name,omitempty"`
@@ -811,6 +819,21 @@ type AccountProperties struct {
 	IsHnsEnabled *bool `json:"isHnsEnabled,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for AccountProperties.
+func (ap AccountProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if ap.EnableHTTPSTrafficOnly != nil {
+		objectMap["supportsHttpsTrafficOnly"] = ap.EnableHTTPSTrafficOnly
+	}
+	if ap.IsHnsEnabled != nil {
+		objectMap["isHnsEnabled"] = ap.IsHnsEnabled
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // AccountPropertiesCreateParameters the parameters used to create the storage account.
 type AccountPropertiesCreateParameters struct {
 	// CustomDomain - User domain assigned to the storage account. Name is the CNAME source. Only one custom domain is supported per storage account at this time. To clear the existing custom domain, use an empty string for the custom domain name property.
@@ -867,8 +890,12 @@ type AccountSasParameters struct {
 	KeyToSign *string `json:"keyToSign,omitempty"`
 }
 
+<<<<<<< HEAD
+// AccountsCreateFuture an abstraction for monitoring and retrieving the results of a long-running operation.
+=======
 // AccountsCreateFuture an abstraction for monitoring and retrieving the results of a long-running
 // operation.
+>>>>>>> cbc9bb05... fixup add vendor back
 type AccountsCreateFuture struct {
 	azure.Future
 }
@@ -896,8 +923,12 @@ func (future *AccountsCreateFuture) Result(client AccountsClient) (a Account, er
 	return
 }
 
+<<<<<<< HEAD
+// AccountUpdateParameters the parameters that can be provided when updating the storage account properties.
+=======
 // AccountUpdateParameters the parameters that can be provided when updating the storage account
 // properties.
+>>>>>>> cbc9bb05... fixup add vendor back
 type AccountUpdateParameters struct {
 	// Sku - Gets or sets the SKU name. Note that the SKU name cannot be updated to Standard_ZRS or Premium_LRS, nor can accounts of those sku names be updated to any other value.
 	Sku *Sku `json:"sku,omitempty"`
@@ -1169,6 +1200,18 @@ type EncryptionService struct {
 	LastEnabledTime *date.Time `json:"lastEnabledTime,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for EncryptionService.
+func (es EncryptionService) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if es.Enabled != nil {
+		objectMap["enabled"] = es.Enabled
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // EncryptionServices a list of services that support encryption.
 type EncryptionServices struct {
 	// Blob - The encryption function of the blob storage service.
@@ -1181,8 +1224,24 @@ type EncryptionServices struct {
 	Queue *EncryptionService `json:"queue,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for EncryptionServices.
+func (es EncryptionServices) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if es.Blob != nil {
+		objectMap["blob"] = es.Blob
+	}
+	if es.File != nil {
+		objectMap["file"] = es.File
+	}
+	return json.Marshal(objectMap)
+}
+
+// Endpoints the URIs that are used to perform a retrieval of a public blob, queue, table, web or dfs object.
+=======
 // Endpoints the URIs that are used to perform a retrieval of a public blob, queue, table, web or dfs
 // object.
+>>>>>>> cbc9bb05... fixup add vendor back
 type Endpoints struct {
 	// Blob - READ-ONLY; Gets the blob endpoint.
 	Blob *string `json:"blob,omitempty"`
@@ -1208,6 +1267,18 @@ type Identity struct {
 	Type *string `json:"type,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for Identity.
+func (i Identity) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if i.Type != nil {
+		objectMap["type"] = i.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // ImmutabilityPolicy the ImmutabilityPolicy property of a blob container, including Id, resource name,
 // resource type, Etag.
 type ImmutabilityPolicy struct {
@@ -1362,6 +1433,18 @@ type ImmutabilityPolicyProperty struct {
 	State ImmutabilityPolicyState `json:"state,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for ImmutabilityPolicyProperty.
+func (ipp ImmutabilityPolicyProperty) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if ipp.ImmutabilityPeriodSinceCreationInDays != nil {
+		objectMap["immutabilityPeriodSinceCreationInDays"] = ipp.ImmutabilityPeriodSinceCreationInDays
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // IPRule IP rule with specific IP or IP range in CIDR format.
 type IPRule struct {
 	// IPAddressOrRange - Specifies the IP or IP range in CIDR format. Only IPV4 address is allowed.
@@ -1412,6 +1495,18 @@ type LegalHold struct {
 	Tags *[]string `json:"tags,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for LegalHold.
+func (lh LegalHold) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if lh.Tags != nil {
+		objectMap["tags"] = lh.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // LegalHoldProperties the LegalHold property of a blob container.
 type LegalHoldProperties struct {
 	// HasLegalHold - READ-ONLY; The hasLegalHold public property is set to true by SRP if there are at least one existing tag. The hasLegalHold public property is set to false by SRP if all existing legal hold tags are cleared out. There can be a maximum of 1000 blob containers with hasLegalHold=true for a given account.
@@ -1420,6 +1515,18 @@ type LegalHoldProperties struct {
 	Tags *[]TagProperty `json:"tags,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for LegalHoldProperties.
+func (lhp LegalHoldProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if lhp.Tags != nil {
+		objectMap["tags"] = lhp.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // ListAccountSasResponse the List SAS credentials operation response.
 type ListAccountSasResponse struct {
 	autorest.Response `json:"-"`
@@ -1651,8 +1758,13 @@ type OperationDisplay struct {
 	Description *string `json:"description,omitempty"`
 }
 
+<<<<<<< HEAD
+// OperationListResult result of the request to list Storage operations. It contains a list of operations and a
+// URL link to get the next set of results.
+=======
 // OperationListResult result of the request to list Storage operations. It contains a list of operations
 // and a URL link to get the next set of results.
+>>>>>>> cbc9bb05... fixup add vendor back
 type OperationListResult struct {
 	autorest.Response `json:"-"`
 	// Value - List of Storage operations supported by the Storage resource provider.
@@ -1696,6 +1808,18 @@ type Restriction struct {
 	ReasonCode ReasonCode `json:"reasonCode,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for Restriction.
+func (r Restriction) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if r.ReasonCode != "" {
+		objectMap["reasonCode"] = r.ReasonCode
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // ServiceSasParameters the parameters to list service SAS credentials of a specific resource.
 type ServiceSasParameters struct {
 	// CanonicalizedResource - The canonical path to the signed resource.
@@ -1760,6 +1884,21 @@ type Sku struct {
 	Restrictions *[]Restriction `json:"restrictions,omitempty"`
 }
 
+<<<<<<< HEAD
+// MarshalJSON is the custom marshaler for Sku.
+func (s Sku) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if s.Name != "" {
+		objectMap["name"] = s.Name
+	}
+	if s.Restrictions != nil {
+		objectMap["restrictions"] = s.Restrictions
+	}
+	return json.Marshal(objectMap)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // SKUCapability the capability information in the specified sku, including file encryption, network acls,
 // change notification, etc.
 type SKUCapability struct {

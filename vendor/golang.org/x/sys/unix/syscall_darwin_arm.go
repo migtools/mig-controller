@@ -4,7 +4,13 @@
 
 package unix
 
+<<<<<<< HEAD
+import (
+	"syscall"
+)
+=======
 import "syscall"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 func ptrace(request int, pid int, addr uintptr, data uintptr) error {
 	return ENOTSUP

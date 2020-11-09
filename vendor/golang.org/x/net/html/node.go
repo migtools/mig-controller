@@ -18,6 +18,14 @@ const (
 	ElementNode
 	CommentNode
 	DoctypeNode
+<<<<<<< HEAD
+	// RawNode nodes are not returned by the parser, but can be part of the
+	// Node tree passed to func Render to insert raw HTML (without escaping).
+	// If so, this package makes no guarantee that the rendered HTML is secure
+	// (from e.g. Cross Site Scripting attacks) or well-formed.
+	RawNode
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	scopeMarkerNode
 )
 

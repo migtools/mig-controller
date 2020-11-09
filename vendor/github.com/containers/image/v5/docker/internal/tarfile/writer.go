@@ -48,7 +48,11 @@ func NewWriter(dest io.Writer) *Writer {
 }
 
 // lock does some sanity checks and locks the Writer.
+<<<<<<< HEAD
+// If this function succeeds, the caller must call w.unlock.
+=======
 // If this function suceeds, the caller must call w.unlock.
+>>>>>>> cbc9bb05... fixup add vendor back
 // Do not use Writer.mutex directly.
 func (w *Writer) lock() error {
 	w.mutex.Lock()
@@ -67,7 +71,11 @@ func (w *Writer) unlock() {
 
 // tryReusingBlobLocked checks whether the transport already contains, a blob, and if so, returns its metadata.
 // info.Digest must not be empty.
+<<<<<<< HEAD
+// If the blob has been successfully reused, returns (true, info, nil); info must contain at least a digest and size.
+=======
 // If the blob has been succesfully reused, returns (true, info, nil); info must contain at least a digest and size.
+>>>>>>> cbc9bb05... fixup add vendor back
 // If the transport can not reuse the requested blob, tryReusingBlob returns (false, {}, nil); it returns a non-nil error only on an unexpected failure.
 // The caller must have locked the Writer.
 func (w *Writer) tryReusingBlobLocked(info types.BlobInfo) (bool, types.BlobInfo, error) {

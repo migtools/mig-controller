@@ -93,6 +93,8 @@ func (r *legacyLayerWriterWrapper) Close() (err error) {
 			return err
 		}
 	}
+<<<<<<< HEAD
+=======
 
 	// The reapplyDirectoryTimes must be called AFTER we are done with Tombstone
 	// deletion and hard link creation. This is because Tombstone deletion and hard link
@@ -106,6 +108,7 @@ func (r *legacyLayerWriterWrapper) Close() (err error) {
 		return err
 	}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Prepare the utility VM for use if one is present in the layer.
 	if r.HasUtilityVM {
 		err := safefile.EnsureNotReparsePointRelative("UtilityVM", r.destRoot)

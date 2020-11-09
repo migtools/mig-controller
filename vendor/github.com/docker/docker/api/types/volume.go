@@ -27,6 +27,12 @@ type Volume struct {
 	Name string `json:"Name"`
 
 	// The driver specific options used when creating the volume.
+<<<<<<< HEAD
+	// Required: true
+	Options map[string]string `json:"Options"`
+
+	// The level at which the volume exists. Either `global` for cluster-wide, or `local` for machine level.
+=======
 	//
 	// Required: true
 	Options map[string]string `json:"Options"`
@@ -34,6 +40,7 @@ type Volume struct {
 	// The level at which the volume exists. Either `global` for cluster-wide,
 	// or `local` for machine level.
 	//
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Required: true
 	Scope string `json:"Scope"`
 

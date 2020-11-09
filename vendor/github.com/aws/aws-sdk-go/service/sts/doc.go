@@ -3,6 +3,13 @@
 // Package sts provides the client and types for making API
 // requests to AWS Security Token Service.
 //
+<<<<<<< HEAD
+// AWS Security Token Service (STS) enables you to request temporary, limited-privilege
+// credentials for AWS Identity and Access Management (IAM) users or for users
+// that you authenticate (federated users). This guide provides descriptions
+// of the STS API. For more information about using this service, see Temporary
+// Security Credentials (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
+=======
 // The AWS Security Token Service (STS) is a web service that enables you to
 // request temporary, limited-privilege credentials for AWS Identity and Access
 // Management (IAM) users or for users that you authenticate (federated users).
@@ -84,6 +91,7 @@
 //
 // To learn more about CloudTrail, including how to turn it on and find your
 // log files, see the AWS CloudTrail User Guide (https://docs.aws.amazon.com/awscloudtrail/latest/userguide/what_is_cloud_trail_top_level.html).
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // See https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15 for more information on this service.
 //

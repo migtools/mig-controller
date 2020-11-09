@@ -20,6 +20,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+<<<<<<< HEAD
+
+	"github.com/prometheus/procfs/internal/fs"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // Proc provides information about a running process.
@@ -27,7 +32,11 @@ type Proc struct {
 	// The process ID.
 	PID int
 
+<<<<<<< HEAD
+	fs fs.FS
+=======
 	fs FS
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Procs represents a list of Proc structs.
@@ -52,7 +61,11 @@ func NewProc(pid int) (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
+<<<<<<< HEAD
+	return fs.Proc(pid)
+=======
 	return fs.NewProc(pid)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // AllProcs returns a list of all currently available processes under /proc.
@@ -66,6 +79,32 @@ func AllProcs() (Procs, error) {
 
 // Self returns a process for the current process.
 func (fs FS) Self() (Proc, error) {
+<<<<<<< HEAD
+	p, err := os.Readlink(fs.proc.Path("self"))
+	if err != nil {
+		return Proc{}, err
+	}
+	pid, err := strconv.Atoi(strings.Replace(p, string(fs.proc), "", -1))
+	if err != nil {
+		return Proc{}, err
+	}
+	return fs.Proc(pid)
+}
+
+// NewProc returns a process for the given pid.
+//
+// Deprecated: use fs.Proc() instead
+func (fs FS) NewProc(pid int) (Proc, error) {
+	return fs.Proc(pid)
+}
+
+// Proc returns a process for the given pid.
+func (fs FS) Proc(pid int) (Proc, error) {
+	if _, err := os.Stat(fs.proc.Path(strconv.Itoa(pid))); err != nil {
+		return Proc{}, err
+	}
+	return Proc{PID: pid, fs: fs.proc}, nil
+=======
 	p, err := os.Readlink(fs.Path("self"))
 	if err != nil {
 		return Proc{}, err
@@ -83,11 +122,16 @@ func (fs FS) NewProc(pid int) (Proc, error) {
 		return Proc{}, err
 	}
 	return Proc{PID: pid, fs: fs}, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // AllProcs returns a list of all currently available processes.
 func (fs FS) AllProcs() (Procs, error) {
+<<<<<<< HEAD
+	d, err := os.Open(fs.proc.Path())
+=======
 	d, err := os.Open(fs.Path())
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return Procs{}, err
 	}
@@ -104,7 +148,11 @@ func (fs FS) AllProcs() (Procs, error) {
 		if err != nil {
 			continue
 		}
+<<<<<<< HEAD
+		p = append(p, Proc{PID: int(pid), fs: fs.proc})
+=======
 		p = append(p, Proc{PID: int(pid), fs: fs})
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	return p, nil
@@ -238,6 +286,23 @@ func (p Proc) MountStats() ([]*Mount, error) {
 	return parseMountStats(f)
 }
 
+<<<<<<< HEAD
+// MountInfo retrieves mount information for mount points in a
+// process's namespace.
+// It supplies information missing in `/proc/self/mounts` and
+// fixes various other problems with that file too.
+func (p Proc) MountInfo() ([]*MountInfo, error) {
+	f, err := os.Open(p.path("mountinfo"))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return parseMountInfo(f)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (p Proc) fileDescriptors() ([]string, error) {
 	d, err := os.Open(p.path("fd"))
 	if err != nil {

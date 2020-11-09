@@ -10,6 +10,10 @@ import (
 	"html/template"
 	"net/http"
 
+<<<<<<< HEAD
+	"github.com/gin-gonic/gin/internal/bytesconv"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"github.com/gin-gonic/gin/internal/json"
 )
 
@@ -100,8 +104,14 @@ func (r SecureJSON) Render(w http.ResponseWriter) error {
 		return err
 	}
 	// if the jsonBytes is array values
+<<<<<<< HEAD
+	if bytes.HasPrefix(jsonBytes, bytesconv.StringToBytes("[")) && bytes.HasSuffix(jsonBytes,
+		bytesconv.StringToBytes("]")) {
+		_, err = w.Write(bytesconv.StringToBytes(r.Prefix))
+=======
 	if bytes.HasPrefix(jsonBytes, []byte("[")) && bytes.HasSuffix(jsonBytes, []byte("]")) {
 		_, err = w.Write([]byte(r.Prefix))
+>>>>>>> cbc9bb05... fixup add vendor back
 		if err != nil {
 			return err
 		}
@@ -129,11 +139,19 @@ func (r JsonpJSON) Render(w http.ResponseWriter) (err error) {
 	}
 
 	callback := template.JSEscapeString(r.Callback)
+<<<<<<< HEAD
+	_, err = w.Write(bytesconv.StringToBytes(callback))
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(bytesconv.StringToBytes("("))
+=======
 	_, err = w.Write([]byte(callback))
 	if err != nil {
 		return err
 	}
 	_, err = w.Write([]byte("("))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return err
 	}
@@ -141,7 +159,11 @@ func (r JsonpJSON) Render(w http.ResponseWriter) (err error) {
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
+	_, err = w.Write(bytesconv.StringToBytes(");"))
+=======
 	_, err = w.Write([]byte(")"))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return err
 	}
@@ -163,7 +185,11 @@ func (r AsciiJSON) Render(w http.ResponseWriter) (err error) {
 	}
 
 	var buffer bytes.Buffer
+<<<<<<< HEAD
+	for _, r := range bytesconv.BytesToString(ret) {
+=======
 	for _, r := range string(ret) {
+>>>>>>> cbc9bb05... fixup add vendor back
 		cvt := string(r)
 		if r >= 128 {
 			cvt = fmt.Sprintf("\\u%04x", int64(r))

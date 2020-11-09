@@ -16,6 +16,11 @@
  *
  */
 
+<<<<<<< HEAD
+//go:generate ./regenerate.sh
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 /*
 Package grpc implements an RPC system called gRPC.
 

@@ -78,8 +78,13 @@ type SpanningTransformer interface {
 	// considering the error err.
 	//
 	// A nil error means that all input bytes are known to be identical to the
+<<<<<<< HEAD
+	// output produced by the Transformer. A nil error can be returned
+	// regardless of whether atEOF is true. If err is nil, then n must
+=======
 	// output produced by the Transformer. A nil error can be be returned
 	// regardless of whether atEOF is true. If err is nil, then then n must
+>>>>>>> cbc9bb05... fixup add vendor back
 	// equal len(src); the converse is not necessarily true.
 	//
 	// ErrEndOfSpan means that the Transformer output may differ from the
@@ -493,7 +498,11 @@ func (c *chain) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err erro
 	return dstL.n, srcL.p, err
 }
 
+<<<<<<< HEAD
+// Deprecated: Use runes.Remove instead.
+=======
 // Deprecated: use runes.Remove instead.
+>>>>>>> cbc9bb05... fixup add vendor back
 func RemoveFunc(f func(r rune) bool) Transformer {
 	return removeF(f)
 }
@@ -648,7 +657,12 @@ func String(t Transformer, s string) (result string, n int, err error) {
 	// Transform the remaining input, growing dst and src buffers as necessary.
 	for {
 		n := copy(src, s[pSrc:])
+<<<<<<< HEAD
+		atEOF := pSrc+n == len(s)
+		nDst, nSrc, err := t.Transform(dst[pDst:], src[:n], atEOF)
+=======
 		nDst, nSrc, err := t.Transform(dst[pDst:], src[:n], pSrc+n == len(s))
+>>>>>>> cbc9bb05... fixup add vendor back
 		pDst += nDst
 		pSrc += nSrc
 
@@ -659,6 +673,12 @@ func String(t Transformer, s string) (result string, n int, err error) {
 				dst = grow(dst, pDst)
 			}
 		} else if err == ErrShortSrc {
+<<<<<<< HEAD
+			if atEOF {
+				return string(dst[:pDst]), pSrc, err
+			}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 			if nSrc == 0 {
 				src = grow(src, 0)
 			}

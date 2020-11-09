@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+<<<<<<< HEAD
+//go:generate go run gen.go -output tables.go
+=======
 //go:generate go run gen.go gen_common.go -output tables.go
 //go:generate go run gen_index.go
+>>>>>>> cbc9bb05... fixup add vendor back
 
 package language
 
@@ -11,6 +15,12 @@ package language
 // - verifying that tables are dropped correctly (most notably matcher tables).
 
 import (
+<<<<<<< HEAD
+	"strings"
+
+	"golang.org/x/text/internal/language"
+	"golang.org/x/text/internal/language/compact"
+=======
 	"errors"
 	"fmt"
 	"strings"
@@ -28,11 +38,33 @@ const (
 	// maxSimpleUExtensionSize is the maximum size of a -u extension with one
 	// key-type pair. Equals len("-u-") + key (2) + dash + max value (8).
 	maxSimpleUExtensionSize = 14
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // Tag represents a BCP 47 language tag. It is used to specify an instance of a
 // specific language or locale. All language tag values are guaranteed to be
 // well-formed.
+<<<<<<< HEAD
+type Tag compact.Tag
+
+func makeTag(t language.Tag) (tag Tag) {
+	return Tag(compact.Make(t))
+}
+
+func (t *Tag) tag() language.Tag {
+	return (*compact.Tag)(t).Tag()
+}
+
+func (t *Tag) isCompact() bool {
+	return (*compact.Tag)(t).IsCompact()
+}
+
+// TODO: improve performance.
+func (t *Tag) lang() language.Language { return t.tag().LangID }
+func (t *Tag) region() language.Region { return t.tag().RegionID }
+func (t *Tag) script() language.Script { return t.tag().ScriptID }
+
+=======
 type Tag struct {
 	lang   langID
 	region regionID
@@ -52,6 +84,7 @@ type Tag struct {
 	str string
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Make is a convenience wrapper for Parse that omits the error.
 // In case of an error, a sensible default is returned.
 func Make(s string) Tag {
@@ -68,16 +101,24 @@ func (c CanonType) Make(s string) Tag {
 // Raw returns the raw base language, script and region, without making an
 // attempt to infer their values.
 func (t Tag) Raw() (b Base, s Script, r Region) {
+<<<<<<< HEAD
+	tt := t.tag()
+	return Base{tt.LangID}, Script{tt.ScriptID}, Region{tt.RegionID}
+=======
 	return Base{t.lang}, Script{t.script}, Region{t.region}
 }
 
 // equalTags compares language, script and region subtags only.
 func (t Tag) equalTags(a Tag) bool {
 	return t.lang == a.lang && t.script == a.script && t.region == a.region
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // IsRoot returns true if t is equal to language "und".
 func (t Tag) IsRoot() bool {
+<<<<<<< HEAD
+	return compact.Tag(t).IsRoot()
+=======
 	if int(t.pVariant) < len(t.str) {
 		return false
 	}
@@ -87,6 +128,7 @@ func (t Tag) IsRoot() bool {
 // private reports whether the Tag consists solely of a private use tag.
 func (t Tag) private() bool {
 	return t.str != "" && t.pVariant == 0
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // CanonType can be used to enable or disable various types of canonicalization.
@@ -138,19 +180,41 @@ const (
 
 // canonicalize returns the canonicalized equivalent of the tag and
 // whether there was any change.
+<<<<<<< HEAD
+func canonicalize(c CanonType, t language.Tag) (language.Tag, bool) {
+=======
 func (t Tag) canonicalize(c CanonType) (Tag, bool) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	if c == Raw {
 		return t, false
 	}
 	changed := false
 	if c&SuppressScript != 0 {
+<<<<<<< HEAD
+		if t.LangID.SuppressScript() == t.ScriptID {
+			t.ScriptID = 0
+=======
 		if t.lang < langNoIndexOffset && uint8(t.script) == suppressScript[t.lang] {
 			t.script = 0
+>>>>>>> cbc9bb05... fixup add vendor back
 			changed = true
 		}
 	}
 	if c&canonLang != 0 {
 		for {
+<<<<<<< HEAD
+			if l, aliasType := t.LangID.Canonicalize(); l != t.LangID {
+				switch aliasType {
+				case language.Legacy:
+					if c&Legacy != 0 {
+						if t.LangID == _sh && t.ScriptID == 0 {
+							t.ScriptID = _Latn
+						}
+						t.LangID = l
+						changed = true
+					}
+				case language.Macro:
+=======
 			if l, aliasType := normLang(t.lang); l != t.lang {
 				switch aliasType {
 				case langLegacy:
@@ -162,12 +226,30 @@ func (t Tag) canonicalize(c CanonType) (Tag, bool) {
 						changed = true
 					}
 				case langMacro:
+>>>>>>> cbc9bb05... fixup add vendor back
 					if c&Macro != 0 {
 						// We deviate here from CLDR. The mapping "nb" -> "no"
 						// qualifies as a typical Macro language mapping.  However,
 						// for legacy reasons, CLDR maps "no", the macro language
 						// code for Norwegian, to the dominant variant "nb". This
 						// change is currently under consideration for CLDR as well.
+<<<<<<< HEAD
+						// See https://unicode.org/cldr/trac/ticket/2698 and also
+						// https://unicode.org/cldr/trac/ticket/1790 for some of the
+						// practical implications. TODO: this check could be removed
+						// if CLDR adopts this change.
+						if c&CLDR == 0 || t.LangID != _nb {
+							changed = true
+							t.LangID = l
+						}
+					}
+				case language.Deprecated:
+					if c&DeprecatedBase != 0 {
+						if t.LangID == _mo && t.RegionID == 0 {
+							t.RegionID = _MD
+						}
+						t.LangID = l
+=======
 						// See http://unicode.org/cldr/trac/ticket/2698 and also
 						// http://unicode.org/cldr/trac/ticket/1790 for some of the
 						// practical implications. TODO: this check could be removed
@@ -183,19 +265,36 @@ func (t Tag) canonicalize(c CanonType) (Tag, bool) {
 							t.region = _MD
 						}
 						t.lang = l
+>>>>>>> cbc9bb05... fixup add vendor back
 						changed = true
 						// Other canonicalization types may still apply.
 						continue
 					}
 				}
+<<<<<<< HEAD
+			} else if c&Legacy != 0 && t.LangID == _no && c&CLDR != 0 {
+				t.LangID = _nb
+=======
 			} else if c&Legacy != 0 && t.lang == _no && c&CLDR != 0 {
 				t.lang = _nb
+>>>>>>> cbc9bb05... fixup add vendor back
 				changed = true
 			}
 			break
 		}
 	}
 	if c&DeprecatedScript != 0 {
+<<<<<<< HEAD
+		if t.ScriptID == _Qaai {
+			changed = true
+			t.ScriptID = _Zinh
+		}
+	}
+	if c&DeprecatedRegion != 0 {
+		if r := t.RegionID.Canonicalize(); r != t.RegionID {
+			changed = true
+			t.RegionID = r
+=======
 		if t.script == _Qaai {
 			changed = true
 			t.script = _Zinh
@@ -205,6 +304,7 @@ func (t Tag) canonicalize(c CanonType) (Tag, bool) {
 		if r := normRegion(t.region); r != 0 {
 			changed = true
 			t.region = r
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return t, changed
@@ -212,11 +312,28 @@ func (t Tag) canonicalize(c CanonType) (Tag, bool) {
 
 // Canonicalize returns the canonicalized equivalent of the tag.
 func (c CanonType) Canonicalize(t Tag) (Tag, error) {
+<<<<<<< HEAD
+	// First try fast path.
+	if t.isCompact() {
+		if _, changed := canonicalize(c, compact.Tag(t).Tag()); !changed {
+			return t, nil
+		}
+	}
+	// It is unlikely that one will canonicalize a tag after matching. So do
+	// a slow but simple approach here.
+	if tag, changed := canonicalize(c, t.tag()); changed {
+		tag.RemakeString()
+		return makeTag(tag), nil
+	}
+	return t, nil
+
+=======
 	t, changed := t.canonicalize(c)
 	if changed {
 		t.remakeString()
 	}
 	return t, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Confidence indicates the level of certainty for a given return value.
@@ -239,6 +356,11 @@ func (c Confidence) String() string {
 	return confName[c]
 }
 
+<<<<<<< HEAD
+// String returns the canonical string representation of the language tag.
+func (t Tag) String() string {
+	return t.tag().String()
+=======
 // remakeString is used to update t.str in case lang, script or region changed.
 // It is assumed that pExt and pVariant still point to the start of the
 // respective parts.
@@ -297,10 +419,14 @@ func (t Tag) String() string {
 	}
 	buf := [maxCoreSize]byte{}
 	return string(buf[:t.genCoreBytes(buf[:])])
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // MarshalText implements encoding.TextMarshaler.
 func (t Tag) MarshalText() (text []byte, err error) {
+<<<<<<< HEAD
+	return t.tag().MarshalText()
+=======
 	if t.str != "" {
 		text = append(text, t.str...)
 	} else if t.script == 0 && t.region == 0 {
@@ -310,12 +436,19 @@ func (t Tag) MarshalText() (text []byte, err error) {
 		text = buf[:t.genCoreBytes(buf[:])]
 	}
 	return text, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (t *Tag) UnmarshalText(text []byte) error {
+<<<<<<< HEAD
+	var tag language.Tag
+	err := tag.UnmarshalText(text)
+	*t = makeTag(tag)
+=======
 	tag, err := Raw.Parse(string(text))
 	*t = tag
+>>>>>>> cbc9bb05... fixup add vendor back
 	return err
 }
 
@@ -323,6 +456,18 @@ func (t *Tag) UnmarshalText(text []byte) error {
 // unspecified, an attempt will be made to infer it from the context.
 // It uses a variant of CLDR's Add Likely Subtags algorithm. This is subject to change.
 func (t Tag) Base() (Base, Confidence) {
+<<<<<<< HEAD
+	if b := t.lang(); b != 0 {
+		return Base{b}, Exact
+	}
+	tt := t.tag()
+	c := High
+	if tt.ScriptID == 0 && !tt.RegionID.IsCountry() {
+		c = Low
+	}
+	if tag, err := tt.Maximize(); err == nil && tag.LangID != 0 {
+		return Base{tag.LangID}, c
+=======
 	if t.lang != 0 {
 		return Base{t.lang}, Exact
 	}
@@ -332,6 +477,7 @@ func (t Tag) Base() (Base, Confidence) {
 	}
 	if tag, err := addTags(t); err == nil && tag.lang != 0 {
 		return Base{tag.lang}, c
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return Base{0}, No
 }
@@ -344,13 +490,40 @@ func (t Tag) Base() (Base, Confidence) {
 // If a script cannot be inferred (Zzzz, No) is returned. We do not use Zyyy (undetermined)
 // as one would suspect from the IANA registry for BCP 47. In a Unicode context Zyyy marks
 // common characters (like 1, 2, 3, '.', etc.) and is therefore more like multiple scripts.
+<<<<<<< HEAD
+// See https://www.unicode.org/reports/tr24/#Values for more details. Zzzz is also used for
+=======
 // See http://www.unicode.org/reports/tr24/#Values for more details. Zzzz is also used for
+>>>>>>> cbc9bb05... fixup add vendor back
 // unknown value in CLDR.  (Zzzz, Exact) is returned if Zzzz was explicitly specified.
 // Note that an inferred script is never guaranteed to be the correct one. Latin is
 // almost exclusively used for Afrikaans, but Arabic has been used for some texts
 // in the past.  Also, the script that is commonly used may change over time.
 // It uses a variant of CLDR's Add Likely Subtags algorithm. This is subject to change.
 func (t Tag) Script() (Script, Confidence) {
+<<<<<<< HEAD
+	if scr := t.script(); scr != 0 {
+		return Script{scr}, Exact
+	}
+	tt := t.tag()
+	sc, c := language.Script(_Zzzz), No
+	if scr := tt.LangID.SuppressScript(); scr != 0 {
+		// Note: it is not always the case that a language with a suppress
+		// script value is only written in one script (e.g. kk, ms, pa).
+		if tt.RegionID == 0 {
+			return Script{scr}, High
+		}
+		sc, c = scr, High
+	}
+	if tag, err := tt.Maximize(); err == nil {
+		if tag.ScriptID != sc {
+			sc, c = tag.ScriptID, Low
+		}
+	} else {
+		tt, _ = canonicalize(Deprecated|Macro, tt)
+		if tag, err := tt.Maximize(); err == nil && tag.ScriptID != sc {
+			sc, c = tag.ScriptID, Low
+=======
 	if t.script != 0 {
 		return Script{t.script}, Exact
 	}
@@ -373,6 +546,7 @@ func (t Tag) Script() (Script, Confidence) {
 		t, _ = (Deprecated | Macro).Canonicalize(t)
 		if tag, err := addTags(t); err == nil && tag.script != sc {
 			sc, c = tag.script, Low
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return Script{sc}, c
@@ -382,6 +556,18 @@ func (t Tag) Script() (Script, Confidence) {
 // infer a most likely candidate from the context.
 // It uses a variant of CLDR's Add Likely Subtags algorithm. This is subject to change.
 func (t Tag) Region() (Region, Confidence) {
+<<<<<<< HEAD
+	if r := t.region(); r != 0 {
+		return Region{r}, Exact
+	}
+	tt := t.tag()
+	if tt, err := tt.Maximize(); err == nil {
+		return Region{tt.RegionID}, Low // TODO: differentiate between high and low.
+	}
+	tt, _ = canonicalize(Deprecated|Macro, tt)
+	if tag, err := tt.Maximize(); err == nil {
+		return Region{tag.RegionID}, Low
+=======
 	if t.region != 0 {
 		return Region{t.region}, Exact
 	}
@@ -391,10 +577,24 @@ func (t Tag) Region() (Region, Confidence) {
 	t, _ = (Deprecated | Macro).Canonicalize(t)
 	if tag, err := addTags(t); err == nil {
 		return Region{tag.region}, Low
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return Region{_ZZ}, No // TODO: return world instead of undetermined?
 }
 
+<<<<<<< HEAD
+// Variants returns the variants specified explicitly for this language tag.
+// or nil if no variant was specified.
+func (t Tag) Variants() []Variant {
+	if !compact.Tag(t).MayHaveVariants() {
+		return nil
+	}
+	v := []Variant{}
+	x, str := "", t.tag().Variants()
+	for str != "" {
+		x, str = nextToken(str)
+		v = append(v, Variant{x})
+=======
 // Variant returns the variants specified explicitly for this language tag.
 // or nil if no variant was specified.
 func (t Tag) Variants() []Variant {
@@ -404,6 +604,7 @@ func (t Tag) Variants() []Variant {
 			x, str = nextToken(str)
 			v = append(v, Variant{x})
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return v
 }
@@ -411,6 +612,15 @@ func (t Tag) Variants() []Variant {
 // Parent returns the CLDR parent of t. In CLDR, missing fields in data for a
 // specific language are substituted with fields from the parent language.
 // The parent for a language may change for newer versions of CLDR.
+<<<<<<< HEAD
+//
+// Parent returns a tag for a less specific language that is mutually
+// intelligible or Und if there is no such language. This may not be the same as
+// simply stripping the last BCP 47 subtag. For instance, the parent of "zh-TW"
+// is "zh-Hant", and the parent of "zh-Hant" is "und".
+func (t Tag) Parent() Tag {
+	return Tag(compact.Tag(t).Parent())
+=======
 func (t Tag) Parent() Tag {
 	if t.str != "" {
 		// Strip the variants and extensions.
@@ -462,6 +672,7 @@ func (t Tag) Parent() Tag {
 		}
 	}
 	return und
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // returns token t and the rest of the string.
@@ -487,6 +698,10 @@ func (e Extension) String() string {
 
 // ParseExtension parses s as an extension and returns it on success.
 func ParseExtension(s string) (e Extension, err error) {
+<<<<<<< HEAD
+	ext, err := language.ParseExtension(s)
+	return Extension{ext}, err
+=======
 	scan := makeScannerString(s)
 	var end int
 	if n := len(scan.token); n != 1 {
@@ -498,6 +713,7 @@ func ParseExtension(s string) (e Extension, err error) {
 		return Extension{}, errSyntax
 	}
 	return Extension{string(scan.b)}, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Type returns the one-byte extension type of e. It returns 0 for the zero
@@ -518,6 +734,13 @@ func (e Extension) Tokens() []string {
 // false for ok if t does not have the requested extension. The returned
 // extension will be invalid in this case.
 func (t Tag) Extension(x byte) (ext Extension, ok bool) {
+<<<<<<< HEAD
+	if !compact.Tag(t).MayHaveExtensions() {
+		return Extension{}, false
+	}
+	e, ok := t.tag().Extension(x)
+	return Extension{e}, ok
+=======
 	for i := int(t.pExt); i < len(t.str)-1; {
 		var ext string
 		i, ext = getExtension(t.str, i)
@@ -526,14 +749,23 @@ func (t Tag) Extension(x byte) (ext Extension, ok bool) {
 		}
 	}
 	return Extension{}, false
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Extensions returns all extensions of t.
 func (t Tag) Extensions() []Extension {
+<<<<<<< HEAD
+	if !compact.Tag(t).MayHaveExtensions() {
+		return nil
+	}
+	e := []Extension{}
+	for _, ext := range t.tag().Extensions() {
+=======
 	e := []Extension{}
 	for i := int(t.pExt); i < len(t.str)-1; {
 		var ext string
 		i, ext = getExtension(t.str, i)
+>>>>>>> cbc9bb05... fixup add vendor back
 		e = append(e, Extension{ext})
 	}
 	return e
@@ -541,6 +773,43 @@ func (t Tag) Extensions() []Extension {
 
 // TypeForKey returns the type associated with the given key, where key and type
 // are of the allowed values defined for the Unicode locale extension ('u') in
+<<<<<<< HEAD
+// https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
+// TypeForKey will traverse the inheritance chain to get the correct value.
+func (t Tag) TypeForKey(key string) string {
+	if !compact.Tag(t).MayHaveExtensions() {
+		if key != "rg" && key != "va" {
+			return ""
+		}
+	}
+	return t.tag().TypeForKey(key)
+}
+
+// SetTypeForKey returns a new Tag with the key set to type, where key and type
+// are of the allowed values defined for the Unicode locale extension ('u') in
+// https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
+// An empty value removes an existing pair with the same key.
+func (t Tag) SetTypeForKey(key, value string) (Tag, error) {
+	tt, err := t.tag().SetTypeForKey(key, value)
+	return makeTag(tt), err
+}
+
+// NumCompactTags is the number of compact tags. The maximum tag is
+// NumCompactTags-1.
+const NumCompactTags = compact.NumCompactTags
+
+// CompactIndex returns an index, where 0 <= index < NumCompactTags, for tags
+// for which data exists in the text repository.The index will change over time
+// and should not be stored in persistent storage. If t does not match a compact
+// index, exact will be false and the compact index will be returned for the
+// first match after repeatedly taking the Parent of t.
+func CompactIndex(t Tag) (index int, exact bool) {
+	id, exact := compact.LanguageID(compact.Tag(t))
+	return int(id), exact
+}
+
+var root = language.Tag{}
+=======
 // http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // TypeForKey will traverse the inheritance chain to get the correct value.
 func (t Tag) TypeForKey(key string) string {
@@ -748,17 +1017,47 @@ func CompactIndex(t Tag) (index int, ok bool) {
 	x, ok := coreTags[key]
 	return int(x), ok
 }
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // Base is an ISO 639 language code, used for encoding the base language
 // of a language tag.
 type Base struct {
+<<<<<<< HEAD
+	langID language.Language
+=======
 	langID
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ParseBase parses a 2- or 3-letter ISO 639 code.
 // It returns a ValueError if s is a well-formed but unknown language identifier
 // or another error if another error occurred.
 func ParseBase(s string) (Base, error) {
+<<<<<<< HEAD
+	l, err := language.ParseBase(s)
+	return Base{l}, err
+}
+
+// String returns the BCP 47 representation of the base language.
+func (b Base) String() string {
+	return b.langID.String()
+}
+
+// ISO3 returns the ISO 639-3 language code.
+func (b Base) ISO3() string {
+	return b.langID.ISO3()
+}
+
+// IsPrivateUse reports whether this language code is reserved for private use.
+func (b Base) IsPrivateUse() bool {
+	return b.langID.IsPrivateUse()
+}
+
+// Script is a 4-letter ISO 15924 code for representing scripts.
+// It is idiomatically represented in title case.
+type Script struct {
+	scriptID language.Script
+=======
 	if n := len(s); n < 2 || 3 < n {
 		return Base{}, errSyntax
 	}
@@ -771,12 +1070,33 @@ func ParseBase(s string) (Base, error) {
 // It is idiomatically represented in title case.
 type Script struct {
 	scriptID
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ParseScript parses a 4-letter ISO 15924 code.
 // It returns a ValueError if s is a well-formed but unknown script identifier
 // or another error if another error occurred.
 func ParseScript(s string) (Script, error) {
+<<<<<<< HEAD
+	sc, err := language.ParseScript(s)
+	return Script{sc}, err
+}
+
+// String returns the script code in title case.
+// It returns "Zzzz" for an unspecified script.
+func (s Script) String() string {
+	return s.scriptID.String()
+}
+
+// IsPrivateUse reports whether this script code is reserved for private use.
+func (s Script) IsPrivateUse() bool {
+	return s.scriptID.IsPrivateUse()
+}
+
+// Region is an ISO 3166-1 or UN M.49 code for representing countries and regions.
+type Region struct {
+	regionID language.Region
+=======
 	if len(s) != 4 {
 		return Script{}, errSyntax
 	}
@@ -788,12 +1108,17 @@ func ParseScript(s string) (Script, error) {
 // Region is an ISO 3166-1 or UN M.49 code for representing countries and regions.
 type Region struct {
 	regionID
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // EncodeM49 returns the Region for the given UN M.49 code.
 // It returns an error if r is not a valid code.
 func EncodeM49(r int) (Region, error) {
+<<<<<<< HEAD
+	rid, err := language.EncodeM49(r)
+=======
 	rid, err := getRegionM49(r)
+>>>>>>> cbc9bb05... fixup add vendor back
 	return Region{rid}, err
 }
 
@@ -801,6 +1126,42 @@ func EncodeM49(r int) (Region, error) {
 // It returns a ValueError if s is a well-formed but unknown region identifier
 // or another error if another error occurred.
 func ParseRegion(s string) (Region, error) {
+<<<<<<< HEAD
+	r, err := language.ParseRegion(s)
+	return Region{r}, err
+}
+
+// String returns the BCP 47 representation for the region.
+// It returns "ZZ" for an unspecified region.
+func (r Region) String() string {
+	return r.regionID.String()
+}
+
+// ISO3 returns the 3-letter ISO code of r.
+// Note that not all regions have a 3-letter ISO code.
+// In such cases this method returns "ZZZ".
+func (r Region) ISO3() string {
+	return r.regionID.ISO3()
+}
+
+// M49 returns the UN M.49 encoding of r, or 0 if this encoding
+// is not defined for r.
+func (r Region) M49() int {
+	return r.regionID.M49()
+}
+
+// IsPrivateUse reports whether r has the ISO 3166 User-assigned status. This
+// may include private-use tags that are assigned by CLDR and used in this
+// implementation. So IsPrivateUse and IsCountry can be simultaneously true.
+func (r Region) IsPrivateUse() bool {
+	return r.regionID.IsPrivateUse()
+}
+
+// IsCountry returns whether this region is a country or autonomous area. This
+// includes non-standard definitions from CLDR.
+func (r Region) IsCountry() bool {
+	return r.regionID.IsCountry()
+=======
 	if n := len(s); n < 2 || 3 < n {
 		return Region{}, errSyntax
 	}
@@ -816,20 +1177,30 @@ func (r Region) IsCountry() bool {
 		return false
 	}
 	return true
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // IsGroup returns whether this region defines a collection of regions. This
 // includes non-standard definitions from CLDR.
 func (r Region) IsGroup() bool {
+<<<<<<< HEAD
+	return r.regionID.IsGroup()
+=======
 	if r.regionID == 0 {
 		return false
 	}
 	return int(regionInclusion[r.regionID]) < len(regionContainment)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Contains returns whether Region c is contained by Region r. It returns true
 // if c == r.
 func (r Region) Contains(c Region) bool {
+<<<<<<< HEAD
+	return r.regionID.Contains(c.regionID)
+}
+
+=======
 	return r.regionID.contains(c.regionID)
 }
 
@@ -857,6 +1228,7 @@ func (r regionID) contains(c regionID) bool {
 
 var errNoTLD = errors.New("language: region is not a valid ccTLD")
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // TLD returns the country code top-level domain (ccTLD). UK is returned for GB.
 // In all other cases it returns either the region itself or an error.
 //
@@ -865,6 +1237,10 @@ var errNoTLD = errors.New("language: region is not a valid ccTLD")
 // region will already be canonicalized it was obtained from a Tag that was
 // obtained using any of the default methods.
 func (r Region) TLD() (Region, error) {
+<<<<<<< HEAD
+	tld, err := r.regionID.TLD()
+	return Region{tld}, err
+=======
 	// See http://en.wikipedia.org/wiki/Country_code_top-level_domain for the
 	// difference between ISO 3166-1 and IANA ccTLD.
 	if r.regionID == _GB {
@@ -874,16 +1250,21 @@ func (r Region) TLD() (Region, error) {
 		return Region{}, errNoTLD
 	}
 	return r, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Canonicalize returns the region or a possible replacement if the region is
 // deprecated. It will not return a replacement for deprecated regions that
 // are split into multiple regions.
 func (r Region) Canonicalize() Region {
+<<<<<<< HEAD
+	return Region{r.regionID.Canonicalize()}
+=======
 	if cr := normRegion(r.regionID); cr != 0 {
 		return Region{cr}
 	}
 	return r
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Variant represents a registered variant of a language as defined by BCP 47.
@@ -894,11 +1275,16 @@ type Variant struct {
 // ParseVariant parses and returns a Variant. An error is returned if s is not
 // a valid variant.
 func ParseVariant(s string) (Variant, error) {
+<<<<<<< HEAD
+	v, err := language.ParseVariant(s)
+	return Variant{v.String()}, err
+=======
 	s = strings.ToLower(s)
 	if _, ok := variantIndex[s]; ok {
 		return Variant{s}, nil
 	}
 	return Variant{}, mkErrInvalid([]byte(s))
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // String returns the string representation of the variant.

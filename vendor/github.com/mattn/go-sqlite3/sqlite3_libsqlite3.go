@@ -14,5 +14,9 @@ package sqlite3
 #cgo darwin CFLAGS: -I/usr/local/opt/sqlite/include
 #cgo openbsd LDFLAGS: -lsqlite3
 #cgo solaris LDFLAGS: -lsqlite3
+<<<<<<< HEAD
+#cgo windows LDFLAGS: -lsqlite3
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 */
 import "C"

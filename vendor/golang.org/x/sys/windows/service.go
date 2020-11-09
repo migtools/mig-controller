@@ -65,7 +65,10 @@ const (
 	SERVICE_ACCEPT_HARDWAREPROFILECHANGE = 32
 	SERVICE_ACCEPT_POWEREVENT            = 64
 	SERVICE_ACCEPT_SESSIONCHANGE         = 128
+<<<<<<< HEAD
+=======
 	SERVICE_ACCEPT_PRESHUTDOWN           = 256
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	SERVICE_CONTROL_STOP                  = 1
 	SERVICE_CONTROL_PAUSE                 = 2
@@ -81,7 +84,10 @@ const (
 	SERVICE_CONTROL_HARDWAREPROFILECHANGE = 12
 	SERVICE_CONTROL_POWEREVENT            = 13
 	SERVICE_CONTROL_SESSIONCHANGE         = 14
+<<<<<<< HEAD
+=======
 	SERVICE_CONTROL_PRESHUTDOWN           = 15
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	SERVICE_ACTIVE    = 1
 	SERVICE_INACTIVE  = 2

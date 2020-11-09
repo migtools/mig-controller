@@ -232,10 +232,25 @@ type BucketAttrs struct {
 	// ACL is the list of access control rules on the bucket.
 	ACL []ACLRule
 
+<<<<<<< HEAD
+	// BucketPolicyOnly is an alias for UniformBucketLevelAccess. Use of
+	// UniformBucketLevelAccess is recommended above the use of this field.
+	// Setting BucketPolicyOnly.Enabled OR UniformBucketLevelAccess.Enabled to
+	// true, will enable UniformBucketLevelAccess.
+	BucketPolicyOnly BucketPolicyOnly
+
+	// UniformBucketLevelAccess configures access checks to use only bucket-level IAM
+	// policies and ignore any ACL rules for the bucket.
+	// See https://cloud.google.com/storage/docs/uniform-bucket-level-access
+	// for more information.
+	UniformBucketLevelAccess UniformBucketLevelAccess
+
+=======
 	// BucketPolicyOnly configures access checks to use only bucket-level IAM
 	// policies.
 	BucketPolicyOnly BucketPolicyOnly
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	// DefaultObjectACL is the list of access controls to
 	// apply to new objects when no object ACL is provided.
 	DefaultObjectACL []ACLRule
@@ -267,11 +282,18 @@ type BucketAttrs struct {
 
 	// StorageClass is the default storage class of the bucket. This defines
 	// how objects in the bucket are stored and determines the SLA
+<<<<<<< HEAD
+	// and the cost of storage. Typical values are "STANDARD", "NEARLINE",
+	// "COLDLINE" and "ARCHIVE". Defaults to "STANDARD".
+	// See https://cloud.google.com/storage/docs/storage-classes for all
+	// valid values.
+=======
 	// and the cost of storage. Typical values are "MULTI_REGIONAL",
 	// "REGIONAL", "NEARLINE", "COLDLINE", "STANDARD" and
 	// "DURABLE_REDUCED_AVAILABILITY". Defaults to "STANDARD", which
 	// is equivalent to "MULTI_REGIONAL" or "REGIONAL" depending on
 	// the bucket's location settings.
+>>>>>>> cbc9bb05... fixup add vendor back
 	StorageClass string
 
 	// Created is the creation time of the bucket.
@@ -313,11 +335,39 @@ type BucketAttrs struct {
 
 	// The website configuration.
 	Website *BucketWebsite
+<<<<<<< HEAD
+
+	// Etag is the HTTP/1.1 Entity tag for the bucket.
+	// This field is read-only.
+	Etag string
+
+	// LocationType describes how data is stored and replicated.
+	// Typical values are "multi-region", "region" and "dual-region".
+	// This field is read-only.
+	LocationType string
+}
+
+// BucketPolicyOnly is an alias for UniformBucketLevelAccess.
+// Use of UniformBucketLevelAccess is preferred above BucketPolicyOnly.
+type BucketPolicyOnly struct {
+	// Enabled specifies whether access checks use only bucket-level IAM
+	// policies. Enabled may be disabled until the locked time.
+	Enabled bool
+	// LockedTime specifies the deadline for changing Enabled from true to
+	// false.
+	LockedTime time.Time
+}
+
+// UniformBucketLevelAccess configures access checks to use only bucket-level IAM
+// policies.
+type UniformBucketLevelAccess struct {
+=======
 }
 
 // BucketPolicyOnly configures access checks to use only bucket-level IAM
 // policies.
 type BucketPolicyOnly struct {
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Enabled specifies whether access checks use only bucket-level IAM
 	// policies. Enabled may be disabled until the locked time.
 	Enabled bool
@@ -434,8 +484,12 @@ type LifecycleCondition struct {
 	// MatchesStorageClasses is the condition matching the object's storage
 	// class.
 	//
+<<<<<<< HEAD
+	// Values include "STANDARD", "NEARLINE", "COLDLINE" and "ARCHIVE".
+=======
 	// Values include "MULTI_REGIONAL", "REGIONAL", "NEARLINE", "COLDLINE",
 	// "STANDARD", and "DURABLE_REDUCED_AVAILABILITY".
+>>>>>>> cbc9bb05... fixup add vendor back
 	MatchesStorageClasses []string
 
 	// NumNewerVersions is the condition matching objects with a number of newer versions.
@@ -483,6 +537,29 @@ func newBucket(b *raw.Bucket) (*BucketAttrs, error) {
 		return nil, err
 	}
 	return &BucketAttrs{
+<<<<<<< HEAD
+		Name:                     b.Name,
+		Location:                 b.Location,
+		MetaGeneration:           b.Metageneration,
+		DefaultEventBasedHold:    b.DefaultEventBasedHold,
+		StorageClass:             b.StorageClass,
+		Created:                  convertTime(b.TimeCreated),
+		VersioningEnabled:        b.Versioning != nil && b.Versioning.Enabled,
+		ACL:                      toBucketACLRules(b.Acl),
+		DefaultObjectACL:         toObjectACLRules(b.DefaultObjectAcl),
+		Labels:                   b.Labels,
+		RequesterPays:            b.Billing != nil && b.Billing.RequesterPays,
+		Lifecycle:                toLifecycle(b.Lifecycle),
+		RetentionPolicy:          rp,
+		CORS:                     toCORS(b.Cors),
+		Encryption:               toBucketEncryption(b.Encryption),
+		Logging:                  toBucketLogging(b.Logging),
+		Website:                  toBucketWebsite(b.Website),
+		BucketPolicyOnly:         toBucketPolicyOnly(b.IamConfiguration),
+		UniformBucketLevelAccess: toUniformBucketLevelAccess(b.IamConfiguration),
+		Etag:                     b.Etag,
+		LocationType:             b.LocationType,
+=======
 		Name:                  b.Name,
 		Location:              b.Location,
 		MetaGeneration:        b.Metageneration,
@@ -501,6 +578,7 @@ func newBucket(b *raw.Bucket) (*BucketAttrs, error) {
 		Logging:               toBucketLogging(b.Logging),
 		Website:               toBucketWebsite(b.Website),
 		BucketPolicyOnly:      toBucketPolicyOnly(b.IamConfiguration),
+>>>>>>> cbc9bb05... fixup add vendor back
 	}, nil
 }
 
@@ -526,9 +604,15 @@ func (b *BucketAttrs) toRawBucket() *raw.Bucket {
 		bb = &raw.BucketBilling{RequesterPays: true}
 	}
 	var bktIAM *raw.BucketIamConfiguration
+<<<<<<< HEAD
+	if b.UniformBucketLevelAccess.Enabled || b.BucketPolicyOnly.Enabled {
+		bktIAM = &raw.BucketIamConfiguration{
+			UniformBucketLevelAccess: &raw.BucketIamConfigurationUniformBucketLevelAccess{
+=======
 	if b.BucketPolicyOnly.Enabled {
 		bktIAM = &raw.BucketIamConfiguration{
 			BucketPolicyOnly: &raw.BucketIamConfigurationBucketPolicyOnly{
+>>>>>>> cbc9bb05... fixup add vendor back
 				Enabled: true,
 			},
 		}
@@ -595,10 +679,27 @@ type BucketAttrsToUpdate struct {
 	// newly created objects in this bucket.
 	DefaultEventBasedHold optional.Bool
 
+<<<<<<< HEAD
+	// BucketPolicyOnly is an alias for UniformBucketLevelAccess. Use of
+	// UniformBucketLevelAccess is recommended above the use of this field.
+	// Setting BucketPolicyOnly.Enabled OR UniformBucketLevelAccess.Enabled to
+	// true, will enable UniformBucketLevelAccess. If both BucketPolicyOnly and
+	// UniformBucketLevelAccess are set, the value of UniformBucketLevelAccess
+	// will take precedence.
+	BucketPolicyOnly *BucketPolicyOnly
+
+	// UniformBucketLevelAccess configures access checks to use only bucket-level IAM
+	// policies and ignore any ACL rules for the bucket.
+	// See https://cloud.google.com/storage/docs/uniform-bucket-level-access
+	// for more information.
+	UniformBucketLevelAccess *UniformBucketLevelAccess
+
+=======
 	// BucketPolicyOnly configures access checks to use only bucket-level IAM
 	// policies.
 	BucketPolicyOnly *BucketPolicyOnly
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	// If set, updates the retention policy of the bucket. Using
 	// RetentionPolicy.RetentionPeriod = 0 will delete the existing policy.
 	//
@@ -687,8 +788,22 @@ func (ua *BucketAttrsToUpdate) toRawBucket() *raw.Bucket {
 	}
 	if ua.BucketPolicyOnly != nil {
 		rb.IamConfiguration = &raw.BucketIamConfiguration{
+<<<<<<< HEAD
+			UniformBucketLevelAccess: &raw.BucketIamConfigurationUniformBucketLevelAccess{
+				Enabled:         ua.BucketPolicyOnly.Enabled,
+				ForceSendFields: []string{"Enabled"},
+			},
+		}
+	}
+	if ua.UniformBucketLevelAccess != nil {
+		rb.IamConfiguration = &raw.BucketIamConfiguration{
+			UniformBucketLevelAccess: &raw.BucketIamConfigurationUniformBucketLevelAccess{
+				Enabled:         ua.UniformBucketLevelAccess.Enabled,
+				ForceSendFields: []string{"Enabled"},
+=======
 			BucketPolicyOnly: &raw.BucketIamConfigurationBucketPolicyOnly{
 				Enabled: ua.BucketPolicyOnly.Enabled,
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		}
 	}
@@ -702,6 +817,10 @@ func (ua *BucketAttrsToUpdate) toRawBucket() *raw.Bucket {
 	}
 	if ua.Lifecycle != nil {
 		rb.Lifecycle = toRawLifecycle(*ua.Lifecycle)
+<<<<<<< HEAD
+		rb.ForceSendFields = append(rb.ForceSendFields, "Lifecycle")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if ua.Logging != nil {
 		if *ua.Logging == (BucketLogging{}) {
@@ -888,7 +1007,11 @@ func toCORS(rc []*raw.BucketCors) []CORS {
 func toRawLifecycle(l Lifecycle) *raw.BucketLifecycle {
 	var rl raw.BucketLifecycle
 	if len(l.Rules) == 0 {
+<<<<<<< HEAD
+		rl.ForceSendFields = []string{"Rule"}
+=======
 		return nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	for _, r := range l.Rules {
 		rr := &raw.BucketLifecycleRule{
@@ -938,12 +1061,20 @@ func toLifecycle(rl *raw.BucketLifecycle) Lifecycle {
 			},
 		}
 
+<<<<<<< HEAD
+		if rr.Condition.IsLive == nil {
+			r.Condition.Liveness = LiveAndArchived
+		} else if *rr.Condition.IsLive {
+			r.Condition.Liveness = Live
+		} else {
+=======
 		switch {
 		case rr.Condition.IsLive == nil:
 			r.Condition.Liveness = LiveAndArchived
 		case *rr.Condition.IsLive == true:
 			r.Condition.Liveness = Live
 		case *rr.Condition.IsLive == false:
+>>>>>>> cbc9bb05... fixup add vendor back
 			r.Condition.Liveness = Archived
 		}
 
@@ -1027,8 +1158,31 @@ func toBucketPolicyOnly(b *raw.BucketIamConfiguration) BucketPolicyOnly {
 	}
 }
 
+<<<<<<< HEAD
+func toUniformBucketLevelAccess(b *raw.BucketIamConfiguration) UniformBucketLevelAccess {
+	if b == nil || b.UniformBucketLevelAccess == nil || !b.UniformBucketLevelAccess.Enabled {
+		return UniformBucketLevelAccess{}
+	}
+	lt, err := time.Parse(time.RFC3339, b.UniformBucketLevelAccess.LockedTime)
+	if err != nil {
+		return UniformBucketLevelAccess{
+			Enabled: true,
+		}
+	}
+	return UniformBucketLevelAccess{
+		Enabled:    true,
+		LockedTime: lt,
+	}
+}
+
 // Objects returns an iterator over the objects in the bucket that match the Query q.
 // If q is nil, no filtering is done.
+//
+// Note: The returned iterator is not safe for concurrent operations without explicit synchronization.
+=======
+// Objects returns an iterator over the objects in the bucket that match the Query q.
+// If q is nil, no filtering is done.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (b *BucketHandle) Objects(ctx context.Context, q *Query) *ObjectIterator {
 	it := &ObjectIterator{
 		ctx:    ctx,
@@ -1045,6 +1199,11 @@ func (b *BucketHandle) Objects(ctx context.Context, q *Query) *ObjectIterator {
 }
 
 // An ObjectIterator is an iterator over ObjectAttrs.
+<<<<<<< HEAD
+//
+// Note: This iterator is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type ObjectIterator struct {
 	ctx      context.Context
 	bucket   *BucketHandle
@@ -1055,6 +1214,11 @@ type ObjectIterator struct {
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
+<<<<<<< HEAD
+//
+// Note: This method is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (it *ObjectIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
 
 // Next returns the next result. Its second return value is iterator.Done if
@@ -1064,6 +1228,11 @@ func (it *ObjectIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
 // If Query.Delimiter is non-empty, some of the ObjectAttrs returned by Next will
 // have a non-empty Prefix field, and a zero value for all other fields. These
 // represent prefixes.
+<<<<<<< HEAD
+//
+// Note: This method is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (it *ObjectIterator) Next() (*ObjectAttrs, error) {
 	if err := it.nextFunc(); err != nil {
 		return nil, err
@@ -1080,6 +1249,12 @@ func (it *ObjectIterator) fetch(pageSize int, pageToken string) (string, error) 
 	req.Delimiter(it.query.Delimiter)
 	req.Prefix(it.query.Prefix)
 	req.Versions(it.query.Versions)
+<<<<<<< HEAD
+	if len(it.query.fieldSelection) > 0 {
+		req.Fields("nextPageToken", googleapi.Field(it.query.fieldSelection))
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	req.PageToken(pageToken)
 	if it.bucket.userProject != "" {
 		req.UserProject(it.bucket.userProject)
@@ -1112,6 +1287,11 @@ func (it *ObjectIterator) fetch(pageSize int, pageToken string) (string, error) 
 // optionally set the iterator's Prefix field to restrict the list to buckets
 // whose names begin with the prefix. By default, all buckets in the project
 // are returned.
+<<<<<<< HEAD
+//
+// Note: The returned iterator is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *Client) Buckets(ctx context.Context, projectID string) *BucketIterator {
 	it := &BucketIterator{
 		ctx:       ctx,
@@ -1122,10 +1302,19 @@ func (c *Client) Buckets(ctx context.Context, projectID string) *BucketIterator 
 		it.fetch,
 		func() int { return len(it.buckets) },
 		func() interface{} { b := it.buckets; it.buckets = nil; return b })
+<<<<<<< HEAD
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return it
 }
 
 // A BucketIterator is an iterator over BucketAttrs.
+<<<<<<< HEAD
+//
+// Note: This iterator is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type BucketIterator struct {
 	// Prefix restricts the iterator to buckets whose names begin with it.
 	Prefix string
@@ -1141,6 +1330,11 @@ type BucketIterator struct {
 // Next returns the next result. Its second return value is iterator.Done if
 // there are no more results. Once Next returns iterator.Done, all subsequent
 // calls will return iterator.Done.
+<<<<<<< HEAD
+//
+// Note: This method is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (it *BucketIterator) Next() (*BucketAttrs, error) {
 	if err := it.nextFunc(); err != nil {
 		return nil, err
@@ -1151,6 +1345,11 @@ func (it *BucketIterator) Next() (*BucketAttrs, error) {
 }
 
 // PageInfo supports pagination. See the google.golang.org/api/iterator package for details.
+<<<<<<< HEAD
+//
+// Note: This method is not safe for concurrent operations without explicit synchronization.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (it *BucketIterator) PageInfo() *iterator.PageInfo { return it.pageInfo }
 
 func (it *BucketIterator) fetch(pageSize int, pageToken string) (token string, err error) {

@@ -24,6 +24,9 @@
 // holds a value of type syscall.Errno.
 package unix // import "golang.org/x/sys/unix"
 
+<<<<<<< HEAD
+import "strings"
+=======
 import (
 	"bytes"
 	"strings"
@@ -31,6 +34,7 @@ import (
 
 	"golang.org/x/sys/internal/unsafeheader"
 )
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // ByteSliceFromString returns a NUL-terminated slice of bytes
 // containing the text of s. If s contains a NUL byte at any
@@ -55,6 +59,8 @@ func BytePtrFromString(s string) (*byte, error) {
 	return &a[0], nil
 }
 
+<<<<<<< HEAD
+=======
 // ByteSliceToString returns a string form of the text represented by the slice s, with a terminating NUL and any
 // bytes after the NUL removed.
 func ByteSliceToString(s []byte) string {
@@ -90,5 +96,6 @@ func BytePtrToString(p *byte) string {
 	return string(s)
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Single-word zero for use when we need a valid pointer to 0 bytes.
 var _zero uintptr

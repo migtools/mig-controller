@@ -137,6 +137,12 @@ func (enc *jsonEncoder) resetReflectBuf() {
 	if enc.reflectBuf == nil {
 		enc.reflectBuf = bufferpool.Get()
 		enc.reflectEnc = json.NewEncoder(enc.reflectBuf)
+<<<<<<< HEAD
+
+		// For consistency with our custom JSON encoder.
+		enc.reflectEnc.SetEscapeHTML(false)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	} else {
 		enc.reflectBuf.Reset()
 	}

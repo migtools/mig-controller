@@ -17,7 +17,10 @@
 package jose
 
 import (
+<<<<<<< HEAD
+=======
 	"bytes"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/base64"
@@ -78,6 +81,8 @@ func (so *SignerOptions) WithType(typ ContentType) *SignerOptions {
 	return so.WithHeader(HeaderType, typ)
 }
 
+<<<<<<< HEAD
+=======
 // WithCritical adds the given names to the critical ("crit") header and returns
 // the updated SignerOptions.
 func (so *SignerOptions) WithCritical(names ...string) *SignerOptions {
@@ -99,6 +104,7 @@ func (so *SignerOptions) WithBase64(b64 bool) *SignerOptions {
 	return so
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 type payloadSigner interface {
 	signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error)
 }
@@ -255,10 +261,14 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 			if ctx.embedJWK {
 				protected[headerJWK] = recipient.publicKey()
 			} else {
+<<<<<<< HEAD
+				protected[headerKeyID] = recipient.publicKey().KeyID
+=======
 				keyID := recipient.publicKey().KeyID
 				if keyID != "" {
 					protected[headerKeyID] = keyID
 				}
+>>>>>>> cbc9bb05... fixup add vendor back
 			}
 		}
 
@@ -275,6 +285,14 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 		}
 
 		serializedProtected := mustSerializeJSON(protected)
+<<<<<<< HEAD
+
+		input := []byte(fmt.Sprintf("%s.%s",
+			base64.RawURLEncoding.EncodeToString(serializedProtected),
+			base64.RawURLEncoding.EncodeToString(payload)))
+
+		signatureInfo, err := recipient.signer.signPayload(input, recipient.sigAlg)
+=======
 		needsBase64 := true
 
 		if b64, ok := protected[headerB64]; ok {
@@ -295,6 +313,7 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 		}
 
 		signatureInfo, err := recipient.signer.signPayload(input.Bytes(), recipient.sigAlg)
+>>>>>>> cbc9bb05... fixup add vendor back
 		if err != nil {
 			return nil, err
 		}
@@ -363,6 +382,14 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
+	if len(critical) > 0 {
+		// Unsupported crit header
+		return ErrCryptoFailure
+	}
+
+	input := obj.computeAuthData(payload, &signature)
+=======
 
 	for _, name := range critical {
 		if !supportedCritical[name] {
@@ -375,6 +402,7 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 		return ErrCryptoFailure
 	}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	alg := headers.getSignatureAlgorithm()
 	err = verifier.verifyPayload(input, signature.Signature, alg)
 	if err == nil {
@@ -411,13 +439,24 @@ func (obj JSONWebSignature) DetachedVerifyMulti(payload []byte, verificationKey 
 		return -1, Signature{}, err
 	}
 
+<<<<<<< HEAD
+=======
 outer:
+>>>>>>> cbc9bb05... fixup add vendor back
 	for i, signature := range obj.Signatures {
 		headers := signature.mergedHeaders()
 		critical, err := headers.getCritical()
 		if err != nil {
 			continue
 		}
+<<<<<<< HEAD
+		if len(critical) > 0 {
+			// Unsupported crit header
+			continue
+		}
+
+		input := obj.computeAuthData(payload, &signature)
+=======
 
 		for _, name := range critical {
 			if !supportedCritical[name] {
@@ -430,6 +469,7 @@ outer:
 			continue
 		}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 		alg := headers.getSignatureAlgorithm()
 		err = verifier.verifyPayload(input, signature.Signature, alg)
 		if err == nil {

@@ -44,8 +44,11 @@ func Wrap(outer, inner error) error {
 //
 // format is the format of the error message. The string '{{err}}' will
 // be replaced with the original error message.
+<<<<<<< HEAD
+=======
 //
 // Deprecated: Use fmt.Errorf()
+>>>>>>> cbc9bb05... fixup add vendor back
 func Wrapf(format string, err error) error {
 	outerMsg := "<nil>"
 	if err != nil {
@@ -150,9 +153,12 @@ func Walk(err error, cb WalkFunc) {
 		for _, err := range e.WrappedErrors() {
 			Walk(err, cb)
 		}
+<<<<<<< HEAD
+=======
 	case interface{ Unwrap() error }:
 		cb(err)
 		Walk(e.Unwrap(), cb)
+>>>>>>> cbc9bb05... fixup add vendor back
 	default:
 		cb(err)
 	}
@@ -172,7 +178,10 @@ func (w *wrappedError) Error() string {
 func (w *wrappedError) WrappedErrors() []error {
 	return []error{w.Outer, w.Inner}
 }
+<<<<<<< HEAD
+=======
 
 func (w *wrappedError) Unwrap() error {
 	return w.Inner
 }
+>>>>>>> cbc9bb05... fixup add vendor back

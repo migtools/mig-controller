@@ -27,7 +27,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	pb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
+<<<<<<< HEAD
+=======
 	"google.golang.org/grpc/grpclog"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -66,7 +69,11 @@ func newMethodLogger(h, m uint64) *MethodLogger {
 		callID:          idGen.next(),
 		idWithinCallGen: &callIDGenerator{},
 
+<<<<<<< HEAD
+		sink: DefaultSink, // TODO(blog): make it plugable.
+=======
 		sink: defaultSink, // TODO(blog): make it plugable.
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -219,12 +226,20 @@ func (c *ClientMessage) toProto() *pb.GrpcLogEntry {
 	if m, ok := c.Message.(proto.Message); ok {
 		data, err = proto.Marshal(m)
 		if err != nil {
+<<<<<<< HEAD
+			grpclogLogger.Infof("binarylogging: failed to marshal proto message: %v", err)
+=======
 			grpclog.Infof("binarylogging: failed to marshal proto message: %v", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	} else if b, ok := c.Message.([]byte); ok {
 		data = b
 	} else {
+<<<<<<< HEAD
+		grpclogLogger.Infof("binarylogging: message to log is neither proto.message nor []byte")
+=======
 		grpclog.Infof("binarylogging: message to log is neither proto.message nor []byte")
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	ret := &pb.GrpcLogEntry{
 		Type: pb.GrpcLogEntry_EVENT_TYPE_CLIENT_MESSAGE,
@@ -259,12 +274,20 @@ func (c *ServerMessage) toProto() *pb.GrpcLogEntry {
 	if m, ok := c.Message.(proto.Message); ok {
 		data, err = proto.Marshal(m)
 		if err != nil {
+<<<<<<< HEAD
+			grpclogLogger.Infof("binarylogging: failed to marshal proto message: %v", err)
+=======
 			grpclog.Infof("binarylogging: failed to marshal proto message: %v", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	} else if b, ok := c.Message.([]byte); ok {
 		data = b
 	} else {
+<<<<<<< HEAD
+		grpclogLogger.Infof("binarylogging: message to log is neither proto.message nor []byte")
+=======
 		grpclog.Infof("binarylogging: message to log is neither proto.message nor []byte")
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	ret := &pb.GrpcLogEntry{
 		Type: pb.GrpcLogEntry_EVENT_TYPE_SERVER_MESSAGE,
@@ -315,7 +338,11 @@ type ServerTrailer struct {
 func (c *ServerTrailer) toProto() *pb.GrpcLogEntry {
 	st, ok := status.FromError(c.Err)
 	if !ok {
+<<<<<<< HEAD
+		grpclogLogger.Info("binarylogging: error in trailer is not a status error")
+=======
 		grpclog.Info("binarylogging: error in trailer is not a status error")
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	var (
 		detailsBytes []byte
@@ -325,7 +352,11 @@ func (c *ServerTrailer) toProto() *pb.GrpcLogEntry {
 	if stProto != nil && len(stProto.Details) != 0 {
 		detailsBytes, err = proto.Marshal(stProto)
 		if err != nil {
+<<<<<<< HEAD
+			grpclogLogger.Infof("binarylogging: failed to marshal status proto: %v", err)
+=======
 			grpclog.Infof("binarylogging: failed to marshal status proto: %v", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	ret := &pb.GrpcLogEntry{

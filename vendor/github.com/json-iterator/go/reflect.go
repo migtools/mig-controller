@@ -60,6 +60,10 @@ func (b *ctx) append(prefix string) *ctx {
 
 // ReadVal copy the underlying JSON into go interface, same as json.Unmarshal
 func (iter *Iterator) ReadVal(obj interface{}) {
+<<<<<<< HEAD
+	depth := iter.depth
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	cacheKey := reflect2.RTypeOf(obj)
 	decoder := iter.cfg.getDecoderFromCache(cacheKey)
 	if decoder == nil {
@@ -76,6 +80,13 @@ func (iter *Iterator) ReadVal(obj interface{}) {
 		return
 	}
 	decoder.Decode(ptr, iter)
+<<<<<<< HEAD
+	if iter.depth != depth {
+		iter.ReportError("ReadVal", "unexpected mismatched nesting")
+		return
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // WriteVal copy the go interface into underlying JSON, same as json.Marshal

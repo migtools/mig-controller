@@ -41,9 +41,13 @@ const (
 //go:generate go run enumgen/gen.go
 type Cap int
 
+<<<<<<< HEAD
+// POSIX-draft defined capabilities.
+=======
 // POSIX-draft defined capabilities and Linux extensions.
 //
 // Defined in https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
+>>>>>>> cbc9bb05... fixup add vendor back
 const (
 	// In a system with the [_POSIX_CHOWN_RESTRICTED] option defined, this
 	// overrides the restriction of changing file ownership and group
@@ -189,7 +193,10 @@ const (
 	// arbitrary SCSI commands
 	// Allow setting encryption key on loopback filesystem
 	// Allow setting zone reclaim policy
+<<<<<<< HEAD
+=======
 	// Allow everything under CAP_BPF and CAP_PERFMON for backward compatibility
+>>>>>>> cbc9bb05... fixup add vendor back
 	CAP_SYS_ADMIN = Cap(21)
 
 	// Allow use of reboot()
@@ -214,7 +221,10 @@ const (
 	// Allow more than 64hz interrupts from the real-time clock
 	// Override max number of consoles on console allocation
 	// Override max number of keymaps
+<<<<<<< HEAD
+=======
 	// Control memory reclaim behavior
+>>>>>>> cbc9bb05... fixup add vendor back
 	CAP_SYS_RESOURCE = Cap(24)
 
 	// Allow manipulation of system clock
@@ -260,6 +270,10 @@ const (
 	// Allow preventing system suspends
 	CAP_BLOCK_SUSPEND = Cap(36)
 
+<<<<<<< HEAD
+	// Allow reading audit messages from the kernel
+	CAP_AUDIT_READ = Cap(37)
+=======
 	// Allow reading the audit log via multicast netlink socket
 	CAP_AUDIT_READ = Cap(37)
 
@@ -299,6 +313,7 @@ const (
 	// Allow checkpoint/restore related operations.
 	// Introduced in kernel 5.9
 	CAP_CHECKPOINT_RESTORE = Cap(40)
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var (

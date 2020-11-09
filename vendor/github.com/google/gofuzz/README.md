@@ -3,7 +3,11 @@ gofuzz
 
 gofuzz is a library for populating go objects with random values.
 
+<<<<<<< HEAD
+[![GoDoc](https://godoc.org/github.com/google/gofuzz?status.svg)](https://godoc.org/github.com/google/gofuzz)
+=======
 [![GoDoc](https://godoc.org/github.com/google/gofuzz?status.png)](https://godoc.org/github.com/google/gofuzz)
+>>>>>>> cbc9bb05... fixup add vendor back
 [![Travis](https://travis-ci.org/google/gofuzz.svg?branch=master)](https://travis-ci.org/google/gofuzz)
 
 This is useful for testing:

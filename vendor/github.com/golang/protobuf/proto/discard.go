@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+// Copyright 2019 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+=======
 // Go support for Protocol Buffers - Google's data interchange format
 //
 // Copyright 2017 The Go Authors.  All rights reserved.
@@ -28,10 +33,16 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>>>>>>> cbc9bb05... fixup add vendor back
 
 package proto
 
 import (
+<<<<<<< HEAD
+	"google.golang.org/protobuf/reflect/protoreflect"
+)
+
+=======
 	"fmt"
 	"reflect"
 	"strings"
@@ -43,6 +54,7 @@ type generatedDiscarder interface {
 	XXX_DiscardUnknown()
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // DiscardUnknown recursively discards all unknown fields from this message
 // and all embedded messages.
 //
@@ -51,6 +63,46 @@ type generatedDiscarder interface {
 // marshal to be able to produce a message that continues to have those
 // unrecognized fields. To avoid this, DiscardUnknown is used to
 // explicitly clear the unknown fields after unmarshaling.
+<<<<<<< HEAD
+func DiscardUnknown(m Message) {
+	if m != nil {
+		discardUnknown(MessageReflect(m))
+	}
+}
+
+func discardUnknown(m protoreflect.Message) {
+	m.Range(func(fd protoreflect.FieldDescriptor, val protoreflect.Value) bool {
+		switch {
+		// Handle singular message.
+		case fd.Cardinality() != protoreflect.Repeated:
+			if fd.Message() != nil {
+				discardUnknown(m.Get(fd).Message())
+			}
+		// Handle list of messages.
+		case fd.IsList():
+			if fd.Message() != nil {
+				ls := m.Get(fd).List()
+				for i := 0; i < ls.Len(); i++ {
+					discardUnknown(ls.Get(i).Message())
+				}
+			}
+		// Handle map of messages.
+		case fd.IsMap():
+			if fd.MapValue().Message() != nil {
+				ms := m.Get(fd).Map()
+				ms.Range(func(_ protoreflect.MapKey, v protoreflect.Value) bool {
+					discardUnknown(v.Message())
+					return true
+				})
+			}
+		}
+		return true
+	})
+
+	// Discard unknown fields.
+	if len(m.GetUnknown()) > 0 {
+		m.SetUnknown(nil)
+=======
 //
 // For proto2 messages, the unknown fields of message extensions are only
 // discarded from messages that have been accessed via GetExtension.
@@ -346,5 +398,6 @@ func discardLegacy(m Message) {
 				discardLegacy(m)
 			}
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }

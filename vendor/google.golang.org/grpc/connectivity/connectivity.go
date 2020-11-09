@@ -22,11 +22,19 @@
 package connectivity
 
 import (
+<<<<<<< HEAD
+	"google.golang.org/grpc/grpclog"
+)
+
+var logger = grpclog.Component("core")
+
+=======
 	"context"
 
 	"google.golang.org/grpc/grpclog"
 )
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // State indicates the state of connectivity.
 // It can be the state of a ClientConn or SubConn.
 type State int
@@ -44,7 +52,11 @@ func (s State) String() string {
 	case Shutdown:
 		return "SHUTDOWN"
 	default:
+<<<<<<< HEAD
+		logger.Errorf("unknown connectivity state: %d", s)
+=======
 		grpclog.Errorf("unknown connectivity state: %d", s)
+>>>>>>> cbc9bb05... fixup add vendor back
 		return "Invalid-State"
 	}
 }
@@ -61,6 +73,8 @@ const (
 	// Shutdown indicates the ClientConn has started shutting down.
 	Shutdown
 )
+<<<<<<< HEAD
+=======
 
 // Reporter reports the connectivity states.
 type Reporter interface {
@@ -71,3 +85,4 @@ type Reporter interface {
 	// It returns false if <-ctx.Done() can proceed (ctx got timeout or got canceled).
 	WaitForStateChange(context.Context, State) bool
 }
+>>>>>>> cbc9bb05... fixup add vendor back

@@ -183,6 +183,15 @@ static int _sqlite3_limit(sqlite3* db, int limitId, int newLimit) {
   return sqlite3_limit(db, limitId, newLimit);
 #endif
 }
+<<<<<<< HEAD
+
+#if SQLITE_VERSION_NUMBER < 3012000
+static int sqlite3_system_errno(sqlite3 *db) {
+  return 0;
+}
+#endif
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 */
 import "C"
 import (
@@ -198,6 +207,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+<<<<<<< HEAD
+	"syscall"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"time"
 	"unsafe"
 )
@@ -466,7 +479,11 @@ func (c *SQLiteConn) RegisterCollation(name string, cmp func(string, string) int
 	handle := newHandle(c, cmp)
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
+<<<<<<< HEAD
+	rv := C.sqlite3_create_collation(c.db, cname, C.SQLITE_UTF8, handle, (*[0]byte)(unsafe.Pointer(C.compareTrampoline)))
+=======
 	rv := C.sqlite3_create_collation(c.db, cname, C.SQLITE_UTF8, unsafe.Pointer(handle), (*[0]byte)(unsafe.Pointer(C.compareTrampoline)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if rv != C.SQLITE_OK {
 		return c.lastError()
 	}
@@ -484,7 +501,11 @@ func (c *SQLiteConn) RegisterCommitHook(callback func() int) {
 	if callback == nil {
 		C.sqlite3_commit_hook(c.db, nil, nil)
 	} else {
+<<<<<<< HEAD
+		C.sqlite3_commit_hook(c.db, (*[0]byte)(C.commitHookTrampoline), newHandle(c, callback))
+=======
 		C.sqlite3_commit_hook(c.db, (*[0]byte)(C.commitHookTrampoline), unsafe.Pointer(newHandle(c, callback)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -497,7 +518,11 @@ func (c *SQLiteConn) RegisterRollbackHook(callback func()) {
 	if callback == nil {
 		C.sqlite3_rollback_hook(c.db, nil, nil)
 	} else {
+<<<<<<< HEAD
+		C.sqlite3_rollback_hook(c.db, (*[0]byte)(C.rollbackHookTrampoline), newHandle(c, callback))
+=======
 		C.sqlite3_rollback_hook(c.db, (*[0]byte)(C.rollbackHookTrampoline), unsafe.Pointer(newHandle(c, callback)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -514,7 +539,11 @@ func (c *SQLiteConn) RegisterUpdateHook(callback func(int, string, string, int64
 	if callback == nil {
 		C.sqlite3_update_hook(c.db, nil, nil)
 	} else {
+<<<<<<< HEAD
+		C.sqlite3_update_hook(c.db, (*[0]byte)(C.updateHookTrampoline), newHandle(c, callback))
+=======
 		C.sqlite3_update_hook(c.db, (*[0]byte)(C.updateHookTrampoline), unsafe.Pointer(newHandle(c, callback)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -528,7 +557,11 @@ func (c *SQLiteConn) RegisterAuthorizer(callback func(int, string, string, strin
 	if callback == nil {
 		C.sqlite3_set_authorizer(c.db, nil, nil)
 	} else {
+<<<<<<< HEAD
+		C.sqlite3_set_authorizer(c.db, (*[0]byte)(C.authorizerTrampoline), newHandle(c, callback))
+=======
 		C.sqlite3_set_authorizer(c.db, (*[0]byte)(C.authorizerTrampoline), unsafe.Pointer(newHandle(c, callback)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -609,8 +642,13 @@ func (c *SQLiteConn) RegisterFunc(name string, impl interface{}, pure bool) erro
 	return nil
 }
 
+<<<<<<< HEAD
+func sqlite3CreateFunction(db *C.sqlite3, zFunctionName *C.char, nArg C.int, eTextRep C.int, pApp unsafe.Pointer, xFunc unsafe.Pointer, xStep unsafe.Pointer, xFinal unsafe.Pointer) C.int {
+	return C._sqlite3_create_function(db, zFunctionName, nArg, eTextRep, C.uintptr_t(uintptr(pApp)), (*[0]byte)(xFunc), (*[0]byte)(xStep), (*[0]byte)(xFinal))
+=======
 func sqlite3CreateFunction(db *C.sqlite3, zFunctionName *C.char, nArg C.int, eTextRep C.int, pApp uintptr, xFunc unsafe.Pointer, xStep unsafe.Pointer, xFinal unsafe.Pointer) C.int {
 	return C._sqlite3_create_function(db, zFunctionName, nArg, eTextRep, C.uintptr_t(pApp), (*[0]byte)(xFunc), (*[0]byte)(xStep), (*[0]byte)(xFinal))
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // RegisterAggregator makes a Go type available as a SQLite aggregation function.
@@ -749,6 +787,30 @@ func (c *SQLiteConn) lastError() error {
 	return lastError(c.db)
 }
 
+<<<<<<< HEAD
+// Note: may be called with db == nil
+func lastError(db *C.sqlite3) error {
+	rv := C.sqlite3_errcode(db) // returns SQLITE_NOMEM if db == nil
+	if rv == C.SQLITE_OK {
+		return nil
+	}
+	extrv := C.sqlite3_extended_errcode(db)    // returns SQLITE_NOMEM if db == nil
+	errStr := C.GoString(C.sqlite3_errmsg(db)) // returns "out of memory" if db == nil
+
+	// https://www.sqlite.org/c3ref/system_errno.html
+	// sqlite3_system_errno is only meaningful if the error code was SQLITE_CANTOPEN,
+	// or it was SQLITE_IOERR and the extended code was not SQLITE_IOERR_NOMEM
+	var systemErrno syscall.Errno
+	if rv == C.SQLITE_CANTOPEN || (rv == C.SQLITE_IOERR && extrv != C.SQLITE_IOERR_NOMEM) {
+		systemErrno = syscall.Errno(C.sqlite3_system_errno(db))
+	}
+
+	return Error{
+		Code:         ErrNo(rv),
+		ExtendedCode: ErrNoExtended(extrv),
+		SystemErrno:  systemErrno,
+		err:          errStr,
+=======
 func lastError(db *C.sqlite3) error {
 	rv := C.sqlite3_errcode(db)
 	if rv == C.SQLITE_OK {
@@ -758,6 +820,7 @@ func lastError(db *C.sqlite3) error {
 		Code:         ErrNo(rv),
 		ExtendedCode: ErrNoExtended(C.sqlite3_extended_errcode(db)),
 		err:          C.GoString(C.sqlite3_errmsg(db)),
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -782,6 +845,27 @@ func (c *SQLiteConn) exec(ctx context.Context, query string, args []namedValue) 
 		}
 		var res driver.Result
 		if s.(*SQLiteStmt).s != nil {
+<<<<<<< HEAD
+			stmtArgs := make([]namedValue, 0, len(args))
+			na := s.NumInput()
+			if len(args)-start < na {
+				s.Close()
+				return nil, fmt.Errorf("not enough args to execute query: want %d got %d", na, len(args))
+			}
+			// consume the number of arguments used in the current
+			// statement and append all named arguments not
+			// contained therein
+			stmtArgs = append(stmtArgs, args[start:start+na]...)
+			for i := range args {
+				if (i < start || i >= na) && args[i].Name != "" {
+					stmtArgs = append(stmtArgs, args[i])
+				}
+			}
+			for i := range stmtArgs {
+				stmtArgs[i].Ordinal = i + 1
+			}
+			res, err = s.(*SQLiteStmt).exec(ctx, stmtArgs)
+=======
 			na := s.NumInput()
 			if len(args) < na {
 				s.Close()
@@ -791,11 +875,15 @@ func (c *SQLiteConn) exec(ctx context.Context, query string, args []namedValue) 
 				args[i].Ordinal -= start
 			}
 			res, err = s.(*SQLiteStmt).exec(ctx, args[:na])
+>>>>>>> cbc9bb05... fixup add vendor back
 			if err != nil && err != driver.ErrSkip {
 				s.Close()
 				return nil, err
 			}
+<<<<<<< HEAD
+=======
 			args = args[na:]
+>>>>>>> cbc9bb05... fixup add vendor back
 			start += na
 		}
 		tail := s.(*SQLiteStmt).t
@@ -828,12 +916,34 @@ func (c *SQLiteConn) Query(query string, args []driver.Value) (driver.Rows, erro
 func (c *SQLiteConn) query(ctx context.Context, query string, args []namedValue) (driver.Rows, error) {
 	start := 0
 	for {
+<<<<<<< HEAD
+		stmtArgs := make([]namedValue, 0, len(args))
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		s, err := c.prepare(ctx, query)
 		if err != nil {
 			return nil, err
 		}
 		s.(*SQLiteStmt).cls = true
 		na := s.NumInput()
+<<<<<<< HEAD
+		if len(args)-start < na {
+			return nil, fmt.Errorf("not enough args to execute query: want %d got %d", na, len(args)-start)
+		}
+		// consume the number of arguments used in the current
+		// statement and append all named arguments not contained
+		// therein
+		stmtArgs = append(stmtArgs, args[start:start+na]...)
+		for i := range args {
+			if (i < start || i >= na) && args[i].Name != "" {
+				stmtArgs = append(stmtArgs, args[i])
+			}
+		}
+		for i := range stmtArgs {
+			stmtArgs[i].Ordinal = i + 1
+		}
+		rows, err := s.(*SQLiteStmt).query(ctx, stmtArgs)
+=======
 		if len(args) < na {
 			return nil, fmt.Errorf("not enough args to execute query: want %d got %d", na, len(args))
 		}
@@ -841,11 +951,15 @@ func (c *SQLiteConn) query(ctx context.Context, query string, args []namedValue)
 			args[i].Ordinal -= start
 		}
 		rows, err := s.(*SQLiteStmt).query(ctx, args[:na])
+>>>>>>> cbc9bb05... fixup add vendor back
 		if err != nil && err != driver.ErrSkip {
 			s.Close()
 			return rows, err
 		}
+<<<<<<< HEAD
+=======
 		args = args[na:]
+>>>>>>> cbc9bb05... fixup add vendor back
 		start += na
 		tail := s.(*SQLiteStmt).t
 		if tail == "" {
@@ -869,10 +983,13 @@ func (c *SQLiteConn) begin(ctx context.Context) (driver.Tx, error) {
 	return &SQLiteTx{c}, nil
 }
 
+<<<<<<< HEAD
+=======
 func errorString(err Error) string {
 	return C.GoString(C.sqlite3_errstr(C.int(err.Code)))
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Open database and return a new connection.
 //
 // A pragma can take either zero or one argument.
@@ -897,7 +1014,11 @@ func errorString(err Error) string {
 //      - rwc
 //      - memory
 //
+<<<<<<< HEAD
+//   cache
+=======
 //   shared
+>>>>>>> cbc9bb05... fixup add vendor back
 //     SQLite Shared-Cache Mode
 //     https://www.sqlite.org/sharedcache.html
 //     Values:
@@ -1342,10 +1463,20 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 		mutex|C.SQLITE_OPEN_READWRITE|C.SQLITE_OPEN_CREATE,
 		nil)
 	if rv != 0 {
+<<<<<<< HEAD
+		// Save off the error _before_ closing the database.
+		// This is safe even if db is nil.
+		err := lastError(db)
+		if db != nil {
+			C.sqlite3_close_v2(db)
+		}
+		return nil, err
+=======
 		if db != nil {
 			C.sqlite3_close_v2(db)
 		}
 		return nil, Error{Code: ErrNo(rv)}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if db == nil {
 		return nil, errors.New("sqlite succeeded without returning a database")
@@ -1759,11 +1890,14 @@ func (s *SQLiteStmt) NumInput() int {
 	return int(C.sqlite3_bind_parameter_count(s.s))
 }
 
+<<<<<<< HEAD
+=======
 type bindArg struct {
 	n int
 	v driver.Value
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 var placeHolder = []byte{0}
 
 func (s *SQLiteStmt) bind(args []namedValue) error {
@@ -1772,6 +1906,65 @@ func (s *SQLiteStmt) bind(args []namedValue) error {
 		return s.c.lastError()
 	}
 
+<<<<<<< HEAD
+	bindIndices := make([][3]int, len(args))
+	prefixes := []string{":", "@", "$"}
+	for i, v := range args {
+		bindIndices[i][0] = args[i].Ordinal
+		if v.Name != "" {
+			for j := range prefixes {
+				cname := C.CString(prefixes[j] + v.Name)
+				bindIndices[i][j] = int(C.sqlite3_bind_parameter_index(s.s, cname))
+				C.free(unsafe.Pointer(cname))
+			}
+			args[i].Ordinal = bindIndices[i][0]
+		}
+	}
+
+	for i, arg := range args {
+		for j := range bindIndices[i] {
+			if bindIndices[i][j] == 0 {
+				continue
+			}
+			n := C.int(bindIndices[i][j])
+			switch v := arg.Value.(type) {
+			case nil:
+				rv = C.sqlite3_bind_null(s.s, n)
+			case string:
+				if len(v) == 0 {
+					rv = C._sqlite3_bind_text(s.s, n, (*C.char)(unsafe.Pointer(&placeHolder[0])), C.int(0))
+				} else {
+					b := []byte(v)
+					rv = C._sqlite3_bind_text(s.s, n, (*C.char)(unsafe.Pointer(&b[0])), C.int(len(b)))
+				}
+			case int64:
+				rv = C.sqlite3_bind_int64(s.s, n, C.sqlite3_int64(v))
+			case bool:
+				if v {
+					rv = C.sqlite3_bind_int(s.s, n, 1)
+				} else {
+					rv = C.sqlite3_bind_int(s.s, n, 0)
+				}
+			case float64:
+				rv = C.sqlite3_bind_double(s.s, n, C.double(v))
+			case []byte:
+				if v == nil {
+					rv = C.sqlite3_bind_null(s.s, n)
+				} else {
+					ln := len(v)
+					if ln == 0 {
+						v = placeHolder
+					}
+					rv = C._sqlite3_bind_blob(s.s, n, unsafe.Pointer(&v[0]), C.int(ln))
+				}
+			case time.Time:
+				b := []byte(v.Format(SQLiteTimestampFormats[0]))
+				rv = C._sqlite3_bind_text(s.s, n, (*C.char)(unsafe.Pointer(&b[0])), C.int(len(b)))
+			}
+			if rv != C.SQLITE_OK {
+				return s.c.lastError()
+			}
+=======
 	for i, v := range args {
 		if v.Name != "" {
 			cname := C.CString(":" + v.Name)
@@ -1818,6 +2011,7 @@ func (s *SQLiteStmt) bind(args []namedValue) error {
 		}
 		if rv != C.SQLITE_OK {
 			return s.c.lastError()
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return nil
@@ -1875,6 +2069,17 @@ func (s *SQLiteStmt) Exec(args []driver.Value) (driver.Result, error) {
 	return s.exec(context.Background(), list)
 }
 
+<<<<<<< HEAD
+func isInterruptErr(err error) bool {
+	sqliteErr, ok := err.(Error)
+	if ok {
+		return sqliteErr.Code == ErrInterrupt
+	}
+	return false
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // exec executes a query that doesn't return rows. Attempts to honor context timeout.
 func (s *SQLiteStmt) exec(ctx context.Context, args []namedValue) (driver.Result, error) {
 	if ctx.Done() == nil {
@@ -1890,6 +2095,24 @@ func (s *SQLiteStmt) exec(ctx context.Context, args []namedValue) (driver.Result
 		r, err := s.execSync(args)
 		resultCh <- result{r, err}
 	}()
+<<<<<<< HEAD
+	var rv result
+	select {
+	case rv = <-resultCh:
+	case <-ctx.Done():
+		select {
+		case rv = <-resultCh: // no need to interrupt, operation completed in db
+		default:
+			// this is still racy and can be no-op if executed between sqlite3_* calls in execSync.
+			C.sqlite3_interrupt(s.c.db)
+			rv = <-resultCh // wait for goroutine completed
+			if isInterruptErr(rv.err) {
+				return nil, ctx.Err()
+			}
+		}
+	}
+	return rv.r, rv.err
+=======
 	select {
 	case rv := <- resultCh:
 		return rv.r, rv.err
@@ -1903,6 +2126,7 @@ func (s *SQLiteStmt) exec(ctx context.Context, args []namedValue) (driver.Result
 		}
 		return nil, ctx.Err()
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (s *SQLiteStmt) execSync(args []namedValue) (driver.Result, error) {
@@ -1992,7 +2216,11 @@ func (rc *SQLiteRows) Next(dest []driver.Value) error {
 		resultCh <- rc.nextSyncLocked(dest)
 	}()
 	select {
+<<<<<<< HEAD
+	case err := <-resultCh:
+=======
 	case err := <- resultCh:
+>>>>>>> cbc9bb05... fixup add vendor back
 		return err
 	case <-rc.ctx.Done():
 		select {

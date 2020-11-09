@@ -249,6 +249,13 @@ type mapEncoder struct {
 }
 
 func (encoder *mapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
+<<<<<<< HEAD
+	if *(*unsafe.Pointer)(ptr) == nil {
+		stream.WriteNil()
+		return
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	stream.WriteObjectStart()
 	iter := encoder.mapType.UnsafeIterate(ptr)
 	for i := 0; iter.HasNext(); i++ {
@@ -286,16 +293,29 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteObjectStart()
 	mapIter := encoder.mapType.UnsafeIterate(ptr)
 	subStream := stream.cfg.BorrowStream(nil)
+<<<<<<< HEAD
+	subStream.Attachment = stream.Attachment
+	subIter := stream.cfg.BorrowIterator(nil)
+	keyValues := encodedKeyValues{}
+	for mapIter.HasNext() {
+		key, elem := mapIter.UnsafeNext()
+		subStreamIndex := subStream.Buffered()
+=======
 	subIter := stream.cfg.BorrowIterator(nil)
 	keyValues := encodedKeyValues{}
 	for mapIter.HasNext() {
 		subStream.buf = make([]byte, 0, 64)
 		key, elem := mapIter.UnsafeNext()
+>>>>>>> cbc9bb05... fixup add vendor back
 		encoder.keyEncoder.Encode(key, subStream)
 		if subStream.Error != nil && subStream.Error != io.EOF && stream.Error == nil {
 			stream.Error = subStream.Error
 		}
+<<<<<<< HEAD
+		encodedKey := subStream.Buffer()[subStreamIndex:]
+=======
 		encodedKey := subStream.Buffer()
+>>>>>>> cbc9bb05... fixup add vendor back
 		subIter.ResetBytes(encodedKey)
 		decodedKey := subIter.ReadString()
 		if stream.indention > 0 {
@@ -306,7 +326,11 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 		encoder.elemEncoder.Encode(elem, subStream)
 		keyValues = append(keyValues, encodedKV{
 			key:      decodedKey,
+<<<<<<< HEAD
+			keyValue: subStream.Buffer()[subStreamIndex:],
+=======
 			keyValue: subStream.Buffer(),
+>>>>>>> cbc9bb05... fixup add vendor back
 		})
 	}
 	sort.Sort(keyValues)
@@ -316,6 +340,12 @@ func (encoder *sortKeysMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 		}
 		stream.Write(keyValue.keyValue)
 	}
+<<<<<<< HEAD
+	if subStream.Error != nil && stream.Error == nil {
+		stream.Error = subStream.Error
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	stream.WriteObjectEnd()
 	stream.cfg.ReturnStream(subStream)
 	stream.cfg.ReturnIterator(subIter)

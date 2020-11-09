@@ -1,8 +1,13 @@
 language: go
 
 go:
+<<<<<<< HEAD
+  - 1.8
+  - 1.7
+=======
   - 1.14
   - 1.13
+>>>>>>> cbc9bb05... fixup add vendor back
 
 install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
@@ -11,9 +16,12 @@ install:
 script:
   - go get
   - go test -cover ./...
+<<<<<<< HEAD
+=======
   - cd ./v5
   - go get
   - go test -cover ./...
+>>>>>>> cbc9bb05... fixup add vendor back
 
 notifications:
   email: false

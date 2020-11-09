@@ -26,7 +26,10 @@ import (
 //sys hcsResumeComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) = vmcompute.HcsResumeComputeSystem?
 //sys hcsGetComputeSystemProperties(computeSystem HcsSystem, propertyQuery string, properties **uint16, result **uint16) (hr error) = vmcompute.HcsGetComputeSystemProperties?
 //sys hcsModifyComputeSystem(computeSystem HcsSystem, configuration string, result **uint16) (hr error) = vmcompute.HcsModifyComputeSystem?
+<<<<<<< HEAD
+=======
 //sys hcsModifyServiceSettings(settings string, result **uint16) (hr error) = vmcompute.HcsModifyServiceSettings?
+>>>>>>> cbc9bb05... fixup add vendor back
 //sys hcsRegisterComputeSystemCallback(computeSystem HcsSystem, callback uintptr, context uintptr, callbackHandle *HcsCallback) (hr error) = vmcompute.HcsRegisterComputeSystemCallback?
 //sys hcsUnregisterComputeSystemCallback(callbackHandle HcsCallback) (hr error) = vmcompute.HcsUnregisterComputeSystemCallback?
 
@@ -338,6 +341,8 @@ func HcsModifyComputeSystem(ctx gcontext.Context, computeSystem HcsSystem, confi
 	})
 }
 
+<<<<<<< HEAD
+=======
 func HcsModifyServiceSettings(ctx gcontext.Context, settings string) (result string, hr error) {
 	ctx, span := trace.StartSpan(ctx, "HcsModifyServiceSettings")
 	defer span.End()
@@ -359,6 +364,7 @@ func HcsModifyServiceSettings(ctx gcontext.Context, settings string) (result str
 	})
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func HcsRegisterComputeSystemCallback(ctx gcontext.Context, computeSystem HcsSystem, callback uintptr, context uintptr) (callbackHandle HcsCallback, hr error) {
 	ctx, span := trace.StartSpan(ctx, "HcsRegisterComputeSystemCallback")
 	defer span.End()

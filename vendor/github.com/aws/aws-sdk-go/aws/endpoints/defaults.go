@@ -292,6 +292,10 @@ var awsPartition = partition{
 				Protocols: []string{"https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -301,6 +305,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -347,6 +355,11 @@ var awsPartition = partition{
 				Protocols: []string{"https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+				"ap-east-1":      endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
 				"ap-south-1":     endpoint{},
@@ -355,9 +368,17 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
+				"me-south-1":     endpoint{},
+=======
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+				"eu-west-3":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 				"sa-east-1":      endpoint{},
 				"us-east-1":      endpoint{},
 				"us-east-2":      endpoint{},
@@ -587,6 +608,10 @@ var awsPartition = partition{
 		"api.sagemaker": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -596,6 +621,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -656,6 +685,29 @@ var awsPartition = partition{
 				"us-west-2":      endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"appflow": service{
+
+			Endpoints: endpoints{
+				"ap-northeast-1": endpoint{},
+				"ap-northeast-2": endpoint{},
+				"ap-south-1":     endpoint{},
+				"ap-southeast-1": endpoint{},
+				"ap-southeast-2": endpoint{},
+				"ca-central-1":   endpoint{},
+				"eu-central-1":   endpoint{},
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+				"eu-west-3":      endpoint{},
+				"sa-east-1":      endpoint{},
+				"us-east-1":      endpoint{},
+				"us-east-2":      endpoint{},
+				"us-west-1":      endpoint{},
+				"us-west-2":      endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"application-autoscaling": service{
 			Defaults: endpoint{
 				Protocols: []string{"http", "https"},
@@ -695,6 +747,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -765,6 +821,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -808,6 +868,10 @@ var awsPartition = partition{
 				Protocols: []string{"http", "https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -817,6 +881,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -831,6 +899,10 @@ var awsPartition = partition{
 		"backup": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -840,6 +912,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -1178,6 +1254,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -1225,6 +1305,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -1988,6 +2072,64 @@ var awsPartition = partition{
 				},
 			},
 		},
+<<<<<<< HEAD
+		"ebs": service{
+
+			Endpoints: endpoints{
+				"af-south-1":     endpoint{},
+				"ap-east-1":      endpoint{},
+				"ap-northeast-1": endpoint{},
+				"ap-northeast-2": endpoint{},
+				"ap-south-1":     endpoint{},
+				"ap-southeast-1": endpoint{},
+				"ap-southeast-2": endpoint{},
+				"ca-central-1":   endpoint{},
+				"eu-central-1":   endpoint{},
+				"eu-north-1":     endpoint{},
+				"eu-south-1":     endpoint{},
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+				"eu-west-3":      endpoint{},
+				"fips-ca-central-1": endpoint{
+					Hostname: "ebs-fips.ca-central-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ca-central-1",
+					},
+				},
+				"fips-us-east-1": endpoint{
+					Hostname: "ebs-fips.us-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-1",
+					},
+				},
+				"fips-us-east-2": endpoint{
+					Hostname: "ebs-fips.us-east-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-2",
+					},
+				},
+				"fips-us-west-1": endpoint{
+					Hostname: "ebs-fips.us-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-1",
+					},
+				},
+				"fips-us-west-2": endpoint{
+					Hostname: "ebs-fips.us-west-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-2",
+					},
+				},
+				"me-south-1": endpoint{},
+				"sa-east-1":  endpoint{},
+				"us-east-1":  endpoint{},
+				"us-east-2":  endpoint{},
+				"us-west-1":  endpoint{},
+				"us-west-2":  endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"ec2": service{
 			Defaults: endpoint{
 				Protocols: []string{"http", "https"},
@@ -2136,6 +2278,15 @@ var awsPartition = partition{
 						Region: "us-east-2",
 					},
 				},
+<<<<<<< HEAD
+				"fips-us-west-1": endpoint{
+					Hostname: "fips.eks.us-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-us-west-2": endpoint{
 					Hostname: "fips.eks.us-west-2.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -2146,6 +2297,10 @@ var awsPartition = partition{
 				"sa-east-1":  endpoint{},
 				"us-east-1":  endpoint{},
 				"us-east-2":  endpoint{},
+<<<<<<< HEAD
+				"us-west-1":  endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-west-2":  endpoint{},
 			},
 		},
@@ -2655,6 +2810,10 @@ var awsPartition = partition{
 				Protocols: []string{"https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -2664,6 +2823,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -2905,6 +3068,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -2962,6 +3129,10 @@ var awsPartition = partition{
 		"groundstation": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-southeast-2": endpoint{},
 				"eu-north-1":     endpoint{},
 				"eu-west-1":      endpoint{},
@@ -3037,7 +3208,16 @@ var awsPartition = partition{
 		"health": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-east-2": endpoint{
+					Hostname: "health-fips.us-east-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-2",
+					},
+				},
+=======
 				"us-east-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"honeycode": service{
@@ -3068,6 +3248,12 @@ var awsPartition = partition{
 		"identitystore": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"ap-northeast-1": endpoint{},
+				"ap-northeast-2": endpoint{},
+				"ap-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-southeast-1": endpoint{},
 				"ap-southeast-2": endpoint{},
 				"ca-central-1":   endpoint{},
@@ -3378,6 +3564,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -3385,6 +3575,10 @@ var awsPartition = partition{
 				"sa-east-1":      endpoint{},
 				"us-east-1":      endpoint{},
 				"us-east-2":      endpoint{},
+<<<<<<< HEAD
+				"us-west-1":      endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-west-2":      endpoint{},
 			},
 		},
@@ -3444,6 +3638,41 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+				"eu-west-3":      endpoint{},
+				"fips-us-east-1": endpoint{
+					Hostname: "lakeformation-fips.us-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-1",
+					},
+				},
+				"fips-us-east-2": endpoint{
+					Hostname: "lakeformation-fips.us-east-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-2",
+					},
+				},
+				"fips-us-west-1": endpoint{
+					Hostname: "lakeformation-fips.us-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-1",
+					},
+				},
+				"fips-us-west-2": endpoint{
+					Hostname: "lakeformation-fips.us-west-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-2",
+					},
+				},
+				"sa-east-1": endpoint{},
+				"us-east-1": endpoint{},
+				"us-east-2": endpoint{},
+				"us-west-1": endpoint{},
+				"us-west-2": endpoint{},
+=======
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -3452,6 +3681,7 @@ var awsPartition = partition{
 				"us-east-2":      endpoint{},
 				"us-west-1":      endpoint{},
 				"us-west-2":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"lambda": service{
@@ -3698,6 +3928,10 @@ var awsPartition = partition{
 				"ap-northeast-2": endpoint{},
 				"ap-southeast-1": endpoint{},
 				"eu-west-1":      endpoint{},
+<<<<<<< HEAD
+				"eu-west-2":      endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-east-1":      endpoint{},
 			},
 		},
@@ -3976,6 +4210,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -4137,6 +4375,27 @@ var awsPartition = partition{
 		"oidc": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"ap-northeast-1": endpoint{
+					Hostname: "oidc.ap-northeast-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ap-northeast-1",
+					},
+				},
+				"ap-northeast-2": endpoint{
+					Hostname: "oidc.ap-northeast-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ap-northeast-2",
+					},
+				},
+				"ap-south-1": endpoint{
+					Hostname: "oidc.ap-south-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ap-south-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-southeast-1": endpoint{
 					Hostname: "oidc.ap-southeast-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -4314,11 +4573,23 @@ var awsPartition = partition{
 				},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"ap-northeast-1": endpoint{},
+				"ap-northeast-2": endpoint{},
+				"ap-south-1":     endpoint{},
+				"ap-southeast-1": endpoint{},
+				"ap-southeast-2": endpoint{},
+				"ca-central-1":   endpoint{},
+				"eu-central-1":   endpoint{},
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+=======
 				"ap-northeast-2": endpoint{},
 				"ap-south-1":     endpoint{},
 				"ap-southeast-2": endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-west-1":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-us-east-1": endpoint{
 					Hostname: "pinpoint-fips.us-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -4622,9 +4893,22 @@ var awsPartition = partition{
 				"ap-south-1":     endpoint{},
 				"ap-southeast-1": endpoint{},
 				"ap-southeast-2": endpoint{},
+<<<<<<< HEAD
+				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
+				"rekognition-fips.ca-central-1": endpoint{
+					Hostname: "rekognition-fips.ca-central-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ca-central-1",
+					},
+				},
+=======
+				"eu-central-1":   endpoint{},
+				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 				"rekognition-fips.us-east-1": endpoint{
 					Hostname: "rekognition-fips.us-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -4727,6 +5011,15 @@ var awsPartition = partition{
 						Region: "us-east-1",
 					},
 				},
+<<<<<<< HEAD
+				"fips-aws-global": endpoint{
+					Hostname: "route53-fips.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"route53domains": service{
@@ -4782,6 +5075,10 @@ var awsPartition = partition{
 		"runtime.sagemaker": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1":      endpoint{},
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
@@ -4791,6 +5088,10 @@ var awsPartition = partition{
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
 				"eu-north-1":     endpoint{},
+<<<<<<< HEAD
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -4948,6 +5249,16 @@ var awsPartition = partition{
 						Region: "ca-central-1",
 					},
 				},
+<<<<<<< HEAD
+				"ca-central-1-fips": endpoint{
+					Hostname:          "s3-control-fips.ca-central-1.amazonaws.com",
+					SignatureVersions: []string{"s3v4"},
+					CredentialScope: credentialScope{
+						Region: "ca-central-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-central-1": endpoint{
 					Hostname:          "s3-control.eu-central-1.amazonaws.com",
 					SignatureVersions: []string{"s3v4"},
@@ -5326,10 +5637,23 @@ var awsPartition = partition{
 				"eu-west-3":      endpoint{},
 				"me-south-1":     endpoint{},
 				"sa-east-1":      endpoint{},
+<<<<<<< HEAD
+				"servicediscovery-fips": endpoint{
+					Hostname: "servicediscovery-fips.ca-central-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ca-central-1",
+					},
+				},
+				"us-east-1": endpoint{},
+				"us-east-2": endpoint{},
+				"us-west-1": endpoint{},
+				"us-west-2": endpoint{},
+=======
 				"us-east-1":      endpoint{},
 				"us-east-2":      endpoint{},
 				"us-west-1":      endpoint{},
 				"us-west-2":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"servicequotas": service{
@@ -5447,6 +5771,10 @@ var awsPartition = partition{
 		"snowball": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"ap-east-1":      endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-northeast-1": endpoint{},
 				"ap-northeast-2": endpoint{},
 				"ap-south-1":     endpoint{},
@@ -5454,6 +5782,11 @@ var awsPartition = partition{
 				"ap-southeast-2": endpoint{},
 				"ca-central-1":   endpoint{},
 				"eu-central-1":   endpoint{},
+<<<<<<< HEAD
+				"eu-north-1":     endpoint{},
+				"eu-south-1":     endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
@@ -5469,6 +5802,15 @@ var awsPartition = partition{
 						Region: "ap-northeast-2",
 					},
 				},
+<<<<<<< HEAD
+				"fips-ap-northeast-3": endpoint{
+					Hostname: "snowball-fips.ap-northeast-3.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ap-northeast-3",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-ap-south-1": endpoint{
 					Hostname: "snowball-fips.ap-south-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -5676,6 +6018,15 @@ var awsPartition = partition{
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
 				"eu-west-3":      endpoint{},
+<<<<<<< HEAD
+				"fips-ca-central-1": endpoint{
+					Hostname: "ssm-fips.ca-central-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "ca-central-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-us-east-1": endpoint{
 					Hostname: "ssm-fips.us-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -5702,6 +6053,12 @@ var awsPartition = partition{
 				},
 				"me-south-1": endpoint{},
 				"sa-east-1":  endpoint{},
+<<<<<<< HEAD
+				"us-east-1":  endpoint{},
+				"us-east-2":  endpoint{},
+				"us-west-1":  endpoint{},
+				"us-west-2":  endpoint{},
+=======
 				"ssm-facade-fips-us-east-1": endpoint{
 					Hostname: "ssm-facade-fips.us-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -5730,6 +6087,7 @@ var awsPartition = partition{
 				"us-east-2": endpoint{},
 				"us-west-1": endpoint{},
 				"us-west-2": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"states": service{
@@ -6071,7 +6429,13 @@ var awsPartition = partition{
 			Endpoints: endpoints{
 				"ap-southeast-2": endpoint{},
 				"ca-central-1":   endpoint{},
+<<<<<<< HEAD
+				"eu-central-1":   endpoint{},
 				"eu-west-1":      endpoint{},
+				"eu-west-2":      endpoint{},
+=======
+				"eu-west-1":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-east-1":      endpoint{},
 				"us-east-2":      endpoint{},
 				"us-west-2":      endpoint{},
@@ -6191,6 +6555,15 @@ var awsPartition = partition{
 		"waf-regional": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"af-south-1": endpoint{
+					Hostname: "waf-regional.af-south-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "af-south-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"ap-east-1": endpoint{
 					Hostname: "waf-regional.ap-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -6245,6 +6618,15 @@ var awsPartition = partition{
 						Region: "eu-north-1",
 					},
 				},
+<<<<<<< HEAD
+				"eu-south-1": endpoint{
+					Hostname: "waf-regional.eu-south-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "eu-south-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"eu-west-1": endpoint{
 					Hostname: "waf-regional.eu-west-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -6263,6 +6645,15 @@ var awsPartition = partition{
 						Region: "eu-west-3",
 					},
 				},
+<<<<<<< HEAD
+				"fips-af-south-1": endpoint{
+					Hostname: "waf-regional-fips.af-south-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "af-south-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-ap-east-1": endpoint{
 					Hostname: "waf-regional-fips.ap-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -6317,6 +6708,15 @@ var awsPartition = partition{
 						Region: "eu-north-1",
 					},
 				},
+<<<<<<< HEAD
+				"fips-eu-south-1": endpoint{
+					Hostname: "waf-regional-fips.eu-south-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "eu-south-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"fips-eu-west-1": endpoint{
 					Hostname: "waf-regional-fips.eu-west-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -6453,9 +6853,27 @@ var awsPartition = partition{
 				"eu-central-1":   endpoint{},
 				"eu-west-1":      endpoint{},
 				"eu-west-2":      endpoint{},
+<<<<<<< HEAD
+				"fips-us-east-1": endpoint{
+					Hostname: "workspaces-fips.us-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-east-1",
+					},
+				},
+				"fips-us-west-2": endpoint{
+					Hostname: "workspaces-fips.us-west-2.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-west-2",
+					},
+				},
+				"sa-east-1": endpoint{},
+				"us-east-1": endpoint{},
+				"us-west-2": endpoint{},
+=======
 				"sa-east-1":      endpoint{},
 				"us-east-1":      endpoint{},
 				"us-west-2":      endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"xray": service{
@@ -6744,6 +7162,16 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"ebs": service{
+
+			Endpoints: endpoints{
+				"cn-north-1":     endpoint{},
+				"cn-northwest-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"ec2": service{
 			Defaults: endpoint{
 				Protocols: []string{"http", "https"},
@@ -6852,6 +7280,16 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"fsx": service{
+
+			Endpoints: endpoints{
+				"cn-north-1":     endpoint{},
+				"cn-northwest-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"gamelift": service{
 
 			Endpoints: endpoints{
@@ -6914,6 +7352,32 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"iotanalytics": service{
+
+			Endpoints: endpoints{
+				"cn-north-1": endpoint{},
+			},
+		},
+		"iotevents": service{
+
+			Endpoints: endpoints{
+				"cn-north-1": endpoint{},
+			},
+		},
+		"ioteventsdata": service{
+
+			Endpoints: endpoints{
+				"cn-north-1": endpoint{
+					Hostname: "data.iotevents.cn-north-1.amazonaws.com.cn",
+					CredentialScope: credentialScope{
+						Region: "cn-north-1",
+					},
+				},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"iotsecuredtunneling": service{
 
 			Endpoints: endpoints{
@@ -6949,6 +7413,15 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"lakeformation": service{
+
+			Endpoints: endpoints{
+				"cn-north-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"lambda": service{
 
 			Endpoints: endpoints{
@@ -7040,6 +7513,16 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"resource-groups": service{
+
+			Endpoints: endpoints{
+				"cn-north-1":     endpoint{},
+				"cn-northwest-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"route53": service{
 			PartitionEndpoint: "aws-cn-global",
 			IsRegionalized:    boxedFalse,
@@ -7105,6 +7588,16 @@ var awscnPartition = partition{
 				"cn-northwest-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"securityhub": service{
+
+			Endpoints: endpoints{
+				"cn-north-1":     endpoint{},
+				"cn-northwest-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"serverlessrepo": service{
 			Defaults: endpoint{
 				Protocols: []string{"https"},
@@ -7118,6 +7611,16 @@ var awscnPartition = partition{
 				},
 			},
 		},
+<<<<<<< HEAD
+		"servicediscovery": service{
+
+			Endpoints: endpoints{
+				"cn-north-1":     endpoint{},
+				"cn-northwest-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"sms": service{
 
 			Endpoints: endpoints{
@@ -7313,8 +7816,23 @@ var awsusgovPartition = partition{
 		"acm": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"us-gov-east-1": endpoint{
+					Hostname: "acm.us-gov-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-east-1",
+					},
+				},
+				"us-gov-west-1": endpoint{
+					Hostname: "acm.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"acm-pca": service{
@@ -7413,8 +7931,17 @@ var awsusgovPartition = partition{
 				},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"us-gov-east-1": endpoint{
+					Protocols: []string{"http", "https"},
+				},
+				"us-gov-west-1": endpoint{
+					Protocols: []string{"http", "https"},
+				},
+=======
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"appstream2": service{
@@ -7469,8 +7996,17 @@ var awsusgovPartition = partition{
 				Protocols: []string{"http", "https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"us-gov-east-1": endpoint{
+					Protocols: []string{"http", "https"},
+				},
+				"us-gov-west-1": endpoint{
+					Protocols: []string{"http", "https"},
+				},
+=======
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"backup": service{
@@ -7622,6 +8158,15 @@ var awsusgovPartition = partition{
 		"cognito-identity": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "cognito-identity-fips.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-west-1": endpoint{},
 			},
 		},
@@ -7768,6 +8313,16 @@ var awsusgovPartition = partition{
 				},
 			},
 		},
+<<<<<<< HEAD
+		"ebs": service{
+
+			Endpoints: endpoints{
+				"us-gov-east-1": endpoint{},
+				"us-gov-west-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"ec2": service{
 
 			Endpoints: endpoints{
@@ -7820,6 +8375,21 @@ var awsusgovPartition = partition{
 				Protocols: []string{"http", "https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-gov-east-1": endpoint{
+					Hostname: "eks.us-gov-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-east-1",
+					},
+				},
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "eks.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
 			},
@@ -7877,13 +8447,21 @@ var awsusgovPartition = partition{
 
 			Endpoints: endpoints{
 				"fips-us-gov-east-1": endpoint{
+<<<<<<< HEAD
+					Hostname: "elasticloadbalancing.us-gov-east-1.amazonaws.com",
+=======
 					Hostname: "elasticloadbalancing-fips.us-gov-east-1.amazonaws.com",
+>>>>>>> cbc9bb05... fixup add vendor back
 					CredentialScope: credentialScope{
 						Region: "us-gov-east-1",
 					},
 				},
 				"fips-us-gov-west-1": endpoint{
+<<<<<<< HEAD
+					Hostname: "elasticloadbalancing.us-gov-west-1.amazonaws.com",
+=======
 					Hostname: "elasticloadbalancing-fips.us-gov-west-1.amazonaws.com",
+>>>>>>> cbc9bb05... fixup add vendor back
 					CredentialScope: credentialScope{
 						Region: "us-gov-west-1",
 					},
@@ -8019,6 +8597,15 @@ var awsusgovPartition = partition{
 				Protocols: []string{"https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"dataplane-us-gov-west-1": endpoint{
+					Hostname: "greengrass-ats.iot.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-west-1": endpoint{
 					Hostname: "greengrass.us-gov-west-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -8033,6 +8620,10 @@ var awsusgovPartition = partition{
 				Protocols: []string{"https"},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"us-gov-east-1": endpoint{},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-west-1": endpoint{},
 				"us-gov-west-1-fips": endpoint{
 					Hostname: "guardduty.us-gov-west-1.amazonaws.com",
@@ -8045,7 +8636,16 @@ var awsusgovPartition = partition{
 		"health": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "health-fips.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"iam": service{
@@ -8114,20 +8714,33 @@ var awsusgovPartition = partition{
 		"kinesis": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"us-gov-east-1": endpoint{
+					Hostname: "kinesis.us-gov-east-1.amazonaws.com",
+=======
 				"fips-us-gov-east-1": endpoint{
 					Hostname: "kinesis-fips.us-gov-east-1.amazonaws.com",
+>>>>>>> cbc9bb05... fixup add vendor back
 					CredentialScope: credentialScope{
 						Region: "us-gov-east-1",
 					},
 				},
+<<<<<<< HEAD
+				"us-gov-west-1": endpoint{
+					Hostname: "kinesis.us-gov-west-1.amazonaws.com",
+=======
 				"fips-us-gov-west-1": endpoint{
 					Hostname: "kinesis-fips.us-gov-west-1.amazonaws.com",
+>>>>>>> cbc9bb05... fixup add vendor back
 					CredentialScope: credentialScope{
 						Region: "us-gov-west-1",
 					},
 				},
+<<<<<<< HEAD
+=======
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"kinesisanalytics": service{
@@ -8306,7 +8919,22 @@ var awsusgovPartition = partition{
 				},
 			},
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "pinpoint-fips.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+				"us-gov-west-1": endpoint{
+					Hostname: "pinpoint.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
 				"us-gov-west-1": endpoint{},
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"polly": service{
@@ -8406,6 +9034,15 @@ var awsusgovPartition = partition{
 						Region: "us-gov-west-1",
 					},
 				},
+<<<<<<< HEAD
+				"fips-aws-us-gov-global": endpoint{
+					Hostname: "route53.us-gov.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 			},
 		},
 		"route53resolver": service{
@@ -8430,7 +9067,11 @@ var awsusgovPartition = partition{
 			},
 			Endpoints: endpoints{
 				"fips-us-gov-west-1": endpoint{
+<<<<<<< HEAD
+					Hostname: "s3-fips.us-gov-west-1.amazonaws.com",
+=======
 					Hostname: "s3-fips-us-gov-west-1.amazonaws.com",
+>>>>>>> cbc9bb05... fixup add vendor back
 					CredentialScope: credentialScope{
 						Region: "us-gov-west-1",
 					},
@@ -8652,6 +9293,8 @@ var awsusgovPartition = partition{
 						Region: "us-gov-west-1",
 					},
 				},
+<<<<<<< HEAD
+=======
 				"ssm-facade-fips-us-gov-east-1": endpoint{
 					Hostname: "ssm-facade.us-gov-east-1.amazonaws.com",
 					CredentialScope: credentialScope{
@@ -8664,6 +9307,7 @@ var awsusgovPartition = partition{
 						Region: "us-gov-west-1",
 					},
 				},
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-east-1": endpoint{},
 				"us-gov-west-1": endpoint{},
 			},
@@ -8805,6 +9449,28 @@ var awsusgovPartition = partition{
 				"us-gov-west-1": endpoint{},
 			},
 		},
+<<<<<<< HEAD
+		"transfer": service{
+
+			Endpoints: endpoints{
+				"fips-us-gov-east-1": endpoint{
+					Hostname: "transfer-fips.us-gov-east-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-east-1",
+					},
+				},
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "transfer-fips.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+				"us-gov-east-1": endpoint{},
+				"us-gov-west-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"translate": service{
 			Defaults: endpoint{
 				Protocols: []string{"https"},
@@ -8839,6 +9505,15 @@ var awsusgovPartition = partition{
 		"workspaces": service{
 
 			Endpoints: endpoints{
+<<<<<<< HEAD
+				"fips-us-gov-west-1": endpoint{
+					Hostname: "workspaces-fips.us-gov-west-1.amazonaws.com",
+					CredentialScope: credentialScope{
+						Region: "us-gov-west-1",
+					},
+				},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				"us-gov-west-1": endpoint{},
 			},
 		},
@@ -9263,6 +9938,20 @@ var awsisobPartition = partition{
 		},
 	},
 	Services: services{
+<<<<<<< HEAD
+		"api.ecr": service{
+
+			Endpoints: endpoints{
+				"us-isob-east-1": endpoint{
+					Hostname: "api.ecr.us-isob-east-1.sc2s.sgov.gov",
+					CredentialScope: credentialScope{
+						Region: "us-isob-east-1",
+					},
+				},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"application-autoscaling": service{
 			Defaults: endpoint{
 				Protocols: []string{"http", "https"},
@@ -9342,6 +10031,15 @@ var awsisobPartition = partition{
 				},
 			},
 		},
+<<<<<<< HEAD
+		"ecs": service{
+
+			Endpoints: endpoints{
+				"us-isob-east-1": endpoint{},
+			},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		"elasticache": service{
 
 			Endpoints: endpoints{

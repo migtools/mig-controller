@@ -209,6 +209,10 @@ func dockerCertDir(sys *types.SystemContext, hostPort string) (string, error) {
 
 // newDockerClientFromRef returns a new dockerClient instance for refHostname (a host a specified in the Docker image reference, not canonicalized to dockerRegistry)
 // “write” specifies whether the client will be used for "write" access (in particular passed to lookaside.go:toplevelFromSection)
+<<<<<<< HEAD
+// signatureBase is always set in the return value
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write bool, actions string) (*dockerClient, error) {
 	registry := reference.Domain(ref.ref)
 	auth, err := config.GetCredentials(sys, registry)
@@ -216,7 +220,11 @@ func newDockerClientFromRef(sys *types.SystemContext, ref dockerReference, write
 		return nil, errors.Wrapf(err, "error getting username and password")
 	}
 
+<<<<<<< HEAD
+	sigBase, err := SignatureStorageBaseURL(sys, ref, write)
+=======
 	sigBase, err := configuredSignatureStorageBase(sys, ref, write)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return nil, err
 	}

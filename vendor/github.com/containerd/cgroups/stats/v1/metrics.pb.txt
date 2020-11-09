@@ -63,6 +63,8 @@ file {
       type_name: ".io.containerd.cgroups.v1.NetworkStat"
       json_name: "network"
     }
+<<<<<<< HEAD
+=======
     field {
       name: "cgroup_stats"
       number: 8
@@ -79,6 +81,7 @@ file {
       type_name: ".io.containerd.cgroups.v1.MemoryOomControl"
       json_name: "memoryOomControl"
     }
+>>>>>>> cbc9bb05... fixup add vendor back
   }
   message_type {
     name: "HugetlbStat"
@@ -511,6 +514,8 @@ file {
     }
   }
   message_type {
+<<<<<<< HEAD
+=======
     name: "MemoryOomControl"
     field {
       name: "oom_kill_disable"
@@ -535,6 +540,7 @@ file {
     }
   }
   message_type {
+>>>>>>> cbc9bb05... fixup add vendor back
     name: "BlkIOStat"
     field {
       name: "io_service_bytes_recursive"
@@ -748,6 +754,8 @@ file {
       json_name: "txDropped"
     }
   }
+<<<<<<< HEAD
+=======
   message_type {
     name: "CgroupStats"
     field {
@@ -786,5 +794,6 @@ file {
       json_name: "nrIoWait"
     }
   }
+>>>>>>> cbc9bb05... fixup add vendor back
   syntax: "proto3"
 }

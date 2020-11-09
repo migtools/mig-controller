@@ -21,15 +21,28 @@ import (
 	"runtime/pprof"
 	"strings"
 
+<<<<<<< HEAD
+	"golang.org/x/tools/internal/gocommand"
+	"golang.org/x/tools/internal/imports"
+=======
 	"golang.org/x/tools/imports"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var (
 	// main operation modes
+<<<<<<< HEAD
+	list   = flag.Bool("l", false, "list files whose formatting differs from goimport's")
+	write  = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	doDiff = flag.Bool("d", false, "display diffs instead of rewriting files")
+	srcdir = flag.String("srcdir", "", "choose imports as if source code is from `dir`. When operating on a single file, dir may instead be the complete file name.")
+
+=======
 	list    = flag.Bool("l", false, "list files whose formatting differs from goimport's")
 	write   = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	doDiff  = flag.Bool("d", false, "display diffs instead of rewriting files")
 	srcdir  = flag.String("srcdir", "", "choose imports as if source code is from `dir`. When operating on a single file, dir may instead be the complete file name.")
+>>>>>>> cbc9bb05... fixup add vendor back
 	verbose bool // verbose logging
 
 	cpuProfile     = flag.String("cpuprofile", "", "CPU profile output")
@@ -41,13 +54,24 @@ var (
 		TabIndent: true,
 		Comments:  true,
 		Fragment:  true,
+<<<<<<< HEAD
+		Env: &imports.ProcessEnv{
+			GocmdRunner: &gocommand.Runner{},
+		},
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	exitCode = 0
 )
 
 func init() {
 	flag.BoolVar(&options.AllErrors, "e", false, "report all errors (not just the first 10 on different lines)")
+<<<<<<< HEAD
+	flag.StringVar(&options.LocalPrefix, "local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
+	flag.BoolVar(&options.FormatOnly, "format-only", false, "if true, don't fix imports and only format. In this mode, goimports is effectively gofmt, with the addition that imports are grouped into sections.")
+=======
 	flag.StringVar(&imports.LocalPrefix, "local", "", "put imports beginning with this string after 3rd-party packages; comma-separated list")
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func report(err error) {
@@ -148,7 +172,16 @@ func processFile(filename string, in io.Reader, out io.Writer, argType argumentT
 				// filename is "<standard input>"
 				return errors.New("can't use -w on stdin")
 			}
+<<<<<<< HEAD
+			// On Windows, we need to re-set the permissions from the file. See golang/go#38225.
+			var perms os.FileMode
+			if fi, err := os.Stat(filename); err == nil {
+				perms = fi.Mode() & os.ModePerm
+			}
+			err = ioutil.WriteFile(filename, res, perms)
+=======
 			err = ioutil.WriteFile(filename, res, 0)
+>>>>>>> cbc9bb05... fixup add vendor back
 			if err != nil {
 				return err
 			}
@@ -250,7 +283,11 @@ func gofmtMain() {
 
 	if verbose {
 		log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+<<<<<<< HEAD
+		options.Env.Logf = log.Printf
+=======
 		imports.Debug = true
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if options.TabWidth < 0 {
 		fmt.Fprintf(os.Stderr, "negative tabwidth %d\n", options.TabWidth)

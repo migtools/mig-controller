@@ -154,6 +154,13 @@ func EncodeInternalExtension(m extendableProto, data []byte) (n int, err error) 
 	return EncodeExtensionMap(m.extensionsWrite(), data)
 }
 
+<<<<<<< HEAD
+func EncodeInternalExtensionBackwards(m extendableProto, data []byte) (n int, err error) {
+	return EncodeExtensionMapBackwards(m.extensionsWrite(), data)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func EncodeExtensionMap(m map[int32]Extension, data []byte) (n int, err error) {
 	o := 0
 	for _, e := range m {
@@ -169,6 +176,26 @@ func EncodeExtensionMap(m map[int32]Extension, data []byte) (n int, err error) {
 	return o, nil
 }
 
+<<<<<<< HEAD
+func EncodeExtensionMapBackwards(m map[int32]Extension, data []byte) (n int, err error) {
+	o := 0
+	end := len(data)
+	for _, e := range m {
+		if err := e.Encode(); err != nil {
+			return 0, err
+		}
+		n := copy(data[end-len(e.enc):], e.enc)
+		if n != len(e.enc) {
+			return 0, io.ErrShortBuffer
+		}
+		end -= n
+		o += n
+	}
+	return o, nil
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func GetRawExtension(m map[int32]Extension, id int32) ([]byte, error) {
 	e := m[id]
 	if err := e.Encode(); err != nil {

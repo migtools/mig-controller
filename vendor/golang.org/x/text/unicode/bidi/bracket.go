@@ -12,7 +12,11 @@ import (
 
 // This file contains a port of the reference implementation of the
 // Bidi Parentheses Algorithm:
+<<<<<<< HEAD
+// https://www.unicode.org/Public/PROGRAMS/BidiReferenceJava/BidiPBAReference.java
+=======
 // http://www.unicode.org/Public/PROGRAMS/BidiReferenceJava/BidiPBAReference.java
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // The implementation in this file covers definitions BD14-BD16 and rule N0
 // of UAX#9.
@@ -246,7 +250,11 @@ func (p *bracketPairer) getStrongTypeN0(index int) Class {
 // assuming the given embedding direction.
 //
 // It returns ON if no strong type is found. If a single strong type is found,
+<<<<<<< HEAD
+// it returns this type. Otherwise it returns the embedding direction.
+=======
 // it returns this this type. Otherwise it returns the embedding direction.
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // TODO: use separate type for "strong" directionality.
 func (p *bracketPairer) classifyPairContent(loc bracketPair, dirEmbed Class) Class {

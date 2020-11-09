@@ -32,7 +32,11 @@ type WriteScheduler interface {
 
 	// Pop dequeues the next frame to write. Returns false if no frames can
 	// be written. Frames with a given wr.StreamID() are Pop'd in the same
+<<<<<<< HEAD
+	// order they are Push'd. No frames should be discarded except by CloseStream.
+=======
 	// order they are Push'd.
+>>>>>>> cbc9bb05... fixup add vendor back
 	Pop() (wr FrameWriteRequest, ok bool)
 }
 
@@ -76,6 +80,15 @@ func (wr FrameWriteRequest) StreamID() uint32 {
 	return wr.stream.id
 }
 
+<<<<<<< HEAD
+// isControl reports whether wr is a control frame for MaxQueuedControlFrames
+// purposes. That includes non-stream frames and RST_STREAM frames.
+func (wr FrameWriteRequest) isControl() bool {
+	return wr.stream == nil
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // DataSize returns the number of flow control bytes that must be consumed
 // to write this entire frame. This is 0 for non-DATA frames.
 func (wr FrameWriteRequest) DataSize() int {

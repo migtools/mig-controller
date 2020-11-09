@@ -16,8 +16,11 @@ package prometheus
 import (
 	"errors"
 	"os"
+<<<<<<< HEAD
+=======
 
 	"github.com/prometheus/procfs"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 type processCollector struct {
@@ -59,6 +62,11 @@ type ProcessCollectorOpts struct {
 // collector for the current process with an empty namespace string and no error
 // reporting.
 //
+<<<<<<< HEAD
+// The collector only works on operating systems with a Linux-style proc
+// filesystem and on Microsoft Windows. On other operating systems, it will not
+// collect any metrics.
+=======
 // Currently, the collector depends on a Linux-style proc filesystem and
 // therefore only exports metrics for Linux.
 //
@@ -73,6 +81,7 @@ type ProcessCollectorOpts struct {
 // The following call of the current version is equivalent to the above:
 //
 //     NewProcessCollector(ProcessCollectorOpts{})
+>>>>>>> cbc9bb05... fixup add vendor back
 func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	ns := ""
 	if len(opts.Namespace) > 0 {
@@ -126,7 +135,11 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	}
 
 	// Set up process metric collection if supported by the runtime.
+<<<<<<< HEAD
+	if canCollectProcess() {
+=======
 	if _, err := procfs.NewStat(); err == nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 		c.collectFn = c.processCollect
 	} else {
 		c.collectFn = func(ch chan<- Metric) {
@@ -153,6 +166,8 @@ func (c *processCollector) Collect(ch chan<- Metric) {
 	c.collectFn(ch)
 }
 
+<<<<<<< HEAD
+=======
 func (c *processCollector) processCollect(ch chan<- Metric) {
 	pid, err := c.pidFn()
 	if err != nil {
@@ -193,6 +208,7 @@ func (c *processCollector) processCollect(ch chan<- Metric) {
 	}
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *processCollector) reportError(ch chan<- Metric, desc *Desc, err error) {
 	if !c.reportErrors {
 		return

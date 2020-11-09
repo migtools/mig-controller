@@ -18,9 +18,17 @@ import (
 func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 	s := bufio.NewScanner(r)
 	out := []*Info{}
+<<<<<<< HEAD
+	var err error
+	for s.Scan() {
+		if err = s.Err(); err != nil {
+			return nil, err
+		}
+=======
 	for s.Scan() {
 		var err error
 
+>>>>>>> cbc9bb05... fixup add vendor back
 		/*
 		   See http://man7.org/linux/man-pages/man5/proc.5.html
 
@@ -72,6 +80,10 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 
 		p := &Info{}
 
+<<<<<<< HEAD
+		// Fill in the fields that a filter might check
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		p.Mountpoint, err = unescape(fields[4])
 		if err != nil {
 			return nil, fmt.Errorf("Parsing '%s' failed: mount point: %w", fields[4], err)
@@ -86,6 +98,21 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 		}
 		p.VFSOptions = fields[sepIdx+3]
 
+<<<<<<< HEAD
+		// Run a filter early so we can skip parsing/adding entries
+		// the caller is not interested in
+		var skip, stop bool
+		if filter != nil {
+			skip, stop = filter(p)
+			if skip {
+				continue
+			}
+		}
+
+		// Fill in the rest of the fields
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		// ignore any numbers parsing errors, as there should not be any
 		p.ID, _ = strconv.Atoi(fields[0])
 		p.Parent, _ = strconv.Atoi(fields[1])
@@ -113,6 +140,8 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 			p.Optional = strings.Join(fields[6:sepIdx-1], " ")
 		}
 
+<<<<<<< HEAD
+=======
 		// Run the filter after parsing all of the fields.
 		var skip, stop bool
 		if filter != nil {
@@ -122,14 +151,18 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 			}
 		}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 		out = append(out, p)
 		if stop {
 			break
 		}
 	}
+<<<<<<< HEAD
+=======
 	if err := s.Err(); err != nil {
 		return nil, err
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	return out, nil
 }
 
@@ -145,6 +178,11 @@ func parseMountTable(filter FilterFunc) ([]*Info, error) {
 	return GetMountsFromReader(f, filter)
 }
 
+<<<<<<< HEAD
+// PidMountInfo collects the mounts for a specific process ID. If the process
+// ID is unknown, it is better to use `GetMounts` which will inspect
+// "/proc/self/mountinfo" instead.
+=======
 // PidMountInfo retrieves the list of mounts from a given process' mount
 // namespace. Unless there is a need to get mounts from a mount namespace
 // different from that of a calling process, use GetMounts.
@@ -153,6 +191,7 @@ func parseMountTable(filter FilterFunc) ([]*Info, error) {
 //
 // Deprecated: this will be removed before v1; use GetMountsFromReader with
 // opened /proc/<pid>/mountinfo as an argument instead.
+>>>>>>> cbc9bb05... fixup add vendor back
 func PidMountInfo(pid int) ([]*Info, error) {
 	f, err := os.Open(fmt.Sprintf("/proc/%d/mountinfo", pid))
 	if err != nil {

@@ -25,20 +25,31 @@
 package windows // import "golang.org/x/sys/windows"
 
 import (
+<<<<<<< HEAD
+	"syscall"
+=======
 	"bytes"
 	"strings"
 	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/internal/unsafeheader"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // ByteSliceFromString returns a NUL-terminated slice of bytes
 // containing the text of s. If s contains a NUL byte at any
 // location, it returns (nil, syscall.EINVAL).
 func ByteSliceFromString(s string) ([]byte, error) {
+<<<<<<< HEAD
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0 {
+			return nil, syscall.EINVAL
+		}
+=======
 	if strings.IndexByte(s, 0) != -1 {
 		return nil, syscall.EINVAL
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	a := make([]byte, len(s)+1)
 	copy(a, s)
@@ -56,6 +67,8 @@ func BytePtrFromString(s string) (*byte, error) {
 	return &a[0], nil
 }
 
+<<<<<<< HEAD
+=======
 // ByteSliceToString returns a string form of the text represented by the slice s, with a terminating NUL and any
 // bytes after the NUL removed.
 func ByteSliceToString(s []byte) string {
@@ -91,6 +104,7 @@ func BytePtrToString(p *byte) string {
 	return string(s)
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Single-word zero for use when we need a valid pointer to 0 bytes.
 // See mksyscall.pl.
 var _zero uintptr

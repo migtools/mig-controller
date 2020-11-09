@@ -14,6 +14,16 @@ import (
 	"sync"
 )
 
+<<<<<<< HEAD
+// ErrTraverseLink is used as a return value from WalkFuncs to indicate that the
+// symlink named in the call may be traversed.
+var ErrTraverseLink = errors.New("fastwalk: traverse symlink, assuming target is a directory")
+
+// ErrSkipFiles is a used as a return value from WalkFuncs to indicate that the
+// callback should not be called for any other files in the current directory.
+// Child directories will still be traversed.
+var ErrSkipFiles = errors.New("fastwalk: skip remaining files in directory")
+=======
 // TraverseLink is used as a return value from WalkFuncs to indicate that the
 // symlink named in the call may be traversed.
 var TraverseLink = errors.New("fastwalk: traverse symlink, assuming target is a directory")
@@ -22,6 +32,7 @@ var TraverseLink = errors.New("fastwalk: traverse symlink, assuming target is a 
 // callback should not be called for any other files in the current directory.
 // Child directories will still be traversed.
 var SkipFiles = errors.New("fastwalk: skip remaining files in directory")
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // Walk is a faster implementation of filepath.Walk.
 //
@@ -167,7 +178,11 @@ func (w *walker) onDirEnt(dirName, baseName string, typ os.FileMode) error {
 
 	err := w.fn(joined, typ)
 	if typ == os.ModeSymlink {
+<<<<<<< HEAD
+		if err == ErrTraverseLink {
+=======
 		if err == TraverseLink {
+>>>>>>> cbc9bb05... fixup add vendor back
 			// Set callbackDone so we don't call it twice for both the
 			// symlink-as-symlink and the symlink-as-directory later:
 			w.enqueue(walkItem{dir: joined, callbackDone: true})

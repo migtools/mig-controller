@@ -1,8 +1,13 @@
 language: go
 sudo: false
 go:
+<<<<<<< HEAD
+  - 1.11.x
+  - 1.12.x
+=======
   - 1.9.x
   - 1.10.x
+>>>>>>> cbc9bb05... fixup add vendor back
 go_import_path: go.uber.org/zap
 env:
   global:

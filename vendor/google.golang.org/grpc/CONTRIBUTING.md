@@ -57,6 +57,9 @@ How to get your contributions merged smoothly and quickly.
   - `make vet` to catch vet errors
   - `make test` to run the tests
   - `make testrace` to run tests in race mode
+<<<<<<< HEAD
+=======
   - optional `make testappengine` to run tests with appengine
+>>>>>>> cbc9bb05... fixup add vendor back
 
 - Exceptions to the rules can be made if there's a compelling reason for doing so.

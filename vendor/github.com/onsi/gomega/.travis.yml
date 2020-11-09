@@ -4,6 +4,10 @@ go:
   - 1.10.x
   - 1.11.x
   - 1.12.x
+<<<<<<< HEAD
+  - gotip
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 
 env:
   - GO111MODULE=on

@@ -35,6 +35,10 @@ type authPath struct {
 
 var (
 	defaultPerUIDPathFormat = filepath.FromSlash("/run/containers/%d/auth.json")
+<<<<<<< HEAD
+	xdgConfigHomePath       = filepath.FromSlash("containers/auth.json")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	xdgRuntimeDirPath       = filepath.FromSlash("containers/auth.json")
 	dockerHomePath          = filepath.FromSlash(".docker/config.json")
 	dockerLegacyHomePath    = ".dockercfg"
@@ -117,7 +121,11 @@ func GetAllCredentials(sys *types.SystemContext) (map[string]types.DockerAuthCon
 		}
 	}
 
+<<<<<<< HEAD
+	// TODO(keyring): if we ever re-enable the keyring support, we had to
+=======
 	// TODO(keyring): if we ever reenable the keyring support, we had to
+>>>>>>> cbc9bb05... fixup add vendor back
 	// query all credentials from the keyring here.
 
 	return authConfigs, nil
@@ -136,8 +144,26 @@ func getAuthFilePaths(sys *types.SystemContext) []authPath {
 		// Logging the error as a warning instead and moving on to pulling the image
 		logrus.Warnf("%v: Trying to pull image in the event that it is a public image.", err)
 	}
+<<<<<<< HEAD
+	xdgCfgHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgCfgHome == "" {
+		xdgCfgHome = filepath.Join(homedir.Get(), ".config")
+	}
+	paths = append(paths, authPath{path: filepath.Join(xdgCfgHome, xdgConfigHomePath), legacyFormat: false})
+	if dockerConfig := os.Getenv("DOCKER_CONFIG"); dockerConfig != "" {
+		paths = append(paths,
+			authPath{path: filepath.Join(dockerConfig, "config.json"), legacyFormat: false},
+		)
+	} else {
+		paths = append(paths,
+			authPath{path: filepath.Join(homedir.Get(), dockerHomePath), legacyFormat: false},
+		)
+	}
+	paths = append(paths,
+=======
 	paths = append(paths,
 		authPath{path: filepath.Join(homedir.Get(), dockerHomePath), legacyFormat: false},
+>>>>>>> cbc9bb05... fixup add vendor back
 		authPath{path: filepath.Join(homedir.Get(), dockerLegacyHomePath), legacyFormat: true},
 	)
 	return paths
@@ -245,7 +271,11 @@ func RemoveAllAuthentication(sys *types.SystemContext) error {
 	})
 }
 
+<<<<<<< HEAD
+// getPathToAuth gets the path of the auth.json file used for reading and writing credentials
+=======
 // getPathToAuth gets the path of the auth.json file used for reading and writting credentials
+>>>>>>> cbc9bb05... fixup add vendor back
 // returns the path, and a bool specifies whether the file is in legacy format
 func getPathToAuth(sys *types.SystemContext) (string, bool, error) {
 	if sys != nil {

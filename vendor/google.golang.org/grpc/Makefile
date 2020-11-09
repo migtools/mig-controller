@@ -19,6 +19,13 @@ proto:
 test: testdeps
 	go test -cpu 1,4 -timeout 7m google.golang.org/grpc/...
 
+<<<<<<< HEAD
+testsubmodule: testdeps
+	cd security/advancedtls && go test -cpu 1,4 -timeout 7m google.golang.org/grpc/security/advancedtls/...
+	cd security/authorization && go test -cpu 1,4 -timeout 7m google.golang.org/grpc/security/authorization/...
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 testappengine: testappenginedeps
 	goapp test -cpu 1,4 -timeout 7m google.golang.org/grpc/...
 

@@ -32,7 +32,11 @@ func limitDial(network, addr string) (net.Conn, error) {
 
 	// Dial with a timeout in case the API host is MIA.
 	// The connection should normally be very fast.
+<<<<<<< HEAD
+	conn, err := net.DialTimeout(network, addr, 10*time.Second)
+=======
 	conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		limitRelease()
 		return nil, err

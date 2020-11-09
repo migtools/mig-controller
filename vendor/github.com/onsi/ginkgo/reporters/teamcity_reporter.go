@@ -22,8 +22,14 @@ const (
 )
 
 type TeamCityReporter struct {
+<<<<<<< HEAD
+	writer         io.Writer
+	testSuiteName  string
+	ReporterConfig config.DefaultReporterConfigType
+=======
 	writer        io.Writer
 	testSuiteName string
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func NewTeamCityReporter(writer io.Writer) *TeamCityReporter {
@@ -65,6 +71,13 @@ func (reporter *TeamCityReporter) SpecWillRun(specSummary *types.SpecSummary) {
 func (reporter *TeamCityReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	testName := escape(strings.Join(specSummary.ComponentTexts[1:], " "))
 
+<<<<<<< HEAD
+	if reporter.ReporterConfig.ReportPassed && specSummary.State == types.SpecStatePassed {
+		details := escape(specSummary.CapturedOutput)
+		fmt.Fprintf(reporter.writer, "%s[testPassed name='%s' details='%s']", messageId, testName, details)
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if specSummary.State == types.SpecStateFailed || specSummary.State == types.SpecStateTimedOut || specSummary.State == types.SpecStatePanicked {
 		message := escape(specSummary.Failure.ComponentCodeLocation.String())
 		details := escape(specSummary.Failure.Message)

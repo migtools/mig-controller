@@ -90,6 +90,10 @@ func buildEventsQueryParams(cliVersion string, options types.EventsOptions) (url
 	}
 
 	if options.Filters.Len() > 0 {
+<<<<<<< HEAD
+		//nolint:staticcheck // ignore SA1019 for old code
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		filterJSON, err := filters.ToParamWithVersion(cliVersion, options.Filters)
 		if err != nil {
 			return nil, err

@@ -39,7 +39,11 @@ func initOptions() {
 
 func archInit() {
 	switch runtime.GOOS {
+<<<<<<< HEAD
+	case "android", "darwin", "netbsd":
+=======
 	case "android", "darwin", "ios", "netbsd", "openbsd":
+>>>>>>> cbc9bb05... fixup add vendor back
 		// Android and iOS don't seem to allow reading these registers.
 		//
 		// NetBSD:
@@ -47,9 +51,12 @@ func archInit() {
 		// It can be read via sysctl(3). Example for future implementers:
 		// https://nxr.netbsd.org/xref/src/usr.sbin/cpuctl/arch/aarch64.c
 		//
+<<<<<<< HEAD
+=======
 		// OpenBSD:
 		// See https://golang.org/issue/31746
 		//
+>>>>>>> cbc9bb05... fixup add vendor back
 		// Fake the minimal features expected by
 		// TestARM64minimalFeatures.
 		ARM64.HasASIMD = true

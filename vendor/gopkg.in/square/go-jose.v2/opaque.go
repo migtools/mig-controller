@@ -81,6 +81,8 @@ type opaqueVerifier struct {
 func (o *opaqueVerifier) verifyPayload(payload []byte, signature []byte, alg SignatureAlgorithm) error {
 	return o.verifier.VerifyPayload(payload, signature, alg)
 }
+<<<<<<< HEAD
+=======
 
 // OpaqueKeyEncrypter is an interface that supports encrypting keys with an opaque key.
 type OpaqueKeyEncrypter interface {
@@ -142,3 +144,4 @@ func (okd *opaqueKeyDecrypter) decryptKey(headers rawHeader, recipient *recipien
 
 	return okd.decrypter.DecryptKey(recipient.encryptedKey, header)
 }
+>>>>>>> cbc9bb05... fixup add vendor back

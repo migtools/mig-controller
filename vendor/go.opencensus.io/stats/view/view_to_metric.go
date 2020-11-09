@@ -18,6 +18,11 @@ package view
 import (
 	"time"
 
+<<<<<<< HEAD
+	"go.opencensus.io/resource"
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/stats"
 )
@@ -117,6 +122,17 @@ func toLabelValues(row *Row, expectedKeys []metricdata.LabelKey) []metricdata.La
 	return labelValues
 }
 
+<<<<<<< HEAD
+func rowToTimeseries(v *viewInternal, row *Row, now time.Time) *metricdata.TimeSeries {
+	return &metricdata.TimeSeries{
+		Points:      []metricdata.Point{row.Data.toPoint(v.metricDescriptor.Type, now)},
+		LabelValues: toLabelValues(row, v.metricDescriptor.LabelKeys),
+		StartTime:   row.Data.StartTime(),
+	}
+}
+
+func viewToMetric(v *viewInternal, r *resource.Resource, now time.Time) *metricdata.Metric {
+=======
 func rowToTimeseries(v *viewInternal, row *Row, now time.Time, startTime time.Time) *metricdata.TimeSeries {
 	return &metricdata.TimeSeries{
 		Points:      []metricdata.Point{row.Data.toPoint(v.metricDescriptor.Type, now)},
@@ -131,6 +147,7 @@ func viewToMetric(v *viewInternal, now time.Time, startTime time.Time) *metricda
 		startTime = time.Time{}
 	}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	rows := v.collectedRows()
 	if len(rows) == 0 {
 		return nil
@@ -138,12 +155,20 @@ func viewToMetric(v *viewInternal, now time.Time, startTime time.Time) *metricda
 
 	ts := []*metricdata.TimeSeries{}
 	for _, row := range rows {
+<<<<<<< HEAD
+		ts = append(ts, rowToTimeseries(v, row, now))
+=======
 		ts = append(ts, rowToTimeseries(v, row, now, startTime))
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	m := &metricdata.Metric{
 		Descriptor: *v.metricDescriptor,
 		TimeSeries: ts,
+<<<<<<< HEAD
+		Resource:   r,
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return m
 }

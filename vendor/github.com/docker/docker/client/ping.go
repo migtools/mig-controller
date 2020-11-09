@@ -19,7 +19,11 @@ func (cli *Client) Ping(ctx context.Context) (types.Ping, error) {
 	// Using cli.buildRequest() + cli.doRequest() instead of cli.sendRequest()
 	// because ping requests are used during  API version negotiation, so we want
 	// to hit the non-versioned /_ping endpoint, not /v1.xx/_ping
+<<<<<<< HEAD
+	req, err := cli.buildRequest(http.MethodHead, path.Join(cli.basePath, "/_ping"), nil, nil)
+=======
 	req, err := cli.buildRequest("HEAD", path.Join(cli.basePath, "/_ping"), nil, nil)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return ping, err
 	}
@@ -35,7 +39,11 @@ func (cli *Client) Ping(ctx context.Context) (types.Ping, error) {
 		return ping, err
 	}
 
+<<<<<<< HEAD
+	req, err = cli.buildRequest(http.MethodGet, path.Join(cli.basePath, "/_ping"), nil, nil)
+=======
 	req, err = cli.buildRequest("GET", path.Join(cli.basePath, "/_ping"), nil, nil)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return ping, err
 	}

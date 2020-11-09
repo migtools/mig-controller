@@ -50,7 +50,11 @@ type archiveReference struct {
 	// Must not be set if ref is set.
 	sourceIndex int
 	// If not nil, must have been created from path (but archiveReader.path may point at a temporary
+<<<<<<< HEAD
+	// file, not necessarily path precisely).
+=======
 	// file, not necesarily path precisely).
+>>>>>>> cbc9bb05... fixup add vendor back
 	archiveReader *tarfile.Reader
 	// If not nil, must have been created for path
 	archiveWriter *tarfile.Writer

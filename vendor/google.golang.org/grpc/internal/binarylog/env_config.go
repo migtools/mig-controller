@@ -24,8 +24,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+<<<<<<< HEAD
+=======
 
 	"google.golang.org/grpc/grpclog"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // NewLoggerFromConfigString reads the string and build a logger. It can be used
@@ -43,7 +46,11 @@ import (
 //    Foo.
 //
 // If two configs exist for one certain method or service, the one specified
+<<<<<<< HEAD
+// later overrides the previous config.
+=======
 // later overrides the privous config.
+>>>>>>> cbc9bb05... fixup add vendor back
 func NewLoggerFromConfigString(s string) Logger {
 	if s == "" {
 		return nil
@@ -52,7 +59,11 @@ func NewLoggerFromConfigString(s string) Logger {
 	methods := strings.Split(s, ",")
 	for _, method := range methods {
 		if err := l.fillMethodLoggerWithConfigString(method); err != nil {
+<<<<<<< HEAD
+			grpclogLogger.Warningf("failed to parse binary log config: %v", err)
+=======
 			grpclog.Warningf("failed to parse binary log config: %v", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 			return nil
 		}
 	}
@@ -74,7 +85,11 @@ func (l *logger) fillMethodLoggerWithConfigString(config string) error {
 			return fmt.Errorf("invalid config: %q, %v", config, err)
 		}
 		if m == "*" {
+<<<<<<< HEAD
+			return fmt.Errorf("invalid config: %q, %v", config, "* not allowed in blacklist config")
+=======
 			return fmt.Errorf("invalid config: %q, %v", config, "* not allowd in blacklist config")
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 		if suffix != "" {
 			return fmt.Errorf("invalid config: %q, %v", config, "header/message limit not allowed in blacklist config")

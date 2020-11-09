@@ -73,7 +73,10 @@ func DefaultTokenSource(ctx context.Context, scope ...string) (oauth2.TokenSourc
 //   4. On Google Compute Engine, Google App Engine standard second generation runtimes
 //      (>= Go 1.11), and Google App Engine flexible environment, it fetches
 //      credentials from the metadata server.
+<<<<<<< HEAD
+=======
 //      (In this final case any provided scopes are ignored.)
+>>>>>>> cbc9bb05... fixup add vendor back
 func FindDefaultCredentials(ctx context.Context, scopes ...string) (*Credentials, error) {
 	// First, try the environment variable.
 	const envVar = "GOOGLE_APPLICATION_CREDENTIALS"
@@ -109,7 +112,11 @@ func FindDefaultCredentials(ctx context.Context, scopes ...string) (*Credentials
 		id, _ := metadata.ProjectID()
 		return &DefaultCredentials{
 			ProjectID:   id,
+<<<<<<< HEAD
+			TokenSource: ComputeTokenSource("", scopes...),
+=======
 			TokenSource: ComputeTokenSource(""),
+>>>>>>> cbc9bb05... fixup add vendor back
 		}, nil
 	}
 

@@ -58,8 +58,8 @@ deploy: manifests
 
 # Generate manifests e.g. CRD, Webhooks
 manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go webhook
+	${CONTROLLER_GEN} crd
+	${CONTROLLER_GEN} webhook
 
 # Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
 samples:
@@ -75,12 +75,12 @@ vet:
 	go vet -tags "${BUILDTAGS}" ./pkg/... ./cmd/...
 
 # Generate code
-generate: conversion-gen
-	go generate ./pkg/... ./cmd/...
+generate: conversion-gen controller-gen
+	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./..."
 
 # Generate conversion functions
 conversion-gen:
-	./hack/conversion-gen-${GOOS} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i ./pkg/compat/conversion/...
+	./hack/conversion-gen-${GOOS} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i github.com/konveyor/mig-controller/pkg/compat/conversion/...
 
 # Build the docker image
 #docker-build: test
@@ -92,3 +92,20 @@ docker-build:
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif

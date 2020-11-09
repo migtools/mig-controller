@@ -66,6 +66,17 @@ type Config struct {
 	// request.  If empty, the value of TokenURL is used as the
 	// intended audience.
 	Audience string
+<<<<<<< HEAD
+
+	// PrivateClaims optionally specifies custom private claims in the JWT.
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.3
+	PrivateClaims map[string]interface{}
+
+	// UseIDToken optionally specifies whether ID token should be used instead
+	// of access token when the server returns both.
+	UseIDToken bool
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // TokenSource returns a JWT TokenSource using the configuration
@@ -97,9 +108,16 @@ func (js jwtSource) Token() (*oauth2.Token, error) {
 	}
 	hc := oauth2.NewClient(js.ctx, nil)
 	claimSet := &jws.ClaimSet{
+<<<<<<< HEAD
+		Iss:           js.conf.Email,
+		Scope:         strings.Join(js.conf.Scopes, " "),
+		Aud:           js.conf.TokenURL,
+		PrivateClaims: js.conf.PrivateClaims,
+=======
 		Iss:   js.conf.Email,
 		Scope: strings.Join(js.conf.Scopes, " "),
 		Aud:   js.conf.TokenURL,
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if subject := js.conf.Subject; subject != "" {
 		claimSet.Sub = subject
@@ -166,5 +184,14 @@ func (js jwtSource) Token() (*oauth2.Token, error) {
 		}
 		token.Expiry = time.Unix(claimSet.Exp, 0)
 	}
+<<<<<<< HEAD
+	if js.conf.UseIDToken {
+		if tokenRes.IDToken == "" {
+			return nil, fmt.Errorf("oauth2: response doesn't have JWT token")
+		}
+		token.AccessToken = tokenRes.IDToken
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return token, nil
 }

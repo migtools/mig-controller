@@ -80,12 +80,15 @@ func (c Cap) String() string {
 		return "block_suspend"
 	case CAP_AUDIT_READ:
 		return "audit_read"
+<<<<<<< HEAD
+=======
 	case CAP_PERFMON:
 		return "perfmon"
 	case CAP_BPF:
 		return "bpf"
 	case CAP_CHECKPOINT_RESTORE:
 		return "checkpoint_restore"
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return "unknown"
 }
@@ -131,8 +134,11 @@ func List() []Cap {
 		CAP_WAKE_ALARM,
 		CAP_BLOCK_SUSPEND,
 		CAP_AUDIT_READ,
+<<<<<<< HEAD
+=======
 		CAP_PERFMON,
 		CAP_BPF,
 		CAP_CHECKPOINT_RESTORE,
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }

@@ -12,10 +12,18 @@ import (
 	"strings"
 	"time"
 
+<<<<<<< HEAD
+	"github.com/gin-gonic/gin/internal/bytesconv"
+	"github.com/gin-gonic/gin/internal/json"
+)
+
+var errUnknownType = errors.New("unknown type")
+=======
 	"github.com/gin-gonic/gin/internal/json"
 )
 
 var errUnknownType = errors.New("Unknown type")
+>>>>>>> cbc9bb05... fixup add vendor back
 
 func mapUri(ptr interface{}, m map[string][]string) error {
 	return mapFormByTag(ptr, m, "uri")
@@ -51,6 +59,13 @@ func mappingByPtr(ptr interface{}, setter setter, tag string) error {
 }
 
 func mapping(value reflect.Value, field reflect.StructField, setter setter, tag string) (bool, error) {
+<<<<<<< HEAD
+	if field.Tag.Get(tag) == "-" { // just ignoring this field
+		return false, nil
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	var vKind = value.Kind()
 
 	if vKind == reflect.Ptr {
@@ -70,12 +85,23 @@ func mapping(value reflect.Value, field reflect.StructField, setter setter, tag 
 		return isSetted, nil
 	}
 
+<<<<<<< HEAD
+	if vKind != reflect.Struct || !field.Anonymous {
+		ok, err := tryToSetValue(value, field, setter, tag)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+=======
 	ok, err := tryToSetValue(value, field, setter, tag)
 	if err != nil {
 		return false, err
 	}
 	if ok {
 		return true, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	if vKind == reflect.Struct {
@@ -83,7 +109,12 @@ func mapping(value reflect.Value, field reflect.StructField, setter setter, tag 
 
 		var isSetted bool
 		for i := 0; i < value.NumField(); i++ {
+<<<<<<< HEAD
+			sf := tValue.Field(i)
+			if sf.PkgPath != "" && !sf.Anonymous { // unexported
+=======
 			if !value.Field(i).CanSet() {
+>>>>>>> cbc9bb05... fixup add vendor back
 				continue
 			}
 			ok, err := mapping(value.Field(i), tValue.Field(i), setter, tag)
@@ -109,9 +140,12 @@ func tryToSetValue(value reflect.Value, field reflect.StructField, setter setter
 	tagValue = field.Tag.Get(tag)
 	tagValue, opts := head(tagValue, ",")
 
+<<<<<<< HEAD
+=======
 	if tagValue == "-" { // just ignoring this field
 		return false, nil
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	if tagValue == "" { // default value is FieldName
 		tagValue = field.Name
 	}
@@ -123,9 +157,13 @@ func tryToSetValue(value reflect.Value, field reflect.StructField, setter setter
 	for len(opts) > 0 {
 		opt, opts = head(opts, ",")
 
+<<<<<<< HEAD
+		if k, v := head(opt, "="); k == "default" {
+=======
 		k, v := head(opt, "=")
 		switch k {
 		case "default":
+>>>>>>> cbc9bb05... fixup add vendor back
 			setOpt.isDefaultExists = true
 			setOpt.defaultValue = v
 		}
@@ -206,9 +244,15 @@ func setWithProperType(val string, value reflect.Value, field reflect.StructFiel
 		case time.Time:
 			return setTimeField(val, field, value)
 		}
+<<<<<<< HEAD
+		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
+	case reflect.Map:
+		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
+=======
 		return json.Unmarshal([]byte(val), value.Addr().Interface())
 	case reflect.Map:
 		return json.Unmarshal([]byte(val), value.Addr().Interface())
+>>>>>>> cbc9bb05... fixup add vendor back
 	default:
 		return errUnknownType
 	}
@@ -265,6 +309,27 @@ func setTimeField(val string, structField reflect.StructField, value reflect.Val
 		timeFormat = time.RFC3339
 	}
 
+<<<<<<< HEAD
+	switch tf := strings.ToLower(timeFormat); tf {
+	case "unix", "unixnano":
+		tv, err := strconv.ParseInt(val, 10, 0)
+		if err != nil {
+			return err
+		}
+
+		d := time.Duration(1)
+		if tf == "unixnano" {
+			d = time.Second
+		}
+
+		t := time.Unix(tv/int64(d), tv%int64(d))
+		value.Set(reflect.ValueOf(t))
+		return nil
+
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if val == "" {
 		value.Set(reflect.ValueOf(time.Time{}))
 		return nil

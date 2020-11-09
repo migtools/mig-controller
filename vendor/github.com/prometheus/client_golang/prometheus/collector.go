@@ -79,7 +79,11 @@ type Collector interface {
 // of the Describe method. If a Collector sometimes collects no metrics at all
 // (for example vectors like CounterVec, GaugeVec, etc., which only collect
 // metrics after a metric with a fully specified label set has been accessed),
+<<<<<<< HEAD
+// it might even get registered as an unchecked Collector (cf. the Register
+=======
 // it might even get registered as an unchecked Collecter (cf. the Register
+>>>>>>> cbc9bb05... fixup add vendor back
 // method of the Registerer interface). Hence, only use this shortcut
 // implementation of Describe if you are certain to fulfill the contract.
 //

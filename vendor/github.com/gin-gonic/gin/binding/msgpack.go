@@ -2,6 +2,11 @@
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
+<<<<<<< HEAD
+// +build !nomsgpack
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package binding
 
 import (

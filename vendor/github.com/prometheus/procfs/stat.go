@@ -20,6 +20,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+<<<<<<< HEAD
+
+	"github.com/prometheus/procfs/internal/fs"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // CPUStat shows how much time the cpu spend in various stages.
@@ -78,6 +83,8 @@ type Stat struct {
 	SoftIRQ SoftIRQStat
 }
 
+<<<<<<< HEAD
+=======
 // NewStat returns kernel/system statistics read from /proc/stat.
 func NewStat() (Stat, error) {
 	fs, err := NewFS(DefaultMountPoint)
@@ -88,6 +95,7 @@ func NewStat() (Stat, error) {
 	return fs.NewStat()
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Parse a cpu statistics line and returns the CPUStat struct plus the cpu id (or -1 for the overall sum).
 func parseCPUStat(line string) (CPUStat, int64, error) {
 	cpuStat := CPUStat{}
@@ -149,11 +157,39 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 	return softIRQStat, total, nil
 }
 
+<<<<<<< HEAD
+// NewStat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+//
+// Deprecated: use fs.Stat() instead
+func NewStat() (Stat, error) {
+	fs, err := NewFS(fs.DefaultProcMountPoint)
+	if err != nil {
+		return Stat{}, err
+	}
+	return fs.Stat()
+}
+
+// NewStat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+//
+// Deprecated: use fs.Stat() instead
+func (fs FS) NewStat() (Stat, error) {
+	return fs.Stat()
+}
+
+// Stat returns information about current cpu/process statistics.
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+func (fs FS) Stat() (Stat, error) {
+
+	f, err := os.Open(fs.proc.Path("stat"))
+=======
 // NewStat returns an information about current kernel/system statistics.
 func (fs FS) NewStat() (Stat, error) {
 	// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 
 	f, err := os.Open(fs.Path("stat"))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return Stat{}, err
 	}

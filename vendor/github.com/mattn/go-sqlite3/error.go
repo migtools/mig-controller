@@ -5,7 +5,19 @@
 
 package sqlite3
 
+<<<<<<< HEAD
+/*
+#ifndef USE_LIBSQLITE3
+#include <sqlite3-binding.h>
+#else
+#include <sqlite3.h>
+#endif
+*/
 import "C"
+import "syscall"
+=======
+import "C"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // ErrNo inherit errno.
 type ErrNo int
@@ -20,6 +32,10 @@ type ErrNoExtended int
 type Error struct {
 	Code         ErrNo         /* The error code returned by SQLite */
 	ExtendedCode ErrNoExtended /* The extended error code returned by SQLite */
+<<<<<<< HEAD
+	SystemErrno  syscall.Errno /* The system errno returned by the OS through SQLite, if applicable */
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	err          string        /* The error string returned by sqlite3_errmsg(),
 	this usually contains more specific details. */
 }
@@ -72,10 +88,23 @@ func (err ErrNoExtended) Error() string {
 }
 
 func (err Error) Error() string {
+<<<<<<< HEAD
+	var str string
+	if err.err != "" {
+		str = err.err
+	} else {
+		str = C.GoString(C.sqlite3_errstr(C.int(err.Code)))
+	}
+	if err.SystemErrno != 0 {
+		str += ": " + err.SystemErrno.Error()
+	}
+	return str
+=======
 	if err.err != "" {
 		return err.err
 	}
 	return errorString(err)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // result codes from http://www.sqlite.org/c3ref/c_abort_rollback.html

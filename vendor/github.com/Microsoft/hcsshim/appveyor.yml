@@ -18,7 +18,10 @@ build_script:
   - go build ./cmd/runhcs
   - go build ./cmd/tar2ext4
   - go build ./cmd/wclayer
+<<<<<<< HEAD
+=======
   - go build ./cmd/device-util
+>>>>>>> cbc9bb05... fixup add vendor back
   - go build ./internal/tools/grantvmgroupaccess 
   - go build ./internal/tools/uvmboot
   - go build ./internal/tools/zapdir
@@ -34,7 +37,10 @@ artifacts:
   - path: 'containerd-shim-runhcs-v1.exe'
   - path: 'runhcs.exe'
   - path: 'tar2ext4.exe'
+<<<<<<< HEAD
+=======
   - path: 'device-util.exe'
+>>>>>>> cbc9bb05... fixup add vendor back
   - path: 'wclayer.exe'
   - path: 'grantvmgroupaccess.exe'  
   - path: 'uvmboot.exe'

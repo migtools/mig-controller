@@ -5,7 +5,11 @@
 package v1
 
 import (
+<<<<<<< HEAD
+	corev1 "k8s.io/api/core/v1"
+=======
 	core_v1 "k8s.io/api/core/v1"
+>>>>>>> cbc9bb05... fixup add vendor back
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -85,12 +89,17 @@ func (in *ImageBlobReferences) DeepCopyInto(out *ImageBlobReferences) {
 	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
+<<<<<<< HEAD
+		*out = new(string)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(string)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return
 }
@@ -111,12 +120,17 @@ func (in *ImageImportSpec) DeepCopyInto(out *ImageImportSpec) {
 	out.From = in.From
 	if in.To != nil {
 		in, out := &in.To, &out.To
+<<<<<<< HEAD
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(core_v1.LocalObjectReference)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	out.ImportPolicy = in.ImportPolicy
 	out.ReferencePolicy = in.ReferencePolicy
@@ -139,12 +153,17 @@ func (in *ImageImportStatus) DeepCopyInto(out *ImageImportStatus) {
 	in.Status.DeepCopyInto(&out.Status)
 	if in.Image != nil {
 		in, out := &in.Image, &out.Image
+<<<<<<< HEAD
+		*out = new(Image)
+		(*in).DeepCopyInto(*out)
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(Image)
 			(*in).DeepCopyInto(*out)
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return
 }
@@ -180,12 +199,17 @@ func (in *ImageLayerData) DeepCopyInto(out *ImageLayerData) {
 	*out = *in
 	if in.LayerSize != nil {
 		in, out := &in.LayerSize, &out.LayerSize
+<<<<<<< HEAD
+		*out = new(int64)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(int64)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return
 }
@@ -275,6 +299,19 @@ func (in *ImageSignature) DeepCopyInto(out *ImageSignature) {
 	}
 	if in.Created != nil {
 		in, out := &in.Created, &out.Created
+<<<<<<< HEAD
+		*out = (*in).DeepCopy()
+	}
+	if in.IssuedBy != nil {
+		in, out := &in.IssuedBy, &out.IssuedBy
+		*out = new(SignatureIssuer)
+		**out = **in
+	}
+	if in.IssuedTo != nil {
+		in, out := &in.IssuedTo, &out.IssuedTo
+		*out = new(SignatureSubject)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
@@ -298,6 +335,7 @@ func (in *ImageSignature) DeepCopyInto(out *ImageSignature) {
 			*out = new(SignatureSubject)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return
 }
@@ -408,12 +446,17 @@ func (in *ImageStreamImportSpec) DeepCopyInto(out *ImageStreamImportSpec) {
 	*out = *in
 	if in.Repository != nil {
 		in, out := &in.Repository, &out.Repository
+<<<<<<< HEAD
+		*out = new(RepositoryImportSpec)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(RepositoryImportSpec)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if in.Images != nil {
 		in, out := &in.Images, &out.Images
@@ -440,6 +483,15 @@ func (in *ImageStreamImportStatus) DeepCopyInto(out *ImageStreamImportStatus) {
 	*out = *in
 	if in.Import != nil {
 		in, out := &in.Import, &out.Import
+<<<<<<< HEAD
+		*out = new(ImageStream)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Repository != nil {
+		in, out := &in.Repository, &out.Repository
+		*out = new(RepositoryImportStatus)
+		(*in).DeepCopyInto(*out)
+=======
 		if *in == nil {
 			*out = nil
 		} else {
@@ -455,6 +507,7 @@ func (in *ImageStreamImportStatus) DeepCopyInto(out *ImageStreamImportStatus) {
 			*out = new(RepositoryImportStatus)
 			(*in).DeepCopyInto(*out)
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if in.Images != nil {
 		in, out := &in.Images, &out.Images
@@ -485,18 +538,26 @@ func (in *ImageStreamLayers) DeepCopyInto(out *ImageStreamLayers) {
 		in, out := &in.Blobs, &out.Blobs
 		*out = make(map[string]ImageLayerData, len(*in))
 		for key, val := range *in {
+<<<<<<< HEAD
+			(*out)[key] = *val.DeepCopy()
+=======
 			newVal := new(ImageLayerData)
 			val.DeepCopyInto(newVal)
 			(*out)[key] = *newVal
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	if in.Images != nil {
 		in, out := &in.Images, &out.Images
 		*out = make(map[string]ImageBlobReferences, len(*in))
 		for key, val := range *in {
+<<<<<<< HEAD
+			(*out)[key] = *val.DeepCopy()
+=======
 			newVal := new(ImageBlobReferences)
 			val.DeepCopyInto(newVal)
 			(*out)[key] = *newVal
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return
@@ -634,12 +695,17 @@ func (in *ImageStreamTag) DeepCopyInto(out *ImageStreamTag) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.Tag != nil {
 		in, out := &in.Tag, &out.Tag
+<<<<<<< HEAD
+		*out = new(TagReference)
+		(*in).DeepCopyInto(*out)
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(TagReference)
 			(*in).DeepCopyInto(*out)
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	out.LookupPolicy = in.LookupPolicy
 	if in.Conditions != nil {
@@ -912,6 +978,15 @@ func (in *TagReference) DeepCopyInto(out *TagReference) {
 	}
 	if in.From != nil {
 		in, out := &in.From, &out.From
+<<<<<<< HEAD
+		*out = new(corev1.ObjectReference)
+		**out = **in
+	}
+	if in.Generation != nil {
+		in, out := &in.Generation, &out.Generation
+		*out = new(int64)
+		**out = **in
+=======
 		if *in == nil {
 			*out = nil
 		} else {
@@ -927,6 +1002,7 @@ func (in *TagReference) DeepCopyInto(out *TagReference) {
 			*out = new(int64)
 			**out = **in
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	out.ImportPolicy = in.ImportPolicy
 	out.ReferencePolicy = in.ReferencePolicy

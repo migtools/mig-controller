@@ -122,13 +122,22 @@
 // the Collect method. The Describe method has to return separate Desc
 // instances, representative of the “throw-away” metrics to be created later.
 // NewDesc comes in handy to create those Desc instances. Alternatively, you
+<<<<<<< HEAD
+// could return no Desc at all, which will mark the Collector “unchecked”.  No
+// checks are performed at registration time, but metric consistency will still
+=======
 // could return no Desc at all, which will marke the Collector “unchecked”.  No
 // checks are porformed at registration time, but metric consistency will still
+>>>>>>> cbc9bb05... fixup add vendor back
 // be ensured at scrape time, i.e. any inconsistencies will lead to scrape
 // errors. Thus, with unchecked Collectors, the responsibility to not collect
 // metrics that lead to inconsistencies in the total scrape result lies with the
 // implementer of the Collector. While this is not a desirable state, it is
+<<<<<<< HEAD
+// sometimes necessary. The typical use case is a situation where the exact
+=======
 // sometimes necessary. The typical use case is a situatios where the exact
+>>>>>>> cbc9bb05... fixup add vendor back
 // metrics to be returned by a Collector cannot be predicted at registration
 // time, but the implementer has sufficient knowledge of the whole system to
 // guarantee metric consistency.
@@ -183,7 +192,10 @@
 // method can then expose the gathered metrics in some way. Usually, the metrics
 // are served via HTTP on the /metrics endpoint. That's happening in the example
 // above. The tools to expose metrics via HTTP are in the promhttp sub-package.
+<<<<<<< HEAD
+=======
 // (The top-level functions in the prometheus package are deprecated.)
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // Pushing to the Pushgateway
 //

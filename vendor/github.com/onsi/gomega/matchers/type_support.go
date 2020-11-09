@@ -6,6 +6,12 @@ See the docs for Gomega for documentation on the matchers
 
 http://onsi.github.io/gomega/
 */
+<<<<<<< HEAD
+
+// untested sections: 11
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package matchers
 
 import (

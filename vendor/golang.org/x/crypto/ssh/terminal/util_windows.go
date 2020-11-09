@@ -85,8 +85,13 @@ func ReadPassword(fd int) ([]byte, error) {
 	}
 	old := st
 
+<<<<<<< HEAD
+	st &^= (windows.ENABLE_ECHO_INPUT | windows.ENABLE_LINE_INPUT)
+	st |= (windows.ENABLE_PROCESSED_OUTPUT | windows.ENABLE_PROCESSED_INPUT)
+=======
 	st &^= (windows.ENABLE_ECHO_INPUT)
 	st |= (windows.ENABLE_PROCESSED_INPUT | windows.ENABLE_LINE_INPUT | windows.ENABLE_PROCESSED_OUTPUT)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err := windows.SetConsoleMode(windows.Handle(fd), st); err != nil {
 		return nil, err
 	}

@@ -37,17 +37,37 @@ func (iter *Iterator) SkipAndReturnBytes() []byte {
 	return iter.stopCapture()
 }
 
+<<<<<<< HEAD
+// SkipAndAppendBytes skips next JSON element and appends its content to
+// buffer, returning the result.
+func (iter *Iterator) SkipAndAppendBytes(buf []byte) []byte {
+	iter.startCaptureTo(buf, iter.head)
+	iter.Skip()
+	return iter.stopCapture()
+}
+
+func (iter *Iterator) startCaptureTo(buf []byte, captureStartedAt int) {
+=======
 type captureBuffer struct {
 	startedAt int
 	captured  []byte
 }
 
 func (iter *Iterator) startCapture(captureStartedAt int) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	if iter.captured != nil {
 		panic("already in capture mode")
 	}
 	iter.captureStartedAt = captureStartedAt
+<<<<<<< HEAD
+	iter.captured = buf
+}
+
+func (iter *Iterator) startCapture(captureStartedAt int) {
+	iter.startCaptureTo(make([]byte, 0, 32), captureStartedAt)
+=======
 	iter.captured = make([]byte, 0, 32)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (iter *Iterator) stopCapture() []byte {
@@ -58,6 +78,9 @@ func (iter *Iterator) stopCapture() []byte {
 	remaining := iter.buf[iter.captureStartedAt:iter.head]
 	iter.captureStartedAt = -1
 	iter.captured = nil
+<<<<<<< HEAD
+	return append(captured, remaining...)
+=======
 	if len(captured) == 0 {
 		copied := make([]byte, len(remaining))
 		copy(copied, remaining)
@@ -65,6 +88,7 @@ func (iter *Iterator) stopCapture() []byte {
 	}
 	captured = append(captured, remaining...)
 	return captured
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Skip skips a json object and positions to relatively the next json object

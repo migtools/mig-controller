@@ -53,7 +53,11 @@ func newImageSource(ctx context.Context, sys *types.SystemContext, ref dockerRef
 	// contain the image, it will be used for all future pull actions.  Always try the
 	// non-mirror original location last; this both transparently handles the case
 	// of no mirrors configured, and ensures we return the error encountered when
+<<<<<<< HEAD
+	// accessing the upstream location if all endpoints fail.
+=======
 	// acessing the upstream location if all endpoints fail.
+>>>>>>> cbc9bb05... fixup add vendor back
 	pullSources, err := registry.PullSourcesFromReference(ref.ref)
 	if err != nil {
 		return nil, err
@@ -238,6 +242,12 @@ func (s *dockerImageSource) getExternalBlob(ctx context.Context, urls []string) 
 		return nil, 0, errors.New("internal error: getExternalBlob called with no URLs")
 	}
 	for _, url := range urls {
+<<<<<<< HEAD
+		// NOTE: we must not authenticate on additional URLs as those
+		//       can be abused to leak credentials or tokens.  Please
+		//       refer to CVE-2020-15157 for more information.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		resp, err = s.c.makeRequestToResolvedURL(ctx, "GET", url, nil, nil, -1, noAuth, nil)
 		if err == nil {
 			if resp.StatusCode != http.StatusOK {
@@ -297,12 +307,21 @@ func (s *dockerImageSource) GetSignatures(ctx context.Context, instanceDigest *d
 		return nil, err
 	}
 	switch {
+<<<<<<< HEAD
+	case s.c.supportsSignatures:
+		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
+	case s.c.signatureBase != nil:
+		return s.getSignaturesFromLookaside(ctx, instanceDigest)
+	default:
+		return nil, errors.Errorf("Internal error: X-Registry-Supports-Signatures extension not supported, and lookaside should not be empty configuration")
+=======
 	case s.c.signatureBase != nil:
 		return s.getSignaturesFromLookaside(ctx, instanceDigest)
 	case s.c.supportsSignatures:
 		return s.getSignaturesFromAPIExtension(ctx, instanceDigest)
 	default:
 		return [][]byte{}, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
@@ -336,9 +355,12 @@ func (s *dockerImageSource) getSignaturesFromLookaside(ctx context.Context, inst
 	signatures := [][]byte{}
 	for i := 0; ; i++ {
 		url := signatureStorageURL(s.c.signatureBase, manifestDigest, i)
+<<<<<<< HEAD
+=======
 		if url == nil {
 			return nil, errors.Errorf("Internal error: signatureStorageURL with non-nil base returned nil")
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 		signature, missing, err := s.getOneSignature(ctx, url)
 		if err != nil {
 			return nil, err
@@ -474,6 +496,21 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 		return errors.Errorf("Failed to delete %v: %s (%v)", deletePath, string(body), delete.Status)
 	}
 
+<<<<<<< HEAD
+	manifestDigest, err := manifest.Digest(manifestBody)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; ; i++ {
+		url := signatureStorageURL(c.signatureBase, manifestDigest, i)
+		missing, err := c.deleteOneSignature(url)
+		if err != nil {
+			return err
+		}
+		if missing {
+			break
+=======
 	if c.signatureBase != nil {
 		manifestDigest, err := manifest.Digest(manifestBody)
 		if err != nil {
@@ -492,6 +529,7 @@ func deleteImage(ctx context.Context, sys *types.SystemContext, ref dockerRefere
 			if missing {
 				break
 			}
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 

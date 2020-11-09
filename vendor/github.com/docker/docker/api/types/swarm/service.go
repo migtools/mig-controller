@@ -10,6 +10,16 @@ type Service struct {
 	PreviousSpec *ServiceSpec  `json:",omitempty"`
 	Endpoint     Endpoint      `json:",omitempty"`
 	UpdateStatus *UpdateStatus `json:",omitempty"`
+<<<<<<< HEAD
+
+	// ServiceStatus is an optional, extra field indicating the number of
+	// desired and running tasks. It is provided primarily as a shortcut to
+	// calculating these values client-side, which otherwise would require
+	// listing all tasks for a service, an operation that could be
+	// computation and network expensive.
+	ServiceStatus *ServiceStatus `json:",omitempty"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ServiceSpec represents the spec of a service.
@@ -122,3 +132,20 @@ type UpdateConfig struct {
 	// started, or the new task is started before the old task is shut down.
 	Order string
 }
+<<<<<<< HEAD
+
+// ServiceStatus represents the number of running tasks in a service and the
+// number of tasks desired to be running.
+type ServiceStatus struct {
+	// RunningTasks is the number of tasks for the service actually in the
+	// Running state
+	RunningTasks uint64
+
+	// DesiredTasks is the number of tasks desired to be running by the
+	// service. For replicated services, this is the replica count. For global
+	// services, this is computed by taking the number of tasks with desired
+	// state of not-Shutdown.
+	DesiredTasks uint64
+}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

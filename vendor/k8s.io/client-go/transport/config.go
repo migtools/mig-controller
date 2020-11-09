@@ -39,11 +39,20 @@ type Config struct {
 	// Bearer token for authentication
 	BearerToken string
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 	// Path to a file containing a BearerToken.
 	// If set, the contents are periodically read.
 	// The last successfully read value takes precedence over BearerToken.
 	BearerTokenFile string
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
 
@@ -85,7 +94,15 @@ func (c *Config) HasBasicAuth() bool {
 
 // HasTokenAuth returns whether the configuration has token authentication or not.
 func (c *Config) HasTokenAuth() bool {
+<<<<<<< HEAD
 	return len(c.BearerToken) != 0 || len(c.BearerTokenFile) != 0
+=======
+<<<<<<< HEAD
+	return len(c.BearerToken) != 0 || len(c.BearerTokenFile) != 0
+=======
+	return len(c.BearerToken) != 0
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 }
 
 // HasCertAuth returns whether the configuration has certificate authentication or not.

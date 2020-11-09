@@ -16,6 +16,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+<<<<<<< HEAD
+	"sync"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"time"
 
 	"github.com/gin-contrib/sse"
@@ -48,9 +52,19 @@ type Context struct {
 	Params   Params
 	handlers HandlersChain
 	index    int8
+<<<<<<< HEAD
+	fullPath string
 
 	engine *Engine
 
+	// This mutex protect Keys map
+	mu sync.RWMutex
+
+=======
+
+	engine *Engine
+
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Keys is a key/value pair exclusively for the context of each request.
 	Keys map[string]interface{}
 
@@ -59,6 +73,20 @@ type Context struct {
 
 	// Accepted defines a list of manually accepted formats for content negotiation.
 	Accepted []string
+<<<<<<< HEAD
+
+	// queryCache use url.ParseQuery cached the param query result from c.Request.URL.Query()
+	queryCache url.Values
+
+	// formCache use url.ParseQuery cached PostForm contains the parsed form data from POST, PATCH,
+	// or PUT body parameters.
+	formCache url.Values
+
+	// SameSite allows a server to define a cookie attribute making it impossible for
+	// the browser to send this cookie along with cross-site requests.
+	sameSite http.SameSite
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 /************************************/
@@ -70,15 +98,34 @@ func (c *Context) reset() {
 	c.Params = c.Params[0:0]
 	c.handlers = nil
 	c.index = -1
+<<<<<<< HEAD
+
+	c.fullPath = ""
 	c.Keys = nil
 	c.Errors = c.Errors[0:0]
 	c.Accepted = nil
+	c.queryCache = nil
+	c.formCache = nil
+=======
+	c.Keys = nil
+	c.Errors = c.Errors[0:0]
+	c.Accepted = nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Copy returns a copy of the current context that can be safely used outside the request's scope.
 // This has to be used when the context has to be passed to a goroutine.
 func (c *Context) Copy() *Context {
+<<<<<<< HEAD
+	cp := Context{
+		writermem: c.writermem,
+		Request:   c.Request,
+		Params:    c.Params,
+		engine:    c.engine,
+	}
+=======
 	var cp = *c
+>>>>>>> cbc9bb05... fixup add vendor back
 	cp.writermem.ResponseWriter = nil
 	cp.Writer = &cp.writermem
 	cp.index = abortIndex
@@ -87,6 +134,12 @@ func (c *Context) Copy() *Context {
 	for k, v := range c.Keys {
 		cp.Keys[k] = v
 	}
+<<<<<<< HEAD
+	paramCopy := make([]Param, len(cp.Params))
+	copy(paramCopy, cp.Params)
+	cp.Params = paramCopy
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return &cp
 }
 
@@ -111,6 +164,18 @@ func (c *Context) Handler() HandlerFunc {
 	return c.handlers.Last()
 }
 
+<<<<<<< HEAD
+// FullPath returns a matched route full path. For not found routes
+// returns an empty string.
+//     router.GET("/user/:id", func(c *gin.Context) {
+//         c.FullPath() == "/user/:id" // true
+//     })
+func (c *Context) FullPath() string {
+	return c.fullPath
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 /************************************/
 /*********** FLOW CONTROL ***********/
 /************************************/
@@ -196,16 +261,32 @@ func (c *Context) Error(err error) *Error {
 // Set is used to store a new key/value pair exclusively for this context.
 // It also lazy initializes  c.Keys if it was not used previously.
 func (c *Context) Set(key string, value interface{}) {
+<<<<<<< HEAD
+	c.mu.Lock()
+	if c.Keys == nil {
+		c.Keys = make(map[string]interface{})
+	}
+
+	c.Keys[key] = value
+	c.mu.Unlock()
+=======
 	if c.Keys == nil {
 		c.Keys = make(map[string]interface{})
 	}
 	c.Keys[key] = value
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Get returns the value for the given key, ie: (value, true).
 // If the value does not exists it returns (nil, false)
 func (c *Context) Get(key string) (value interface{}, exists bool) {
+<<<<<<< HEAD
+	c.mu.RLock()
 	value, exists = c.Keys[key]
+	c.mu.RUnlock()
+=======
+	value, exists = c.Keys[key]
+>>>>>>> cbc9bb05... fixup add vendor back
 	return
 }
 
@@ -368,10 +449,24 @@ func (c *Context) QueryArray(key string) []string {
 	return values
 }
 
+<<<<<<< HEAD
+func (c *Context) getQueryCache() {
+	if c.queryCache == nil {
+		c.queryCache = c.Request.URL.Query()
+	}
+}
+
+// GetQueryArray returns a slice of strings for a given query key, plus
+// a boolean value whether at least one value exists for the given key.
+func (c *Context) GetQueryArray(key string) ([]string, bool) {
+	c.getQueryCache()
+	if values, ok := c.queryCache[key]; ok && len(values) > 0 {
+=======
 // GetQueryArray returns a slice of strings for a given query key, plus
 // a boolean value whether at least one value exists for the given key.
 func (c *Context) GetQueryArray(key string) ([]string, bool) {
 	if values, ok := c.Request.URL.Query()[key]; ok && len(values) > 0 {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return values, true
 	}
 	return []string{}, false
@@ -386,7 +481,12 @@ func (c *Context) QueryMap(key string) map[string]string {
 // GetQueryMap returns a map for a given query key, plus a boolean value
 // whether at least one value exists for the given key.
 func (c *Context) GetQueryMap(key string) (map[string]string, bool) {
+<<<<<<< HEAD
+	c.getQueryCache()
+	return c.get(c.queryCache, key)
+=======
 	return c.get(c.Request.URL.Query(), key)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // PostForm returns the specified key from a POST urlencoded form or multipart form
@@ -427,6 +527,26 @@ func (c *Context) PostFormArray(key string) []string {
 	return values
 }
 
+<<<<<<< HEAD
+func (c *Context) getFormCache() {
+	if c.formCache == nil {
+		c.formCache = make(url.Values)
+		req := c.Request
+		if err := req.ParseMultipartForm(c.engine.MaxMultipartMemory); err != nil {
+			if err != http.ErrNotMultipart {
+				debugPrint("error on parse multipart form array: %v", err)
+			}
+		}
+		c.formCache = req.PostForm
+	}
+}
+
+// GetPostFormArray returns a slice of strings for a given form key, plus
+// a boolean value whether at least one value exists for the given key.
+func (c *Context) GetPostFormArray(key string) ([]string, bool) {
+	c.getFormCache()
+	if values := c.formCache[key]; len(values) > 0 {
+=======
 // GetPostFormArray returns a slice of strings for a given form key, plus
 // a boolean value whether at least one value exists for the given key.
 func (c *Context) GetPostFormArray(key string) ([]string, bool) {
@@ -437,6 +557,7 @@ func (c *Context) GetPostFormArray(key string) ([]string, bool) {
 		}
 	}
 	if values := req.PostForm[key]; len(values) > 0 {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return values, true
 	}
 	return []string{}, false
@@ -451,6 +572,10 @@ func (c *Context) PostFormMap(key string) map[string]string {
 // GetPostFormMap returns a map for a given form key, plus a boolean value
 // whether at least one value exists for the given key.
 func (c *Context) GetPostFormMap(key string) (map[string]string, bool) {
+<<<<<<< HEAD
+	c.getFormCache()
+	return c.get(c.formCache, key)
+=======
 	req := c.Request
 	if err := req.ParseMultipartForm(c.engine.MaxMultipartMemory); err != nil {
 		if err != http.ErrNotMultipart {
@@ -458,6 +583,7 @@ func (c *Context) GetPostFormMap(key string) (map[string]string, bool) {
 		}
 	}
 	return c.get(req.PostForm, key)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // get is an internal method and returns a map which satisfy conditions.
@@ -482,7 +608,15 @@ func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
 			return nil, err
 		}
 	}
+<<<<<<< HEAD
+	f, fh, err := c.Request.FormFile(name)
+	if err != nil {
+		return nil, err
+	}
+	f.Close()
+=======
 	_, fh, err := c.Request.FormFile(name)
+>>>>>>> cbc9bb05... fixup add vendor back
 	return fh, err
 }
 
@@ -543,6 +677,14 @@ func (c *Context) BindYAML(obj interface{}) error {
 	return c.MustBindWith(obj, binding.YAML)
 }
 
+<<<<<<< HEAD
+// BindHeader is a shortcut for c.MustBindWith(obj, binding.Header).
+func (c *Context) BindHeader(obj interface{}) error {
+	return c.MustBindWith(obj, binding.Header)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // BindUri binds the passed struct pointer using binding.Uri.
 // It will abort the request with HTTP 400 if any error occurs.
 func (c *Context) BindUri(obj interface{}) error {
@@ -597,6 +739,14 @@ func (c *Context) ShouldBindYAML(obj interface{}) error {
 	return c.ShouldBindWith(obj, binding.YAML)
 }
 
+<<<<<<< HEAD
+// ShouldBindHeader is a shortcut for c.ShouldBindWith(obj, binding.Header).
+func (c *Context) ShouldBindHeader(obj interface{}) error {
+	return c.ShouldBindWith(obj, binding.Header)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // ShouldBindUri binds the passed struct pointer using the specified binding engine.
 func (c *Context) ShouldBindUri(obj interface{}) error {
 	m := make(map[string][]string)
@@ -671,7 +821,11 @@ func (c *Context) ContentType() string {
 // handshake is being initiated by the client.
 func (c *Context) IsWebsocket() bool {
 	if strings.Contains(strings.ToLower(c.requestHeader("Connection")), "upgrade") &&
+<<<<<<< HEAD
+		strings.EqualFold(c.requestHeader("Upgrade"), "websocket") {
+=======
 		strings.ToLower(c.requestHeader("Upgrade")) == "websocket" {
+>>>>>>> cbc9bb05... fixup add vendor back
 		return true
 	}
 	return false
@@ -700,7 +854,11 @@ func bodyAllowedForStatus(status int) bool {
 
 // Status sets the HTTP response code.
 func (c *Context) Status(code int) {
+<<<<<<< HEAD
+	c.Writer.WriteHeader(code)
+=======
 	c.writermem.WriteHeader(code)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Header is a intelligent shortcut for c.Writer.Header().Set(key, value).
@@ -724,6 +882,14 @@ func (c *Context) GetRawData() ([]byte, error) {
 	return ioutil.ReadAll(c.Request.Body)
 }
 
+<<<<<<< HEAD
+// SetSameSite with cookie
+func (c *Context) SetSameSite(samesite http.SameSite) {
+	c.sameSite = samesite
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // SetCookie adds a Set-Cookie header to the ResponseWriter's headers.
 // The provided cookie must have a valid Name. Invalid cookies may be
 // silently dropped.
@@ -737,6 +903,10 @@ func (c *Context) SetCookie(name, value string, maxAge int, path, domain string,
 		MaxAge:   maxAge,
 		Path:     path,
 		Domain:   domain,
+<<<<<<< HEAD
+		SameSite: c.sameSite,
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		Secure:   secure,
 		HttpOnly: httpOnly,
 	})
@@ -876,6 +1046,20 @@ func (c *Context) File(filepath string) {
 	http.ServeFile(c.Writer, c.Request, filepath)
 }
 
+<<<<<<< HEAD
+// FileFromFS writes the specified file from http.FileSytem into the body stream in an efficient way.
+func (c *Context) FileFromFS(filepath string, fs http.FileSystem) {
+	defer func(old string) {
+		c.Request.URL.Path = old
+	}(c.Request.URL.Path)
+
+	c.Request.URL.Path = filepath
+
+	http.FileServer(fs).ServeHTTP(c.Writer, c.Request)
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // FileAttachment writes the specified file into the body stream in an efficient way
 // On the client side, the file will typically be downloaded with the given filename
 func (c *Context) FileAttachment(filepath, filename string) {
@@ -921,6 +1105,10 @@ type Negotiate struct {
 	HTMLData interface{}
 	JSONData interface{}
 	XMLData  interface{}
+<<<<<<< HEAD
+	YAMLData interface{}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Data     interface{}
 }
 
@@ -939,6 +1127,13 @@ func (c *Context) Negotiate(code int, config Negotiate) {
 		data := chooseData(config.XMLData, config.Data)
 		c.XML(code, data)
 
+<<<<<<< HEAD
+	case binding.MIMEYAML:
+		data := chooseData(config.YAMLData, config.Data)
+		c.YAML(code, data)
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	default:
 		c.AbortWithError(http.StatusNotAcceptable, errors.New("the accepted formats are not offered by the server")) // nolint: errcheck
 	}
@@ -955,20 +1150,35 @@ func (c *Context) NegotiateFormat(offered ...string) string {
 		return offered[0]
 	}
 	for _, accepted := range c.Accepted {
+<<<<<<< HEAD
+		for _, offer := range offered {
+=======
 		for _, offert := range offered {
+>>>>>>> cbc9bb05... fixup add vendor back
 			// According to RFC 2616 and RFC 2396, non-ASCII characters are not allowed in headers,
 			// therefore we can just iterate over the string without casting it into []rune
 			i := 0
 			for ; i < len(accepted); i++ {
+<<<<<<< HEAD
+				if accepted[i] == '*' || offer[i] == '*' {
+					return offer
+				}
+				if accepted[i] != offer[i] {
+=======
 				if accepted[i] == '*' || offert[i] == '*' {
 					return offert
 				}
 				if accepted[i] != offert[i] {
+>>>>>>> cbc9bb05... fixup add vendor back
 					break
 				}
 			}
 			if i == len(accepted) {
+<<<<<<< HEAD
+				return offer
+=======
 				return offert
+>>>>>>> cbc9bb05... fixup add vendor back
 			}
 		}
 	}
@@ -984,26 +1194,41 @@ func (c *Context) SetAccepted(formats ...string) {
 /***** GOLANG.ORG/X/NET/CONTEXT *****/
 /************************************/
 
+<<<<<<< HEAD
+// Deadline always returns that there is no deadline (ok==false),
+// maybe you want to use Request.Context().Deadline() instead.
+=======
 // Deadline returns the time when work done on behalf of this context
 // should be canceled. Deadline returns ok==false when no deadline is
 // set. Successive calls to Deadline return the same results.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *Context) Deadline() (deadline time.Time, ok bool) {
 	return
 }
 
+<<<<<<< HEAD
+// Done always returns nil (chan which will wait forever),
+// if you want to abort your work when the connection was closed
+// you should use Request.Context().Done() instead.
+=======
 // Done returns a channel that's closed when work done on behalf of this
 // context should be canceled. Done may return nil if this context can
 // never be canceled. Successive calls to Done return the same value.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *Context) Done() <-chan struct{} {
 	return nil
 }
 
+<<<<<<< HEAD
+// Err always returns nil, maybe you want to use Request.Context().Err() instead.
+=======
 // Err returns a non-nil error value after Done is closed,
 // successive calls to Err return the same error.
 // If Done is not yet closed, Err returns nil.
 // If Done is closed, Err returns a non-nil error explaining why:
 // Canceled if the context was canceled
 // or DeadlineExceeded if the context's deadline passed.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *Context) Err() error {
 	return nil
 }

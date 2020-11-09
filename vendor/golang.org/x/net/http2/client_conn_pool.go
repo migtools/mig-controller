@@ -107,6 +107,10 @@ func (p *clientConnPool) getClientConn(req *http.Request, addr string, dialOnMis
 
 // dialCall is an in-flight Transport dial call to a host.
 type dialCall struct {
+<<<<<<< HEAD
+	_    incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	p    *clientConnPool
 	done chan struct{} // closed when done
 	res  *ClientConn   // valid after done is closed
@@ -180,6 +184,10 @@ func (p *clientConnPool) addConnIfNeeded(key string, t *Transport, c *tls.Conn) 
 }
 
 type addConnCall struct {
+<<<<<<< HEAD
+	_    incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	p    *clientConnPool
 	done chan struct{} // closed when done
 	err  error
@@ -200,12 +208,15 @@ func (c *addConnCall) run(t *Transport, key string, tc *tls.Conn) {
 	close(c.done)
 }
 
+<<<<<<< HEAD
+=======
 func (p *clientConnPool) addConn(key string, cc *ClientConn) {
 	p.mu.Lock()
 	p.addConnLocked(key, cc)
 	p.mu.Unlock()
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // p.mu must be held
 func (p *clientConnPool) addConnLocked(key string, cc *ClientConn) {
 	for _, v := range p.conns[key] {

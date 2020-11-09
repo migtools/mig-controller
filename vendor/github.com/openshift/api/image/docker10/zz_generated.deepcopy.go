@@ -19,8 +19,13 @@ func (in *DockerConfig) DeepCopyInto(out *DockerConfig) {
 	if in.ExposedPorts != nil {
 		in, out := &in.ExposedPorts, &out.ExposedPorts
 		*out = make(map[string]struct{}, len(*in))
+<<<<<<< HEAD
+		for key, val := range *in {
+			(*out)[key] = val
+=======
 		for key := range *in {
 			(*out)[key] = struct{}{}
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	if in.Env != nil {
@@ -41,8 +46,13 @@ func (in *DockerConfig) DeepCopyInto(out *DockerConfig) {
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
 		*out = make(map[string]struct{}, len(*in))
+<<<<<<< HEAD
+		for key, val := range *in {
+			(*out)[key] = val
+=======
 		for key := range *in {
 			(*out)[key] = struct{}{}
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	if in.Entrypoint != nil {
@@ -88,12 +98,17 @@ func (in *DockerImage) DeepCopyInto(out *DockerImage) {
 	in.ContainerConfig.DeepCopyInto(&out.ContainerConfig)
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
+<<<<<<< HEAD
+		*out = new(DockerConfig)
+		(*in).DeepCopyInto(*out)
+=======
 		if *in == nil {
 			*out = nil
 		} else {
 			*out = new(DockerConfig)
 			(*in).DeepCopyInto(*out)
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return
 }

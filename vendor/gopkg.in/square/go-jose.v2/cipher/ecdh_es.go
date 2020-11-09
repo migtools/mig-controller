@@ -17,10 +17,15 @@
 package josecipher
 
 import (
+<<<<<<< HEAD
+	"crypto"
+	"crypto/ecdsa"
+=======
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"encoding/binary"
 )
 
@@ -46,6 +51,11 @@ func DeriveECDHES(alg string, apuData, apvData []byte, priv *ecdsa.PrivateKey, p
 		panic("public key not on same curve as private key")
 	}
 
+<<<<<<< HEAD
+	z, _ := priv.PublicKey.Curve.ScalarMult(pub.X, pub.Y, priv.D.Bytes())
+	reader := NewConcatKDF(crypto.SHA256, z.Bytes(), algID, ptyUInfo, ptyVInfo, supPubInfo, []byte{})
+
+=======
 	z, _ := priv.Curve.ScalarMult(pub.X, pub.Y, priv.D.Bytes())
 	zBytes := z.Bytes()
 
@@ -59,10 +69,16 @@ func DeriveECDHES(alg string, apuData, apvData []byte, priv *ecdsa.PrivateKey, p
 	}
 
 	reader := NewConcatKDF(crypto.SHA256, zBytes, algID, ptyUInfo, ptyVInfo, supPubInfo, []byte{})
+>>>>>>> cbc9bb05... fixup add vendor back
 	key := make([]byte, size)
 
 	// Read on the KDF will never fail
 	_, _ = reader.Read(key)
+<<<<<<< HEAD
+	return key
+}
+
+=======
 
 	return key
 }
@@ -78,6 +94,7 @@ func dSize(curve elliptic.Curve) int {
 	return size
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func lengthPrefixed(data []byte) []byte {
 	out := make([]byte, len(data)+4)
 	binary.BigEndian.PutUint32(out, uint32(len(data)))

@@ -18,6 +18,11 @@
 
 package grpclog
 
+<<<<<<< HEAD
+import "google.golang.org/grpc/internal/grpclog"
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // Logger mimics golang's standard Logger as an interface.
 //
 // Deprecated: use LoggerV2.
@@ -35,7 +40,11 @@ type Logger interface {
 //
 // Deprecated: use SetLoggerV2.
 func SetLogger(l Logger) {
+<<<<<<< HEAD
+	grpclog.Logger = &loggerWrapper{Logger: l}
+=======
 	logger = &loggerWrapper{Logger: l}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // loggerWrapper wraps Logger into a LoggerV2.

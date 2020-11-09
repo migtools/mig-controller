@@ -1,5 +1,17 @@
 # Mergo
 
+<<<<<<< HEAD
+
+[![GoDoc][3]][4]
+[![GitHub release][5]][6]
+[![GoCard][7]][8]
+[![Build Status][1]][2]
+[![Coverage Status][9]][10]
+[![Sourcegraph][11]][12]
+[![FOSSA Status][13]][14]
+
+[![GoCenter Kudos][15]][16]
+=======
 A helper to merge structs and maps in Golang. Useful for configuration default values, avoiding messy if-statements.
 
 Also a lovely [comune](http://en.wikipedia.org/wiki/Mergo) (municipality) in the Province of Ancona in the Italian region of Marche.
@@ -14,11 +26,48 @@ It is ready for production use. [It is used in several projects by Docker, Googl
 [![Coverage Status][7]][8]
 [![Sourcegraph][9]][10]
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fimdario%2Fmergo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fimdario%2Fmergo?ref=badge_shield)
+>>>>>>> cbc9bb05... fixup add vendor back
 
 [1]: https://travis-ci.org/imdario/mergo.png
 [2]: https://travis-ci.org/imdario/mergo
 [3]: https://godoc.org/github.com/imdario/mergo?status.svg
 [4]: https://godoc.org/github.com/imdario/mergo
+<<<<<<< HEAD
+[5]: https://img.shields.io/github/release/imdario/mergo.svg
+[6]: https://github.com/imdario/mergo/releases
+[7]: https://goreportcard.com/badge/imdario/mergo
+[8]: https://goreportcard.com/report/github.com/imdario/mergo
+[9]: https://coveralls.io/repos/github/imdario/mergo/badge.svg?branch=master
+[10]: https://coveralls.io/github/imdario/mergo?branch=master
+[11]: https://sourcegraph.com/github.com/imdario/mergo/-/badge.svg
+[12]: https://sourcegraph.com/github.com/imdario/mergo?badge
+[13]: https://app.fossa.io/api/projects/git%2Bgithub.com%2Fimdario%2Fmergo.svg?type=shield
+[14]: https://app.fossa.io/projects/git%2Bgithub.com%2Fimdario%2Fmergo?ref=badge_shield
+[15]: https://search.gocenter.io/api/ui/badge/github.com%2Fimdario%2Fmergo
+[16]: https://search.gocenter.io/github.com/imdario/mergo
+
+A helper to merge structs and maps in Golang. Useful for configuration default values, avoiding messy if-statements.
+
+Mergo merges same-type structs and maps by setting default values in zero-value fields. Mergo won't merge unexported (private) fields. It will do recursively any exported one. It also won't merge structs inside maps (because they are not addressable using Go reflection).
+
+Also a lovely [comune](http://en.wikipedia.org/wiki/Mergo) (municipality) in the Province of Ancona in the Italian region of Marche.
+
+## Status
+
+It is ready for production use. [It is used in several projects by Docker, Google, The Linux Foundation, VMWare, Shopify, etc](https://github.com/imdario/mergo#mergo-in-the-wild).
+
+### Important note
+
+Please keep in mind that a problematic PR broke [0.3.9](//github.com/imdario/mergo/releases/tag/0.3.9). I reverted it in [0.3.10](//github.com/imdario/mergo/releases/tag/0.3.10), and I consider it stable but not bug-free. Also, this version adds suppot for go modules.
+
+Keep in mind that in [0.3.2](//github.com/imdario/mergo/releases/tag/0.3.2), Mergo changed `Merge()`and `Map()` signatures to support [transformers](#transformers). I added an optional/variadic argument so that it won't break the existing code.
+
+If you were using Mergo before April 6th, 2015, please check your project works as intended after updating your local copy with ```go get -u github.com/imdario/mergo```. I apologize for any issue caused by its previous behavior and any future bug that Mergo could cause in existing projects after the change (release 0.2.0).
+
+### Donations
+
+If Mergo is useful to you, consider buying me a coffee, a beer, or making a monthly donation to allow me to keep building great free software. :heart_eyes:
+=======
 [5]: https://goreportcard.com/badge/imdario/mergo
 [6]: https://goreportcard.com/report/github.com/imdario/mergo
 [7]: https://coveralls.io/repos/github/imdario/mergo/badge.svg?branch=master
@@ -39,6 +88,7 @@ If you were using Mergo **before** April 6th 2015, please check your project wor
 ### Donations
 
 If Mergo is useful to you, consider buying me a coffee, a beer or making a monthly donation so I can keep building great free software. :heart_eyes:
+>>>>>>> cbc9bb05... fixup add vendor back
 
 <a href='https://ko-fi.com/B0B58839' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://az743702.vo.msecnd.net/cdn/kofi1.png?v=0' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 [![Beerpay](https://beerpay.io/imdario/mergo/badge.svg)](https://beerpay.io/imdario/mergo)
@@ -87,8 +137,14 @@ If Mergo is useful to you, consider buying me a coffee, a beer or making a month
 - [mantasmatelis/whooplist-server](https://github.com/mantasmatelis/whooplist-server)
 - [jnuthong/item_search](https://github.com/jnuthong/item_search)
 - [bukalapak/snowboard](https://github.com/bukalapak/snowboard)
+<<<<<<< HEAD
+- [janoszen/containerssh](https://github.com/janoszen/containerssh)
+
+## Install
+=======
 
 ## Installation
+>>>>>>> cbc9bb05... fixup add vendor back
 
     go get github.com/imdario/mergo
 
@@ -99,7 +155,11 @@ If Mergo is useful to you, consider buying me a coffee, a beer or making a month
 
 ## Usage
 
+<<<<<<< HEAD
+You can only merge same-type structs with exported fields initialized as zero value of their type and same-types maps. Mergo won't merge unexported (private) fields but will do recursively any exported one. It won't merge empty structs value as [they are zero values](https://golang.org/ref/spec#The_zero_value) too. Also, maps will be merged recursively except for structs inside maps (because they are not addressable using Go reflection).
+=======
 You can only merge same-type structs with exported fields initialized as zero value of their type and same-types maps. Mergo won't merge unexported (private) fields but will do recursively any exported one. It won't merge empty structs value as [they are not considered zero values](https://golang.org/ref/spec#The_zero_value) either. Also maps will be merged recursively except for structs inside maps (because they are not addressable using Go reflection).
+>>>>>>> cbc9bb05... fixup add vendor back
 
 ```go
 if err := mergo.Merge(&dst, src); err != nil {
@@ -125,9 +185,13 @@ if err := mergo.Map(&dst, srcMap); err != nil {
 
 Warning: if you map a struct to map, it won't do it recursively. Don't expect Mergo to map struct members of your struct as `map[string]interface{}`. They will be just assigned as values.
 
+<<<<<<< HEAD
+Here is a nice example:
+=======
 More information and examples in [godoc documentation](http://godoc.org/github.com/imdario/mergo).
 
 ### Nice example
+>>>>>>> cbc9bb05... fixup add vendor back
 
 ```go
 package main
@@ -175,10 +239,17 @@ import (
         "time"
 )
 
+<<<<<<< HEAD
+type timeTransformer struct {
+}
+
+func (t timeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+=======
 type timeTransfomer struct {
 }
 
 func (t timeTransfomer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+>>>>>>> cbc9bb05... fixup add vendor back
 	if typ == reflect.TypeOf(time.Time{}) {
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
@@ -202,7 +273,11 @@ type Snapshot struct {
 func main() {
 	src := Snapshot{time.Now()}
 	dest := Snapshot{}
+<<<<<<< HEAD
+	mergo.Merge(&dest, src, mergo.WithTransformers(timeTransformer{}))
+=======
 	mergo.Merge(&dest, src, mergo.WithTransformers(timeTransfomer{}))
+>>>>>>> cbc9bb05... fixup add vendor back
 	fmt.Println(dest)
 	// Will print
 	// { 2018-01-12 01:15:00 +0000 UTC m=+0.000000001 }

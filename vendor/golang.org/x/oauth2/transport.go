@@ -6,7 +6,11 @@ package oauth2
 
 import (
 	"errors"
+<<<<<<< HEAD
+	"log"
+=======
 	"io"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"net/http"
 	"sync"
 )
@@ -25,9 +29,12 @@ type Transport struct {
 	// Base is the base RoundTripper used to make HTTP requests.
 	// If nil, http.DefaultTransport is used.
 	Base http.RoundTripper
+<<<<<<< HEAD
+=======
 
 	mu     sync.Mutex                      // guards modReq
 	modReq map[*http.Request]*http.Request // original -> modified
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // RoundTrip authorizes and authenticates the request with an
@@ -52,6 +59,24 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	req2 := cloneRequest(req) // per RoundTripper contract
 	token.SetAuthHeader(req2)
+<<<<<<< HEAD
+
+	// req.Body is assumed to be closed by the base RoundTripper.
+	reqBodyClosed = true
+	return t.base().RoundTrip(req2)
+}
+
+var cancelOnce sync.Once
+
+// CancelRequest does nothing. It used to be a legacy cancellation mechanism
+// but now only it only logs on first use to warn that it's deprecated.
+//
+// Deprecated: use contexts for cancellation instead.
+func (t *Transport) CancelRequest(req *http.Request) {
+	cancelOnce.Do(func() {
+		log.Printf("deprecated: golang.org/x/oauth2: Transport.CancelRequest no longer does anything; use contexts")
+	})
+=======
 	t.setModReq(req, req2)
 	res, err := t.base().RoundTrip(req2)
 
@@ -81,6 +106,7 @@ func (t *Transport) CancelRequest(req *http.Request) {
 		t.mu.Unlock()
 		cr.CancelRequest(modReq)
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (t *Transport) base() http.RoundTripper {
@@ -90,6 +116,8 @@ func (t *Transport) base() http.RoundTripper {
 	return http.DefaultTransport
 }
 
+<<<<<<< HEAD
+=======
 func (t *Transport) setModReq(orig, mod *http.Request) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -103,6 +131,7 @@ func (t *Transport) setModReq(orig, mod *http.Request) {
 	}
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // cloneRequest returns a clone of the provided *http.Request.
 // The clone is a shallow copy of the struct and its Header map.
 func cloneRequest(r *http.Request) *http.Request {
@@ -116,6 +145,8 @@ func cloneRequest(r *http.Request) *http.Request {
 	}
 	return r2
 }
+<<<<<<< HEAD
+=======
 
 type onEOFReader struct {
 	rc io.ReadCloser
@@ -142,3 +173,4 @@ func (r *onEOFReader) runFunc() {
 		r.fn = nil
 	}
 }
+>>>>>>> cbc9bb05... fixup add vendor back

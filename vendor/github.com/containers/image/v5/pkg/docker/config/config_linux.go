@@ -63,7 +63,11 @@ func removeAllAuthFromKernelKeyring() error {
 		// split string "type;uid;gid;perm;description"
 		keyAttrs := strings.SplitN(keyAttr, ";", 5)
 		if len(keyAttrs) < 5 {
+<<<<<<< HEAD
+			return errors.Errorf("Key attributes of %d are not available", k.ID())
+=======
 			return errors.Errorf("Key attributes of %d are not avaliable", k.ID())
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 		keyDescribe := keyAttrs[4]
 		if strings.HasPrefix(keyDescribe, keyDescribePrefix) {

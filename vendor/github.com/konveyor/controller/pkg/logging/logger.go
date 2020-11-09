@@ -4,10 +4,16 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
+<<<<<<< HEAD
+	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apiserver/pkg/storage/names"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+=======
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/storage/names"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sync"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 const (
@@ -17,6 +23,17 @@ const (
 )
 
 //
+<<<<<<< HEAD
+// Logger
+// Delegates functionality to the wrapped `Real` logger.
+// Provides:
+//   - Provides a `Trace()` method for convenience and brevity.
+//   - Prevent spamming the log with `Conflict` errors.
+//   - Handles wrapped errors.
+type Logger struct {
+	Real logr.Logger
+	name string
+=======
 // Protect the history.
 // Cannot be part of Logger as logr interface requires
 // some by-value method receivers.
@@ -33,6 +50,7 @@ type Logger struct {
 	Real    logr.Logger
 	history map[error]bool
 	name    string
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 //
@@ -48,6 +66,13 @@ func WithName(name string) Logger {
 
 //
 // Reset the logger.
+<<<<<<< HEAD
+// Updates the generated correlation suffix in the name.
+func (l *Logger) Reset() {
+	name := fmt.Sprintf("%s|", l.name)
+	name = names.SimpleNameGenerator.GenerateName(name)
+	l.Real = logf.Log.WithName(name)
+=======
 // Updates the generated correlation suffix in the name and
 // clears the reported error history.
 func (l *Logger) Reset() {
@@ -57,6 +82,7 @@ func (l *Logger) Reset() {
 	name = names.SimpleNameGenerator.GenerateName(name)
 	l.Real = logf.Log.WithName(name)
 	l.history = make(map[error]bool)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 //
@@ -73,12 +99,21 @@ func (l Logger) Info(message string, kvpair ...interface{}) {
 
 //
 // Logs an error.
+<<<<<<< HEAD
+=======
 // Previously logged errors are ignored.
 // `Conflict` errors are not logged.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 	if err == nil {
 		return
 	}
+<<<<<<< HEAD
+	le, wrapped := err.(*liberr.Error)
+	if wrapped {
+		err = le.Unwrap()
+		if k8serr.IsConflict(err) {
+=======
 	mutex.Lock()
 	defer mutex.Unlock()
 	le, wrapped := err.(*liberr.Error)
@@ -86,6 +121,7 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 		err = le.Unwrap()
 		_, found := l.history[err]
 		if found || errors.IsConflict(err) {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return
 		}
 		kvpair = append(
@@ -95,6 +131,20 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 			Stack,
 			le.Stack())
 		l.Real.Info(message, kvpair...)
+<<<<<<< HEAD
+		return
+	}
+	if wErr, wrapped := err.(interface {
+		Unwrap() error
+	}); wrapped {
+		err = wErr.Unwrap()
+	}
+	if err == nil || k8serr.IsConflict(err) {
+		return
+	}
+
+	l.Real.Error(err, message, kvpair...)
+=======
 		l.history[err] = true
 	} else {
 		_, found := l.history[err]
@@ -104,6 +154,7 @@ func (l Logger) Error(err error, message string, kvpair ...interface{}) {
 		l.Real.Error(err, message, kvpair...)
 		l.history[err] = true
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 //

@@ -31,11 +31,18 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/encoding"
+<<<<<<< HEAD
+=======
 	"google.golang.org/grpc/grpclog"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/internal/balancerload"
 	"google.golang.org/grpc/internal/binarylog"
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcrand"
+<<<<<<< HEAD
+	"google.golang.org/grpc/internal/grpcutil"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -278,7 +285,10 @@ func newClientStream(ctx context.Context, desc *StreamDesc, cc *ClientConn, meth
 	}
 	cs.binlog = binarylog.GetMethodLogger(method)
 
+<<<<<<< HEAD
+=======
 	cs.callInfo.stream = cs
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Only this initial attempt has stats/tracing.
 	// TODO(dfawley): move to newAttempt when per-attempt stats are implemented.
 	if err := cs.newAttemptLocked(sh, trInfo); err != nil {
@@ -348,7 +358,20 @@ func (cs *clientStream) newAttemptLocked(sh stats.Handler, trInfo *traceInfo) (r
 	if err := cs.ctx.Err(); err != nil {
 		return toRPCErr(err)
 	}
+<<<<<<< HEAD
+
+	ctx := cs.ctx
+	if cs.cc.parsedTarget.Scheme == "xds" {
+		// Add extra metadata (metadata that will be added by transport) to context
+		// so the balancer can see them.
+		ctx = grpcutil.WithExtraMetadata(cs.ctx, metadata.Pairs(
+			"content-type", grpcutil.ContentType(cs.callHdr.ContentSubtype),
+		))
+	}
+	t, done, err := cs.cc.getTransport(ctx, cs.callInfo.failFast, cs.callHdr.Method)
+=======
 	t, done, err := cs.cc.getTransport(cs.ctx, cs.callInfo.failFast, cs.callHdr.Method)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return err
 	}
@@ -366,6 +389,14 @@ func (a *csAttempt) newStream() error {
 	cs.callHdr.PreviousAttempts = cs.numRetries
 	s, err := a.t.NewStream(cs.ctx, cs.callHdr)
 	if err != nil {
+<<<<<<< HEAD
+		if _, ok := err.(transport.PerformedIOError); ok {
+			// Return without converting to an RPC error so retry code can
+			// inspect.
+			return err
+		}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		return toRPCErr(err)
 	}
 	cs.attempt.s = s
@@ -461,11 +492,29 @@ func (cs *clientStream) commitAttempt() {
 // shouldRetry returns nil if the RPC should be retried; otherwise it returns
 // the error that should be returned by the operation.
 func (cs *clientStream) shouldRetry(err error) error {
+<<<<<<< HEAD
+	unprocessed := false
+	if cs.attempt.s == nil {
+		pioErr, ok := err.(transport.PerformedIOError)
+		if ok {
+			// Unwrap error.
+			err = toRPCErr(pioErr.Err)
+		} else {
+			unprocessed = true
+		}
+		if !ok && !cs.callInfo.failFast {
+			// In the event of a non-IO operation error from NewStream, we
+			// never attempted to write anything to the wire, so we can retry
+			// indefinitely for non-fail-fast RPCs.
+			return nil
+		}
+=======
 	if cs.attempt.s == nil && !cs.callInfo.failFast {
 		// In the event of any error from NewStream (attempt.s == nil), we
 		// never attempted to write anything to the wire, so we can retry
 		// indefinitely for non-fail-fast RPCs.
 		return nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if cs.finished || cs.committed {
 		// RPC is finished or committed; cannot retry.
@@ -474,6 +523,14 @@ func (cs *clientStream) shouldRetry(err error) error {
 	// Wait for the trailers.
 	if cs.attempt.s != nil {
 		<-cs.attempt.s.Done()
+<<<<<<< HEAD
+		unprocessed = cs.attempt.s.Unprocessed()
+	}
+	if cs.firstAttempt && unprocessed {
+		// First attempt, stream unprocessed: transparently retry.
+		return nil
+	}
+=======
 	}
 	if cs.firstAttempt && (cs.attempt.s == nil || cs.attempt.s.Unprocessed()) {
 		// First attempt, stream unprocessed: transparently retry.
@@ -481,6 +538,7 @@ func (cs *clientStream) shouldRetry(err error) error {
 		return nil
 	}
 	cs.firstAttempt = false
+>>>>>>> cbc9bb05... fixup add vendor back
 	if cs.cc.dopts.disableRetry {
 		return err
 	}
@@ -488,7 +546,11 @@ func (cs *clientStream) shouldRetry(err error) error {
 	pushback := 0
 	hasPushback := false
 	if cs.attempt.s != nil {
+<<<<<<< HEAD
+		if !cs.attempt.s.TrailersOnly() {
+=======
 		if to, toErr := cs.attempt.s.TrailersOnly(); toErr != nil || !to {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return err
 		}
 
@@ -498,13 +560,21 @@ func (cs *clientStream) shouldRetry(err error) error {
 		if len(sps) == 1 {
 			var e error
 			if pushback, e = strconv.Atoi(sps[0]); e != nil || pushback < 0 {
+<<<<<<< HEAD
+				channelz.Infof(logger, cs.cc.channelzID, "Server retry pushback specified to abort (%q).", sps[0])
+=======
 				grpclog.Infof("Server retry pushback specified to abort (%q).", sps[0])
+>>>>>>> cbc9bb05... fixup add vendor back
 				cs.retryThrottler.throttle() // This counts as a failure for throttling.
 				return err
 			}
 			hasPushback = true
 		} else if len(sps) > 1 {
+<<<<<<< HEAD
+			channelz.Warningf(logger, cs.cc.channelzID, "Server retry pushback specified multiple values (%q); not retrying.", sps)
+=======
 			grpclog.Warningf("Server retry pushback specified multiple values (%q); not retrying.", sps)
+>>>>>>> cbc9bb05... fixup add vendor back
 			cs.retryThrottler.throttle() // This counts as a failure for throttling.
 			return err
 		}
@@ -566,6 +636,10 @@ func (cs *clientStream) retryLocked(lastErr error) error {
 			cs.commitAttemptLocked()
 			return err
 		}
+<<<<<<< HEAD
+		cs.firstAttempt = false
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		if err := cs.newAttemptLocked(nil, nil); err != nil {
 			return err
 		}
@@ -800,6 +874,18 @@ func (cs *clientStream) finish(err error) {
 	}
 	cs.finished = true
 	cs.commitAttemptLocked()
+<<<<<<< HEAD
+	if cs.attempt != nil {
+		cs.attempt.finish(err)
+		// after functions all rely upon having a stream.
+		if cs.attempt.s != nil {
+			for _, o := range cs.opts {
+				o.after(cs.callInfo, cs.attempt)
+			}
+		}
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	cs.mu.Unlock()
 	// For binary logging. only log cancel in finish (could be caused by RPC ctx
 	// canceled or ClientConn closed). Trailer will be logged in RecvMsg.
@@ -821,6 +907,8 @@ func (cs *clientStream) finish(err error) {
 			cs.cc.incrCallsSucceeded()
 		}
 	}
+<<<<<<< HEAD
+=======
 	if cs.attempt != nil {
 		cs.attempt.finish(err)
 		// after functions all rely upon having a stream.
@@ -830,6 +918,7 @@ func (cs *clientStream) finish(err error) {
 			}
 		}
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	cs.cancel()
 }
 
@@ -906,7 +995,11 @@ func (a *csAttempt) recvMsg(m interface{}, payInfo *payloadInfo) (err error) {
 			Payload:  m,
 			// TODO truncate large payload.
 			Data:       payInfo.uncompressedBytes,
+<<<<<<< HEAD
+			WireLength: payInfo.wireLength + headerLen,
+=======
 			WireLength: payInfo.wireLength,
+>>>>>>> cbc9bb05... fixup add vendor back
 			Length:     len(payInfo.uncompressedBytes),
 		})
 	}
@@ -1067,7 +1160,10 @@ func newNonRetryClientStream(ctx context.Context, desc *StreamDesc, method strin
 		t:        t,
 	}
 
+<<<<<<< HEAD
+=======
 	as.callInfo.stream = as
+>>>>>>> cbc9bb05... fixup add vendor back
 	s, err := as.t.NewStream(as.ctx, as.callHdr)
 	if err != nil {
 		err = toRPCErr(err)
@@ -1489,7 +1585,11 @@ func (ss *serverStream) RecvMsg(m interface{}) (err error) {
 			Payload:  m,
 			// TODO truncate large payload.
 			Data:       payInfo.uncompressedBytes,
+<<<<<<< HEAD
+			WireLength: payInfo.wireLength + headerLen,
+=======
 			WireLength: payInfo.wireLength,
+>>>>>>> cbc9bb05... fixup add vendor back
 			Length:     len(payInfo.uncompressedBytes),
 		})
 	}

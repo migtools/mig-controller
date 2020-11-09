@@ -47,11 +47,23 @@ func DoRetryWithRegistration(client autorest.Client) autorest.SendDecorator {
 				if resp.StatusCode != http.StatusConflict || client.SkipResourceProviderRegistration {
 					return resp, err
 				}
+<<<<<<< HEAD
+
+				var re RequestError
+				if strings.Contains(r.Header.Get("Content-Type"), "xml") {
+					// XML errors (e.g. Storage Data Plane) only return the inner object
+					err = autorest.Respond(resp, autorest.ByUnmarshallingXML(&re.ServiceError))
+				} else {
+					err = autorest.Respond(resp, autorest.ByUnmarshallingJSON(&re))
+				}
+
+=======
 				var re RequestError
 				err = autorest.Respond(
 					resp,
 					autorest.ByUnmarshallingJSON(&re),
 				)
+>>>>>>> cbc9bb05... fixup add vendor back
 				if err != nil {
 					return resp, err
 				}

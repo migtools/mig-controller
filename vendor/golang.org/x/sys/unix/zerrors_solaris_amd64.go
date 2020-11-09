@@ -192,12 +192,15 @@ const (
 	CSTOPB                        = 0x40
 	CSUSP                         = 0x1a
 	CSWTCH                        = 0x1a
+<<<<<<< HEAD
+=======
 	DIOC                          = 0x6400
 	DIOCGETB                      = 0x6402
 	DIOCGETC                      = 0x6401
 	DIOCGETP                      = 0x6408
 	DIOCSETE                      = 0x6403
 	DIOCSETP                      = 0x6409
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_AIRONET_HEADER            = 0x78
 	DLT_APPLE_IP_OVER_IEEE1394    = 0x8a
 	DLT_ARCNET                    = 0x7
@@ -296,7 +299,10 @@ const (
 	FF0                           = 0x0
 	FF1                           = 0x8000
 	FFDLY                         = 0x8000
+<<<<<<< HEAD
+=======
 	FIORDCHK                      = 0x6603
+>>>>>>> cbc9bb05... fixup add vendor back
 	FLUSHALL                      = 0x1
 	FLUSHDATA                     = 0x0
 	FLUSHO                        = 0x2000
@@ -652,6 +658,8 @@ const (
 	MAP_SHARED                    = 0x1
 	MAP_TEXT                      = 0x400
 	MAP_TYPE                      = 0xf
+<<<<<<< HEAD
+=======
 	MCAST_BLOCK_SOURCE            = 0x2b
 	MCAST_EXCLUDE                 = 0x2
 	MCAST_INCLUDE                 = 0x1
@@ -660,6 +668,7 @@ const (
 	MCAST_LEAVE_GROUP             = 0x2a
 	MCAST_LEAVE_SOURCE_GROUP      = 0x2e
 	MCAST_UNBLOCK_SOURCE          = 0x2c
+>>>>>>> cbc9bb05... fixup add vendor back
 	MCL_CURRENT                   = 0x1
 	MCL_FUTURE                    = 0x2
 	MSG_CTRUNC                    = 0x10
@@ -668,7 +677,10 @@ const (
 	MSG_DUPCTRL                   = 0x800
 	MSG_EOR                       = 0x8
 	MSG_MAXIOVLEN                 = 0x10
+<<<<<<< HEAD
+=======
 	MSG_NOSIGNAL                  = 0x200
+>>>>>>> cbc9bb05... fixup add vendor back
 	MSG_NOTIFICATION              = 0x100
 	MSG_OOB                       = 0x1
 	MSG_PEEK                      = 0x2
@@ -703,7 +715,10 @@ const (
 	O_APPEND                      = 0x8
 	O_CLOEXEC                     = 0x800000
 	O_CREAT                       = 0x100
+<<<<<<< HEAD
+=======
 	O_DIRECTORY                   = 0x1000000
+>>>>>>> cbc9bb05... fixup add vendor back
 	O_DSYNC                       = 0x40
 	O_EXCL                        = 0x400
 	O_EXEC                        = 0x400000
@@ -742,7 +757,11 @@ const (
 	RLIMIT_FSIZE                  = 0x1
 	RLIMIT_NOFILE                 = 0x5
 	RLIMIT_STACK                  = 0x3
+<<<<<<< HEAD
+	RLIM_INFINITY                 = -0x3
+=======
 	RLIM_INFINITY                 = 0xfffffffffffffffd
+>>>>>>> cbc9bb05... fixup add vendor back
 	RTAX_AUTHOR                   = 0x6
 	RTAX_BRD                      = 0x7
 	RTAX_DST                      = 0x0
@@ -1064,7 +1083,10 @@ const (
 	TCOON                         = 0x1
 	TCP_ABORT_THRESHOLD           = 0x11
 	TCP_ANONPRIVBIND              = 0x20
+<<<<<<< HEAD
+=======
 	TCP_CONGESTION                = 0x25
+>>>>>>> cbc9bb05... fixup add vendor back
 	TCP_CONN_ABORT_THRESHOLD      = 0x13
 	TCP_CONN_NOTIFY_THRESHOLD     = 0x12
 	TCP_CORK                      = 0x18
@@ -1094,8 +1116,11 @@ const (
 	TCSETSF                       = 0x5410
 	TCSETSW                       = 0x540f
 	TCXONC                        = 0x5406
+<<<<<<< HEAD
+=======
 	TIMER_ABSTIME                 = 0x1
 	TIMER_RELTIME                 = 0x0
+>>>>>>> cbc9bb05... fixup add vendor back
 	TIOC                          = 0x5400
 	TIOCCBRK                      = 0x747a
 	TIOCCDTR                      = 0x7478

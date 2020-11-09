@@ -50,7 +50,10 @@ var (
 	procHcsResumeComputeSystem             = modvmcompute.NewProc("HcsResumeComputeSystem")
 	procHcsGetComputeSystemProperties      = modvmcompute.NewProc("HcsGetComputeSystemProperties")
 	procHcsModifyComputeSystem             = modvmcompute.NewProc("HcsModifyComputeSystem")
+<<<<<<< HEAD
+=======
 	procHcsModifyServiceSettings           = modvmcompute.NewProc("HcsModifyServiceSettings")
+>>>>>>> cbc9bb05... fixup add vendor back
 	procHcsRegisterComputeSystemCallback   = modvmcompute.NewProc("HcsRegisterComputeSystemCallback")
 	procHcsUnregisterComputeSystemCallback = modvmcompute.NewProc("HcsUnregisterComputeSystemCallback")
 	procHcsCreateProcess                   = modvmcompute.NewProc("HcsCreateProcess")
@@ -315,6 +318,8 @@ func _hcsModifyComputeSystem(computeSystem HcsSystem, configuration *uint16, res
 	return
 }
 
+<<<<<<< HEAD
+=======
 func hcsModifyServiceSettings(settings string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(settings)
@@ -338,6 +343,7 @@ func _hcsModifyServiceSettings(settings *uint16, result **uint16) (hr error) {
 	return
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func hcsRegisterComputeSystemCallback(computeSystem HcsSystem, callback uintptr, context uintptr, callbackHandle *HcsCallback) (hr error) {
 	if hr = procHcsRegisterComputeSystemCallback.Find(); hr != nil {
 		return

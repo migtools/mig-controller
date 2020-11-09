@@ -16,9 +16,12 @@ func FcntlFlock(fd uintptr, cmd int, lk *Flock_t) error {
 	_, err := fcntl(int(fd), cmd, int(uintptr(unsafe.Pointer(lk))))
 	return err
 }
+<<<<<<< HEAD
+=======
 
 // FcntlFstore performs a fcntl syscall for the F_PREALLOCATE command.
 func FcntlFstore(fd uintptr, cmd int, fstore *Fstore_t) error {
 	_, err := fcntl(int(fd), cmd, int(uintptr(unsafe.Pointer(fstore))))
 	return err
 }
+>>>>>>> cbc9bb05... fixup add vendor back

@@ -15,11 +15,31 @@ package adal
 //  limitations under the License.
 
 import (
+<<<<<<< HEAD
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
+=======
+	"encoding/json"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+<<<<<<< HEAD
+
+	"golang.org/x/crypto/pkcs12"
+)
+
+var (
+	// ErrMissingCertificate is returned when no local certificate is found in the provided PFX data.
+	ErrMissingCertificate = errors.New("adal: certificate missing")
+
+	// ErrMissingPrivateKey is returned when no private key is found in the provided PFX data.
+	ErrMissingPrivateKey = errors.New("adal: private key missing")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // LoadToken restores a Token object from a file located at 'path'.
@@ -71,3 +91,55 @@ func SaveToken(path string, mode os.FileMode, token Token) error {
 	}
 	return nil
 }
+<<<<<<< HEAD
+
+// DecodePfxCertificateData extracts the x509 certificate and RSA private key from the provided PFX data.
+// The PFX data must contain a private key along with a certificate whose public key matches that of the
+// private key or an error is returned.
+// If the private key is not password protected pass the empty string for password.
+func DecodePfxCertificateData(pfxData []byte, password string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	blocks, err := pkcs12.ToPEM(pfxData, password)
+	if err != nil {
+		return nil, nil, err
+	}
+	// first extract the private key
+	var priv *rsa.PrivateKey
+	for _, block := range blocks {
+		if block.Type == "PRIVATE KEY" {
+			priv, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, nil, err
+			}
+			break
+		}
+	}
+	if priv == nil {
+		return nil, nil, ErrMissingPrivateKey
+	}
+	// now find the certificate with the matching public key of our private key
+	var cert *x509.Certificate
+	for _, block := range blocks {
+		if block.Type == "CERTIFICATE" {
+			pcert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, nil, err
+			}
+			certKey, ok := pcert.PublicKey.(*rsa.PublicKey)
+			if !ok {
+				// keep looking
+				continue
+			}
+			if priv.E == certKey.E && priv.N.Cmp(certKey.N) == 0 {
+				// found a match
+				cert = pcert
+				break
+			}
+		}
+	}
+	if cert == nil {
+		return nil, nil, ErrMissingCertificate
+	}
+	return cert, priv, nil
+}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

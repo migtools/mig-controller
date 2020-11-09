@@ -1,5 +1,82 @@
 # CHANGELOG
 
+<<<<<<< HEAD
+## v14.2.0
+
+- Added package comment to make `github.com/Azure/go-autorest` importable.
+
+## v14.1.1
+
+### Bug Fixes
+
+- Change `x-ms-authorization-auxiliary` header value separator to comma.
+
+## v14.1.0
+
+### New Features
+
+- Added `azure.SetEnvironment()` that will update the global environments map with the specified values.
+
+## v14.0.1
+
+### Bug Fixes
+
+- Fix race condition when refreshing token.
+- Fixed some tests to work with Go 1.14.
+
+## v14.0.0
+
+## Breaking Changes
+
+- By default, the `DoRetryForStatusCodes` functions will no longer infinitely retry a request when the response returns an HTTP status code of 429 (StatusTooManyRequests).  To opt in to the old behavior set `autorest.Count429AsRetry` to `false`.
+
+## New Features
+
+- Variable `autorest.Max429Delay` can be used to control the maximum delay between retries when a 429 is received with no `Retry-After` header.  The default is zero which means there is no cap.
+
+## v13.4.0
+
+## New Features
+
+- Added field `SendDecorators` to the `Client` type.  This can be used to specify a custom chain of SendDecorators per client.
+- Added method `Client.Send()` which includes logic for selecting the preferred chain of SendDecorators.
+
+## v13.3.3
+
+### Bug Fixes
+
+- Fixed connection leak when retrying requests.
+- Enabled exponential back-off with a 2-minute cap when retrying on 429.
+- Fixed some cases where errors were inadvertently dropped.
+
+## v13.3.2
+
+### Bug Fixes
+
+- Updated `autorest.AsStringSlice()` to convert slice elements to their string representation.
+
+## v13.3.1
+
+- Updated external dependencies.
+
+### Bug Fixes
+
+## v13.3.0
+
+### New Features
+
+- Added support for shared key and shared access signature token authorization.
+  - `autorest.NewSharedKeyAuthorizer()` and dependent types.
+  - `autorest.NewSASTokenAuthorizer()` and dependent types.
+- Added `ServicePrincipalToken.SetCustomRefresh()` so a custom refresh function can be invoked when a token has expired.
+
+### Bug Fixes
+
+- Fixed `cli.AccessTokensPath()` to respect `AZURE_CONFIG_DIR` when set.
+- Support parsing error messages in XML responses.
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 ## v13.2.0
 
 ### New Features

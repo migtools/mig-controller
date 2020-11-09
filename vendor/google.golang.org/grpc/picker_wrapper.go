@@ -25,7 +25,10 @@ import (
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
+<<<<<<< HEAD
+=======
 	"google.golang.org/grpc/grpclog"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/status"
@@ -38,6 +41,26 @@ type pickerWrapper struct {
 	done       bool
 	blockingCh chan struct{}
 	picker     balancer.Picker
+<<<<<<< HEAD
+}
+
+func newPickerWrapper() *pickerWrapper {
+	return &pickerWrapper{blockingCh: make(chan struct{})}
+}
+
+// updatePicker is called by UpdateBalancerState. It unblocks all blocked pick.
+func (pw *pickerWrapper) updatePicker(p balancer.Picker) {
+	pw.mu.Lock()
+	if pw.done {
+		pw.mu.Unlock()
+		return
+	}
+	pw.picker = p
+	// pw.blockingCh should never be nil.
+	close(pw.blockingCh)
+	pw.blockingCh = make(chan struct{})
+	pw.mu.Unlock()
+=======
 
 	// The latest connection happened.
 	connErrMu sync.Mutex
@@ -74,6 +97,7 @@ func (bp *pickerWrapper) updatePicker(p balancer.Picker) {
 	close(bp.blockingCh)
 	bp.blockingCh = make(chan struct{})
 	bp.mu.Unlock()
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func doneChannelzWrapper(acw *acBalancerWrapper, done func(balancer.DoneInfo)) func(balancer.DoneInfo) {
@@ -100,6 +124,41 @@ func doneChannelzWrapper(acw *acBalancerWrapper, done func(balancer.DoneInfo)) f
 // - the current picker returns other errors and failfast is false.
 // - the subConn returned by the current picker is not READY
 // When one of these situations happens, pick blocks until the picker gets updated.
+<<<<<<< HEAD
+func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.PickInfo) (transport.ClientTransport, func(balancer.DoneInfo), error) {
+	var ch chan struct{}
+
+	var lastPickErr error
+	for {
+		pw.mu.Lock()
+		if pw.done {
+			pw.mu.Unlock()
+			return nil, nil, ErrClientConnClosing
+		}
+
+		if pw.picker == nil {
+			ch = pw.blockingCh
+		}
+		if ch == pw.blockingCh {
+			// This could happen when either:
+			// - pw.picker is nil (the previous if condition), or
+			// - has called pick on the current picker.
+			pw.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				var errStr string
+				if lastPickErr != nil {
+					errStr = "latest balancer error: " + lastPickErr.Error()
+				} else {
+					errStr = ctx.Err().Error()
+				}
+				switch ctx.Err() {
+				case context.DeadlineExceeded:
+					return nil, nil, status.Error(codes.DeadlineExceeded, errStr)
+				case context.Canceled:
+					return nil, nil, status.Error(codes.Canceled, errStr)
+				}
+=======
 func (bp *pickerWrapper) pick(ctx context.Context, failfast bool, opts balancer.PickOptions) (transport.ClientTransport, func(balancer.DoneInfo), error) {
 	var ch chan struct{}
 
@@ -129,11 +188,40 @@ func (bp *pickerWrapper) pick(ctx context.Context, failfast bool, opts balancer.
 					}
 				}
 				return nil, nil, ctx.Err()
+>>>>>>> cbc9bb05... fixup add vendor back
 			case <-ch:
 			}
 			continue
 		}
 
+<<<<<<< HEAD
+		ch = pw.blockingCh
+		p := pw.picker
+		pw.mu.Unlock()
+
+		pickResult, err := p.Pick(info)
+
+		if err != nil {
+			if err == balancer.ErrNoSubConnAvailable {
+				continue
+			}
+			if _, ok := status.FromError(err); ok {
+				// Status error: end the RPC unconditionally with this status.
+				return nil, nil, err
+			}
+			// For all other errors, wait for ready RPCs should block and other
+			// RPCs should fail with unavailable.
+			if !failfast {
+				lastPickErr = err
+				continue
+			}
+			return nil, nil, status.Error(codes.Unavailable, err.Error())
+		}
+
+		acw, ok := pickResult.SubConn.(*acBalancerWrapper)
+		if !ok {
+			logger.Error("subconn returned from pick is not *acBalancerWrapper")
+=======
 		ch = bp.blockingCh
 		p := bp.picker
 		bp.mu.Unlock()
@@ -165,10 +253,23 @@ func (bp *pickerWrapper) pick(ctx context.Context, failfast bool, opts balancer.
 		acw, ok := subConn.(*acBalancerWrapper)
 		if !ok {
 			grpclog.Error("subconn returned from pick is not *acBalancerWrapper")
+>>>>>>> cbc9bb05... fixup add vendor back
 			continue
 		}
 		if t, ok := acw.getAddrConn().getReadyTransport(); ok {
 			if channelz.IsOn() {
+<<<<<<< HEAD
+				return t, doneChannelzWrapper(acw, pickResult.Done), nil
+			}
+			return t, pickResult.Done, nil
+		}
+		if pickResult.Done != nil {
+			// Calling done with nil error, no bytes sent and no bytes received.
+			// DoneInfo with default value works.
+			pickResult.Done(balancer.DoneInfo{})
+		}
+		logger.Infof("blockingPicker: the picked transport is not ready, loop back to repick")
+=======
 				return t, doneChannelzWrapper(acw, done), nil
 			}
 			return t, done, nil
@@ -179,6 +280,7 @@ func (bp *pickerWrapper) pick(ctx context.Context, failfast bool, opts balancer.
 			done(balancer.DoneInfo{})
 		}
 		grpclog.Infof("blockingPicker: the picked transport is not ready, loop back to repick")
+>>>>>>> cbc9bb05... fixup add vendor back
 		// If ok == false, ac.state is not READY.
 		// A valid picker always returns READY subConn. This means the state of ac
 		// just changed, and picker will be updated shortly.
@@ -186,6 +288,16 @@ func (bp *pickerWrapper) pick(ctx context.Context, failfast bool, opts balancer.
 	}
 }
 
+<<<<<<< HEAD
+func (pw *pickerWrapper) close() {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	if pw.done {
+		return
+	}
+	pw.done = true
+	close(pw.blockingCh)
+=======
 func (bp *pickerWrapper) close() {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -194,4 +306,5 @@ func (bp *pickerWrapper) close() {
 	}
 	bp.done = true
 	close(bp.blockingCh)
+>>>>>>> cbc9bb05... fixup add vendor back
 }

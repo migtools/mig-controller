@@ -6,7 +6,11 @@
 
 // Package bidi contains functionality for bidirectional text support.
 //
+<<<<<<< HEAD
+// See https://www.unicode.org/reports/tr9.
+=======
 // See http://www.unicode.org/reports/tr9.
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // NOTE: UNDER CONSTRUCTION. This API may change in backwards incompatible ways
 // and without notice.

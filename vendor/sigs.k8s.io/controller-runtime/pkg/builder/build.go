@@ -183,6 +183,13 @@ func (blder *Builder) doConfig() error {
 	if blder.config != nil {
 		return nil
 	}
+<<<<<<< HEAD
+	if blder.mgr != nil {
+		blder.config = blder.mgr.GetConfig()
+		return nil
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	var err error
 	blder.config, err = getConfig()
 	return err

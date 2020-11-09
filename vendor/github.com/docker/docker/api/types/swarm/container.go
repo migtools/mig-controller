@@ -67,10 +67,20 @@ type ContainerSpec struct {
 	// The format of extra hosts on swarmkit is specified in:
 	// http://man7.org/linux/man-pages/man5/hosts.5.html
 	//    IP_address canonical_hostname [aliases...]
+<<<<<<< HEAD
+	Hosts        []string            `json:",omitempty"`
+	DNSConfig    *DNSConfig          `json:",omitempty"`
+	Secrets      []*SecretReference  `json:",omitempty"`
+	Configs      []*ConfigReference  `json:",omitempty"`
+	Isolation    container.Isolation `json:",omitempty"`
+	Sysctls      map[string]string   `json:",omitempty"`
+	Capabilities []string            `json:",omitempty"`
+=======
 	Hosts     []string            `json:",omitempty"`
 	DNSConfig *DNSConfig          `json:",omitempty"`
 	Secrets   []*SecretReference  `json:",omitempty"`
 	Configs   []*ConfigReference  `json:",omitempty"`
 	Isolation container.Isolation `json:",omitempty"`
 	Sysctls   map[string]string   `json:",omitempty"`
+>>>>>>> cbc9bb05... fixup add vendor back
 }

@@ -5,6 +5,23 @@
 package language
 
 import (
+<<<<<<< HEAD
+	"errors"
+	"strconv"
+	"strings"
+
+	"golang.org/x/text/internal/language"
+)
+
+// ValueError is returned by any of the parsing functions when the
+// input is well-formed but the respective subtag is not recognized
+// as a valid value.
+type ValueError interface {
+	error
+
+	// Subtag returns the subtag for which the error occurred.
+	Subtag() string
+=======
 	"bytes"
 	"errors"
 	"fmt"
@@ -215,6 +232,7 @@ func (s *scanner) acceptMinSize(min int) (end int) {
 		end = s.end
 	}
 	return end
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Parse parses the given BCP 47 string and returns a valid Tag. If parsing
@@ -223,7 +241,11 @@ func (s *scanner) acceptMinSize(min int) (end int) {
 // ValueError. The Tag returned in this case is just stripped of the unknown
 // value. All other values are preserved. It accepts tags in the BCP 47 format
 // and extensions to this standard defined in
+<<<<<<< HEAD
+// https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
+=======
 // http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
+>>>>>>> cbc9bb05... fixup add vendor back
 // The resulting tag is canonicalized using the default canonicalization type.
 func Parse(s string) (t Tag, err error) {
 	return Default.Parse(s)
@@ -235,6 +257,20 @@ func Parse(s string) (t Tag, err error) {
 // ValueError. The Tag returned in this case is just stripped of the unknown
 // value. All other values are preserved. It accepts tags in the BCP 47 format
 // and extensions to this standard defined in
+<<<<<<< HEAD
+// https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
+// The resulting tag is canonicalized using the canonicalization type c.
+func (c CanonType) Parse(s string) (t Tag, err error) {
+	tt, err := language.Parse(s)
+	if err != nil {
+		return makeTag(tt), err
+	}
+	tt, changed := canonicalize(c, tt)
+	if changed {
+		tt.RemakeString()
+	}
+	return makeTag(tt), err
+=======
 // http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // The resulting tag is canonicalized using the the canonicalization type c.
 func (c CanonType) Parse(s string) (t Tag, err error) {
@@ -556,6 +592,7 @@ func parseExtension(scan *scanner) int {
 		end = scan.acceptMinSize(2)
 	}
 	return end
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Compose creates a Tag from individual parts, which may be of type Tag, Base,
@@ -563,10 +600,18 @@ func parseExtension(scan *scanner) int {
 // Base, Script or Region or slice of type Variant or Extension is passed more
 // than once, the latter will overwrite the former. Variants and Extensions are
 // accumulated, but if two extensions of the same type are passed, the latter
+<<<<<<< HEAD
+// will replace the former. For -u extensions, though, the key-type pairs are
+// added, where later values overwrite older ones. A Tag overwrites all former
+// values and typically only makes sense as the first argument. The resulting
+// tag is returned after canonicalizing using the Default CanonType. If one or
+// more errors are encountered, one of the errors is returned.
+=======
 // will replace the former. A Tag overwrites all former values and typically
 // only makes sense as the first argument. The resulting tag is returned after
 // canonicalizing using the Default CanonType. If one or more errors are
 // encountered, one of the errors is returned.
+>>>>>>> cbc9bb05... fixup add vendor back
 func Compose(part ...interface{}) (t Tag, err error) {
 	return Default.Compose(part...)
 }
@@ -576,6 +621,20 @@ func Compose(part ...interface{}) (t Tag, err error) {
 // Base, Script or Region or slice of type Variant or Extension is passed more
 // than once, the latter will overwrite the former. Variants and Extensions are
 // accumulated, but if two extensions of the same type are passed, the latter
+<<<<<<< HEAD
+// will replace the former. For -u extensions, though, the key-type pairs are
+// added, where later values overwrite older ones. A Tag overwrites all former
+// values and typically only makes sense as the first argument. The resulting
+// tag is returned after canonicalizing using CanonType c. If one or more errors
+// are encountered, one of the errors is returned.
+func (c CanonType) Compose(part ...interface{}) (t Tag, err error) {
+	var b language.Builder
+	if err = update(&b, part...); err != nil {
+		return und, err
+	}
+	b.Tag, _ = canonicalize(c, b.Tag)
+	return makeTag(b.Make()), err
+=======
 // will replace the former. A Tag overwrites all former values and typically
 // only makes sense as the first argument. The resulting tag is returned after
 // canonicalizing using CanonType c. If one or more errors are encountered,
@@ -625,10 +684,51 @@ func (b *builder) addExt(e string) {
 	} else {
 		b.ext = append(b.ext, e)
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 var errInvalidArgument = errors.New("invalid Extension or Variant")
 
+<<<<<<< HEAD
+func update(b *language.Builder, part ...interface{}) (err error) {
+	for _, x := range part {
+		switch v := x.(type) {
+		case Tag:
+			b.SetTag(v.tag())
+		case Base:
+			b.Tag.LangID = v.langID
+		case Script:
+			b.Tag.ScriptID = v.scriptID
+		case Region:
+			b.Tag.RegionID = v.regionID
+		case Variant:
+			if v.variant == "" {
+				err = errInvalidArgument
+				break
+			}
+			b.AddVariant(v.variant)
+		case Extension:
+			if v.s == "" {
+				err = errInvalidArgument
+				break
+			}
+			b.SetExt(v.s)
+		case []Variant:
+			b.ClearVariants()
+			for _, v := range v {
+				b.AddVariant(v.variant)
+			}
+		case []Extension:
+			b.ClearExtensions()
+			for _, e := range v {
+				b.SetExt(e.s)
+			}
+		// TODO: support parsing of raw strings based on morphology or just extensions?
+		case error:
+			if v != nil {
+				err = v
+			}
+=======
 func (b *builder) update(part ...interface{}) (err error) {
 	replace := func(l *[]string, s string, eq func(a, b string) bool) bool {
 		if s == "" {
@@ -688,11 +788,14 @@ func (b *builder) update(part ...interface{}) (err error) {
 		// TODO: support parsing of raw strings based on morphology or just extensions?
 		case error:
 			err = v
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	return
 }
 
+<<<<<<< HEAD
+=======
 func tokenLen(token ...string) (n int) {
 	for _, t := range token {
 		n += len(t) + 1
@@ -763,6 +866,7 @@ func nextExtension(s string, p int) int {
 	return len(s)
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 var errInvalidWeight = errors.New("ParseAcceptLanguage: invalid weight")
 
 // ParseAcceptLanguage parses the contents of an Accept-Language header as
@@ -788,7 +892,11 @@ func ParseAcceptLanguage(s string) (tag []Tag, q []float32, err error) {
 			if !ok {
 				return nil, nil, err
 			}
+<<<<<<< HEAD
+			t = makeTag(language.Tag{LangID: id})
+=======
 			t = Tag{lang: id}
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 
 		// Scan the optional weight.
@@ -830,9 +938,15 @@ func split(s string, c byte) (head, tail string) {
 	return strings.TrimSpace(s), ""
 }
 
+<<<<<<< HEAD
+// Add hack mapping to deal with a small number of cases that occur
+// in Accept-Language (with reasonable frequency).
+var acceptFallback = map[string]language.Language{
+=======
 // Add hack mapping to deal with a small number of cases that that occur
 // in Accept-Language (with reasonable frequency).
 var acceptFallback = map[string]langID{
+>>>>>>> cbc9bb05... fixup add vendor back
 	"english": _en,
 	"deutsch": _de,
 	"italian": _it,

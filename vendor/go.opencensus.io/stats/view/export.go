@@ -14,6 +14,8 @@
 
 package view
 
+<<<<<<< HEAD
+=======
 import "sync"
 
 var (
@@ -21,6 +23,7 @@ var (
 	exporters   = make(map[Exporter]struct{})
 )
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Exporter exports the collected records as view data.
 //
 // The ExportView method should return quickly; if an
@@ -43,16 +46,24 @@ type Exporter interface {
 //
 // Binaries can register exporters, libraries shouldn't register exporters.
 func RegisterExporter(e Exporter) {
+<<<<<<< HEAD
+	defaultWorker.RegisterExporter(e)
+=======
 	exportersMu.Lock()
 	defer exportersMu.Unlock()
 
 	exporters[e] = struct{}{}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // UnregisterExporter unregisters an exporter.
 func UnregisterExporter(e Exporter) {
+<<<<<<< HEAD
+	defaultWorker.UnregisterExporter(e)
+=======
 	exportersMu.Lock()
 	defer exportersMu.Unlock()
 
 	delete(exporters, e)
+>>>>>>> cbc9bb05... fixup add vendor back
 }

@@ -389,8 +389,18 @@ func (u *marshalInfo) computeMarshalInfo() {
 	// get oneof implementers
 	var oneofImplementers []interface{}
 	// gogo: isOneofMessage is needed for embedded oneof messages, without a marshaler and unmarshaler
+<<<<<<< HEAD
+	if isOneofMessage {
+		switch m := reflect.Zero(reflect.PtrTo(t)).Interface().(type) {
+		case oneofFuncsIface:
+			_, _, _, oneofImplementers = m.XXX_OneofFuncs()
+		case oneofWrappersIface:
+			oneofImplementers = m.XXX_OneofWrappers()
+		}
+=======
 	if m, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok && isOneofMessage {
 		_, _, _, oneofImplementers = m.XXX_OneofFuncs()
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	// normal fields
@@ -519,10 +529,13 @@ func (fi *marshalFieldInfo) computeOneofFieldInfo(f *reflect.StructField, oneofI
 	}
 }
 
+<<<<<<< HEAD
+=======
 type oneofMessage interface {
 	XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), func(Message) int, []interface{})
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // wiretype returns the wire encoding of the type.
 func wiretype(encoding string) uint64 {
 	switch encoding {
@@ -2968,7 +2981,13 @@ func (p *Buffer) Marshal(pb Message) error {
 	if m, ok := pb.(newMarshaler); ok {
 		siz := m.XXX_Size()
 		p.grow(siz) // make sure buf has enough capacity
+<<<<<<< HEAD
+		pp := p.buf[len(p.buf) : len(p.buf) : len(p.buf)+siz]
+		pp, err = m.XXX_Marshal(pp, p.deterministic)
+		p.buf = append(p.buf, pp...)
+=======
 		p.buf, err = m.XXX_Marshal(p.buf, p.deterministic)
+>>>>>>> cbc9bb05... fixup add vendor back
 		return err
 	}
 	if m, ok := pb.(Marshaler); ok {

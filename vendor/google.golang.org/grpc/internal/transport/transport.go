@@ -35,11 +35,20 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
+<<<<<<< HEAD
+	"google.golang.org/grpc/resolver"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/tap"
 )
 
+<<<<<<< HEAD
+const logLevel = 2
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type bufferPool struct {
 	pool sync.Pool
 }
@@ -73,10 +82,18 @@ type recvMsg struct {
 }
 
 // recvBuffer is an unbounded channel of recvMsg structs.
+<<<<<<< HEAD
+//
+// Note: recvBuffer differs from buffer.Unbounded only in the fact that it
+// holds a channel of recvMsg structs instead of objects implementing "item"
+// interface. recvBuffer is written to much more often and using strict recvMsg
+// structs helps avoid allocation in "recvBuffer.put"
+=======
 // Note recvBuffer differs from controlBuffer only in that recvBuffer
 // holds a channel of only recvMsg structs instead of objects implementing "item" interface.
 // recvBuffer is written to much more often than
 // controlBuffer and using strict recvMsg structs helps avoid allocation in "recvBuffer.put"
+>>>>>>> cbc9bb05... fixup add vendor back
 type recvBuffer struct {
 	c       chan recvMsg
 	mu      sync.Mutex
@@ -233,6 +250,10 @@ const (
 type Stream struct {
 	id           uint32
 	st           ServerTransport    // nil for client side Stream
+<<<<<<< HEAD
+	ct           *http2Client       // nil for server side Stream
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	ctx          context.Context    // the associated context of the stream
 	cancel       context.CancelFunc // always nil for client side Stream
 	done         chan struct{}      // closed at the end of stream to unblock writers. On the client side.
@@ -251,6 +272,13 @@ type Stream struct {
 
 	headerChan       chan struct{} // closed to indicate the end of header metadata.
 	headerChanClosed uint32        // set when headerChan is closed. Used to avoid closing headerChan multiple times.
+<<<<<<< HEAD
+	// headerValid indicates whether a valid header was received.  Only
+	// meaningful after headerChan is closed (always call waitOnHeader() before
+	// reading its value).  Not valid on server side.
+	headerValid bool
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	// hdrMu protects header and trailer metadata on the server-side.
 	hdrMu sync.Mutex
@@ -303,6 +331,23 @@ func (s *Stream) getState() streamState {
 	return streamState(atomic.LoadUint32((*uint32)(&s.state)))
 }
 
+<<<<<<< HEAD
+func (s *Stream) waitOnHeader() {
+	if s.headerChan == nil {
+		// On the server headerChan is always nil since a stream originates
+		// only after having received headers.
+		return
+	}
+	select {
+	case <-s.ctx.Done():
+		// Close the stream to prevent headers/trailers from changing after
+		// this function returns.
+		s.ct.CloseStream(s, ContextErr(s.ctx.Err()))
+		// headerChan could possibly not be closed yet if closeStream raced
+		// with operateHeaders; wait until it is closed explicitly here.
+		<-s.headerChan
+	case <-s.headerChan:
+=======
 func (s *Stream) waitOnHeader() error {
 	if s.headerChan == nil {
 		// On the server headerChan is always nil since a stream originates
@@ -322,15 +367,20 @@ func (s *Stream) waitOnHeader() error {
 		return ContextErr(s.ctx.Err())
 	case <-s.headerChan:
 		return nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 
 // RecvCompress returns the compression algorithm applied to the inbound
 // message. It is empty string if there is no compression applied.
 func (s *Stream) RecvCompress() string {
+<<<<<<< HEAD
+	s.waitOnHeader()
+=======
 	if err := s.waitOnHeader(); err != nil {
 		return ""
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	return s.recvCompress
 }
 
@@ -351,13 +401,27 @@ func (s *Stream) Done() <-chan struct{} {
 // available. It blocks until i) the metadata is ready or ii) there is no header
 // metadata or iii) the stream is canceled/expired.
 //
+<<<<<<< HEAD
+// On server side, it returns the out header after t.WriteHeader is called.  It
+// does not block and must not be called until after WriteHeader.
+func (s *Stream) Header() (metadata.MD, error) {
+	if s.headerChan == nil {
+=======
 // On server side, it returns the out header after t.WriteHeader is called.
 func (s *Stream) Header() (metadata.MD, error) {
 	if s.headerChan == nil && s.header != nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 		// On server side, return the header in stream. It will be the out
 		// header after t.WriteHeader is called.
 		return s.header.Copy(), nil
 	}
+<<<<<<< HEAD
+	s.waitOnHeader()
+	if !s.headerValid {
+		return nil, s.status.Err()
+	}
+	return s.header.Copy(), nil
+=======
 	err := s.waitOnHeader()
 	// Even if the stream is closed, header is returned if available.
 	select {
@@ -369,10 +433,17 @@ func (s *Stream) Header() (metadata.MD, error) {
 	default:
 	}
 	return nil, err
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // TrailersOnly blocks until a header or trailers-only frame is received and
 // then returns true if the stream was trailers-only.  If the stream ends
+<<<<<<< HEAD
+// before headers are received, returns true, nil.  Client-side only.
+func (s *Stream) TrailersOnly() bool {
+	s.waitOnHeader()
+	return s.noHeaders
+=======
 // before headers are received, returns true, nil.  If a context error happens
 // first, returns it as a status error.  Client-side only.
 func (s *Stream) TrailersOnly() (bool, error) {
@@ -381,6 +452,7 @@ func (s *Stream) TrailersOnly() (bool, error) {
 		return false, err
 	}
 	return s.noHeaders, nil
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Trailer returns the cached trailer metedata. Note that if it is not called
@@ -534,6 +606,10 @@ type ServerConfig struct {
 	ReadBufferSize        int
 	ChannelzParentID      int64
 	MaxHeaderListSize     *uint32
+<<<<<<< HEAD
+	HeaderTableSize       *uint32
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error
@@ -576,6 +652,12 @@ type ConnectOptions struct {
 	MaxHeaderListSize *uint32
 }
 
+<<<<<<< HEAD
+// NewClientTransport establishes the transport with the required ConnectOptions
+// and returns it to the caller.
+func NewClientTransport(connectCtx, ctx context.Context, addr resolver.Address, opts ConnectOptions, onPrefaceReceipt func(), onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
+	return newHTTP2Client(connectCtx, ctx, addr, opts, onPrefaceReceipt, onGoAway, onClose)
+=======
 // TargetInfo contains the information of the target such as network address and metadata.
 type TargetInfo struct {
 	Addr      string
@@ -587,6 +669,7 @@ type TargetInfo struct {
 // and returns it to the caller.
 func NewClientTransport(connectCtx, ctx context.Context, target TargetInfo, opts ConnectOptions, onPrefaceReceipt func(), onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
 	return newHTTP2Client(connectCtx, ctx, target, opts, onPrefaceReceipt, onGoAway, onClose)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Options provides additional hints and information for message

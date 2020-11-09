@@ -20,6 +20,10 @@ var (
 	ErrNotSupported                = errors.New("only structs and maps are supported")
 	ErrExpectedMapAsDestination    = errors.New("dst was expected to be a map")
 	ErrExpectedStructAsDestination = errors.New("dst was expected to be a struct")
+<<<<<<< HEAD
+	ErrNonPointerAgument           = errors.New("dst must be a pointer")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // During deepMerge, must keep track of checks that are
@@ -75,6 +79,8 @@ func resolveValues(dst, src interface{}) (vDst, vSrc reflect.Value, err error) {
 	}
 	return
 }
+<<<<<<< HEAD
+=======
 
 // Traverses recursively both values, assigning src's fields values to dst.
 // The map argument tracks comparisons that have already been seen, which allows
@@ -95,3 +101,4 @@ func deeper(dst, src reflect.Value, visited map[uintptr]*visit, depth int) (err 
 	}
 	return // TODO refactor
 }
+>>>>>>> cbc9bb05... fixup add vendor back

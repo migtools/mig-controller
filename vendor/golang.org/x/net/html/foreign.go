@@ -172,7 +172,10 @@ var svgAttributeAdjustments = map[string]string{
 	"diffuseconstant":           "diffuseConstant",
 	"edgemode":                  "edgeMode",
 	"externalresourcesrequired": "externalResourcesRequired",
+<<<<<<< HEAD
+=======
 	"filterres":                 "filterRes",
+>>>>>>> cbc9bb05... fixup add vendor back
 	"filterunits":               "filterUnits",
 	"glyphref":                  "glyphRef",
 	"gradienttransform":         "gradientTransform",

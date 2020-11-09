@@ -62,6 +62,23 @@ func (s *stringSliceValue) String() string {
 	return "[" + str + "]"
 }
 
+<<<<<<< HEAD
+func (s *stringSliceValue) Append(val string) error {
+	*s.value = append(*s.value, val)
+	return nil
+}
+
+func (s *stringSliceValue) Replace(val []string) error {
+	*s.value = val
+	return nil
+}
+
+func (s *stringSliceValue) GetSlice() []string {
+	return *s.value
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func stringSliceConv(sval string) (interface{}, error) {
 	sval = sval[1 : len(sval)-1]
 	// An empty string would cause a slice with one (empty) string
@@ -84,7 +101,11 @@ func (f *FlagSet) GetStringSlice(name string) ([]string, error) {
 // The argument p points to a []string variable in which to store the value of the flag.
 // Compared to StringArray flags, StringSlice flags take comma-separated value as arguments and split them accordingly.
 // For example:
+<<<<<<< HEAD
+//   --ss="v1,v2" --ss="v3"
+=======
 //   --ss="v1,v2" -ss="v3"
+>>>>>>> cbc9bb05... fixup add vendor back
 // will result in
 //   []string{"v1", "v2", "v3"}
 func (f *FlagSet) StringSliceVar(p *[]string, name string, value []string, usage string) {
@@ -100,7 +121,11 @@ func (f *FlagSet) StringSliceVarP(p *[]string, name, shorthand string, value []s
 // The argument p points to a []string variable in which to store the value of the flag.
 // Compared to StringArray flags, StringSlice flags take comma-separated value as arguments and split them accordingly.
 // For example:
+<<<<<<< HEAD
+//   --ss="v1,v2" --ss="v3"
+=======
 //   --ss="v1,v2" -ss="v3"
+>>>>>>> cbc9bb05... fixup add vendor back
 // will result in
 //   []string{"v1", "v2", "v3"}
 func StringSliceVar(p *[]string, name string, value []string, usage string) {
@@ -116,7 +141,11 @@ func StringSliceVarP(p *[]string, name, shorthand string, value []string, usage 
 // The return value is the address of a []string variable that stores the value of the flag.
 // Compared to StringArray flags, StringSlice flags take comma-separated value as arguments and split them accordingly.
 // For example:
+<<<<<<< HEAD
+//   --ss="v1,v2" --ss="v3"
+=======
 //   --ss="v1,v2" -ss="v3"
+>>>>>>> cbc9bb05... fixup add vendor back
 // will result in
 //   []string{"v1", "v2", "v3"}
 func (f *FlagSet) StringSlice(name string, value []string, usage string) *[]string {
@@ -136,7 +165,11 @@ func (f *FlagSet) StringSliceP(name, shorthand string, value []string, usage str
 // The return value is the address of a []string variable that stores the value of the flag.
 // Compared to StringArray flags, StringSlice flags take comma-separated value as arguments and split them accordingly.
 // For example:
+<<<<<<< HEAD
+//   --ss="v1,v2" --ss="v3"
+=======
 //   --ss="v1,v2" -ss="v3"
+>>>>>>> cbc9bb05... fixup add vendor back
 // will result in
 //   []string{"v1", "v2", "v3"}
 func StringSlice(name string, value []string, usage string) *[]string {

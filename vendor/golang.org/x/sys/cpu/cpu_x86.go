@@ -16,6 +16,8 @@ func initOptions() {
 		{Name: "aes", Feature: &X86.HasAES},
 		{Name: "avx", Feature: &X86.HasAVX},
 		{Name: "avx2", Feature: &X86.HasAVX2},
+<<<<<<< HEAD
+=======
 		{Name: "avx512", Feature: &X86.HasAVX512},
 		{Name: "avx512f", Feature: &X86.HasAVX512F},
 		{Name: "avx512cd", Feature: &X86.HasAVX512CD},
@@ -36,6 +38,7 @@ func initOptions() {
 		{Name: "avx512vbmi2", Feature: &X86.HasAVX512VBMI2},
 		{Name: "avx512bitalg", Feature: &X86.HasAVX512BITALG},
 		{Name: "avx512bf16", Feature: &X86.HasAVX512BF16},
+>>>>>>> cbc9bb05... fixup add vendor back
 		{Name: "bmi1", Feature: &X86.HasBMI1},
 		{Name: "bmi2", Feature: &X86.HasBMI2},
 		{Name: "erms", Feature: &X86.HasERMS},
@@ -79,15 +82,22 @@ func archInit() {
 	X86.HasOSXSAVE = isSet(27, ecx1)
 	X86.HasRDRAND = isSet(30, ecx1)
 
+<<<<<<< HEAD
+	osSupportsAVX := false
+=======
 	var osSupportsAVX, osSupportsAVX512 bool
+>>>>>>> cbc9bb05... fixup add vendor back
 	// For XGETBV, OSXSAVE bit is required and sufficient.
 	if X86.HasOSXSAVE {
 		eax, _ := xgetbv()
 		// Check if XMM and YMM registers have OS support.
 		osSupportsAVX = isSet(1, eax) && isSet(2, eax)
+<<<<<<< HEAD
+=======
 
 		// Check if OPMASK and ZMM registers have OS support.
 		osSupportsAVX512 = osSupportsAVX && isSet(5, eax) && isSet(6, eax) && isSet(7, eax)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	X86.HasAVX = isSet(28, ecx1) && osSupportsAVX
@@ -96,7 +106,11 @@ func archInit() {
 		return
 	}
 
+<<<<<<< HEAD
+	_, ebx7, _, _ := cpuid(7, 0)
+=======
 	_, ebx7, ecx7, edx7 := cpuid(7, 0)
+>>>>>>> cbc9bb05... fixup add vendor back
 	X86.HasBMI1 = isSet(3, ebx7)
 	X86.HasAVX2 = isSet(5, ebx7) && osSupportsAVX
 	X86.HasBMI2 = isSet(8, ebx7)
@@ -104,6 +118,8 @@ func archInit() {
 	X86.HasRDSEED = isSet(18, ebx7)
 	X86.HasADX = isSet(19, ebx7)
 
+<<<<<<< HEAD
+=======
 	X86.HasAVX512 = isSet(16, ebx7) && osSupportsAVX512 // Because avx-512 foundation is the core required extension
 	if X86.HasAVX512 {
 		X86.HasAVX512F = true
@@ -128,6 +144,7 @@ func archInit() {
 		eax71, _, _, _ := cpuid(7, 1)
 		X86.HasAVX512BF16 = isSet(5, eax71)
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func isSet(bitpos uint, value uint32) bool {

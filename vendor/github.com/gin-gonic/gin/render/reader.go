@@ -21,7 +21,16 @@ type Reader struct {
 // Render (Reader) writes data with custom ContentType and headers.
 func (r Reader) Render(w http.ResponseWriter) (err error) {
 	r.WriteContentType(w)
+<<<<<<< HEAD
+	if r.ContentLength >= 0 {
+		if r.Headers == nil {
+			r.Headers = map[string]string{}
+		}
+		r.Headers["Content-Length"] = strconv.FormatInt(r.ContentLength, 10)
+	}
+=======
 	r.Headers["Content-Length"] = strconv.FormatInt(r.ContentLength, 10)
+>>>>>>> cbc9bb05... fixup add vendor back
 	r.writeHeaders(w, r.Headers)
 	_, err = io.Copy(w, r.Reader)
 	return

@@ -19,7 +19,10 @@ package http2 // import "golang.org/x/net/http2"
 import (
 	"bufio"
 	"crypto/tls"
+<<<<<<< HEAD
+=======
 	"errors"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"fmt"
 	"io"
 	"net/http"
@@ -173,11 +176,14 @@ func (s SettingID) String() string {
 	return fmt.Sprintf("UNKNOWN_SETTING_%d", uint16(s))
 }
 
+<<<<<<< HEAD
+=======
 var (
 	errInvalidHeaderFieldName  = errors.New("http2: invalid header field name")
 	errInvalidHeaderFieldValue = errors.New("http2: invalid header field value")
 )
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // validWireHeaderFieldName reports whether v is a valid header field
 // name (key). See httpguts.ValidHeaderName for the base rules.
 //
@@ -247,6 +253,10 @@ func (cw closeWaiter) Wait() {
 // Its buffered writer is lazily allocated as needed, to minimize
 // idle memory usage with many connections.
 type bufferedWriter struct {
+<<<<<<< HEAD
+	_  incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	w  io.Writer     // immutable
 	bw *bufio.Writer // non-nil when data is buffered
 }
@@ -319,6 +329,10 @@ func bodyAllowedForStatus(status int) bool {
 }
 
 type httpError struct {
+<<<<<<< HEAD
+	_       incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	msg     string
 	timeout bool
 }
@@ -382,3 +396,11 @@ func (s *sorter) SortStrings(ss []string) {
 func validPseudoPath(v string) bool {
 	return (len(v) > 0 && v[0] == '/') || v == "*"
 }
+<<<<<<< HEAD
+
+// incomparable is a zero-width, non-comparable type. Adding it to a struct
+// makes that struct also non-comparable, and generally doesn't add
+// any size (as long as it's first).
+type incomparable [0]func()
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

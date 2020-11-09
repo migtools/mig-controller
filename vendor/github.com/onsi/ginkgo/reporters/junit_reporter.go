@@ -32,12 +32,23 @@ type JUnitTestSuite struct {
 type JUnitTestCase struct {
 	Name           string               `xml:"name,attr"`
 	ClassName      string               `xml:"classname,attr"`
+<<<<<<< HEAD
+	PassedMessage  *JUnitPassedMessage  `xml:"passed,omitempty"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	FailureMessage *JUnitFailureMessage `xml:"failure,omitempty"`
 	Skipped        *JUnitSkipped        `xml:"skipped,omitempty"`
 	Time           float64              `xml:"time,attr"`
 	SystemOut      string               `xml:"system-out,omitempty"`
 }
 
+<<<<<<< HEAD
+type JUnitPassedMessage struct {
+	Message string `xml:",chardata"`
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type JUnitFailureMessage struct {
 	Type    string `xml:"type,attr"`
 	Message string `xml:",chardata"`
@@ -48,9 +59,16 @@ type JUnitSkipped struct {
 }
 
 type JUnitReporter struct {
+<<<<<<< HEAD
+	suite          JUnitTestSuite
+	filename       string
+	testSuiteName  string
+	ReporterConfig config.DefaultReporterConfigType
+=======
 	suite         JUnitTestSuite
 	filename      string
 	testSuiteName string
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 //NewJUnitReporter creates a new JUnit XML reporter.  The XML will be stored in the passed in filename.
@@ -60,12 +78,20 @@ func NewJUnitReporter(filename string) *JUnitReporter {
 	}
 }
 
+<<<<<<< HEAD
+func (reporter *JUnitReporter) SpecSuiteWillBegin(ginkgoConfig config.GinkgoConfigType, summary *types.SuiteSummary) {
+=======
 func (reporter *JUnitReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	reporter.suite = JUnitTestSuite{
 		Name:      summary.SuiteDescription,
 		TestCases: []JUnitTestCase{},
 	}
 	reporter.testSuiteName = summary.SuiteDescription
+<<<<<<< HEAD
+	reporter.ReporterConfig = config.DefaultReporterConfig
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (reporter *JUnitReporter) SpecWillRun(specSummary *types.SpecSummary) {
@@ -105,11 +131,27 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 		Name:      strings.Join(specSummary.ComponentTexts[1:], " "),
 		ClassName: reporter.testSuiteName,
 	}
+<<<<<<< HEAD
+	if reporter.ReporterConfig.ReportPassed && specSummary.State == types.SpecStatePassed {
+		testCase.PassedMessage = &JUnitPassedMessage{
+			Message: specSummary.CapturedOutput,
+		}
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if specSummary.State == types.SpecStateFailed || specSummary.State == types.SpecStateTimedOut || specSummary.State == types.SpecStatePanicked {
 		testCase.FailureMessage = &JUnitFailureMessage{
 			Type:    reporter.failureTypeForState(specSummary.State),
 			Message: failureMessage(specSummary.Failure),
 		}
+<<<<<<< HEAD
+		if specSummary.State == types.SpecStatePanicked {
+			testCase.FailureMessage.Message += fmt.Sprintf("\n\nPanic: %s\n\nFull stack:\n%s",
+				specSummary.Failure.ForwardedPanic,
+				specSummary.Failure.Location.FullStackTrace)
+		}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		testCase.SystemOut = specSummary.CapturedOutput
 	}
 	if specSummary.State == types.SpecStateSkipped || specSummary.State == types.SpecStatePending {
@@ -126,7 +168,11 @@ func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.suite.Errors = 0
 	file, err := os.Create(reporter.filename)
 	if err != nil {
+<<<<<<< HEAD
+		fmt.Fprintf(os.Stderr, "Failed to create JUnit report file: %s\n\t%s", reporter.filename, err.Error())
+=======
 		fmt.Printf("Failed to create JUnit report file: %s\n\t%s", reporter.filename, err.Error())
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	defer file.Close()
 	file.WriteString(xml.Header)
@@ -134,7 +180,11 @@ func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	encoder.Indent("  ", "    ")
 	err = encoder.Encode(reporter.suite)
 	if err != nil {
+<<<<<<< HEAD
+		fmt.Fprintf(os.Stderr, "Failed to generate JUnit report\n\t%s", err.Error())
+=======
 		fmt.Printf("Failed to generate JUnit report\n\t%s", err.Error())
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 

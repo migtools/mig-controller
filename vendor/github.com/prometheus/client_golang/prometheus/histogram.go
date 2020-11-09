@@ -204,8 +204,13 @@ func newHistogram(desc *Desc, opts HistogramOpts, labelValues ...string) Histogr
 			}
 		}
 	}
+<<<<<<< HEAD
+	// Finally we know the final length of h.upperBounds and can make buckets
+	// for both counts:
+=======
 	// Finally we know the final length of h.upperBounds and can make counts
 	// for both states:
+>>>>>>> cbc9bb05... fixup add vendor back
 	h.counts[0].buckets = make([]uint64, len(h.upperBounds))
 	h.counts[1].buckets = make([]uint64, len(h.upperBounds))
 
@@ -224,6 +229,23 @@ type histogramCounts struct {
 }
 
 type histogram struct {
+<<<<<<< HEAD
+	// countAndHotIdx enables lock-free writes with use of atomic updates.
+	// The most significant bit is the hot index [0 or 1] of the count field
+	// below. Observe calls update the hot one. All remaining bits count the
+	// number of Observe calls. Observe starts by incrementing this counter,
+	// and finish by incrementing the count field in the respective
+	// histogramCounts, as a marker for completion.
+	//
+	// Calls of the Write method (which are non-mutating reads from the
+	// perspective of the histogram) swap the hot–cold under the writeMtx
+	// lock. A cooldown is awaited (while locked) by comparing the number of
+	// observations with the initiation count. Once they match, then the
+	// last observation on the now cool one has completed. All cool fields must
+	// be merged into the new hot before releasing writeMtx.
+	//
+	// Fields with atomic access first! See alignment constraint:
+=======
 	// countAndHotIdx is a complicated one. For lock-free yet atomic
 	// observations, we need to save the total count of observations again,
 	// combined with the index of the currently-hot counts struct, so that
@@ -236,6 +258,7 @@ type histogram struct {
 	// which is about 3000 years.
 	//
 	// This has to be first in the struct for 64bit alignment. See
+>>>>>>> cbc9bb05... fixup add vendor back
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG
 	countAndHotIdx uint64
 
@@ -243,16 +266,25 @@ type histogram struct {
 	desc     *Desc
 	writeMtx sync.Mutex // Only used in the Write method.
 
+<<<<<<< HEAD
+=======
 	upperBounds []float64
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Two counts, one is "hot" for lock-free observations, the other is
 	// "cold" for writing out a dto.Metric. It has to be an array of
 	// pointers to guarantee 64bit alignment of the histogramCounts, see
 	// http://golang.org/pkg/sync/atomic/#pkg-note-BUG.
 	counts [2]*histogramCounts
+<<<<<<< HEAD
+
+	upperBounds []float64
+	labelPairs  []*dto.LabelPair
+=======
 	hotIdx int // Index of currently-hot counts. Only used within Write.
 
 	labelPairs []*dto.LabelPair
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (h *histogram) Desc() *Desc {
@@ -271,11 +303,19 @@ func (h *histogram) Observe(v float64) {
 	// 300 buckets: 154 ns/op linear - binary 61.6 ns/op
 	i := sort.SearchFloat64s(h.upperBounds, v)
 
+<<<<<<< HEAD
+	// We increment h.countAndHotIdx so that the counter in the lower
+	// 63 bits gets incremented. At the same time, we get the new value
+	// back, which we can use to find the currently-hot counts.
+	n := atomic.AddUint64(&h.countAndHotIdx, 1)
+	hotCounts := h.counts[n>>63]
+=======
 	// We increment h.countAndHotIdx by 2 so that the counter in the upper
 	// 63 bits gets incremented by 1. At the same time, we get the new value
 	// back, which we can use to find the currently-hot counts.
 	n := atomic.AddUint64(&h.countAndHotIdx, 2)
 	hotCounts := h.counts[n%2]
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	if i < len(h.upperBounds) {
 		atomic.AddUint64(&hotCounts.buckets[i], 1)
@@ -293,6 +333,40 @@ func (h *histogram) Observe(v float64) {
 }
 
 func (h *histogram) Write(out *dto.Metric) error {
+<<<<<<< HEAD
+	// For simplicity, we protect this whole method by a mutex. It is not in
+	// the hot path, i.e. Observe is called much more often than Write. The
+	// complication of making Write lock-free isn't worth it, if possible at
+	// all.
+	h.writeMtx.Lock()
+	defer h.writeMtx.Unlock()
+
+	// Adding 1<<63 switches the hot index (from 0 to 1 or from 1 to 0)
+	// without touching the count bits. See the struct comments for a full
+	// description of the algorithm.
+	n := atomic.AddUint64(&h.countAndHotIdx, 1<<63)
+	// count is contained unchanged in the lower 63 bits.
+	count := n & ((1 << 63) - 1)
+	// The most significant bit tells us which counts is hot. The complement
+	// is thus the cold one.
+	hotCounts := h.counts[n>>63]
+	coldCounts := h.counts[(^n)>>63]
+
+	// Await cooldown.
+	for count != atomic.LoadUint64(&coldCounts.count) {
+		runtime.Gosched() // Let observations get work done.
+	}
+
+	his := &dto.Histogram{
+		Bucket:      make([]*dto.Bucket, len(h.upperBounds)),
+		SampleCount: proto.Uint64(count),
+		SampleSum:   proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+	}
+	var cumCount uint64
+	for i, upperBound := range h.upperBounds {
+		cumCount += atomic.LoadUint64(&coldCounts.buckets[i])
+		his.Bucket[i] = &dto.Bucket{
+=======
 	var (
 		his                   = &dto.Histogram{}
 		buckets               = make([]*dto.Bucket, len(h.upperBounds))
@@ -353,12 +427,16 @@ func (h *histogram) Write(out *dto.Metric) error {
 	for i, upperBound := range h.upperBounds {
 		cumCount += atomic.LoadUint64(&coldCounts.buckets[i])
 		buckets[i] = &dto.Bucket{
+>>>>>>> cbc9bb05... fixup add vendor back
 			CumulativeCount: proto.Uint64(cumCount),
 			UpperBound:      proto.Float64(upperBound),
 		}
 	}
 
+<<<<<<< HEAD
+=======
 	his.Bucket = buckets
+>>>>>>> cbc9bb05... fixup add vendor back
 	out.Histogram = his
 	out.Label = h.labelPairs
 

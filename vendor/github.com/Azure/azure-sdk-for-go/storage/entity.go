@@ -207,7 +207,11 @@ func (e *Entity) Delete(force bool, options *EntityOptions) error {
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(http.MethodDelete, uri, headers, nil, e.Table.tsc.auth)
 	if err != nil {
+<<<<<<< HEAD
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+=======
 		if resp.StatusCode == http.StatusPreconditionFailed {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err
@@ -234,7 +238,11 @@ func (e *Entity) InsertOrMerge(options *EntityOptions) error {
 }
 
 func (e *Entity) buildPath() string {
+<<<<<<< HEAD
+	return fmt.Sprintf("%s(PartitionKey='%s',RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
+=======
 	return fmt.Sprintf("%s(PartitionKey='%s', RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // MarshalJSON is a custom marshaller for entity
@@ -433,7 +441,11 @@ func (e *Entity) updateMerge(force bool, verb string, options *EntityOptions) er
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(verb, uri, headers, bytes.NewReader(body), e.Table.tsc.auth)
 	if err != nil {
+<<<<<<< HEAD
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+=======
 		if resp.StatusCode == http.StatusPreconditionFailed {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err

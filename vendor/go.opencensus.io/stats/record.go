@@ -31,10 +31,25 @@ func init() {
 	}
 }
 
+<<<<<<< HEAD
+// Recorder provides an interface for exporting measurement information from
+// the static Record method by using the WithRecorder option.
+type Recorder interface {
+	// Record records a set of measurements associated with the given tags and attachments.
+	// The second argument is a `[]Measurement`.
+	Record(*tag.Map, interface{}, map[string]interface{})
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type recordOptions struct {
 	attachments  metricdata.Attachments
 	mutators     []tag.Mutator
 	measurements []Measurement
+<<<<<<< HEAD
+	recorder     Recorder
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // WithAttachments applies provided exemplar attachments.
@@ -58,6 +73,17 @@ func WithMeasurements(measurements ...Measurement) Options {
 	}
 }
 
+<<<<<<< HEAD
+// WithRecorder records the measurements to the specified `Recorder`, rather
+// than to the global metrics recorder.
+func WithRecorder(meter Recorder) Options {
+	return func(ro *recordOptions) {
+		ro.recorder = meter
+	}
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // Options apply changes to recordOptions.
 type Options func(*recordOptions)
 
@@ -93,6 +119,12 @@ func RecordWithOptions(ctx context.Context, ros ...Options) error {
 		return nil
 	}
 	recorder := internal.DefaultRecorder
+<<<<<<< HEAD
+	if o.recorder != nil {
+		recorder = o.recorder.Record
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if recorder == nil {
 		return nil
 	}

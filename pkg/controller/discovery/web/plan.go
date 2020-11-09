@@ -253,7 +253,7 @@ func (t *PlanTree) Build() (*TreeNode, error) {
 
 //
 // Get the relevant correlation labels.
-func (t *PlanTree) cLabel(r migapi.MigResource) model.Label {
+func (t *PlanTree) cLabel(r MigResource) model.Label {
 	k, v := r.GetCorrelationLabel()
 	return model.Label{
 		Name:  k,

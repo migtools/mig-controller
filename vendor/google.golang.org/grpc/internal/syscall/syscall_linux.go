@@ -32,16 +32,29 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
+<<<<<<< HEAD
+var logger = grpclog.Component("core")
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // GetCPUTime returns the how much CPU time has passed since the start of this process.
 func GetCPUTime() int64 {
 	var ts unix.Timespec
 	if err := unix.ClockGettime(unix.CLOCK_PROCESS_CPUTIME_ID, &ts); err != nil {
+<<<<<<< HEAD
+		logger.Fatal(err)
+=======
 		grpclog.Fatal(err)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return ts.Nano()
 }
 
+<<<<<<< HEAD
+// Rusage is an alias for syscall.Rusage under linux environment.
+=======
 // Rusage is an alias for syscall.Rusage under linux non-appengine environment.
+>>>>>>> cbc9bb05... fixup add vendor back
 type Rusage syscall.Rusage
 
 // GetRusage returns the resource usage of current process.

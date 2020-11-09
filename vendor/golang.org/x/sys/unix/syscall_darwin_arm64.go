@@ -6,7 +6,17 @@
 
 package unix
 
+<<<<<<< HEAD
+import (
+	"syscall"
+)
+
+func ptrace(request int, pid int, addr uintptr, data uintptr) error {
+	return ENOTSUP
+}
+=======
 import "syscall"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 func setTimespec(sec, nsec int64) Timespec {
 	return Timespec{Sec: sec, Nsec: nsec}
@@ -45,6 +55,9 @@ func Syscall9(num, a1, a2, a3, a4, a5, a6, a7, a8, a9 uintptr) (r1, r2 uintptr, 
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error)
 //sys	getfsstat(buf unsafe.Pointer, size uintptr, flags int) (n int, err error) = SYS_GETFSSTAT
 //sys	Lstat(path string, stat *Stat_t) (err error)
+<<<<<<< HEAD
+=======
 //sys	ptrace(request int, pid int, addr uintptr, data uintptr) (err error)
+>>>>>>> cbc9bb05... fixup add vendor back
 //sys	Stat(path string, stat *Stat_t) (err error)
 //sys	Statfs(path string, stat *Statfs_t) (err error)

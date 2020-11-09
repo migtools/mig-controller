@@ -2,6 +2,11 @@
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
+<<<<<<< HEAD
+// +build !nomsgpack
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package render
 
 import (
@@ -10,6 +15,13 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+<<<<<<< HEAD
+var (
+	_ Render = MsgPack{}
+)
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // MsgPack contains the given interface object.
 type MsgPack struct {
 	Data interface{}

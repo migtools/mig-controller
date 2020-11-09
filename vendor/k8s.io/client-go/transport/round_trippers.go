@@ -22,7 +22,14 @@ import (
 	"strings"
 	"time"
 
+<<<<<<< HEAD
 	"golang.org/x/oauth2"
+=======
+<<<<<<< HEAD
+	"golang.org/x/oauth2"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -45,11 +52,21 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	case config.HasBasicAuth() && config.HasTokenAuth():
 		return nil, fmt.Errorf("username/password or bearer token may be set, but not both")
 	case config.HasTokenAuth():
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 		var err error
 		rt, err = NewBearerAuthWithRefreshRoundTripper(config.BearerToken, config.BearerTokenFile, rt)
 		if err != nil {
 			return nil, err
 		}
+<<<<<<< HEAD
+=======
+=======
+		rt = NewBearerAuthRoundTripper(config.BearerToken, rt)
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	case config.HasBasicAuth():
 		rt = NewBasicAuthRoundTripper(config.Username, config.Password, rt)
 	}
@@ -270,13 +287,24 @@ func (rt *impersonatingRoundTripper) WrappedRoundTripper() http.RoundTripper { r
 
 type bearerAuthRoundTripper struct {
 	bearer string
+<<<<<<< HEAD
 	source oauth2.TokenSource
+=======
+<<<<<<< HEAD
+	source oauth2.TokenSource
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	rt     http.RoundTripper
 }
 
 // NewBearerAuthRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
 func NewBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTripper {
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 	return &bearerAuthRoundTripper{bearer, nil, rt}
 }
 
@@ -299,6 +327,12 @@ func NewBearerAuthWithRefreshRoundTripper(bearer string, tokenFile string, rt ht
 		bearer = token.AccessToken
 	}
 	return &bearerAuthRoundTripper{bearer, source, rt}, nil
+<<<<<<< HEAD
+=======
+=======
+	return &bearerAuthRoundTripper{bearer, rt}
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 }
 
 func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -307,6 +341,10 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	}
 
 	req = utilnet.CloneRequest(req)
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 	token := rt.bearer
 	if rt.source != nil {
 		if refreshedToken, err := rt.source.Token(); err == nil {
@@ -314,6 +352,12 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 		}
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+<<<<<<< HEAD
+=======
+=======
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", rt.bearer))
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	return rt.rt.RoundTrip(req)
 }
 

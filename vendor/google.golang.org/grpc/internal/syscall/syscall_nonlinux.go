@@ -18,6 +18,11 @@
  *
  */
 
+<<<<<<< HEAD
+// Package syscall provides functionalities that grpc uses to get low-level
+// operating system stats/info.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package syscall
 
 import (
@@ -29,10 +34,18 @@ import (
 )
 
 var once sync.Once
+<<<<<<< HEAD
+var logger = grpclog.Component("core")
+
+func log() {
+	once.Do(func() {
+		logger.Info("CPU time info is unavailable on non-linux or appengine environment.")
+=======
 
 func log() {
 	once.Do(func() {
 		grpclog.Info("CPU time info is unavailable on non-linux or appengine environment.")
+>>>>>>> cbc9bb05... fixup add vendor back
 	})
 }
 

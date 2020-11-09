@@ -1,9 +1,20 @@
+<<<<<<< HEAD
+// Copyright 2012 Google LLC. All rights reserved.
+=======
 // Copyright 2012 Google Inc. All rights reserved.
+>>>>>>> cbc9bb05... fixup add vendor back
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 // Package transport contains HTTP transports used to make
 // authenticated API requests.
+<<<<<<< HEAD
+//
+// This package is DEPRECATED. Users should instead use,
+//
+//     service, err := NewService(..., option.WithAPIKey(...))
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package transport
 
 import (
@@ -13,6 +24,11 @@ import (
 
 // APIKey is an HTTP Transport which wraps an underlying transport and
 // appends an API Key "key" parameter to the URL of outgoing requests.
+<<<<<<< HEAD
+//
+// Deprecated: please use NewService(..., option.WithAPIKey(...)) instead.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type APIKey struct {
 	// Key is the API Key to set on requests.
 	Key string

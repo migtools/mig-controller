@@ -131,7 +131,11 @@ var baseVariants = map[string]string{
 	"arm64": "v8",
 }
 
+<<<<<<< HEAD
+// WantedPlatforms returns all compatible platforms with the platform specifics possibly overridden by user,
+=======
 // WantedPlatforms returns all compatible platforms with the platform specifics possibly overriden by user,
+>>>>>>> cbc9bb05... fixup add vendor back
 // the most compatible platform is first.
 // If some option (arch, os, variant) is not present, a value from current platform is detected.
 func WantedPlatforms(ctx *types.SystemContext) ([]imgspecv1.Platform, error) {

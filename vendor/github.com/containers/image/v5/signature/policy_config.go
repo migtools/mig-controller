@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+// policy_config.go handles creation of policy objects, either by parsing JSON
+=======
 // policy_config.go hanles creation of policy objects, either by parsing JSON
+>>>>>>> cbc9bb05... fixup add vendor back
 // or by programs building them programmatically.
 
 // The New* constructors are intended to be a stable API. FIXME: after an independent review.
@@ -516,7 +520,11 @@ func newPolicyReferenceMatchFromJSON(data []byte) (PolicyReferenceMatch, error) 
 	return res, nil
 }
 
+<<<<<<< HEAD
+// newPRMMatchExact is NewPRMMatchExact, except it returns the private type.
+=======
 // newPRMMatchExact is NewPRMMatchExact, except it resturns the private type.
+>>>>>>> cbc9bb05... fixup add vendor back
 func newPRMMatchExact() *prmMatchExact {
 	return &prmMatchExact{prmCommon{Type: prmTypeMatchExact}}
 }
@@ -546,7 +554,11 @@ func (prm *prmMatchExact) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// newPRMMatchRepoDigestOrExact is NewPRMMatchRepoDigestOrExact, except it returns the private type.
+=======
 // newPRMMatchRepoDigestOrExact is NewPRMMatchRepoDigestOrExact, except it resturns the private type.
+>>>>>>> cbc9bb05... fixup add vendor back
 func newPRMMatchRepoDigestOrExact() *prmMatchRepoDigestOrExact {
 	return &prmMatchRepoDigestOrExact{prmCommon{Type: prmTypeMatchRepoDigestOrExact}}
 }
@@ -576,7 +588,11 @@ func (prm *prmMatchRepoDigestOrExact) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// newPRMMatchRepository is NewPRMMatchRepository, except it returns the private type.
+=======
 // newPRMMatchRepository is NewPRMMatchRepository, except it resturns the private type.
+>>>>>>> cbc9bb05... fixup add vendor back
 func newPRMMatchRepository() *prmMatchRepository {
 	return &prmMatchRepository{prmCommon{Type: prmTypeMatchRepository}}
 }
@@ -606,7 +622,11 @@ func (prm *prmMatchRepository) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// newPRMExactReference is NewPRMExactReference, except it returns the private type.
+=======
 // newPRMExactReference is NewPRMExactReference, except it resturns the private type.
+>>>>>>> cbc9bb05... fixup add vendor back
 func newPRMExactReference(dockerReference string) (*prmExactReference, error) {
 	ref, err := reference.ParseNormalizedNamed(dockerReference)
 	if err != nil {
@@ -652,7 +672,11 @@ func (prm *prmExactReference) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// newPRMExactRepository is NewPRMExactRepository, except it returns the private type.
+=======
 // newPRMExactRepository is NewPRMExactRepository, except it resturns the private type.
+>>>>>>> cbc9bb05... fixup add vendor back
 func newPRMExactRepository(dockerRepository string) (*prmExactRepository, error) {
 	if _, err := reference.ParseNormalizedNamed(dockerRepository); err != nil {
 		return nil, InvalidPolicyFormatError(fmt.Sprintf("Invalid format of dockerRepository %s: %s", dockerRepository, err.Error()))

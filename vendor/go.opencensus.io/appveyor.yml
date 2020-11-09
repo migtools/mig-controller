@@ -6,6 +6,14 @@ clone_folder: c:\gopath\src\go.opencensus.io
 
 environment:
   GOPATH: 'c:\gopath'
+<<<<<<< HEAD
+  GO111MODULE: 'on'
+  CGO_ENABLED: '0' # See: https://github.com/appveyor/ci/issues/2613
+
+stack: go 1.11
+
+before_test:
+=======
   GOVERSION: '1.11'
   GO111MODULE: 'on'
   CGO_ENABLED: '0' # See: https://github.com/appveyor/ci/issues/2613
@@ -13,6 +21,7 @@ environment:
 install:
   - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
   - choco upgrade golang --version 1.11.5 # Temporary fix because of a go.sum bug in 1.11
+>>>>>>> cbc9bb05... fixup add vendor back
   - go version
   - go env
 

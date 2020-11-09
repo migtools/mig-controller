@@ -35,6 +35,10 @@ func (cli *Client) ContainerList(ctx context.Context, options types.ContainerLis
 	}
 
 	if options.Filters.Len() > 0 {
+<<<<<<< HEAD
+		//nolint:staticcheck // ignore SA1019 for old code
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		filterJSON, err := filters.ToParamWithVersion(cli.version, options.Filters)
 
 		if err != nil {

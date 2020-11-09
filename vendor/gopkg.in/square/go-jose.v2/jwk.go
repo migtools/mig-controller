@@ -17,11 +17,21 @@
 package jose
 
 import (
+<<<<<<< HEAD
+=======
 	"bytes"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
+<<<<<<< HEAD
+	"crypto/x509"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"math/big"
+=======
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
@@ -31,6 +41,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"reflect"
 	"strings"
 
@@ -62,14 +73,25 @@ type rawJSONWebKey struct {
 	Dq *byteBuffer `json:"dq,omitempty"`
 	Qi *byteBuffer `json:"qi,omitempty"`
 	// Certificates
+<<<<<<< HEAD
+	X5c []string `json:"x5c,omitempty"`
+=======
 	X5c       []string `json:"x5c,omitempty"`
 	X5u       *url.URL `json:"x5u,omitempty"`
 	X5tSHA1   string   `json:"x5t,omitempty"`
 	X5tSHA256 string   `json:"x5t#S256,omitempty"`
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // JSONWebKey represents a public or private key in JWK format.
 type JSONWebKey struct {
+<<<<<<< HEAD
+	Key          interface{}
+	Certificates []*x509.Certificate
+	KeyID        string
+	Algorithm    string
+	Use          string
+=======
 	// Cryptographic key, can be a symmetric or asymmetric key.
 	Key interface{}
 	// Key identifier, parsed from `kid` header.
@@ -87,6 +109,7 @@ type JSONWebKey struct {
 	CertificateThumbprintSHA1 []byte
 	// X.509 certificate thumbprint (SHA-256), parsed from `x5t#S256` header.
 	CertificateThumbprintSHA256 []byte
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // MarshalJSON serializes the given key to its JSON representation.
@@ -125,6 +148,8 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 		raw.X5c = append(raw.X5c, base64.StdEncoding.EncodeToString(cert.Raw))
 	}
 
+<<<<<<< HEAD
+=======
 	x5tSHA1Len := len(k.CertificateThumbprintSHA1)
 	x5tSHA256Len := len(k.CertificateThumbprintSHA256)
 	if x5tSHA1Len > 0 {
@@ -158,6 +183,7 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 
 	raw.X5u = k.CertificatesURL
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	return json.Marshal(raw)
 }
 
@@ -169,6 +195,9 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		return err
 	}
 
+<<<<<<< HEAD
+	var key interface{}
+=======
 	certs, err := parseCertificateChain(raw.X5c)
 	if err != nil {
 		return fmt.Errorf("square/go-jose: failed to unmarshal x5c field: %s", err)
@@ -188,20 +217,32 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		certPub = certs[0].PublicKey
 	}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	switch raw.Kty {
 	case "EC":
 		if raw.D != nil {
 			key, err = raw.ecPrivateKey()
+<<<<<<< HEAD
+		} else {
+			key, err = raw.ecPublicKey()
+=======
 			if err == nil {
 				keyPub = key.(*ecdsa.PrivateKey).Public()
 			}
 		} else {
 			key, err = raw.ecPublicKey()
 			keyPub = key
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	case "RSA":
 		if raw.D != nil {
 			key, err = raw.rsaPrivateKey()
+<<<<<<< HEAD
+		} else {
+			key, err = raw.rsaPublicKey()
+		}
+	case "oct":
+=======
 			if err == nil {
 				keyPub = key.(*rsa.PrivateKey).Public()
 			}
@@ -213,17 +254,23 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		if certPub != nil {
 			return errors.New("square/go-jose: invalid JWK, found 'oct' (symmetric) key with cert chain")
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 		key, err = raw.symmetricKey()
 	case "OKP":
 		if raw.Crv == "Ed25519" && raw.X != nil {
 			if raw.D != nil {
 				key, err = raw.edPrivateKey()
+<<<<<<< HEAD
+			} else {
+				key, err = raw.edPublicKey()
+=======
 				if err == nil {
 					keyPub = key.(ed25519.PrivateKey).Public()
 				}
 			} else {
 				key, err = raw.edPublicKey()
 				keyPub = key
+>>>>>>> cbc9bb05... fixup add vendor back
 			}
 		} else {
 			err = fmt.Errorf("square/go-jose: unknown curve %s'", raw.Crv)
@@ -232,6 +279,14 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		err = fmt.Errorf("square/go-jose: unknown json web key type '%s'", raw.Kty)
 	}
 
+<<<<<<< HEAD
+	if err == nil {
+		*k = JSONWebKey{Key: key, KeyID: raw.Kid, Algorithm: raw.Alg, Use: raw.Use}
+
+		k.Certificates, err = parseCertificateChain(raw.X5c)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal x5c field: %s", err)
+=======
 	if err != nil {
 		return
 	}
@@ -304,6 +359,7 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 
 		if len(k.CertificateThumbprintSHA256) > 0 && !bytes.Equal(sha256sum[:], k.CertificateThumbprintSHA256) {
 			return errors.New("square/go-jose: invalid JWK, x5c thumbprint does not match x5t#S256 value")
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 
@@ -509,11 +565,19 @@ func (key rawJSONWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 	// the curve specified in the "crv" parameter.
 	// https://tools.ietf.org/html/rfc7518#section-6.2.1.2
 	if curveSize(curve) != len(key.X.data) {
+<<<<<<< HEAD
+		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for x")
+	}
+
+	if curveSize(curve) != len(key.Y.data) {
+		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for y")
+=======
 		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for x")
 	}
 
 	if curveSize(curve) != len(key.Y.data) {
 		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for y")
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	x := key.X.bigInt()

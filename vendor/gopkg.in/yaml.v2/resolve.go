@@ -81,7 +81,11 @@ func resolvableTag(tag string) bool {
 	return false
 }
 
+<<<<<<< HEAD
+var yamlStyleFloat = regexp.MustCompile(`^[-+]?(\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][-+]?[0-9]+)?$`)
+=======
 var yamlStyleFloat = regexp.MustCompile(`^[-+]?[0-9]*\.?[0-9]+([eE][-+][0-9]+)?$`)
+>>>>>>> cbc9bb05... fixup add vendor back
 
 func resolve(tag string, in string) (rtag string, out interface{}) {
 	if !resolvableTag(tag) {

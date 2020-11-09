@@ -10,5 +10,9 @@
 package hcsschema
 
 type Memory struct {
+<<<<<<< HEAD
+	SizeInMB int32 `json:"SizeInMB,omitempty"`
+=======
 	SizeInMB uint64 `json:"SizeInMB,omitempty"`
+>>>>>>> cbc9bb05... fixup add vendor back
 }

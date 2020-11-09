@@ -89,7 +89,11 @@ func UnmarshalStrict(in []byte, out interface{}) (err error) {
 	return unmarshal(in, out, true)
 }
 
+<<<<<<< HEAD
+// A Decoder reads and decodes YAML values from an input stream.
+=======
 // A Decorder reads and decodes YAML values from an input stream.
+>>>>>>> cbc9bb05... fixup add vendor back
 type Decoder struct {
 	strict bool
 	parser *parser

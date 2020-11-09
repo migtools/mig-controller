@@ -37,6 +37,11 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+<<<<<<< HEAD
+	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal/grpcutil"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"google.golang.org/grpc/status"
 )
 
@@ -50,7 +55,11 @@ const (
 	// "proto" as a suffix after "+" or ";".  See
 	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
 	// for more details.
+<<<<<<< HEAD
+
+=======
 	baseContentType = "application/grpc"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var (
@@ -71,6 +80,8 @@ var (
 		http2.ErrCodeInadequateSecurity: codes.PermissionDenied,
 		http2.ErrCodeHTTP11Required:     codes.Internal,
 	}
+<<<<<<< HEAD
+=======
 	statusCodeConvTab = map[codes.Code]http2.ErrCode{
 		codes.Internal:          http2.ErrCodeInternal,
 		codes.Canceled:          http2.ErrCodeCancel,
@@ -78,6 +89,7 @@ var (
 		codes.ResourceExhausted: http2.ErrCodeEnhanceYourCalm,
 		codes.PermissionDenied:  http2.ErrCodeInadequateSecurity,
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	// HTTPStatusConvTab is the HTTP status code to gRPC error code conversion table.
 	HTTPStatusConvTab = map[int]codes.Code{
 		// 400 Bad Request - INTERNAL.
@@ -97,6 +109,10 @@ var (
 		// 504 Gateway timeout - UNAVAILABLE.
 		http.StatusGatewayTimeout: codes.Unavailable,
 	}
+<<<<<<< HEAD
+	logger = grpclog.Component("transport")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 type parsedHeaderData struct {
@@ -182,6 +198,8 @@ func isWhitelistedHeader(hdr string) bool {
 	}
 }
 
+<<<<<<< HEAD
+=======
 // contentSubtype returns the content-subtype for the given content-type.  The
 // given content-type must be a valid content-type that starts with
 // "application/grpc". A content-subtype will follow "application/grpc" after a
@@ -222,6 +240,7 @@ func contentType(contentSubtype string) string {
 	return baseContentType + "+" + contentSubtype
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func (d *decodeState) status() *status.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
@@ -259,11 +278,19 @@ func decodeMetadataHeader(k, v string) (string, error) {
 	return v, nil
 }
 
+<<<<<<< HEAD
+func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) (http2.ErrCode, error) {
+	// frame.Truncated is set to true when framer detects that the current header
+	// list size hits MaxHeaderListSize limit.
+	if frame.Truncated {
+		return http2.ErrCodeFrameSize, status.Error(codes.Internal, "peer header list size exceeded limit")
+=======
 func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 	// frame.Truncated is set to true when framer detects that the current header
 	// list size hits MaxHeaderListSize limit.
 	if frame.Truncated {
 		return status.Error(codes.Internal, "peer header list size exceeded limit")
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	for _, hf := range frame.Fields {
@@ -272,10 +299,17 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 
 	if d.data.isGRPC {
 		if d.data.grpcErr != nil {
+<<<<<<< HEAD
+			return http2.ErrCodeProtocol, d.data.grpcErr
+		}
+		if d.serverSide {
+			return http2.ErrCodeNo, nil
+=======
 			return d.data.grpcErr
 		}
 		if d.serverSide {
 			return nil
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 		if d.data.rawStatusCode == nil && d.data.statusGen == nil {
 			// gRPC status doesn't exist.
@@ -287,12 +321,20 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 			code := int(codes.Unknown)
 			d.data.rawStatusCode = &code
 		}
+<<<<<<< HEAD
+		return http2.ErrCodeNo, nil
+=======
 		return nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	// HTTP fallback mode
 	if d.data.httpErr != nil {
+<<<<<<< HEAD
+		return http2.ErrCodeProtocol, d.data.httpErr
+=======
 		return d.data.httpErr
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	var (
@@ -307,7 +349,11 @@ func (d *decodeState) decodeHeader(frame *http2.MetaHeadersFrame) error {
 		}
 	}
 
+<<<<<<< HEAD
+	return http2.ErrCodeProtocol, status.Error(code, d.constructHTTPErrMsg())
+=======
 	return status.Error(code, d.constructHTTPErrMsg())
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // constructErrMsg constructs error message to be returned in HTTP fallback mode.
@@ -340,7 +386,11 @@ func (d *decodeState) addMetadata(k, v string) {
 func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	switch f.Name {
 	case "content-type":
+<<<<<<< HEAD
+		contentSubtype, validContentType := grpcutil.ContentSubtype(f.Value)
+=======
 		contentSubtype, validContentType := contentSubtype(f.Value)
+>>>>>>> cbc9bb05... fixup add vendor back
 		if !validContentType {
 			d.data.contentTypeErr = fmt.Sprintf("transport: received the unexpected content-type %q", f.Value)
 			return
@@ -412,7 +462,13 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		}
 		v, err := decodeMetadataHeader(f.Name, f.Value)
 		if err != nil {
+<<<<<<< HEAD
+			if logger.V(logLevel) {
+				logger.Errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+			}
+=======
 			errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+>>>>>>> cbc9bb05... fixup add vendor back
 			return
 		}
 		d.addMetadata(f.Name, v)
@@ -449,6 +505,8 @@ func timeoutUnitToDuration(u timeoutUnit) (d time.Duration, ok bool) {
 	return
 }
 
+<<<<<<< HEAD
+=======
 const maxTimeoutValue int64 = 100000000 - 1
 
 // div does integer division and round-up the result. Note that this is
@@ -484,6 +542,7 @@ func encodeTimeout(t time.Duration) string {
 	return strconv.FormatInt(div(t, time.Hour), 10) + "H"
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 func decodeTimeout(s string) (time.Duration, error) {
 	size := len(s)
 	if size < 2 {

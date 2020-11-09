@@ -58,8 +58,16 @@ var (
 
 	apiHTTPClient = &http.Client{
 		Transport: &http.Transport{
+<<<<<<< HEAD
+			Proxy:               http.ProxyFromEnvironment,
+			Dial:                limitDial,
+			MaxIdleConns:        1000,
+			MaxIdleConnsPerHost: 10000,
+			IdleConnTimeout:     90 * time.Second,
+=======
 			Proxy: http.ProxyFromEnvironment,
 			Dial:  limitDial,
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 

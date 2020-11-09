@@ -26,8 +26,13 @@ package cloud
 import (
 	_ "github.com/golang/protobuf/protoc-gen-go"
 	_ "github.com/jstemmer/go-junit-report"
+<<<<<<< HEAD
+	_ "golang.org/x/lint/golint"
+	_ "golang.org/x/tools/cmd/goimports"
+=======
 	_ "golang.org/x/exp/cmd/apidiff"
 	_ "golang.org/x/lint/golint"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "honnef.co/go/tools/cmd/staticcheck"
+>>>>>>> cbc9bb05... fixup add vendor back
 )

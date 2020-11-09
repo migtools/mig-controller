@@ -35,56 +35,92 @@ import (
 //export callbackTrampoline
 func callbackTrampoline(ctx *C.sqlite3_context, argc int, argv **C.sqlite3_value) {
 	args := (*[(math.MaxInt32 - 1) / unsafe.Sizeof((*C.sqlite3_value)(nil))]*C.sqlite3_value)(unsafe.Pointer(argv))[:argc:argc]
+<<<<<<< HEAD
+	fi := lookupHandle(C.sqlite3_user_data(ctx)).(*functionInfo)
+=======
 	fi := lookupHandle(uintptr(C.sqlite3_user_data(ctx))).(*functionInfo)
+>>>>>>> cbc9bb05... fixup add vendor back
 	fi.Call(ctx, args)
 }
 
 //export stepTrampoline
 func stepTrampoline(ctx *C.sqlite3_context, argc C.int, argv **C.sqlite3_value) {
 	args := (*[(math.MaxInt32 - 1) / unsafe.Sizeof((*C.sqlite3_value)(nil))]*C.sqlite3_value)(unsafe.Pointer(argv))[:int(argc):int(argc)]
+<<<<<<< HEAD
+	ai := lookupHandle(C.sqlite3_user_data(ctx)).(*aggInfo)
+=======
 	ai := lookupHandle(uintptr(C.sqlite3_user_data(ctx))).(*aggInfo)
+>>>>>>> cbc9bb05... fixup add vendor back
 	ai.Step(ctx, args)
 }
 
 //export doneTrampoline
 func doneTrampoline(ctx *C.sqlite3_context) {
+<<<<<<< HEAD
+	ai := lookupHandle(C.sqlite3_user_data(ctx)).(*aggInfo)
+=======
 	handle := uintptr(C.sqlite3_user_data(ctx))
 	ai := lookupHandle(handle).(*aggInfo)
+>>>>>>> cbc9bb05... fixup add vendor back
 	ai.Done(ctx)
 }
 
 //export compareTrampoline
+<<<<<<< HEAD
+func compareTrampoline(handlePtr unsafe.Pointer, la C.int, a *C.char, lb C.int, b *C.char) C.int {
+=======
 func compareTrampoline(handlePtr uintptr, la C.int, a *C.char, lb C.int, b *C.char) C.int {
+>>>>>>> cbc9bb05... fixup add vendor back
 	cmp := lookupHandle(handlePtr).(func(string, string) int)
 	return C.int(cmp(C.GoStringN(a, la), C.GoStringN(b, lb)))
 }
 
 //export commitHookTrampoline
+<<<<<<< HEAD
+func commitHookTrampoline(handle unsafe.Pointer) int {
+=======
 func commitHookTrampoline(handle uintptr) int {
+>>>>>>> cbc9bb05... fixup add vendor back
 	callback := lookupHandle(handle).(func() int)
 	return callback()
 }
 
 //export rollbackHookTrampoline
+<<<<<<< HEAD
+func rollbackHookTrampoline(handle unsafe.Pointer) {
+=======
 func rollbackHookTrampoline(handle uintptr) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	callback := lookupHandle(handle).(func())
 	callback()
 }
 
 //export updateHookTrampoline
+<<<<<<< HEAD
+func updateHookTrampoline(handle unsafe.Pointer, op int, db *C.char, table *C.char, rowid int64) {
+=======
 func updateHookTrampoline(handle uintptr, op int, db *C.char, table *C.char, rowid int64) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	callback := lookupHandle(handle).(func(int, string, string, int64))
 	callback(op, C.GoString(db), C.GoString(table), rowid)
 }
 
 //export authorizerTrampoline
+<<<<<<< HEAD
+func authorizerTrampoline(handle unsafe.Pointer, op int, arg1 *C.char, arg2 *C.char, arg3 *C.char) int {
+=======
 func authorizerTrampoline(handle uintptr, op int, arg1 *C.char, arg2 *C.char, arg3 *C.char) int {
+>>>>>>> cbc9bb05... fixup add vendor back
 	callback := lookupHandle(handle).(func(int, string, string, string) int)
 	return callback(op, C.GoString(arg1), C.GoString(arg2), C.GoString(arg3))
 }
 
 //export preUpdateHookTrampoline
+<<<<<<< HEAD
+func preUpdateHookTrampoline(handle unsafe.Pointer, dbHandle uintptr, op int, db *C.char, table *C.char, oldrowid int64, newrowid int64) {
+=======
 func preUpdateHookTrampoline(handle uintptr, dbHandle uintptr, op int, db *C.char, table *C.char, oldrowid int64, newrowid int64) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	hval := lookupHandleVal(handle)
 	data := SQLitePreUpdateData{
 		Conn:         hval.db,
@@ -105,6 +141,29 @@ type handleVal struct {
 }
 
 var handleLock sync.Mutex
+<<<<<<< HEAD
+var handleVals = make(map[unsafe.Pointer]handleVal)
+
+func newHandle(db *SQLiteConn, v interface{}) unsafe.Pointer {
+	handleLock.Lock()
+	defer handleLock.Unlock()
+	val := handleVal{db: db, val: v}
+	var p unsafe.Pointer = C.malloc(C.size_t(1))
+	if p == nil {
+		panic("can't allocate 'cgo-pointer hack index pointer': ptr == nil")
+	}
+	handleVals[p] = val
+	return p
+}
+
+func lookupHandleVal(handle unsafe.Pointer) handleVal {
+	handleLock.Lock()
+	defer handleLock.Unlock()
+	return handleVals[handle]
+}
+
+func lookupHandle(handle unsafe.Pointer) interface{} {
+=======
 var handleVals = make(map[uintptr]handleVal)
 var handleIndex uintptr = 100
 
@@ -132,6 +191,7 @@ func lookupHandleVal(handle uintptr) handleVal {
 }
 
 func lookupHandle(handle uintptr) interface{} {
+>>>>>>> cbc9bb05... fixup add vendor back
 	return lookupHandleVal(handle).val
 }
 
@@ -141,6 +201,10 @@ func deleteHandles(db *SQLiteConn) {
 	for handle, val := range handleVals {
 		if val.db == db {
 			delete(handleVals, handle)
+<<<<<<< HEAD
+			C.free(handle)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 }

@@ -112,6 +112,12 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 	c := iter.nextToken()
 	var field string
 	if c == '{' {
+<<<<<<< HEAD
+		if !iter.incrementDepth() {
+			return false
+		}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		c = iter.nextToken()
 		if c == '"' {
 			iter.unreadByte()
@@ -121,6 +127,10 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 				iter.ReportError("ReadObject", "expect : after object field, but found "+string([]byte{c}))
 			}
 			if !callback(iter, field) {
+<<<<<<< HEAD
+				iter.decrementDepth()
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				return false
 			}
 			c = iter.nextToken()
@@ -131,12 +141,28 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 					iter.ReportError("ReadObject", "expect : after object field, but found "+string([]byte{c}))
 				}
 				if !callback(iter, field) {
+<<<<<<< HEAD
+					iter.decrementDepth()
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 					return false
 				}
 				c = iter.nextToken()
 			}
 			if c != '}' {
 				iter.ReportError("ReadObjectCB", `object not ended with }`)
+<<<<<<< HEAD
+				iter.decrementDepth()
+				return false
+			}
+			return iter.decrementDepth()
+		}
+		if c == '}' {
+			return iter.decrementDepth()
+		}
+		iter.ReportError("ReadObjectCB", `expect " after }, but found `+string([]byte{c}))
+		iter.decrementDepth()
+=======
 				return false
 			}
 			return true
@@ -145,6 +171,7 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 			return true
 		}
 		iter.ReportError("ReadObjectCB", `expect " after }, but found `+string([]byte{c}))
+>>>>>>> cbc9bb05... fixup add vendor back
 		return false
 	}
 	if c == 'n' {
@@ -159,15 +186,29 @@ func (iter *Iterator) ReadObjectCB(callback func(*Iterator, string) bool) bool {
 func (iter *Iterator) ReadMapCB(callback func(*Iterator, string) bool) bool {
 	c := iter.nextToken()
 	if c == '{' {
+<<<<<<< HEAD
+		if !iter.incrementDepth() {
+			return false
+		}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		c = iter.nextToken()
 		if c == '"' {
 			iter.unreadByte()
 			field := iter.ReadString()
 			if iter.nextToken() != ':' {
 				iter.ReportError("ReadMapCB", "expect : after object field, but found "+string([]byte{c}))
+<<<<<<< HEAD
+				iter.decrementDepth()
 				return false
 			}
 			if !callback(iter, field) {
+				iter.decrementDepth()
+=======
+				return false
+			}
+			if !callback(iter, field) {
+>>>>>>> cbc9bb05... fixup add vendor back
 				return false
 			}
 			c = iter.nextToken()
@@ -175,15 +216,35 @@ func (iter *Iterator) ReadMapCB(callback func(*Iterator, string) bool) bool {
 				field = iter.ReadString()
 				if iter.nextToken() != ':' {
 					iter.ReportError("ReadMapCB", "expect : after object field, but found "+string([]byte{c}))
+<<<<<<< HEAD
+					iter.decrementDepth()
 					return false
 				}
 				if !callback(iter, field) {
+					iter.decrementDepth()
+=======
+					return false
+				}
+				if !callback(iter, field) {
+>>>>>>> cbc9bb05... fixup add vendor back
 					return false
 				}
 				c = iter.nextToken()
 			}
 			if c != '}' {
 				iter.ReportError("ReadMapCB", `object not ended with }`)
+<<<<<<< HEAD
+				iter.decrementDepth()
+				return false
+			}
+			return iter.decrementDepth()
+		}
+		if c == '}' {
+			return iter.decrementDepth()
+		}
+		iter.ReportError("ReadMapCB", `expect " after }, but found `+string([]byte{c}))
+		iter.decrementDepth()
+=======
 				return false
 			}
 			return true
@@ -192,6 +253,7 @@ func (iter *Iterator) ReadMapCB(callback func(*Iterator, string) bool) bool {
 			return true
 		}
 		iter.ReportError("ReadMapCB", `expect " after }, but found `+string([]byte{c}))
+>>>>>>> cbc9bb05... fixup add vendor back
 		return false
 	}
 	if c == 'n' {

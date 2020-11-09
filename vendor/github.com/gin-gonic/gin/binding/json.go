@@ -18,6 +18,15 @@ import (
 // interface{} as a Number instead of as a float64.
 var EnableDecoderUseNumber = false
 
+<<<<<<< HEAD
+// EnableDecoderDisallowUnknownFields is used to call the DisallowUnknownFields method
+// on the JSON Decoder instance. DisallowUnknownFields causes the Decoder to
+// return an error when the destination is a struct and the input contains object
+// keys which do not match any non-ignored, exported fields in the destination.
+var EnableDecoderDisallowUnknownFields = false
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type jsonBinding struct{}
 
 func (jsonBinding) Name() string {
@@ -40,6 +49,12 @@ func decodeJSON(r io.Reader, obj interface{}) error {
 	if EnableDecoderUseNumber {
 		decoder.UseNumber()
 	}
+<<<<<<< HEAD
+	if EnableDecoderDisallowUnknownFields {
+		decoder.DisallowUnknownFields()
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err := decoder.Decode(obj); err != nil {
 		return err
 	}

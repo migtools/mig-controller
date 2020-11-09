@@ -13,6 +13,30 @@ import (
 	"errors"
 )
 
+<<<<<<< HEAD
+var errorMsg = errors.New("Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work. This is a stub")
+
+func init() {
+	sql.Register("sqlite3", &SQLiteDriver{})
+}
+
+type (
+	SQLiteDriver struct {
+		Extensions  []string
+		ConnectHook func(*SQLiteConn) error
+	}
+	SQLiteConn struct{}
+)
+
+func (SQLiteDriver) Open(s string) (driver.Conn, error)                        { return nil, errorMsg }
+func (c *SQLiteConn) RegisterAggregator(string, interface{}, bool) error       { return errorMsg }
+func (c *SQLiteConn) RegisterAuthorizer(func(int, string, string, string) int) {}
+func (c *SQLiteConn) RegisterCollation(string, func(string, string) int) error { return errorMsg }
+func (c *SQLiteConn) RegisterCommitHook(func() int)                            {}
+func (c *SQLiteConn) RegisterFunc(string, interface{}, bool) error             { return errorMsg }
+func (c *SQLiteConn) RegisterRollbackHook(func())                              {}
+func (c *SQLiteConn) RegisterUpdateHook(func(int, string, string, int64))      {}
+=======
 func init() {
 	sql.Register("sqlite3", &SQLiteDriverMock{})
 }
@@ -24,3 +48,4 @@ var errorMsg = errors.New("Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 
 func (SQLiteDriverMock) Open(s string) (driver.Conn, error) {
 	return nil, errorMsg
 }
+>>>>>>> cbc9bb05... fixup add vendor back

@@ -6,7 +6,11 @@ package uuid
 
 import guuid "github.com/google/uuid"
 
+<<<<<<< HEAD
+// NewRandom returns a Random (Version 4) UUID or panics.
+=======
 // Random returns a Random (Version 4) UUID or panics.
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // The strength of the UUIDs is based on the strength of the crypto/rand
 // package.

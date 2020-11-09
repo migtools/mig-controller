@@ -7,6 +7,11 @@ package language
 import (
 	"fmt"
 	"sort"
+<<<<<<< HEAD
+
+	"golang.org/x/text/internal/language"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // The Coverage interface is used to define the level of coverage of an
@@ -44,9 +49,15 @@ type allSubtags struct{}
 // consecutive range, it simply returns a slice of numbers in increasing order.
 // The "undefined" region is not returned.
 func (s allSubtags) Regions() []Region {
+<<<<<<< HEAD
+	reg := make([]Region, language.NumRegions)
+	for i := range reg {
+		reg[i] = Region{language.Region(i + 1)}
+=======
 	reg := make([]Region, numRegions)
 	for i := range reg {
 		reg[i] = Region{regionID(i + 1)}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return reg
 }
@@ -55,9 +66,15 @@ func (s allSubtags) Regions() []Region {
 // consecutive range, it simply returns a slice of numbers in increasing order.
 // The "undefined" script is not returned.
 func (s allSubtags) Scripts() []Script {
+<<<<<<< HEAD
+	scr := make([]Script, language.NumScripts)
+	for i := range scr {
+		scr[i] = Script{language.Script(i + 1)}
+=======
 	scr := make([]Script, numScripts)
 	for i := range scr {
 		scr[i] = Script{scriptID(i + 1)}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return scr
 }
@@ -65,6 +82,12 @@ func (s allSubtags) Scripts() []Script {
 // BaseLanguages returns the list of all supported base languages. It generates
 // the list by traversing the internal structures.
 func (s allSubtags) BaseLanguages() []Base {
+<<<<<<< HEAD
+	bs := language.BaseLanguages()
+	base := make([]Base, len(bs))
+	for i, b := range bs {
+		base[i] = Base{b}
+=======
 	base := make([]Base, 0, numLanguages)
 	for i := 0; i < langNoIndexOffset; i++ {
 		// We included "und" already for the value 0.
@@ -81,6 +104,7 @@ func (s allSubtags) BaseLanguages() []Base {
 			v >>= 1
 			i++
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return base
 }
@@ -90,7 +114,11 @@ func (s allSubtags) Tags() []Tag {
 	return nil
 }
 
+<<<<<<< HEAD
+// coverage is used by NewCoverage which is used as a convenient way for
+=======
 // coverage is used used by NewCoverage which is used as a convenient way for
+>>>>>>> cbc9bb05... fixup add vendor back
 // creating Coverage implementations for partially defined data. Very often a
 // package will only need to define a subset of slices. coverage provides a
 // convenient way to do this. Moreover, packages using NewCoverage, instead of
@@ -134,7 +162,11 @@ func (s *coverage) BaseLanguages() []Base {
 		}
 		a := make([]Base, len(tags))
 		for i, t := range tags {
+<<<<<<< HEAD
+			a[i] = Base{language.Language(t.lang())}
+=======
 			a[i] = Base{langID(t.lang)}
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 		sort.Sort(bases(a))
 		k := 0

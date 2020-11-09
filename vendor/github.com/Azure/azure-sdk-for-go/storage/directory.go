@@ -94,7 +94,11 @@ func (d *Directory) Create(options *FileRequestOptions) error {
 }
 
 // CreateIfNotExists creates this directory under the associated share if the
+<<<<<<< HEAD
+// directory does not exist. Returns true if the directory is newly created or
+=======
 // directory does not exists. Returns true if the directory is newly created or
+>>>>>>> cbc9bb05... fixup add vendor back
 // false if the directory already exists.
 //
 // See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Create-Directory

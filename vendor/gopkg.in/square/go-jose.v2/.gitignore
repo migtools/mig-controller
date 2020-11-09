@@ -5,4 +5,7 @@
 *.pem
 *.cov
 jose-util/jose-util
+<<<<<<< HEAD
+=======
 jose-util.t.err
+>>>>>>> cbc9bb05... fixup add vendor back

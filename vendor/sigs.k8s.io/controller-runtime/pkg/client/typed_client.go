@@ -104,7 +104,10 @@ func (c *typedClient) List(ctx context.Context, opts *ListOptions, obj runtime.O
 	return r.Get().
 		NamespaceIfScoped(namespace, r.isNamespaced()).
 		Resource(r.resource()).
+<<<<<<< HEAD
+=======
 		Body(obj).
+>>>>>>> cbc9bb05... fixup add vendor back
 		VersionedParams(opts.AsListOptions(), c.paramCodec).
 		Context(ctx).
 		Do().

@@ -19,7 +19,11 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
+<<<<<<< HEAD
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+=======
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+>>>>>>> cbc9bb05... fixup add vendor back
 
 var E_GoprotoEnumPrefix = &proto.ExtensionDesc{
 	ExtendedType:  (*descriptor.EnumOptions)(nil),

@@ -23,11 +23,35 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
+<<<<<<< HEAD
+	"sync"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"time"
 
 	"github.com/Azure/go-autorest/tracing"
 )
 
+<<<<<<< HEAD
+// there is one sender per TLS renegotiation type, i.e. count of tls.RenegotiationSupport enums
+const defaultSendersCount = 3
+
+type defaultSender struct {
+	sender Sender
+	init   *sync.Once
+}
+
+// each type of sender will be created on demand in sender()
+var defaultSenders [defaultSendersCount]defaultSender
+
+func init() {
+	for i := 0; i < defaultSendersCount; i++ {
+		defaultSenders[i].init = &sync.Once{}
+	}
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // used as a key type in context.WithValue()
 type ctxSendDecorators struct{}
 
@@ -107,6 +131,33 @@ func SendWithSender(s Sender, r *http.Request, decorators ...SendDecorator) (*ht
 }
 
 func sender(renengotiation tls.RenegotiationSupport) Sender {
+<<<<<<< HEAD
+	// note that we can't init defaultSenders in init() since it will
+	// execute before calling code has had a chance to enable tracing
+	defaultSenders[renengotiation].init.Do(func() {
+		// Use behaviour compatible with DefaultTransport, but require TLS minimum version.
+		defaultTransport := http.DefaultTransport.(*http.Transport)
+		transport := &http.Transport{
+			Proxy:                 defaultTransport.Proxy,
+			DialContext:           defaultTransport.DialContext,
+			MaxIdleConns:          defaultTransport.MaxIdleConns,
+			IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+			TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+			ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+			TLSClientConfig: &tls.Config{
+				MinVersion:    tls.VersionTLS12,
+				Renegotiation: renengotiation,
+			},
+		}
+		var roundTripper http.RoundTripper = transport
+		if tracing.IsEnabled() {
+			roundTripper = tracing.NewTransport(transport)
+		}
+		j, _ := cookiejar.New(nil)
+		defaultSenders[renengotiation].sender = &http.Client{Jar: j, Transport: roundTripper}
+	})
+	return defaultSenders[renengotiation].sender
+=======
 	// Use behaviour compatible with DefaultTransport, but require TLS minimum version.
 	defaultTransport := http.DefaultTransport.(*http.Transport)
 	transport := &http.Transport{
@@ -127,6 +178,7 @@ func sender(renengotiation tls.RenegotiationSupport) Sender {
 	}
 	j, _ := cookiejar.New(nil)
 	return &http.Client{Jar: j, Transport: roundTripper}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // AfterDelay returns a SendDecorator that delays for the passed time.Duration before
@@ -243,6 +295,10 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 				if err != nil {
 					return resp, err
 				}
+<<<<<<< HEAD
+				DrainResponseBody(resp)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				resp, err = s.Do(rr.Request())
 				if err == nil {
 					return resp, err
@@ -256,6 +312,15 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 	}
 }
 
+<<<<<<< HEAD
+// Count429AsRetry indicates that a 429 response should be included as a retry attempt.
+var Count429AsRetry = true
+
+// Max429Delay is the maximum duration to wait between retries on a 429 if no Retry-After header was received.
+var Max429Delay time.Duration
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // DoRetryForStatusCodes returns a SendDecorator that retries for specified statusCodes for up to the specified
 // number of attempts, exponentially backing off between requests using the supplied backoff
 // time.Duration (which may be zero). Retrying may be canceled by cancelling the context on the http.Request.
@@ -263,7 +328,11 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (*http.Response, error) {
+<<<<<<< HEAD
+			return doRetryForStatusCodesImpl(s, r, Count429AsRetry, attempts, backoff, 0, codes...)
+=======
 			return doRetryForStatusCodesImpl(s, r, false, attempts, backoff, 0, codes...)
+>>>>>>> cbc9bb05... fixup add vendor back
 		})
 	}
 }
@@ -275,7 +344,11 @@ func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) Se
 func DoRetryForStatusCodesWithCap(attempts int, backoff, cap time.Duration, codes ...int) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (*http.Response, error) {
+<<<<<<< HEAD
+			return doRetryForStatusCodesImpl(s, r, Count429AsRetry, attempts, backoff, cap, codes...)
+=======
 			return doRetryForStatusCodesImpl(s, r, true, attempts, backoff, cap, codes...)
+>>>>>>> cbc9bb05... fixup add vendor back
 		})
 	}
 }
@@ -283,11 +356,19 @@ func DoRetryForStatusCodesWithCap(attempts int, backoff, cap time.Duration, code
 func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempts int, backoff, cap time.Duration, codes ...int) (resp *http.Response, err error) {
 	rr := NewRetriableRequest(r)
 	// Increment to add the first call (attempts denotes number of retries)
+<<<<<<< HEAD
+	for attempt, delayCount := 0, 0; attempt < attempts+1; {
+=======
 	for attempt := 0; attempt < attempts+1; {
+>>>>>>> cbc9bb05... fixup add vendor back
 		err = rr.Prepare()
 		if err != nil {
 			return
 		}
+<<<<<<< HEAD
+		DrainResponseBody(resp)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		resp, err = s.Do(rr.Request())
 		// we want to retry if err is not nil (e.g. transient network failure).  note that for failed authentication
 		// resp and err will both have a value, so in this case we don't want to retry as it will never succeed.
@@ -295,7 +376,16 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 			return resp, err
 		}
 		delayed := DelayWithRetryAfter(resp, r.Context().Done())
+<<<<<<< HEAD
+		// if this was a 429 set the delay cap as specified.
+		// applicable only in the absence of a retry-after header.
+		if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+			cap = Max429Delay
+		}
+		if !delayed && !DelayForBackoffWithCap(backoff, cap, delayCount, r.Context().Done()) {
+=======
 		if !delayed && !DelayForBackoffWithCap(backoff, cap, attempt, r.Context().Done()) {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return resp, r.Context().Err()
 		}
 		// when count429 == false don't count a 429 against the number
@@ -303,6 +393,12 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 		if count429 || (resp == nil || resp.StatusCode != http.StatusTooManyRequests) {
 			attempt++
 		}
+<<<<<<< HEAD
+		// delay count is tracked separately from attempts to
+		// ensure that 429 participates in exponential back-off
+		delayCount++
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return resp, err
 }
@@ -347,6 +443,10 @@ func DoRetryForDuration(d time.Duration, backoff time.Duration) SendDecorator {
 				if err != nil {
 					return resp, err
 				}
+<<<<<<< HEAD
+				DrainResponseBody(resp)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				resp, err = s.Do(rr.Request())
 				if err == nil {
 					return resp, err

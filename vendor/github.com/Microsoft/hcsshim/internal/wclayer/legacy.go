@@ -15,7 +15,10 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/longpath"
 	"github.com/Microsoft/hcsshim/internal/safefile"
+<<<<<<< HEAD
+=======
 	"github.com/Microsoft/hcsshim/internal/winapi"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var errorIterationCanceled = errors.New("")
@@ -342,7 +345,11 @@ type legacyLayerWriter struct {
 	backupWriter    *winio.BackupFileWriter
 	Tombstones      []string
 	HasUtilityVM    bool
+<<<<<<< HEAD
+	uvmDi           []dirInfo
+=======
 	changedDi       []dirInfo
+>>>>>>> cbc9bb05... fixup add vendor back
 	addedFiles      map[string]bool
 	PendingLinks    []pendingLink
 	pendingDirs     []pendingDir
@@ -473,8 +480,13 @@ func copyFileWithMetadata(srcRoot, destRoot *os.File, subPath string, isDir bool
 		srcRoot,
 		syscall.GENERIC_READ|winio.ACCESS_SYSTEM_SECURITY,
 		syscall.FILE_SHARE_READ,
+<<<<<<< HEAD
+		safefile.FILE_OPEN,
+		safefile.FILE_OPEN_REPARSE_POINT)
+=======
 		winapi.FILE_OPEN,
 		winapi.FILE_OPEN_REPARSE_POINT)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return nil, err
 	}
@@ -489,14 +501,22 @@ func copyFileWithMetadata(srcRoot, destRoot *os.File, subPath string, isDir bool
 
 	extraFlags := uint32(0)
 	if isDir {
+<<<<<<< HEAD
+		extraFlags |= safefile.FILE_DIRECTORY_FILE
+=======
 		extraFlags |= winapi.FILE_DIRECTORY_FILE
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	dest, err := safefile.OpenRelative(
 		subPath,
 		destRoot,
 		syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
 		syscall.FILE_SHARE_READ,
+<<<<<<< HEAD
+		safefile.FILE_CREATE,
+=======
 		winapi.FILE_CREATE,
+>>>>>>> cbc9bb05... fixup add vendor back
 		extraFlags)
 	if err != nil {
 		return nil, err
@@ -556,7 +576,11 @@ func cloneTree(srcRoot *os.File, destRoot *os.File, subPath string, mutatedFiles
 			if err != nil {
 				return err
 			}
+<<<<<<< HEAD
+			if isDir && !isReparsePoint {
+=======
 			if isDir {
+>>>>>>> cbc9bb05... fixup add vendor back
 				di = append(di, dirInfo{path: relPath, fileInfo: *fi})
 			}
 		} else {
@@ -584,10 +608,13 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		return w.initUtilityVM()
 	}
 
+<<<<<<< HEAD
+=======
 	if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
 		w.changedDi = append(w.changedDi, dirInfo{path: name, fileInfo: *fileInfo})
 	}
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	name = filepath.Clean(name)
 	if hasPathPrefix(name, utilityVMPath) {
 		if !w.HasUtilityVM {
@@ -596,7 +623,11 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		if !hasPathPrefix(name, utilityVMFilesPath) && name != utilityVMFilesPath {
 			return errors.New("invalid UtilityVM layer")
 		}
+<<<<<<< HEAD
+		createDisposition := uint32(safefile.FILE_OPEN)
+=======
 		createDisposition := uint32(winapi.FILE_OPEN)
+>>>>>>> cbc9bb05... fixup add vendor back
 		if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
 			st, err := safefile.LstatRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
@@ -617,13 +648,23 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 					return err
 				}
 			}
+<<<<<<< HEAD
+			if fileInfo.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+				w.uvmDi = append(w.uvmDi, dirInfo{path: name, fileInfo: *fileInfo})
+			}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		} else {
 			// Overwrite any existing hard link.
 			err := safefile.RemoveRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
+<<<<<<< HEAD
+			createDisposition = safefile.FILE_CREATE
+=======
 			createDisposition = winapi.FILE_CREATE
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 
 		f, err := safefile.OpenRelative(
@@ -632,7 +673,11 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 			syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
 			syscall.FILE_SHARE_READ,
 			createDisposition,
+<<<<<<< HEAD
+			safefile.FILE_OPEN_REPARSE_POINT,
+=======
 			winapi.FILE_OPEN_REPARSE_POINT,
+>>>>>>> cbc9bb05... fixup add vendor back
 		)
 		if err != nil {
 			return err
@@ -669,7 +714,11 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		w.currentIsDir = true
 	}
 
+<<<<<<< HEAD
+	f, err := safefile.OpenRelative(fname, w.root, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, safefile.FILE_CREATE, 0)
+=======
 	f, err := safefile.OpenRelative(fname, w.root, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, winapi.FILE_CREATE, 0)
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return err
 	}
@@ -807,5 +856,14 @@ func (w *legacyLayerWriter) Close() error {
 			return err
 		}
 	}
+<<<<<<< HEAD
+	if w.HasUtilityVM {
+		err := reapplyDirectoryTimes(w.destRoot, w.uvmDi)
+		if err != nil {
+			return err
+		}
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return nil
 }

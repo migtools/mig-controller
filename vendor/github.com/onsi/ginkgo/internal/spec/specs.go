@@ -107,11 +107,19 @@ func (e *Specs) applyRegExpFocusAndSkip(description string, focusString string, 
 		toMatch := e.toMatch(description, i)
 
 		if focusFilter != nil {
+<<<<<<< HEAD
+			matchesFocus = focusFilter.Match(toMatch)
+		}
+
+		if skipFilter != nil {
+			matchesSkip = skipFilter.Match(toMatch)
+=======
 			matchesFocus = focusFilter.Match([]byte(toMatch))
 		}
 
 		if skipFilter != nil {
 			matchesSkip = skipFilter.Match([]byte(toMatch))
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 
 		if !matchesFocus || matchesSkip {

@@ -9,6 +9,11 @@ OpenCensus Go is a Go implementation of OpenCensus, a toolkit for
 collecting application performance and behavior monitoring data.
 Currently it consists of three major components: tags, stats and tracing.
 
+<<<<<<< HEAD
+#### OpenCensus and OpenTracing have merged to form OpenTelemetry, which serves as the next major version of OpenCensus and OpenTracing. OpenTelemetry will offer backwards compatibility with existing OpenCensus integrations, and we will continue to make security patches to existing OpenCensus libraries for two years. Read more about the merger [here](https://medium.com/opentracing/a-roadmap-to-convergence-b074e5815289).
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 ## Installation
 
 ```
@@ -57,6 +62,10 @@ can implement their own exporters by implementing the exporter interfaces
 * [Datadog][exporter-datadog] for stats and traces
 * [Graphite][exporter-graphite] for stats
 * [Honeycomb][exporter-honeycomb] for traces
+<<<<<<< HEAD
+* [New Relic][exporter-newrelic] for stats and traces
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 
 ## Overview
 
@@ -261,3 +270,7 @@ release in which the functionality was marked *Deprecated*.
 [exporter-datadog]: https://github.com/DataDog/opencensus-go-exporter-datadog
 [exporter-graphite]: https://github.com/census-ecosystem/opencensus-go-exporter-graphite
 [exporter-honeycomb]: https://github.com/honeycombio/opencensus-exporter
+<<<<<<< HEAD
+[exporter-newrelic]: https://github.com/newrelic/newrelic-opencensus-exporter-go
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

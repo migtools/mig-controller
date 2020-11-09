@@ -28,7 +28,12 @@ type System struct {
 	waitBlock      chan struct{}
 	waitError      error
 	exitError      error
+<<<<<<< HEAD
+
+	os, typ string
+=======
 	os, typ        string
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func newSystem(id string) *System {

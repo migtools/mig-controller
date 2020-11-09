@@ -38,6 +38,10 @@ type client interface {
 	Get(ctx context.Context, resource string) (*pb.Policy, error)
 	Set(ctx context.Context, resource string, p *pb.Policy) error
 	Test(ctx context.Context, resource string, perms []string) ([]string, error)
+<<<<<<< HEAD
+	GetWithVersion(ctx context.Context, resource string, requestedPolicyVersion int32) (*pb.Policy, error)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // grpcClient implements client for the standard gRPC-based IAMPolicy service.
@@ -57,13 +61,29 @@ var withRetry = gax.WithRetry(func() gax.Retryer {
 })
 
 func (g *grpcClient) Get(ctx context.Context, resource string) (*pb.Policy, error) {
+<<<<<<< HEAD
+	return g.GetWithVersion(ctx, resource, 1)
+}
+
+func (g *grpcClient) GetWithVersion(ctx context.Context, resource string, requestedPolicyVersion int32) (*pb.Policy, error) {
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	var proto *pb.Policy
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource", resource))
 	ctx = insertMetadata(ctx, md)
 
 	err := gax.Invoke(ctx, func(ctx context.Context, _ gax.CallSettings) error {
 		var err error
+<<<<<<< HEAD
+		proto, err = g.c.GetIamPolicy(ctx, &pb.GetIamPolicyRequest{
+			Resource: resource,
+			Options: &pb.GetPolicyOptions{
+				RequestedPolicyVersion: requestedPolicyVersion,
+			},
+		})
+=======
 		proto, err = g.c.GetIamPolicy(ctx, &pb.GetIamPolicyRequest{Resource: resource})
+>>>>>>> cbc9bb05... fixup add vendor back
 		return err
 	}, withRetry)
 	if err != nil {
@@ -110,11 +130,25 @@ type Handle struct {
 	resource string
 }
 
+<<<<<<< HEAD
+// A Handle3 provides IAM operations for a resource. It is similar to a Handle, but provides access to newer IAM features (e.g., conditions).
+type Handle3 struct {
+	c        client
+	resource string
+	version  int32
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // InternalNewHandle is for use by the Google Cloud Libraries only.
 //
 // InternalNewHandle returns a Handle for resource.
 // The conn parameter refers to a server that must support the IAMPolicy service.
+<<<<<<< HEAD
+func InternalNewHandle(conn grpc.ClientConnInterface, resource string) *Handle {
+=======
 func InternalNewHandle(conn *grpc.ClientConn, resource string) *Handle {
+>>>>>>> cbc9bb05... fixup add vendor back
 	return InternalNewHandleGRPCClient(pb.NewIAMPolicyClient(conn), resource)
 }
 
@@ -137,6 +171,20 @@ func InternalNewHandleClient(c client, resource string) *Handle {
 	}
 }
 
+<<<<<<< HEAD
+// V3 returns a Handle3, which is like Handle except it sets
+// requestedPolicyVersion to 3 when retrieving a policy and policy.version to 3
+// when storing a policy.
+func (h *Handle) V3() *Handle3 {
+	return &Handle3{
+		c:        h.c,
+		resource: h.resource,
+		version:  3,
+	}
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // Policy retrieves the IAM policy for the resource.
 func (h *Handle) Policy(ctx context.Context) (*Policy, error) {
 	proto, err := h.c.Get(ctx, h.resource)
@@ -313,3 +361,50 @@ func insertMetadata(ctx context.Context, mds ...metadata.MD) context.Context {
 	}
 	return metadata.NewOutgoingContext(ctx, out)
 }
+<<<<<<< HEAD
+
+// A Policy3 is a list of Bindings representing roles granted to members.
+//
+// The zero Policy3 is a valid policy with no bindings.
+//
+// It is similar to a Policy, except a Policy3 provides direct access to the
+// list of Bindings.
+//
+// The policy version is always set to 3.
+type Policy3 struct {
+	etag     []byte
+	Bindings []*pb.Binding
+}
+
+// Policy retrieves the IAM policy for the resource.
+//
+// requestedPolicyVersion is always set to 3.
+func (h *Handle3) Policy(ctx context.Context) (*Policy3, error) {
+	proto, err := h.c.GetWithVersion(ctx, h.resource, h.version)
+	if err != nil {
+		return nil, err
+	}
+	return &Policy3{
+		Bindings: proto.Bindings,
+		etag:     proto.Etag,
+	}, nil
+}
+
+// SetPolicy replaces the resource's current policy with the supplied Policy.
+//
+// If policy was created from a prior call to Get, then the modification will
+// only succeed if the policy has not changed since the Get.
+func (h *Handle3) SetPolicy(ctx context.Context, policy *Policy3) error {
+	return h.c.Set(ctx, h.resource, &pb.Policy{
+		Bindings: policy.Bindings,
+		Etag:     policy.etag,
+		Version:  h.version,
+	})
+}
+
+// TestPermissions returns the subset of permissions that the caller has on the resource.
+func (h *Handle3) TestPermissions(ctx context.Context, permissions []string) ([]string, error) {
+	return h.c.Test(ctx, h.resource, permissions)
+}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

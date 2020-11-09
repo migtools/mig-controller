@@ -6,8 +6,11 @@
 // This file was derived from $GOROOT/src/cmd/compile/internal/gc/iexport.go;
 // see that file for specification of the format.
 
+<<<<<<< HEAD
+=======
 // +build go1.11
 
+>>>>>>> cbc9bb05... fixup add vendor back
 package gcimporter
 
 import (
@@ -28,7 +31,14 @@ import (
 const iexportVersion = 0
 
 // IExportData returns the binary export data for pkg.
+<<<<<<< HEAD
+//
 // If no file set is provided, position info will be missing.
+// The package path of the top-level package will not be recorded,
+// so that calls to IImportData can override with a provided package path.
+=======
+// If no file set is provided, position info will be missing.
+>>>>>>> cbc9bb05... fixup add vendor back
 func IExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -48,6 +58,10 @@ func IExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) 
 		stringIndex: map[string]uint64{},
 		declIndex:   map[types.Object]uint64{},
 		typIndex:    map[types.Type]uint64{},
+<<<<<<< HEAD
+		localpkg:    pkg,
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	for i, pt := range predeclared() {
@@ -73,7 +87,11 @@ func IExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) 
 	// Append indices to data0 section.
 	dataLen := uint64(p.data0.Len())
 	w := p.newWriter()
+<<<<<<< HEAD
+	w.writeIndex(p.declIndex)
+=======
 	w.writeIndex(p.declIndex, pkg)
+>>>>>>> cbc9bb05... fixup add vendor back
 	w.flush()
 
 	// Assemble header.
@@ -95,14 +113,22 @@ func IExportData(fset *token.FileSet, pkg *types.Package) (b []byte, err error) 
 // we're writing out the main index, which is also read by
 // non-compiler tools and includes a complete package description
 // (i.e., name and height).
+<<<<<<< HEAD
+func (w *exportWriter) writeIndex(index map[types.Object]uint64) {
+=======
 func (w *exportWriter) writeIndex(index map[types.Object]uint64, localpkg *types.Package) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Build a map from packages to objects from that package.
 	pkgObjs := map[*types.Package][]types.Object{}
 
 	// For the main index, make sure to include every package that
 	// we reference, even if we're not exporting (or reexporting)
 	// any symbols from it.
+<<<<<<< HEAD
+	pkgObjs[w.p.localpkg] = nil
+=======
 	pkgObjs[localpkg] = nil
+>>>>>>> cbc9bb05... fixup add vendor back
 	for pkg := range w.p.allPkgs {
 		pkgObjs[pkg] = nil
 	}
@@ -121,12 +147,20 @@ func (w *exportWriter) writeIndex(index map[types.Object]uint64, localpkg *types
 	}
 
 	sort.Slice(pkgs, func(i, j int) bool {
+<<<<<<< HEAD
+		return w.exportPath(pkgs[i]) < w.exportPath(pkgs[j])
+=======
 		return pkgs[i].Path() < pkgs[j].Path()
+>>>>>>> cbc9bb05... fixup add vendor back
 	})
 
 	w.uint64(uint64(len(pkgs)))
 	for _, pkg := range pkgs {
+<<<<<<< HEAD
+		w.string(w.exportPath(pkg))
+=======
 		w.string(pkg.Path())
+>>>>>>> cbc9bb05... fixup add vendor back
 		w.string(pkg.Name())
 		w.uint64(uint64(0)) // package height is not needed for go/types
 
@@ -143,6 +177,11 @@ type iexporter struct {
 	fset *token.FileSet
 	out  *bytes.Buffer
 
+<<<<<<< HEAD
+	localpkg *types.Package
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	// allPkgs tracks all packages that have been referenced by
 	// the export data, so we can ensure to include them in the
 	// main index.
@@ -195,6 +234,16 @@ type exportWriter struct {
 	prevLine int64
 }
 
+<<<<<<< HEAD
+func (w *exportWriter) exportPath(pkg *types.Package) string {
+	if pkg == w.p.localpkg {
+		return ""
+	}
+	return pkg.Path()
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (p *iexporter) doDecl(obj types.Object) {
 	w := p.newWriter()
 	w.setPkg(obj.Pkg(), false)
@@ -267,6 +316,14 @@ func (w *exportWriter) tag(tag byte) {
 }
 
 func (w *exportWriter) pos(pos token.Pos) {
+<<<<<<< HEAD
+	if w.p.fset == nil {
+		w.int64(0)
+		return
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	p := w.p.fset.Position(pos)
 	file := p.Filename
 	line := int64(p.Line)
@@ -299,7 +356,11 @@ func (w *exportWriter) pkg(pkg *types.Package) {
 	// Ensure any referenced packages are declared in the main index.
 	w.p.allPkgs[pkg] = true
 
+<<<<<<< HEAD
+	w.string(w.exportPath(pkg))
+=======
 	w.string(pkg.Path())
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (w *exportWriter) qualifiedIdent(obj types.Object) {
@@ -394,7 +455,11 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 			w.pos(f.Pos())
 			w.string(f.Name())
 			w.typ(f.Type(), pkg)
+<<<<<<< HEAD
+			w.bool(f.Anonymous())
+=======
 			w.bool(f.Embedded())
+>>>>>>> cbc9bb05... fixup add vendor back
 			w.string(t.Tag(i)) // note (or tag)
 		}
 

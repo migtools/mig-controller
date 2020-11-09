@@ -54,11 +54,19 @@ func NewAggregator(nodeCount int, result chan bool, config config.DefaultReporte
 		config:       config,
 		stenographer: stenographer,
 
+<<<<<<< HEAD
+		suiteBeginnings: make(chan configAndSuite),
+		beforeSuites:    make(chan *types.SetupSummary),
+		afterSuites:     make(chan *types.SetupSummary),
+		specCompletions: make(chan *types.SpecSummary),
+		suiteEndings:    make(chan *types.SuiteSummary),
+=======
 		suiteBeginnings: make(chan configAndSuite, 0),
 		beforeSuites:    make(chan *types.SetupSummary, 0),
 		afterSuites:     make(chan *types.SetupSummary, 0),
 		specCompletions: make(chan *types.SpecSummary, 0),
 		suiteEndings:    make(chan *types.SuiteSummary, 0),
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	go aggregator.mux()
@@ -227,7 +235,11 @@ func (aggregator *Aggregator) registerSuiteEnding(suite *types.SuiteSummary) (fi
 	aggregatedSuiteSummary.SuiteSucceeded = true
 
 	for _, suiteSummary := range aggregator.aggregatedSuiteEndings {
+<<<<<<< HEAD
+		if !suiteSummary.SuiteSucceeded {
+=======
 		if suiteSummary.SuiteSucceeded == false {
+>>>>>>> cbc9bb05... fixup add vendor back
 			aggregatedSuiteSummary.SuiteSucceeded = false
 		}
 

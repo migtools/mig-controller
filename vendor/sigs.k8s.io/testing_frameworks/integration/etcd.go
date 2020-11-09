@@ -61,6 +61,18 @@ type Etcd struct {
 // Start starts the etcd, waits for it to come up, and returns an error, if one
 // occoured.
 func (e *Etcd) Start() error {
+<<<<<<< HEAD
+	if e.processState == nil {
+		if err := e.setProcessState(); err != nil {
+			return err
+		}
+	}
+	return e.processState.Start(e.Out, e.Err)
+}
+
+func (e *Etcd) setProcessState() error {
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	var err error
 
 	e.processState = &internal.ProcessState{}
@@ -88,11 +100,15 @@ func (e *Etcd) Start() error {
 	e.processState.Args, err = internal.RenderTemplates(
 		internal.DoEtcdArgDefaulting(e.Args), e,
 	)
+<<<<<<< HEAD
+	return err
+=======
 	if err != nil {
 		return err
 	}
 
 	return e.processState.Start(e.Out, e.Err)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Stop stops this process gracefully, waits for its termination, and cleans up

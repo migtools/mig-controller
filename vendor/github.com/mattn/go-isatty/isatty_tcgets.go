@@ -1,6 +1,9 @@
 // +build linux aix
 // +build !appengine
+<<<<<<< HEAD
+=======
 // +build !android
+>>>>>>> cbc9bb05... fixup add vendor back
 
 package isatty
 

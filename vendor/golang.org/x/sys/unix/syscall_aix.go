@@ -19,6 +19,8 @@ import "unsafe"
  * Wrapped
  */
 
+<<<<<<< HEAD
+=======
 func Access(path string, mode uint32) (err error) {
 	return Faccessat(AT_FDCWD, path, mode, 0)
 }
@@ -35,6 +37,7 @@ func Creat(path string, mode uint32) (fd int, err error) {
 	return Open(path, O_CREAT|O_WRONLY|O_TRUNC, mode)
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 //sys	utimes(path string, times *[2]Timeval) (err error)
 func Utimes(path string, tv []Timeval) error {
 	if len(tv) != 2 {

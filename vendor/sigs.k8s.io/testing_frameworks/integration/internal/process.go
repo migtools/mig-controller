@@ -4,11 +4,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+<<<<<<< HEAD
+	"net"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path"
+<<<<<<< HEAD
+	"strconv"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	"time"
 
 	"github.com/onsi/gomega/gbytes"
@@ -38,6 +46,13 @@ type ProcessState struct {
 	// Deprecated: Use HealthCheckEndpoint in favour of StartMessage
 	StartMessage string
 	Args         []string
+<<<<<<< HEAD
+
+	// ready holds wether the process is currently in ready state (hit the ready condition) or not.
+	// It will be set to true on a successful `Start()` and set to false on a successful `Stop()`
+	ready bool
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 type DefaultedProcessInput struct {
@@ -71,7 +86,11 @@ func DoDefaulting(
 		}
 		defaults.URL = url.URL{
 			Scheme: "http",
+<<<<<<< HEAD
+			Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+=======
 			Host:   fmt.Sprintf("%s:%d", host, port),
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	} else {
 		defaults.URL = *listenUrl
@@ -107,6 +126,13 @@ func DoDefaulting(
 type stopChannel chan struct{}
 
 func (ps *ProcessState) Start(stdout, stderr io.Writer) (err error) {
+<<<<<<< HEAD
+	if ps.ready {
+		return nil
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	command := exec.Command(ps.Path, ps.Args...)
 
 	ready := make(chan bool)
@@ -131,6 +157,10 @@ func (ps *ProcessState) Start(stdout, stderr io.Writer) (err error) {
 
 	select {
 	case <-ready:
+<<<<<<< HEAD
+		ps.ready = true
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		return nil
 	case <-timedOut:
 		if pollerStopCh != nil {
@@ -194,7 +224,11 @@ func (ps *ProcessState) Stop() error {
 	case <-timedOut:
 		return fmt.Errorf("timeout waiting for process %s to stop", path.Base(ps.Path))
 	}
+<<<<<<< HEAD
+	ps.ready = false
+=======
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	if ps.DirNeedsCleaning {
 		return os.RemoveAll(ps.Dir)
 	}

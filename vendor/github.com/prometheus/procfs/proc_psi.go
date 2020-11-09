@@ -51,6 +51,13 @@ type PSIStats struct {
 	Full *PSILine
 }
 
+<<<<<<< HEAD
+// PSIStatsForResource reads pressure stall information for the specified
+// resource from /proc/pressure/<resource>. At time of writing this can be
+// either "cpu", "memory" or "io".
+func (fs FS) PSIStatsForResource(resource string) (PSIStats, error) {
+	file, err := os.Open(fs.proc.Path(fmt.Sprintf("%s/%s", "pressure", resource)))
+=======
 // NewPSIStatsForResource reads pressure stall information for the specified
 // resource. At time of writing this can be either "cpu", "memory" or "io".
 func NewPSIStatsForResource(resource string) (PSIStats, error) {
@@ -65,6 +72,7 @@ func NewPSIStatsForResource(resource string) (PSIStats, error) {
 // NewPSIStatsForResource reads pressure stall information from /proc/pressure/<resource>
 func (fs FS) NewPSIStatsForResource(resource string) (PSIStats, error) {
 	file, err := os.Open(fs.Path(fmt.Sprintf("%s/%s", "pressure", resource)))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return PSIStats{}, fmt.Errorf("psi_stats: unavailable for %s", resource)
 	}

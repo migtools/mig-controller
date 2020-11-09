@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+// Copyright 2011 Google LLC. All rights reserved.
+=======
 // Copyright 2011 Google Inc. All rights reserved.
+>>>>>>> cbc9bb05... fixup add vendor back
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -16,7 +20,11 @@ import (
 	"net/url"
 	"strings"
 
+<<<<<<< HEAD
+	"google.golang.org/api/internal/third_party/uritemplates"
+=======
 	"google.golang.org/api/googleapi/internal/uritemplates"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // ContentTyper is an interface for Readers which know (or would like
@@ -54,7 +62,11 @@ const (
 
 	// DefaultUploadChunkSize is the default chunk size to use for resumable
 	// uploads if not specified by the user.
+<<<<<<< HEAD
+	DefaultUploadChunkSize = 16 * 1024 * 1024
+=======
 	DefaultUploadChunkSize = 8 * 1024 * 1024
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	// MinUploadChunkSize is the minimum chunk size that can be used for
 	// resumable uploads.  All user-specified chunk sizes must be multiple of
@@ -69,6 +81,11 @@ type Error struct {
 	// Message is the server response message and is only populated when
 	// explicitly referenced by the JSON server response.
 	Message string `json:"message"`
+<<<<<<< HEAD
+	// Details provide more context to an error.
+	Details []interface{} `json:"details"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Body is the raw response returned by the server.
 	// It is often but not always JSON, depending on how the request fails.
 	Body string
@@ -95,6 +112,19 @@ func (e *Error) Error() string {
 	if e.Message != "" {
 		fmt.Fprintf(&buf, "%s", e.Message)
 	}
+<<<<<<< HEAD
+	if len(e.Details) > 0 {
+		var detailBuf bytes.Buffer
+		enc := json.NewEncoder(&detailBuf)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(e.Details); err == nil {
+			fmt.Fprint(&buf, "\nDetails:")
+			fmt.Fprintf(&buf, "\n%s", detailBuf.String())
+
+		}
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	if len(e.Errors) == 0 {
 		return strings.TrimSpace(buf.String())
 	}
@@ -256,14 +286,31 @@ func ProcessMediaOptions(opts []MediaOption) *MediaOptions {
 // "http://www.golang.org/topics/myproject/mytopic". It strips all parent
 // references (e.g. ../..) as well as anything after the host
 // (e.g. /bar/gaz gets stripped out of foo.com/bar/gaz).
+<<<<<<< HEAD
+//
+// ResolveRelative panics if either basestr or relstr is not able to be parsed.
+func ResolveRelative(basestr, relstr string) string {
+	u, err := url.Parse(basestr)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse %q", basestr))
+	}
+=======
 func ResolveRelative(basestr, relstr string) string {
 	u, _ := url.Parse(basestr)
+>>>>>>> cbc9bb05... fixup add vendor back
 	afterColonPath := ""
 	if i := strings.IndexRune(relstr, ':'); i > 0 {
 		afterColonPath = relstr[i+1:]
 		relstr = relstr[:i]
 	}
+<<<<<<< HEAD
+	rel, err := url.Parse(relstr)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse %q", relstr))
+	}
+=======
 	rel, _ := url.Parse(relstr)
+>>>>>>> cbc9bb05... fixup add vendor back
 	u = u.ResolveReference(rel)
 	us := u.String()
 	if afterColonPath != "" {
@@ -331,7 +378,11 @@ func ConvertVariant(v map[string]interface{}, dst interface{}) bool {
 }
 
 // A Field names a field to be retrieved with a partial response.
+<<<<<<< HEAD
+// https://cloud.google.com/storage/docs/json_api/v1/how-tos/performance
+=======
 // See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // Partial responses can dramatically reduce the amount of data that must be sent to your application.
 // In order to request partial responses, you can specify the full list of fields
@@ -348,9 +399,12 @@ func ConvertVariant(v map[string]interface{}, dst interface{}) bool {
 //
 //     svc.Events.List().Fields("nextPageToken", "items(id,updated)").Do()
 //
+<<<<<<< HEAD
+=======
 // More information about field formatting can be found here:
 // https://developers.google.com/+/api/#fields-syntax
 //
+>>>>>>> cbc9bb05... fixup add vendor back
 // Another way to find field names is through the Google API explorer:
 // https://developers.google.com/apis-explorer/#p/
 type Field string

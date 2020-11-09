@@ -5,12 +5,19 @@
 package binding
 
 import (
+<<<<<<< HEAD
+	"net/http"
+)
+
+const defaultMemory = 32 << 20
+=======
 	"mime/multipart"
 	"net/http"
 	"reflect"
 )
 
 const defaultMemory = 32 * 1024 * 1024
+>>>>>>> cbc9bb05... fixup add vendor back
 
 type formBinding struct{}
 type formPostBinding struct{}
@@ -63,6 +70,8 @@ func (formMultipartBinding) Bind(req *http.Request, obj interface{}) error {
 
 	return validate(obj)
 }
+<<<<<<< HEAD
+=======
 
 type multipartRequest http.Request
 
@@ -87,3 +96,4 @@ func (r *multipartRequest) TrySet(value reflect.Value, field reflect.StructField
 
 	return setByForm(value, field, r.MultipartForm.Value, key, opt)
 }
+>>>>>>> cbc9bb05... fixup add vendor back

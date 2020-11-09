@@ -15,6 +15,11 @@
 
 package view
 
+<<<<<<< HEAD
+import "time"
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // AggType represents the type of aggregation function used on a View.
 type AggType int
 
@@ -45,20 +50,34 @@ type Aggregation struct {
 	Type    AggType   // Type is the AggType of this Aggregation.
 	Buckets []float64 // Buckets are the bucket endpoints if this Aggregation represents a distribution, see Distribution.
 
+<<<<<<< HEAD
+	newData func(time.Time) AggregationData
+=======
 	newData func() AggregationData
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 var (
 	aggCount = &Aggregation{
 		Type: AggTypeCount,
+<<<<<<< HEAD
+		newData: func(t time.Time) AggregationData {
+			return &CountData{Start: t}
+=======
 		newData: func() AggregationData {
 			return &CountData{}
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 	aggSum = &Aggregation{
 		Type: AggTypeSum,
+<<<<<<< HEAD
+		newData: func(t time.Time) AggregationData {
+			return &SumData{Start: t}
+=======
 		newData: func() AggregationData {
 			return &SumData{}
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 )
@@ -99,6 +118,16 @@ func Sum() *Aggregation {
 // If len(bounds) is 1 then there is no finite buckets, and that single
 // element is the common boundary of the overflow and underflow buckets.
 func Distribution(bounds ...float64) *Aggregation {
+<<<<<<< HEAD
+	agg := &Aggregation{
+		Type:    AggTypeDistribution,
+		Buckets: bounds,
+	}
+	agg.newData = func(t time.Time) AggregationData {
+		return newDistributionData(agg, t)
+	}
+	return agg
+=======
 	return &Aggregation{
 		Type:    AggTypeDistribution,
 		Buckets: bounds,
@@ -106,6 +135,7 @@ func Distribution(bounds ...float64) *Aggregation {
 			return newDistributionData(bounds)
 		},
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // LastValue only reports the last value recorded using this
@@ -113,7 +143,11 @@ func Distribution(bounds ...float64) *Aggregation {
 func LastValue() *Aggregation {
 	return &Aggregation{
 		Type: AggTypeLastValue,
+<<<<<<< HEAD
+		newData: func(_ time.Time) AggregationData {
+=======
 		newData: func() AggregationData {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return &LastValueData{}
 		},
 	}

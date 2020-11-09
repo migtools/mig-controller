@@ -17,7 +17,11 @@ each node does not deterministically know how many specs it will end up running.
 
 Unfortunately making such a change would break backward compatibility.
 
+<<<<<<< HEAD
+Until Ginkgo 2.0 comes out we will continue to reuse this struct but populate unknown fields
+=======
 Until Ginkgo 2.0 comes out we will continue to reuse this struct but populate unkown fields
+>>>>>>> cbc9bb05... fixup add vendor back
 with -1.
 */
 type SuiteSummary struct {

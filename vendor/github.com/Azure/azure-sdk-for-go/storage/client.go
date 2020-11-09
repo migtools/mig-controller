@@ -141,6 +141,18 @@ type Client struct {
 	// automatic retry strategy built in. The Sender can be customized.
 	Sender Sender
 
+<<<<<<< HEAD
+	accountName       string
+	accountKey        []byte
+	useHTTPS          bool
+	UseSharedKeyLite  bool
+	baseURL           string
+	apiVersion        string
+	userAgent         string
+	sasClient         bool
+	accountSASToken   url.Values
+	additionalHeaders map[string]string
+=======
 	accountName      string
 	accountKey       []byte
 	useHTTPS         bool
@@ -150,6 +162,7 @@ type Client struct {
 	userAgent        string
 	sasClient        bool
 	accountSASToken  url.Values
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 type odataResponse struct {
@@ -432,6 +445,19 @@ func (c *Client) AddToUserAgent(extension string) error {
 	return fmt.Errorf("Extension was empty, User Agent stayed as %s", c.userAgent)
 }
 
+<<<<<<< HEAD
+// AddAdditionalHeaders adds additional standard headers
+func (c *Client) AddAdditionalHeaders(headers map[string]string) {
+	if headers != nil {
+		c.additionalHeaders = map[string]string{}
+		for k, v := range headers {
+			c.additionalHeaders[k] = v
+		}
+	}
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // protectUserAgent is used in funcs that include extraheaders as a parameter.
 // It prevents the User-Agent header to be overwritten, instead if it happens to
 // be present, it gets added to the current User-Agent. Use it before getStandardHeaders
@@ -696,11 +722,24 @@ func (c Client) GetFileService() FileServiceClient {
 }
 
 func (c Client) getStandardHeaders() map[string]string {
+<<<<<<< HEAD
+	headers := map[string]string{}
+	for k, v := range c.additionalHeaders {
+		headers[k] = v
+	}
+
+	headers[userAgentHeader] = c.userAgent
+	headers["x-ms-version"] = c.apiVersion
+	headers["x-ms-date"] = currentTimeRfc1123Formatted()
+
+	return headers
+=======
 	return map[string]string{
 		userAgentHeader: c.userAgent,
 		"x-ms-version":  c.apiVersion,
 		"x-ms-date":     currentTimeRfc1123Formatted(),
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (c Client) exec(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*http.Response, error) {

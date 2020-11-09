@@ -140,8 +140,28 @@ func Accept4(fd, flags int) (nfd int, sa Sockaddr, err error) {
 	return
 }
 
+<<<<<<< HEAD
+const ImplementsGetwd = true
+
 //sys	Getcwd(buf []byte) (n int, err error) = SYS___GETCWD
 
+func Getwd() (string, error) {
+	var buf [PathMax]byte
+	_, err := Getcwd(buf[0:])
+	if err != nil {
+		return "", err
+	}
+	n := clen(buf[:])
+	if n < 1 {
+		return "", EINVAL
+	}
+	return string(buf[:n]), nil
+}
+
+=======
+//sys	Getcwd(buf []byte) (n int, err error) = SYS___GETCWD
+
+>>>>>>> cbc9bb05... fixup add vendor back
 func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 	var (
 		_p0          unsafe.Pointer

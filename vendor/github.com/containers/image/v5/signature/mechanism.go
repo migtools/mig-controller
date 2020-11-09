@@ -28,8 +28,13 @@ type SigningMechanism interface {
 	Verify(unverifiedSignature []byte) (contents []byte, keyIdentity string, err error)
 	// UntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,
 	// along with a short identifier of the key used for signing.
+<<<<<<< HEAD
+	// WARNING: The short key identifier (which corresponds to "Key ID" for OpenPGP keys)
+	// is NOT the same as a "key identity" used in other calls to this interface, and
+=======
 	// WARNING: The short key identifier (which correponds to "Key ID" for OpenPGP keys)
 	// is NOT the same as a "key identity" used in other calls ot this interface, and
+>>>>>>> cbc9bb05... fixup add vendor back
 	// the values may have no recognizable relationship if the public key is not available.
 	UntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error)
 }
@@ -58,8 +63,13 @@ func NewEphemeralGPGSigningMechanism(blob []byte) (SigningMechanism, []string, e
 
 // gpgUntrustedSignatureContents returns UNTRUSTED contents of the signature WITHOUT ANY VERIFICATION,
 // along with a short identifier of the key used for signing.
+<<<<<<< HEAD
+// WARNING: The short key identifier (which corresponds to "Key ID" for OpenPGP keys)
+// is NOT the same as a "key identity" used in other calls to this interface, and
+=======
 // WARNING: The short key identifier (which correponds to "Key ID" for OpenPGP keys)
 // is NOT the same as a "key identity" used in other calls ot this interface, and
+>>>>>>> cbc9bb05... fixup add vendor back
 // the values may have no recognizable relationship if the public key is not available.
 func gpgUntrustedSignatureContents(untrustedSignature []byte) (untrustedContents []byte, shortKeyIdentifier string, err error) {
 	// This uses the Golang-native OpenPGP implementation instead of gpgme because we are not doing any cryptography.
@@ -75,7 +85,11 @@ func gpgUntrustedSignatureContents(untrustedSignature []byte) (untrustedContents
 		// Coverage: An error during reading the body can happen only if
 		// 1) the message is encrypted, which is not our case (and we don’t give ReadMessage the key
 		// to decrypt the contents anyway), or
+<<<<<<< HEAD
+		// 2) the message is signed AND we give ReadMessage a corresponding public key, which we don’t.
+=======
 		// 2) the message is signed AND we give ReadMessage a correspnding public key, which we don’t.
+>>>>>>> cbc9bb05... fixup add vendor back
 		return nil, "", err
 	}
 

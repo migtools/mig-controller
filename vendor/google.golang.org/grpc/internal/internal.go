@@ -25,12 +25,20 @@ import (
 	"time"
 
 	"google.golang.org/grpc/connectivity"
+<<<<<<< HEAD
+	"google.golang.org/grpc/serviceconfig"
+)
+
+var (
+	// WithHealthCheckFunc is set by dialoptions.go
+=======
 )
 
 var (
 	// WithResolverBuilder is exported by dialoptions.go
 	WithResolverBuilder interface{} // func (resolver.Builder) grpc.DialOption
 	// WithHealthCheckFunc is not exported by dialoptions.go
+>>>>>>> cbc9bb05... fixup add vendor back
 	WithHealthCheckFunc interface{} // func (HealthChecker) DialOption
 	// HealthCheckFunc is used to provide client-side LB channel health checking
 	HealthCheckFunc HealthChecker
@@ -39,6 +47,27 @@ var (
 	// KeepaliveMinPingTime is the minimum ping interval.  This must be 10s by
 	// default, but tests may wish to set it lower for convenience.
 	KeepaliveMinPingTime = 10 * time.Second
+<<<<<<< HEAD
+	// NewRequestInfoContext creates a new context based on the argument context attaching
+	// the passed in RequestInfo to the new context.
+	NewRequestInfoContext interface{} // func(context.Context, credentials.RequestInfo) context.Context
+	// NewClientHandshakeInfoContext returns a copy of the input context with
+	// the passed in ClientHandshakeInfo struct added to it.
+	NewClientHandshakeInfoContext interface{} // func(context.Context, credentials.ClientHandshakeInfo) context.Context
+	// ParseServiceConfigForTesting is for creating a fake
+	// ClientConn for resolver testing only
+	ParseServiceConfigForTesting interface{} // func(string) *serviceconfig.ParseResult
+	// EqualServiceConfigForTesting is for testing service config generation and
+	// parsing. Both a and b should be returned by ParseServiceConfigForTesting.
+	// This function compares the config without rawJSON stripped, in case the
+	// there's difference in white space.
+	EqualServiceConfigForTesting func(a, b serviceconfig.Config) bool
+	// GetCertificateProviderBuilder returns the registered builder for the
+	// given name. This is set by package certprovider for use from xDS
+	// bootstrap code while parsing certificate provider configs in the
+	// bootstrap file.
+	GetCertificateProviderBuilder interface{} // func(string) certprovider.Builder
+=======
 	// ParseServiceConfig is a function to parse JSON service configs into
 	// opaque data structures.
 	ParseServiceConfig func(sc string) (interface{}, error)
@@ -47,6 +76,7 @@ var (
 	// call to proto.Clone(). The returned Status proto should not be mutated by
 	// the caller.
 	StatusRawProto interface{} // func (*status.Status) *spb.Status
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // HealthChecker defines the signature of the client-side LB channel health checking function.
@@ -57,7 +87,11 @@ var (
 //
 // The health checking protocol is defined at:
 // https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+<<<<<<< HEAD
+type HealthChecker func(ctx context.Context, newStream func(string) (interface{}, error), setConnectivityState func(connectivity.State, error), serviceName string) error
+=======
 type HealthChecker func(ctx context.Context, newStream func(string) (interface{}, error), setConnectivityState func(connectivity.State), serviceName string) error
+>>>>>>> cbc9bb05... fixup add vendor back
 
 const (
 	// CredsBundleModeFallback switches GoogleDefaultCreds to fallback mode.

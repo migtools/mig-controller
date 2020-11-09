@@ -62,7 +62,10 @@ const (
 	B28800                            = 0x7080
 	B300                              = 0x12c
 	B38400                            = 0x9600
+<<<<<<< HEAD
+=======
 	B460800                           = 0x70800
+>>>>>>> cbc9bb05... fixup add vendor back
 	B4800                             = 0x12c0
 	B50                               = 0x32
 	B57600                            = 0xe100
@@ -70,15 +73,22 @@ const (
 	B7200                             = 0x1c20
 	B75                               = 0x4b
 	B76800                            = 0x12c00
+<<<<<<< HEAD
+	B9600                             = 0x2580
+=======
 	B921600                           = 0xe1000
 	B9600                             = 0x2580
 	BIOCFEEDBACK                      = 0x8004427d
+>>>>>>> cbc9bb05... fixup add vendor back
 	BIOCFLUSH                         = 0x20004268
 	BIOCGBLEN                         = 0x40044266
 	BIOCGDLT                          = 0x4004426a
 	BIOCGDLTLIST                      = 0xc0104279
 	BIOCGETIF                         = 0x4020426b
+<<<<<<< HEAD
+=======
 	BIOCGFEEDBACK                     = 0x4004427c
+>>>>>>> cbc9bb05... fixup add vendor back
 	BIOCGHDRCMPLT                     = 0x40044274
 	BIOCGRSIG                         = 0x40044272
 	BIOCGRTIMEOUT                     = 0x4010426e
@@ -92,7 +102,10 @@ const (
 	BIOCSETF                          = 0x80104267
 	BIOCSETIF                         = 0x8020426c
 	BIOCSETWF                         = 0x8010427b
+<<<<<<< HEAD
+=======
 	BIOCSFEEDBACK                     = 0x8004427d
+>>>>>>> cbc9bb05... fixup add vendor back
 	BIOCSHDRCMPLT                     = 0x80044275
 	BIOCSRSIG                         = 0x80044273
 	BIOCSRTIMEOUT                     = 0x8010426d
@@ -130,7 +143,10 @@ const (
 	BPF_MINBUFSIZE                    = 0x20
 	BPF_MINOR_VERSION                 = 0x1
 	BPF_MISC                          = 0x7
+<<<<<<< HEAD
+=======
 	BPF_MOD                           = 0x90
+>>>>>>> cbc9bb05... fixup add vendor back
 	BPF_MSH                           = 0xa0
 	BPF_MUL                           = 0x20
 	BPF_NEG                           = 0x80
@@ -145,7 +161,10 @@ const (
 	BPF_TXA                           = 0x80
 	BPF_W                             = 0x0
 	BPF_X                             = 0x8
+<<<<<<< HEAD
+=======
 	BPF_XOR                           = 0xa0
+>>>>>>> cbc9bb05... fixup add vendor back
 	BRKINT                            = 0x2
 	CFLUSH                            = 0xf
 	CLOCAL                            = 0x8000
@@ -163,12 +182,15 @@ const (
 	CLOCK_UPTIME_FAST                 = 0x8
 	CLOCK_UPTIME_PRECISE              = 0x7
 	CLOCK_VIRTUAL                     = 0x1
+<<<<<<< HEAD
+=======
 	CPUSTATES                         = 0x5
 	CP_IDLE                           = 0x4
 	CP_INTR                           = 0x3
 	CP_NICE                           = 0x1
 	CP_SYS                            = 0x2
 	CP_USER                           = 0x0
+>>>>>>> cbc9bb05... fixup add vendor back
 	CREAD                             = 0x800
 	CRTSCTS                           = 0x30000
 	CS5                               = 0x0
@@ -188,7 +210,10 @@ const (
 	DLT_A429                          = 0xb8
 	DLT_A653_ICM                      = 0xb9
 	DLT_AIRONET_HEADER                = 0x78
+<<<<<<< HEAD
+=======
 	DLT_AOS                           = 0xde
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_APPLE_IP_OVER_IEEE1394        = 0x8a
 	DLT_ARCNET                        = 0x7
 	DLT_ARCNET_LINUX                  = 0x81
@@ -198,6 +223,11 @@ const (
 	DLT_AX25                          = 0x3
 	DLT_AX25_KISS                     = 0xca
 	DLT_BACNET_MS_TP                  = 0xa5
+<<<<<<< HEAD
+	DLT_BLUETOOTH_HCI_H4              = 0xbb
+	DLT_BLUETOOTH_HCI_H4_WITH_PHDR    = 0xc9
+	DLT_CAN20B                        = 0xbe
+=======
 	DLT_BLUETOOTH_BREDR_BB            = 0xff
 	DLT_BLUETOOTH_HCI_H4              = 0xbb
 	DLT_BLUETOOTH_HCI_H4_WITH_PHDR    = 0xc9
@@ -206,25 +236,36 @@ const (
 	DLT_BLUETOOTH_LINUX_MONITOR       = 0xfe
 	DLT_CAN20B                        = 0xbe
 	DLT_CAN_SOCKETCAN                 = 0xe3
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_CHAOS                         = 0x5
 	DLT_CHDLC                         = 0x68
 	DLT_CISCO_IOS                     = 0x76
 	DLT_C_HDLC                        = 0x68
 	DLT_C_HDLC_WITH_DIR               = 0xcd
+<<<<<<< HEAD
+	DLT_DOCSIS                        = 0x8f
+=======
 	DLT_DBUS                          = 0xe7
 	DLT_DECT                          = 0xdd
 	DLT_DOCSIS                        = 0x8f
 	DLT_DVB_CI                        = 0xeb
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_ECONET                        = 0x73
 	DLT_EN10MB                        = 0x1
 	DLT_EN3MB                         = 0x2
 	DLT_ENC                           = 0x6d
+<<<<<<< HEAD
+	DLT_ERF                           = 0xc5
+	DLT_ERF_ETH                       = 0xaf
+	DLT_ERF_POS                       = 0xb0
+=======
 	DLT_EPON                          = 0x103
 	DLT_ERF                           = 0xc5
 	DLT_ERF_ETH                       = 0xaf
 	DLT_ERF_POS                       = 0xb0
 	DLT_FC_2                          = 0xe0
 	DLT_FC_2_WITH_FRAME_DELIMS        = 0xe1
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_FDDI                          = 0xa
 	DLT_FLEXRAY                       = 0xd2
 	DLT_FRELAY                        = 0x6b
@@ -234,8 +275,11 @@ const (
 	DLT_GPF_F                         = 0xab
 	DLT_GPF_T                         = 0xaa
 	DLT_GPRS_LLC                      = 0xa9
+<<<<<<< HEAD
+=======
 	DLT_GSMTAP_ABIS                   = 0xda
 	DLT_GSMTAP_UM                     = 0xd9
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_HHDLC                         = 0x79
 	DLT_IBM_SN                        = 0x92
 	DLT_IBM_SP                        = 0x91
@@ -245,6 +289,20 @@ const (
 	DLT_IEEE802_11_RADIO_AVS          = 0xa3
 	DLT_IEEE802_15_4                  = 0xc3
 	DLT_IEEE802_15_4_LINUX            = 0xbf
+<<<<<<< HEAD
+	DLT_IEEE802_15_4_NONASK_PHY       = 0xd7
+	DLT_IEEE802_16_MAC_CPS            = 0xbc
+	DLT_IEEE802_16_MAC_CPS_RADIO      = 0xc1
+	DLT_IPFILTER                      = 0x74
+	DLT_IPMB                          = 0xc7
+	DLT_IPMB_LINUX                    = 0xd1
+	DLT_IP_OVER_FC                    = 0x7a
+	DLT_JUNIPER_ATM1                  = 0x89
+	DLT_JUNIPER_ATM2                  = 0x87
+	DLT_JUNIPER_CHDLC                 = 0xb5
+	DLT_JUNIPER_ES                    = 0x84
+	DLT_JUNIPER_ETHER                 = 0xb2
+=======
 	DLT_IEEE802_15_4_NOFCS            = 0xe6
 	DLT_IEEE802_15_4_NONASK_PHY       = 0xd7
 	DLT_IEEE802_16_MAC_CPS            = 0xbc
@@ -267,6 +325,7 @@ const (
 	DLT_JUNIPER_ES                    = 0x84
 	DLT_JUNIPER_ETHER                 = 0xb2
 	DLT_JUNIPER_FIBRECHANNEL          = 0xea
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_JUNIPER_FRELAY                = 0xb4
 	DLT_JUNIPER_GGSN                  = 0x85
 	DLT_JUNIPER_ISM                   = 0xc2
@@ -279,6 +338,13 @@ const (
 	DLT_JUNIPER_PPPOE                 = 0xa7
 	DLT_JUNIPER_PPPOE_ATM             = 0xa8
 	DLT_JUNIPER_SERVICES              = 0x88
+<<<<<<< HEAD
+	DLT_JUNIPER_ST                    = 0xc8
+	DLT_JUNIPER_VP                    = 0xb7
+	DLT_LAPB_WITH_DIR                 = 0xcf
+	DLT_LAPD                          = 0xcb
+	DLT_LIN                           = 0xd4
+=======
 	DLT_JUNIPER_SRX_E2E               = 0xe9
 	DLT_JUNIPER_ST                    = 0xc8
 	DLT_JUNIPER_VP                    = 0xb7
@@ -287,11 +353,19 @@ const (
 	DLT_LAPD                          = 0xcb
 	DLT_LIN                           = 0xd4
 	DLT_LINUX_EVDEV                   = 0xd8
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_LINUX_IRDA                    = 0x90
 	DLT_LINUX_LAPD                    = 0xb1
 	DLT_LINUX_SLL                     = 0x71
 	DLT_LOOP                          = 0x6c
 	DLT_LTALK                         = 0x72
+<<<<<<< HEAD
+	DLT_MFR                           = 0xb6
+	DLT_MOST                          = 0xd3
+	DLT_MTP2                          = 0x8c
+	DLT_MTP2_WITH_PHDR                = 0x8b
+	DLT_MTP3                          = 0x8d
+=======
 	DLT_MATCHING_MAX                  = 0x109
 	DLT_MATCHING_MIN                  = 0x68
 	DLT_MFR                           = 0xb6
@@ -308,11 +382,15 @@ const (
 	DLT_NFC_LLCP                      = 0xf5
 	DLT_NFLOG                         = 0xef
 	DLT_NG40                          = 0xf4
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_NULL                          = 0x0
 	DLT_PCI_EXP                       = 0x7d
 	DLT_PFLOG                         = 0x75
 	DLT_PFSYNC                        = 0x12
+<<<<<<< HEAD
+=======
 	DLT_PKTAP                         = 0x102
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_PPI                           = 0xc0
 	DLT_PPP                           = 0x9
 	DLT_PPP_BSDOS                     = 0x10
@@ -321,6 +399,17 @@ const (
 	DLT_PPP_SERIAL                    = 0x32
 	DLT_PPP_WITH_DIR                  = 0xcc
 	DLT_PRISM_HEADER                  = 0x77
+<<<<<<< HEAD
+	DLT_PRONET                        = 0x4
+	DLT_RAIF1                         = 0xc6
+	DLT_RAW                           = 0xc
+	DLT_REDBACK_SMARTEDGE             = 0x20
+	DLT_RIO                           = 0x7c
+	DLT_SCCP                          = 0x8e
+	DLT_SITA                          = 0xc4
+	DLT_SLIP                          = 0x8
+	DLT_SLIP_BSDOS                    = 0xf
+=======
 	DLT_PROFIBUS_DL                   = 0x101
 	DLT_PRONET                        = 0x4
 	DLT_RAIF1                         = 0xc6
@@ -335,10 +424,16 @@ const (
 	DLT_SLIP                          = 0x8
 	DLT_SLIP_BSDOS                    = 0xf
 	DLT_STANAG_5066_D_PDU             = 0xed
+>>>>>>> cbc9bb05... fixup add vendor back
 	DLT_SUNATM                        = 0x7b
 	DLT_SYMANTEC_FIREWALL             = 0x63
 	DLT_TZSP                          = 0x80
 	DLT_USB                           = 0xba
+<<<<<<< HEAD
+	DLT_USB_LINUX                     = 0xbd
+	DLT_X2E_SERIAL                    = 0xd5
+	DLT_X2E_XORAYA                    = 0xd6
+=======
 	DLT_USBPCAP                       = 0xf9
 	DLT_USB_FREEBSD                   = 0xba
 	DLT_USB_LINUX                     = 0xbd
@@ -366,6 +461,7 @@ const (
 	DLT_X2E_XORAYA                    = 0xd6
 	DLT_ZWAVE_R1_R2                   = 0x105
 	DLT_ZWAVE_R3                      = 0x106
+>>>>>>> cbc9bb05... fixup add vendor back
 	DT_BLK                            = 0x6
 	DT_CHR                            = 0x2
 	DT_DBF                            = 0xf
@@ -404,11 +500,18 @@ const (
 	EV_EOF                            = 0x8000
 	EV_ERROR                          = 0x4000
 	EV_FLAG1                          = 0x2000
+<<<<<<< HEAD
+	EV_NODATA                         = 0x1000
+	EV_ONESHOT                        = 0x10
+	EV_RECEIPT                        = 0x40
+	EV_SYSFLAGS                       = 0xf000
+=======
 	EV_HUP                            = 0x800
 	EV_NODATA                         = 0x1000
 	EV_ONESHOT                        = 0x10
 	EV_RECEIPT                        = 0x40
 	EV_SYSFLAGS                       = 0xf800
+>>>>>>> cbc9bb05... fixup add vendor back
 	EXTA                              = 0x4b00
 	EXTB                              = 0x9600
 	EXTEXIT_LWP                       = 0x10000
@@ -447,9 +550,14 @@ const (
 	IFF_ALLMULTI                      = 0x200
 	IFF_ALTPHYS                       = 0x4000
 	IFF_BROADCAST                     = 0x2
+<<<<<<< HEAD
+	IFF_CANTCHANGE                    = 0x118e72
+	IFF_DEBUG                         = 0x4
+=======
 	IFF_CANTCHANGE                    = 0x318e72
 	IFF_DEBUG                         = 0x4
 	IFF_IDIRECT                       = 0x200000
+>>>>>>> cbc9bb05... fixup add vendor back
 	IFF_LINK0                         = 0x1000
 	IFF_LINK1                         = 0x2000
 	IFF_LINK2                         = 0x4000
@@ -524,6 +632,10 @@ const (
 	IFT_EPLRS                         = 0x57
 	IFT_ESCON                         = 0x49
 	IFT_ETHER                         = 0x6
+<<<<<<< HEAD
+	IFT_FAITH                         = 0xf2
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	IFT_FAST                          = 0x7d
 	IFT_FASTETHER                     = 0x3e
 	IFT_FASTETHERFX                   = 0x45
@@ -696,7 +808,10 @@ const (
 	IN_CLASSD_NET                     = 0xf0000000
 	IN_CLASSD_NSHIFT                  = 0x1c
 	IN_LOOPBACKNET                    = 0x7f
+<<<<<<< HEAD
+=======
 	IN_RFC3021_MASK                   = 0xfffffffe
+>>>>>>> cbc9bb05... fixup add vendor back
 	IPPROTO_3PC                       = 0x22
 	IPPROTO_ADFS                      = 0x44
 	IPPROTO_AH                        = 0x33
@@ -818,6 +933,10 @@ const (
 	IPV6_DEFHLIM                      = 0x40
 	IPV6_DONTFRAG                     = 0x3e
 	IPV6_DSTOPTS                      = 0x32
+<<<<<<< HEAD
+	IPV6_FAITH                        = 0x1d
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	IPV6_FLOWINFO_MASK                = 0xffffff0f
 	IPV6_FLOWLABEL_MASK               = 0xffff0f00
 	IPV6_FRAGTTL                      = 0x78
@@ -829,6 +948,10 @@ const (
 	IPV6_HLIMDEC                      = 0x1
 	IPV6_HOPLIMIT                     = 0x2f
 	IPV6_HOPOPTS                      = 0x31
+<<<<<<< HEAD
+	IPV6_IPSEC_POLICY                 = 0x1c
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	IPV6_JOIN_GROUP                   = 0xc
 	IPV6_LEAVE_GROUP                  = 0xd
 	IPV6_MAXHLIM                      = 0xff
@@ -876,11 +999,21 @@ const (
 	IP_DUMMYNET_DEL                   = 0x3d
 	IP_DUMMYNET_FLUSH                 = 0x3e
 	IP_DUMMYNET_GET                   = 0x40
+<<<<<<< HEAD
+	IP_FAITH                          = 0x16
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	IP_FW_ADD                         = 0x32
 	IP_FW_DEL                         = 0x33
 	IP_FW_FLUSH                       = 0x34
 	IP_FW_GET                         = 0x36
 	IP_FW_RESETLOG                    = 0x37
+<<<<<<< HEAD
+	IP_FW_X                           = 0x31
+	IP_FW_ZERO                        = 0x35
+	IP_HDRINCL                        = 0x2
+	IP_IPSEC_POLICY                   = 0x15
+=======
 	IP_FW_TBL_ADD                     = 0x2a
 	IP_FW_TBL_CREATE                  = 0x28
 	IP_FW_TBL_DEL                     = 0x2b
@@ -892,6 +1025,7 @@ const (
 	IP_FW_X                           = 0x31
 	IP_FW_ZERO                        = 0x35
 	IP_HDRINCL                        = 0x2
+>>>>>>> cbc9bb05... fixup add vendor back
 	IP_MAXPACKET                      = 0xffff
 	IP_MAX_MEMBERSHIPS                = 0x14
 	IP_MF                             = 0x2000
@@ -1167,10 +1301,19 @@ const (
 	RTM_MISS                          = 0x7
 	RTM_NEWADDR                       = 0xc
 	RTM_NEWMADDR                      = 0xf
+<<<<<<< HEAD
+	RTM_OLDADD                        = 0x9
+	RTM_OLDDEL                        = 0xa
+	RTM_REDIRECT                      = 0x6
+	RTM_RESOLVE                       = 0xb
+	RTM_RTTUNIT                       = 0xf4240
+	RTM_VERSION                       = 0x6
+=======
 	RTM_REDIRECT                      = 0x6
 	RTM_RESOLVE                       = 0xb
 	RTM_RTTUNIT                       = 0xf4240
 	RTM_VERSION                       = 0x7
+>>>>>>> cbc9bb05... fixup add vendor back
 	RTV_EXPIRE                        = 0x4
 	RTV_HOPCOUNT                      = 0x2
 	RTV_IWCAPSEGS                     = 0x400
@@ -1191,6 +1334,15 @@ const (
 	SHUT_RDWR                         = 0x2
 	SHUT_WR                           = 0x1
 	SIOCADDMULTI                      = 0x80206931
+<<<<<<< HEAD
+	SIOCADDRT                         = 0x8040720a
+	SIOCAIFADDR                       = 0x8040691a
+	SIOCALIFADDR                      = 0x8118691b
+	SIOCATMARK                        = 0x40047307
+	SIOCDELMULTI                      = 0x80206932
+	SIOCDELRT                         = 0x8040720b
+	SIOCDIFADDR                       = 0x80206919
+=======
 	SIOCAIFADDR                       = 0x8040691a
 	SIOCAIFGROUP                      = 0x80286987
 	SIOCALIFADDR                      = 0x8118691b
@@ -1198,6 +1350,7 @@ const (
 	SIOCDELMULTI                      = 0x80206932
 	SIOCDIFADDR                       = 0x80206919
 	SIOCDIFGROUP                      = 0x80286989
+>>>>>>> cbc9bb05... fixup add vendor back
 	SIOCDIFPHYADDR                    = 0x80206949
 	SIOCDLIFADDR                      = 0x8118691d
 	SIOCGDRVSPEC                      = 0xc028697b
@@ -1205,7 +1358,10 @@ const (
 	SIOCGETVIFCNT                     = 0xc028720f
 	SIOCGHIWAT                        = 0x40047301
 	SIOCGIFADDR                       = 0xc0206921
+<<<<<<< HEAD
+=======
 	SIOCGIFALIAS                      = 0xc0406929
+>>>>>>> cbc9bb05... fixup add vendor back
 	SIOCGIFBRDADDR                    = 0xc0206923
 	SIOCGIFCAP                        = 0xc020691f
 	SIOCGIFCONF                       = 0xc0106924
@@ -1214,7 +1370,10 @@ const (
 	SIOCGIFFLAGS                      = 0xc0206911
 	SIOCGIFGENERIC                    = 0xc020693a
 	SIOCGIFGMEMB                      = 0xc028698a
+<<<<<<< HEAD
+=======
 	SIOCGIFGROUP                      = 0xc0286988
+>>>>>>> cbc9bb05... fixup add vendor back
 	SIOCGIFINDEX                      = 0xc0206920
 	SIOCGIFMEDIA                      = 0xc0306938
 	SIOCGIFMETRIC                     = 0xc0206917
@@ -1281,7 +1440,10 @@ const (
 	SO_RCVBUF                         = 0x1002
 	SO_RCVLOWAT                       = 0x1004
 	SO_RCVTIMEO                       = 0x1006
+<<<<<<< HEAD
+=======
 	SO_RERROR                         = 0x2000
+>>>>>>> cbc9bb05... fixup add vendor back
 	SO_REUSEADDR                      = 0x4
 	SO_REUSEPORT                      = 0x200
 	SO_SNDBUF                         = 0x1001
@@ -1321,9 +1483,12 @@ const (
 	S_IXGRP                           = 0x8
 	S_IXOTH                           = 0x1
 	S_IXUSR                           = 0x40
+<<<<<<< HEAD
+=======
 	TAB0                              = 0x0
 	TAB3                              = 0x4
 	TABDLY                            = 0x4
+>>>>>>> cbc9bb05... fixup add vendor back
 	TCIFLUSH                          = 0x1
 	TCIOFF                            = 0x3
 	TCIOFLUSH                         = 0x3
@@ -1350,8 +1515,11 @@ const (
 	TCP_NOPUSH                        = 0x4
 	TCP_SIGNATURE_ENABLE              = 0x10
 	TCSAFLUSH                         = 0x2
+<<<<<<< HEAD
+=======
 	TIMER_ABSTIME                     = 0x1
 	TIMER_RELTIME                     = 0x0
+>>>>>>> cbc9bb05... fixup add vendor back
 	TIOCCBRK                          = 0x2000747a
 	TIOCCDTR                          = 0x20007478
 	TIOCCONS                          = 0x80047462
@@ -1365,6 +1533,10 @@ const (
 	TIOCGETD                          = 0x4004741a
 	TIOCGPGRP                         = 0x40047477
 	TIOCGSID                          = 0x40047463
+<<<<<<< HEAD
+	TIOCGSIZE                         = 0x40087468
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	TIOCGWINSZ                        = 0x40087468
 	TIOCISPTMASTER                    = 0x20007455
 	TIOCMBIC                          = 0x8004746b
@@ -1409,6 +1581,10 @@ const (
 	TIOCSETD                          = 0x8004741b
 	TIOCSIG                           = 0x2000745f
 	TIOCSPGRP                         = 0x80047476
+<<<<<<< HEAD
+	TIOCSSIZE                         = 0x80087467
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	TIOCSTART                         = 0x2000746e
 	TIOCSTAT                          = 0x20007465
 	TIOCSTI                           = 0x80017472
@@ -1417,8 +1593,11 @@ const (
 	TIOCTIMESTAMP                     = 0x40107459
 	TIOCUCNTL                         = 0x80047466
 	TOSTOP                            = 0x400000
+<<<<<<< HEAD
+=======
 	UTIME_NOW                         = -0x1
 	UTIME_OMIT                        = -0x2
+>>>>>>> cbc9bb05... fixup add vendor back
 	VCHECKPT                          = 0x13
 	VDISCARD                          = 0xf
 	VDSUSP                            = 0xb
@@ -1443,12 +1622,18 @@ const (
 	VWERASE                           = 0x4
 	WCONTINUED                        = 0x4
 	WCOREFLAG                         = 0x80
+<<<<<<< HEAD
+	WLINUXCLONE                       = 0x80000000
+	WNOHANG                           = 0x1
+	WSTOPPED                          = 0x7f
+=======
 	WEXITED                           = 0x10
 	WLINUXCLONE                       = 0x80000000
 	WNOHANG                           = 0x1
 	WNOWAIT                           = 0x8
 	WSTOPPED                          = 0x2
 	WTRAPPED                          = 0x20
+>>>>>>> cbc9bb05... fixup add vendor back
 	WUNTRACED                         = 0x2
 )
 
@@ -1548,6 +1733,14 @@ const (
 	ETIMEDOUT       = syscall.Errno(0x3c)
 	ETOOMANYREFS    = syscall.Errno(0x3b)
 	ETXTBSY         = syscall.Errno(0x1a)
+<<<<<<< HEAD
+	EUNUSED94       = syscall.Errno(0x5e)
+	EUNUSED95       = syscall.Errno(0x5f)
+	EUNUSED96       = syscall.Errno(0x60)
+	EUNUSED97       = syscall.Errno(0x61)
+	EUNUSED98       = syscall.Errno(0x62)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	EUSERS          = syscall.Errno(0x44)
 	EWOULDBLOCK     = syscall.Errno(0x23)
 	EXDEV           = syscall.Errno(0x12)
@@ -1691,7 +1884,16 @@ var errorList = [...]struct {
 	{91, "ENOLINK", "link has been severed"},
 	{92, "EPROTO", "protocol error"},
 	{93, "ENOMEDIUM", "no medium found"},
+<<<<<<< HEAD
+	{94, "EUNUSED94", "unknown error: 94"},
+	{95, "EUNUSED95", "unknown error: 95"},
+	{96, "EUNUSED96", "unknown error: 96"},
+	{97, "EUNUSED97", "unknown error: 97"},
+	{98, "EUNUSED98", "unknown error: 98"},
+	{99, "ELAST", "unknown error: 99"},
+=======
 	{99, "EASYNC", "unknown error: 99"},
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Signal table

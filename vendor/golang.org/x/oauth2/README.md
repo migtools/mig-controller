@@ -16,6 +16,18 @@ Or you can manually git clone the repository to
 
 See godoc for further documentation and examples.
 
+<<<<<<< HEAD
+* [godoc.org/golang.org/x/oauth2](https://godoc.org/golang.org/x/oauth2)
+* [godoc.org/golang.org/x/oauth2/google](https://godoc.org/golang.org/x/oauth2/google)
+
+## Policy for new packages
+
+We no longer accept new provider-specific packages in this repo if all
+they do is add a single endpoint variable. If you just want to add a
+single endpoint, add it to the
+[godoc.org/golang.org/x/oauth2/endpoints](https://godoc.org/golang.org/x/oauth2/endpoints)
+package.
+=======
 * [godoc.org/golang.org/x/oauth2](http://godoc.org/golang.org/x/oauth2)
 * [godoc.org/golang.org/x/oauth2/google](http://godoc.org/golang.org/x/oauth2/google)
 
@@ -25,6 +37,7 @@ We no longer accept new provider-specific packages in this repo. For
 defining provider endpoints and provider-specific OAuth2 behavior, we
 encourage you to create packages elsewhere. We'll keep the existing
 packages for compatibility.
+>>>>>>> cbc9bb05... fixup add vendor back
 
 ## Report Issues / Send Patches
 

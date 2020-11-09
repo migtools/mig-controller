@@ -20,7 +20,11 @@ import (
 	"fmt"
 )
 
+<<<<<<< HEAD
+const VERSION = "1.10.2"
+=======
 const VERSION = "1.8.0"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 type GinkgoConfigType struct {
 	RandomSeed         int64
@@ -52,13 +56,21 @@ type DefaultReporterConfigType struct {
 	Succinct          bool
 	Verbose           bool
 	FullTrace         bool
+<<<<<<< HEAD
+	ReportPassed      bool
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 var DefaultReporterConfig = DefaultReporterConfigType{}
 
 func processPrefix(prefix string) string {
 	if prefix != "" {
+<<<<<<< HEAD
+		prefix += "."
+=======
 		prefix = prefix + "."
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	return prefix
 }
@@ -98,6 +110,10 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.BoolVar(&(DefaultReporterConfig.Verbose), prefix+"v", false, "If set, default reporter print out all specs as they begin.")
 	flagSet.BoolVar(&(DefaultReporterConfig.Succinct), prefix+"succinct", false, "If set, default reporter prints out a very succinct report")
 	flagSet.BoolVar(&(DefaultReporterConfig.FullTrace), prefix+"trace", false, "If set, default reporter prints out the full stack trace when a failure occurs")
+<<<<<<< HEAD
+	flagSet.BoolVar(&(DefaultReporterConfig.ReportPassed), prefix+"reportPassed", false, "If set, default reporter prints out captured output of passed tests.")
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultReporterConfigType) []string {
@@ -196,5 +212,12 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 		result = append(result, fmt.Sprintf("--%strace", prefix))
 	}
 
+<<<<<<< HEAD
+	if reporter.ReportPassed {
+		result = append(result, fmt.Sprintf("--%sreportPassed", prefix))
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return result
 }

@@ -13,7 +13,11 @@ type Address struct {
 // IPAM represents IP Address Management
 type IPAM struct {
 	Driver  string
+<<<<<<< HEAD
+	Options map[string]string // Per network IPAM driver options
+=======
 	Options map[string]string //Per network IPAM driver options
+>>>>>>> cbc9bb05... fixup add vendor back
 	Config  []IPAMConfig
 }
 

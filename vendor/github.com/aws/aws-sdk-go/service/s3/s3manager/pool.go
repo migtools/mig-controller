@@ -60,6 +60,17 @@ func (p *maxSlicePool) Get(ctx aws.Context) (*[]byte, error) {
 				return nil, errZeroCapacity
 			}
 			return bs, nil
+<<<<<<< HEAD
+		case <-ctx.Done():
+			p.mtx.RUnlock()
+			return nil, ctx.Err()
+		default:
+			// pass
+		}
+
+		select {
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		case _, ok := <-p.allocations:
 			p.mtx.RUnlock()
 			if !ok {

@@ -60,8 +60,13 @@ func (w *normWriter) Close() error {
 }
 
 // Writer returns a new writer that implements Write(b)
+<<<<<<< HEAD
+// by writing f(b) to w. The returned writer may use an
+// internal buffer to maintain state across Write calls.
+=======
 // by writing f(b) to w.  The returned writer may use an
 // an internal buffer to maintain state across Write calls.
+>>>>>>> cbc9bb05... fixup add vendor back
 // Calling its Close method writes any buffered data to w.
 func (f Form) Writer(w io.Writer) io.WriteCloser {
 	wr := &normWriter{rb: reorderBuffer{}, w: w}

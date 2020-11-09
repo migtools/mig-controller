@@ -46,6 +46,11 @@ type ResourceIdentifier struct {
 	Batch               string `json:"batch"`
 	OperationalInsights string `json:"operationalInsights"`
 	Storage             string `json:"storage"`
+<<<<<<< HEAD
+	Synapse             string `json:"synapse"`
+	ServiceBus          string `json:"serviceBus"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Environment represents a set of endpoints for each of Azure's Clouds.
@@ -71,6 +76,11 @@ type Environment struct {
 	ContainerRegistryDNSSuffix   string             `json:"containerRegistryDNSSuffix"`
 	CosmosDBDNSSuffix            string             `json:"cosmosDBDNSSuffix"`
 	TokenAudience                string             `json:"tokenAudience"`
+<<<<<<< HEAD
+	APIManagementHostNameSuffix  string             `json:"apiManagementHostNameSuffix"`
+	SynapseEndpointSuffix        string             `json:"synapseEndpointSuffix"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	ResourceIdentifiers          ResourceIdentifier `json:"resourceIdentifiers"`
 }
 
@@ -98,6 +108,11 @@ var (
 		ContainerRegistryDNSSuffix:   "azurecr.io",
 		CosmosDBDNSSuffix:            "documents.azure.com",
 		TokenAudience:                "https://management.azure.com/",
+<<<<<<< HEAD
+		APIManagementHostNameSuffix:  "azure-api.net",
+		SynapseEndpointSuffix:        "dev.azuresynapse.net",
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		ResourceIdentifiers: ResourceIdentifier{
 			Graph:               "https://graph.windows.net/",
 			KeyVault:            "https://vault.azure.net",
@@ -105,6 +120,11 @@ var (
 			Batch:               "https://batch.core.windows.net/",
 			OperationalInsights: "https://api.loganalytics.io",
 			Storage:             "https://storage.azure.com/",
+<<<<<<< HEAD
+			Synapse:             "https://dev.azuresynapse.net",
+			ServiceBus:          "https://servicebus.azure.net/",
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 
@@ -127,10 +147,19 @@ var (
 		KeyVaultDNSSuffix:            "vault.usgovcloudapi.net",
 		ServiceBusEndpointSuffix:     "servicebus.usgovcloudapi.net",
 		ServiceManagementVMDNSSuffix: "usgovcloudapp.net",
+<<<<<<< HEAD
+		ResourceManagerVMDNSSuffix:   "cloudapp.usgovcloudapi.net",
+		ContainerRegistryDNSSuffix:   "azurecr.us",
+		CosmosDBDNSSuffix:            "documents.azure.us",
+		TokenAudience:                "https://management.usgovcloudapi.net/",
+		APIManagementHostNameSuffix:  "azure-api.us",
+		SynapseEndpointSuffix:        NotAvailable,
+=======
 		ResourceManagerVMDNSSuffix:   "cloudapp.windowsazure.us",
 		ContainerRegistryDNSSuffix:   "azurecr.us",
 		CosmosDBDNSSuffix:            "documents.azure.us",
 		TokenAudience:                "https://management.usgovcloudapi.net/",
+>>>>>>> cbc9bb05... fixup add vendor back
 		ResourceIdentifiers: ResourceIdentifier{
 			Graph:               "https://graph.windows.net/",
 			KeyVault:            "https://vault.usgovcloudapi.net",
@@ -138,6 +167,11 @@ var (
 			Batch:               "https://batch.core.usgovcloudapi.net/",
 			OperationalInsights: "https://api.loganalytics.us",
 			Storage:             "https://storage.azure.com/",
+<<<<<<< HEAD
+			Synapse:             NotAvailable,
+			ServiceBus:          "https://servicebus.azure.net/",
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 
@@ -160,10 +194,19 @@ var (
 		KeyVaultDNSSuffix:            "vault.azure.cn",
 		ServiceBusEndpointSuffix:     "servicebus.chinacloudapi.cn",
 		ServiceManagementVMDNSSuffix: "chinacloudapp.cn",
+<<<<<<< HEAD
+		ResourceManagerVMDNSSuffix:   "cloudapp.chinacloudapi.cn",
+		ContainerRegistryDNSSuffix:   "azurecr.cn",
+		CosmosDBDNSSuffix:            "documents.azure.cn",
+		TokenAudience:                "https://management.chinacloudapi.cn/",
+		APIManagementHostNameSuffix:  "azure-api.cn",
+		SynapseEndpointSuffix:        "dev.azuresynapse.azure.cn",
+=======
 		ResourceManagerVMDNSSuffix:   "cloudapp.azure.cn",
 		ContainerRegistryDNSSuffix:   "azurecr.cn",
 		CosmosDBDNSSuffix:            "documents.azure.cn",
 		TokenAudience:                "https://management.chinacloudapi.cn/",
+>>>>>>> cbc9bb05... fixup add vendor back
 		ResourceIdentifiers: ResourceIdentifier{
 			Graph:               "https://graph.chinacloudapi.cn/",
 			KeyVault:            "https://vault.azure.cn",
@@ -171,6 +214,11 @@ var (
 			Batch:               "https://batch.chinacloudapi.cn/",
 			OperationalInsights: NotAvailable,
 			Storage:             "https://storage.azure.com/",
+<<<<<<< HEAD
+			Synapse:             "https://dev.azuresynapse.net",
+			ServiceBus:          "https://servicebus.azure.net/",
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 
@@ -197,6 +245,11 @@ var (
 		ContainerRegistryDNSSuffix:   NotAvailable,
 		CosmosDBDNSSuffix:            "documents.microsoftazure.de",
 		TokenAudience:                "https://management.microsoftazure.de/",
+<<<<<<< HEAD
+		APIManagementHostNameSuffix:  NotAvailable,
+		SynapseEndpointSuffix:        NotAvailable,
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		ResourceIdentifiers: ResourceIdentifier{
 			Graph:               "https://graph.cloudapi.de/",
 			KeyVault:            "https://vault.microsoftazure.de",
@@ -204,6 +257,11 @@ var (
 			Batch:               "https://batch.cloudapi.de/",
 			OperationalInsights: NotAvailable,
 			Storage:             "https://storage.azure.com/",
+<<<<<<< HEAD
+			Synapse:             NotAvailable,
+			ServiceBus:          "https://servicebus.azure.net/",
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		},
 	}
 )
@@ -242,3 +300,11 @@ func EnvironmentFromFile(location string) (unmarshaled Environment, err error) {
 
 	return
 }
+<<<<<<< HEAD
+
+// SetEnvironment updates the environment map with the specified values.
+func SetEnvironment(name string, env Environment) {
+	environments[strings.ToUpper(name)] = env
+}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

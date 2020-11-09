@@ -22,4 +22,8 @@ const (
 	UnitDimensionless = "1"
 	UnitBytes         = "By"
 	UnitMilliseconds  = "ms"
+<<<<<<< HEAD
+	UnitSeconds       = "s"
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 )

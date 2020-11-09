@@ -17,12 +17,15 @@ import (
 //
 // In most cases, New should be used.
 func NewUUID() (UUID, error) {
+<<<<<<< HEAD
+=======
 	nodeMu.Lock()
 	if nodeID == zeroID {
 		setNodeInterface("")
 	}
 	nodeMu.Unlock()
 
+>>>>>>> cbc9bb05... fixup add vendor back
 	var uuid UUID
 	now, seq, err := GetTime()
 	if err != nil {
@@ -38,7 +41,17 @@ func NewUUID() (UUID, error) {
 	binary.BigEndian.PutUint16(uuid[4:], timeMid)
 	binary.BigEndian.PutUint16(uuid[6:], timeHi)
 	binary.BigEndian.PutUint16(uuid[8:], seq)
+<<<<<<< HEAD
+
+	nodeMu.Lock()
+	if nodeID == zeroID {
+		setNodeInterface("")
+	}
 	copy(uuid[10:], nodeID[:])
+	nodeMu.Unlock()
+=======
+	copy(uuid[10:], nodeID[:])
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	return uuid, nil
 }

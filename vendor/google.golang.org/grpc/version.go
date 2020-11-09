@@ -19,4 +19,8 @@
 package grpc
 
 // Version is the current grpc version.
+<<<<<<< HEAD
+const Version = "1.33.2"
+=======
 const Version = "1.24.0"
+>>>>>>> cbc9bb05... fixup add vendor back

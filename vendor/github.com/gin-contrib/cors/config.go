@@ -60,7 +60,11 @@ func (cors *cors) applyCors(c *gin.Context) {
 		// request is not a CORS request
 		return
 	}
+<<<<<<< HEAD
+	host := c.Request.Host
+=======
 	host := c.Request.Header.Get("Host")
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	if origin == "http://"+host || origin == "https://"+host {
 		// request is not a CORS request but have origin header.

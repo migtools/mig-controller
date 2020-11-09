@@ -141,6 +141,12 @@ func MapWithOverwrite(dst, src interface{}, opts ...func(*Config)) error {
 }
 
 func _map(dst, src interface{}, opts ...func(*Config)) error {
+<<<<<<< HEAD
+	if dst != nil && reflect.ValueOf(dst).Kind() != reflect.Ptr {
+		return ErrNonPointerAgument
+	}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	var (
 		vDst, vSrc reflect.Value
 		err        error

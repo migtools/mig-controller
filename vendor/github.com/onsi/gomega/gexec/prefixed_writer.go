@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+// untested sections: 1
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package gexec
 
 import (
@@ -6,7 +11,11 @@ import (
 )
 
 /*
+<<<<<<< HEAD
+PrefixedWriter wraps an io.Writer, emitting the passed in prefix at the beginning of each new line.
+=======
 PrefixedWriter wraps an io.Writer, emiting the passed in prefix at the beginning of each new line.
+>>>>>>> cbc9bb05... fixup add vendor back
 This can be useful when running multiple gexec.Sessions concurrently - you can prefix the log output of each
 session by passing in a PrefixedWriter:
 

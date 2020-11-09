@@ -229,12 +229,29 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	} else if len(configAuthInfo.TokenFile) > 0 {
+<<<<<<< HEAD
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
 			return nil, err
 		}
 		mergedConfig.BearerToken = string(tokenBytes)
 		mergedConfig.BearerTokenFile = configAuthInfo.TokenFile
+=======
+<<<<<<< HEAD
+		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
+		if err != nil {
+			return nil, err
+		}
+		mergedConfig.BearerToken = string(tokenBytes)
+		mergedConfig.BearerTokenFile = configAuthInfo.TokenFile
+=======
+		ts := restclient.NewCachedFileTokenSource(configAuthInfo.TokenFile)
+		if _, err := ts.Token(); err != nil {
+			return nil, err
+		}
+		mergedConfig.WrapTransport = restclient.TokenSourceWrapTransport(ts)
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	}
 	if len(configAuthInfo.Impersonate) > 0 {
 		mergedConfig.Impersonate = restclient.ImpersonationConfig{

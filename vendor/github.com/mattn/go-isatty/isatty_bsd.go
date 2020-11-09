@@ -3,6 +3,14 @@
 
 package isatty
 
+<<<<<<< HEAD
+import "golang.org/x/sys/unix"
+
+// IsTerminal return true if the file descriptor is terminal.
+func IsTerminal(fd uintptr) bool {
+	_, err := unix.IoctlGetTermios(int(fd), unix.TIOCGETA)
+	return err == nil
+=======
 import (
 	"syscall"
 	"unsafe"
@@ -15,6 +23,7 @@ func IsTerminal(fd uintptr) bool {
 	var termios syscall.Termios
 	_, _, err := syscall.Syscall6(syscall.SYS_IOCTL, fd, ioctlReadTermios, uintptr(unsafe.Pointer(&termios)), 0, 0, 0)
 	return err == 0
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // IsCygwinTerminal return true if the file descriptor is a cygwin or msys2

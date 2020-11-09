@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+// Copyright 2013 Google LLC. All rights reserved.
+=======
 // Copyright 2013 Google Inc. All rights reserved.
+>>>>>>> cbc9bb05... fixup add vendor back
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 

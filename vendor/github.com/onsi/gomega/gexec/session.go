@@ -1,6 +1,12 @@
 /*
 Package gexec provides support for testing external processes.
 */
+<<<<<<< HEAD
+
+// untested sections: 1
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package gexec
 
 import (

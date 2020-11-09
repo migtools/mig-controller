@@ -9,7 +9,11 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
+<<<<<<< HEAD
+	digest "github.com/opencontainers/go-digest"
+=======
 	"github.com/opencontainers/go-digest"
+>>>>>>> cbc9bb05... fixup add vendor back
 	"github.com/pkg/errors"
 )
 

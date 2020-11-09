@@ -44,7 +44,11 @@ func (lm lruMap) len() int {
 }
 
 func (lm lruMap) keys() []interface{} {
+<<<<<<< HEAD
+	keys := make([]interface{}, len(lm.cacheKeys))
+=======
 	keys := []interface{}{}
+>>>>>>> cbc9bb05... fixup add vendor back
 	for k := range lm.cacheKeys {
 		keys = append(keys, k)
 	}

@@ -527,6 +527,10 @@ func ExtensionDescs(pb Message) ([]*ExtensionDesc, error) {
 // SetExtension sets the specified extension of pb to the specified value.
 func SetExtension(pb Message, extension *ExtensionDesc, value interface{}) error {
 	if epb, ok := pb.(extensionsBytes); ok {
+<<<<<<< HEAD
+		ClearExtension(pb, extension)
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		newb, err := encodeExtension(extension, value)
 		if err != nil {
 			return err

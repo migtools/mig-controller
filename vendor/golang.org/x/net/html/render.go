@@ -134,6 +134,12 @@ func render1(w writer, n *Node) error {
 			}
 		}
 		return w.WriteByte('>')
+<<<<<<< HEAD
+	case RawNode:
+		_, err := w.WriteString(n.Data)
+		return err
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	default:
 		return errors.New("html: unknown node type")
 	}
@@ -252,6 +258,23 @@ func writeQuoted(w writer, s string) error {
 // Section 12.1.2, "Elements", gives this list of void elements. Void elements
 // are those that can't have any contents.
 var voidElements = map[string]bool{
+<<<<<<< HEAD
+	"area":   true,
+	"base":   true,
+	"br":     true,
+	"col":    true,
+	"embed":  true,
+	"hr":     true,
+	"img":    true,
+	"input":  true,
+	"keygen": true,
+	"link":   true,
+	"meta":   true,
+	"param":  true,
+	"source": true,
+	"track":  true,
+	"wbr":    true,
+=======
 	"area":    true,
 	"base":    true,
 	"br":      true,
@@ -268,4 +291,5 @@ var voidElements = map[string]bool{
 	"source":  true,
 	"track":   true,
 	"wbr":     true,
+>>>>>>> cbc9bb05... fixup add vendor back
 }

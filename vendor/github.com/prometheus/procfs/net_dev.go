@@ -47,6 +47,15 @@ type NetDevLine struct {
 // are interface names.
 type NetDev map[string]NetDevLine
 
+<<<<<<< HEAD
+// NetDev returns kernel/system statistics read from /proc/net/dev.
+func (fs FS) NetDev() (NetDev, error) {
+	return newNetDev(fs.proc.Path("net/dev"))
+}
+
+// NetDev returns kernel/system statistics read from /proc/[pid]/net/dev.
+func (p Proc) NetDev() (NetDev, error) {
+=======
 // NewNetDev returns kernel/system statistics read from /proc/net/dev.
 func NewNetDev() (NetDev, error) {
 	fs, err := NewFS(DefaultMountPoint)
@@ -64,6 +73,7 @@ func (fs FS) NewNetDev() (NetDev, error) {
 
 // NewNetDev returns kernel/system statistics read from /proc/[pid]/net/dev.
 func (p Proc) NewNetDev() (NetDev, error) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	return newNetDev(p.path("net/dev"))
 }
 
@@ -75,7 +85,11 @@ func newNetDev(file string) (NetDev, error) {
 	}
 	defer f.Close()
 
+<<<<<<< HEAD
+	netDev := NetDev{}
+=======
 	nd := NetDev{}
+>>>>>>> cbc9bb05... fixup add vendor back
 	s := bufio.NewScanner(f)
 	for n := 0; s.Scan(); n++ {
 		// Skip the 2 header lines.
@@ -83,6 +97,17 @@ func newNetDev(file string) (NetDev, error) {
 			continue
 		}
 
+<<<<<<< HEAD
+		line, err := netDev.parseLine(s.Text())
+		if err != nil {
+			return netDev, err
+		}
+
+		netDev[line.Name] = *line
+	}
+
+	return netDev, s.Err()
+=======
 		line, err := nd.parseLine(s.Text())
 		if err != nil {
 			return nd, err
@@ -92,11 +117,16 @@ func newNetDev(file string) (NetDev, error) {
 	}
 
 	return nd, s.Err()
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // parseLine parses a single line from the /proc/net/dev file. Header lines
 // must be filtered prior to calling this method.
+<<<<<<< HEAD
+func (netDev NetDev) parseLine(rawLine string) (*NetDevLine, error) {
+=======
 func (nd NetDev) parseLine(rawLine string) (*NetDevLine, error) {
+>>>>>>> cbc9bb05... fixup add vendor back
 	parts := strings.SplitN(rawLine, ":", 2)
 	if len(parts) != 2 {
 		return nil, errors.New("invalid net/dev line, missing colon")
@@ -185,11 +215,19 @@ func (nd NetDev) parseLine(rawLine string) (*NetDevLine, error) {
 
 // Total aggregates the values across interfaces and returns a new NetDevLine.
 // The Name field will be a sorted comma separated list of interface names.
+<<<<<<< HEAD
+func (netDev NetDev) Total() NetDevLine {
+	total := NetDevLine{}
+
+	names := make([]string, 0, len(netDev))
+	for _, ifc := range netDev {
+=======
 func (nd NetDev) Total() NetDevLine {
 	total := NetDevLine{}
 
 	names := make([]string, 0, len(nd))
 	for _, ifc := range nd {
+>>>>>>> cbc9bb05... fixup add vendor back
 		names = append(names, ifc.Name)
 		total.RxBytes += ifc.RxBytes
 		total.RxPackets += ifc.RxPackets

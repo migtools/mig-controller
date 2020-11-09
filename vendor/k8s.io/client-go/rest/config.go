@@ -70,11 +70,20 @@ type Config struct {
 	// TODO: demonstrate an OAuth2 compatible client.
 	BearerToken string
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 	// Path to a file containing a BearerToken.
 	// If set, the contents are periodically read.
 	// The last successfully read value takes precedence over BearerToken.
 	BearerTokenFile string
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	// Impersonate is the configuration that RESTClient will use for impersonation.
 	Impersonate ImpersonationConfig
 
@@ -327,8 +336,19 @@ func InClusterConfig() (*Config, error) {
 		return nil, ErrNotInCluster
 	}
 
+<<<<<<< HEAD
 	token, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
+=======
+<<<<<<< HEAD
+	token, err := ioutil.ReadFile(tokenFile)
+	if err != nil {
+=======
+	ts := NewCachedFileTokenSource(tokenFile)
+
+	if _, err := ts.Token(); err != nil {
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 		return nil, err
 	}
 
@@ -344,8 +364,17 @@ func InClusterConfig() (*Config, error) {
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(host, port),
 		TLSClientConfig: tlsClientConfig,
+<<<<<<< HEAD
 		BearerToken:     string(token),
 		BearerTokenFile: tokenFile,
+=======
+<<<<<<< HEAD
+		BearerToken:     string(token),
+		BearerTokenFile: tokenFile,
+=======
+		WrapTransport:   TokenSourceWrapTransport(ts),
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 	}, nil
 }
 
@@ -435,6 +464,10 @@ func AnonymousClientConfig(config *Config) *Config {
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
 	return &Config{
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> c419e939... Switching mig-controller to go mod
 		Host:            config.Host,
 		APIPath:         config.APIPath,
 		ContentConfig:   config.ContentConfig,
@@ -442,6 +475,17 @@ func CopyConfig(config *Config) *Config {
 		Password:        config.Password,
 		BearerToken:     config.BearerToken,
 		BearerTokenFile: config.BearerTokenFile,
+<<<<<<< HEAD
+=======
+=======
+		Host:          config.Host,
+		APIPath:       config.APIPath,
+		ContentConfig: config.ContentConfig,
+		Username:      config.Username,
+		Password:      config.Password,
+		BearerToken:   config.BearerToken,
+>>>>>>> cbc9bb05... fixup add vendor back
+>>>>>>> c419e939... Switching mig-controller to go mod
 		Impersonate: ImpersonationConfig{
 			Groups:   config.Impersonate.Groups,
 			Extra:    config.Impersonate.Extra,

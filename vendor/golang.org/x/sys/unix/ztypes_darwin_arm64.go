@@ -70,6 +70,10 @@ type Stat_t struct {
 	Uid     uint32
 	Gid     uint32
 	Rdev    int32
+<<<<<<< HEAD
+	_       [4]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Atim    Timespec
 	Mtim    Timespec
 	Ctim    Timespec
@@ -96,11 +100,18 @@ type Statfs_t struct {
 	Type        uint32
 	Flags       uint32
 	Fssubtype   uint32
+<<<<<<< HEAD
+	Fstypename  [16]int8
+	Mntonname   [1024]int8
+	Mntfromname [1024]int8
+	Reserved    [8]uint32
+=======
 	Fstypename  [16]byte
 	Mntonname   [1024]byte
 	Mntfromname [1024]byte
 	Flags_ext   uint32
 	Reserved    [7]uint32
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 type Flock_t struct {
@@ -133,7 +144,12 @@ type Fbootstraptransfer_t struct {
 
 type Log2phys_t struct {
 	Flags uint32
+<<<<<<< HEAD
+	_     [8]byte
+	_     [8]byte
+=======
 	_     [16]byte
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 type Fsid struct {
@@ -150,10 +166,13 @@ type Dirent struct {
 	_       [3]byte
 }
 
+<<<<<<< HEAD
+=======
 const (
 	PathMax = 0x400
 )
 
+>>>>>>> cbc9bb05... fixup add vendor back
 type RawSockaddrInet4 struct {
 	Len    uint8
 	Family uint8
@@ -224,8 +243,15 @@ type IPv6Mreq struct {
 type Msghdr struct {
 	Name       *byte
 	Namelen    uint32
+<<<<<<< HEAD
+	_          [4]byte
 	Iov        *Iovec
 	Iovlen     int32
+	_          [4]byte
+=======
+	Iov        *Iovec
+	Iovlen     int32
+>>>>>>> cbc9bb05... fixup add vendor back
 	Control    *byte
 	Controllen uint32
 	Flags      int32
@@ -310,6 +336,10 @@ type IfMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
+<<<<<<< HEAD
+	_       [2]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Data    IfData
 }
 
@@ -352,6 +382,10 @@ type IfaMsghdr struct {
 	Addrs   int32
 	Flags   int32
 	Index   uint16
+<<<<<<< HEAD
+	_       [2]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Metric  int32
 }
 
@@ -372,6 +406,10 @@ type IfmaMsghdr2 struct {
 	Addrs    int32
 	Flags    int32
 	Index    uint16
+<<<<<<< HEAD
+	_        [2]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Refcount int32
 }
 
@@ -380,6 +418,10 @@ type RtMsghdr struct {
 	Version uint8
 	Type    uint8
 	Index   uint16
+<<<<<<< HEAD
+	_       [2]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Flags   int32
 	Addrs   int32
 	Pid     int32
@@ -401,8 +443,12 @@ type RtMetrics struct {
 	Rtt      uint32
 	Rttvar   uint32
 	Pksent   uint32
+<<<<<<< HEAD
+	Filler   [4]uint32
+=======
 	State    uint32
 	Filler   [3]uint32
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 const (
@@ -425,6 +471,10 @@ type BpfStat struct {
 
 type BpfProgram struct {
 	Len   uint32
+<<<<<<< HEAD
+	_     [4]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Insns *BpfInsn
 }
 
@@ -449,6 +499,10 @@ type Termios struct {
 	Cflag  uint64
 	Lflag  uint64
 	Cc     [20]uint8
+<<<<<<< HEAD
+	_      [4]byte
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	Ispeed uint64
 	Ospeed uint64
 }
@@ -503,8 +557,11 @@ type Clockinfo struct {
 	Stathz  int32
 	Profhz  int32
 }
+<<<<<<< HEAD
+=======
 
 type CtlInfo struct {
 	Id   uint32
 	Name [96]byte
 }
+>>>>>>> cbc9bb05... fixup add vendor back

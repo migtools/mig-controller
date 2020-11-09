@@ -15,6 +15,10 @@ import (
 )
 
 // A Dialer is a means to establish a connection.
+<<<<<<< HEAD
+// Custom dialers should also implement ContextDialer.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type Dialer interface {
 	// Dial connects to the given address via the proxy.
 	Dial(network, addr string) (c net.Conn, err error)
@@ -25,21 +29,47 @@ type Auth struct {
 	User, Password string
 }
 
+<<<<<<< HEAD
+// FromEnvironment returns the dialer specified by the proxy-related
+// variables in the environment and makes underlying connections
+// directly.
+func FromEnvironment() Dialer {
+	return FromEnvironmentUsing(Direct)
+}
+
+// FromEnvironmentUsing returns the dialer specify by the proxy-related
+// variables in the environment and makes underlying connections
+// using the provided forwarding Dialer (for instance, a *net.Dialer
+// with desired configuration).
+func FromEnvironmentUsing(forward Dialer) Dialer {
+	allProxy := allProxyEnv.Get()
+	if len(allProxy) == 0 {
+		return forward
+=======
 // FromEnvironment returns the dialer specified by the proxy related variables in
 // the environment.
 func FromEnvironment() Dialer {
 	allProxy := allProxyEnv.Get()
 	if len(allProxy) == 0 {
 		return Direct
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	proxyURL, err := url.Parse(allProxy)
 	if err != nil {
+<<<<<<< HEAD
+		return forward
+	}
+	proxy, err := FromURL(proxyURL, forward)
+	if err != nil {
+		return forward
+=======
 		return Direct
 	}
 	proxy, err := FromURL(proxyURL, Direct)
 	if err != nil {
 		return Direct
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 
 	noProxy := noProxyEnv.Get()
@@ -47,7 +77,11 @@ func FromEnvironment() Dialer {
 		return proxy
 	}
 
+<<<<<<< HEAD
+	perHost := NewPerHost(proxy, forward)
+=======
 	perHost := NewPerHost(proxy, Direct)
+>>>>>>> cbc9bb05... fixup add vendor back
 	perHost.AddFromString(noProxy)
 	return perHost
 }

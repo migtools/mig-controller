@@ -23,12 +23,21 @@ import (
 	"encoding/binary"
 	"io"
 	"math/big"
+<<<<<<< HEAD
+	"regexp"
+=======
 	"strings"
 	"unicode"
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	"gopkg.in/square/go-jose.v2/json"
 )
 
+<<<<<<< HEAD
+var stripWhitespaceRegex = regexp.MustCompile("\\s")
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 // Helper function to serialize known-good objects.
 // Precondition: value is not a nil pointer.
 func mustSerializeJSON(value interface{}) []byte {
@@ -55,6 +64,9 @@ func mustSerializeJSON(value interface{}) []byte {
 
 // Strip all newlines and whitespace
 func stripWhitespace(data string) string {
+<<<<<<< HEAD
+	return stripWhitespaceRegex.ReplaceAllString(data, "")
+=======
 	buf := strings.Builder{}
 	buf.Grow(len(data))
 	for _, r := range data {
@@ -63,6 +75,7 @@ func stripWhitespace(data string) string {
 		}
 	}
 	return buf.String()
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Perform compression based on algorithm

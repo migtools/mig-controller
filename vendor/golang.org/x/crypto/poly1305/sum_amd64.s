@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+<<<<<<< HEAD
+// +build !gccgo,!purego
+=======
 // +build amd64,!gccgo,!appengine
+>>>>>>> cbc9bb05... fixup add vendor back
 
 #include "textflag.h"
 
@@ -54,10 +58,13 @@
 	ADCQ  t3, h1;                  \
 	ADCQ  $0, h2
 
+<<<<<<< HEAD
+=======
 DATA ·poly1305Mask<>+0x00(SB)/8, $0x0FFFFFFC0FFFFFFF
 DATA ·poly1305Mask<>+0x08(SB)/8, $0x0FFFFFFC0FFFFFFC
 GLOBL ·poly1305Mask<>(SB), RODATA, $16
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // func update(state *[7]uint64, msg []byte)
 TEXT ·update(SB), $0-32
 	MOVQ state+0(FP), DI
@@ -110,6 +117,8 @@ done:
 	MOVQ R9, 8(DI)
 	MOVQ R10, 16(DI)
 	RET
+<<<<<<< HEAD
+=======
 
 // func initialize(state *[7]uint64, key *[32]byte)
 TEXT ·initialize(SB), $0-16
@@ -146,3 +155,4 @@ TEXT ·finalize(SB), $0-16
 	MOVQ AX, 0(DI)
 	MOVQ BX, 8(DI)
 	RET
+>>>>>>> cbc9bb05... fixup add vendor back

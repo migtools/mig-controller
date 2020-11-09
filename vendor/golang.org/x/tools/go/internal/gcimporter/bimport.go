@@ -332,7 +332,11 @@ func (p *importer) pos() token.Pos {
 	p.prevFile = file
 	p.prevLine = line
 
+<<<<<<< HEAD
+	return p.fake.pos(file, line, 0)
+=======
 	return p.fake.pos(file, line)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Synthesize a token.Pos
@@ -341,7 +345,13 @@ type fakeFileSet struct {
 	files map[string]*token.File
 }
 
+<<<<<<< HEAD
+func (s *fakeFileSet) pos(file string, line, column int) token.Pos {
+	// TODO(mdempsky): Make use of column.
+
+=======
 func (s *fakeFileSet) pos(file string, line int) token.Pos {
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Since we don't know the set of needed file positions, we
 	// reserve maxlines positions per file.
 	const maxlines = 64 * 1024
@@ -976,10 +986,18 @@ const (
 	aliasTag
 )
 
+<<<<<<< HEAD
+var predeclOnce sync.Once
+var predecl []types.Type // initialized lazily
+
+func predeclared() []types.Type {
+	predeclOnce.Do(func() {
+=======
 var predecl []types.Type // initialized lazily
 
 func predeclared() []types.Type {
 	if predecl == nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 		// initialize lazily to be sure that all
 		// elements have been initialized before
 		predecl = []types.Type{ // basic types
@@ -1026,7 +1044,11 @@ func predeclared() []types.Type {
 			// used internally by gc; never used by this package or in .a files
 			anyType{},
 		}
+<<<<<<< HEAD
+	})
+=======
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	return predecl
 }
 

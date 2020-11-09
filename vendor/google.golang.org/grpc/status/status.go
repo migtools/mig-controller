@@ -29,6 +29,25 @@ package status
 
 import (
 	"context"
+<<<<<<< HEAD
+	"fmt"
+
+	spb "google.golang.org/genproto/googleapis/rpc/status"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/internal/status"
+)
+
+// Status references google.golang.org/grpc/internal/status. It represents an
+// RPC status code, message, and details.  It is immutable and should be
+// created with New, Newf, or FromProto.
+// https://godoc.org/google.golang.org/grpc/internal/status
+type Status = status.Status
+
+// New returns a Status representing c and msg.
+func New(c codes.Code, msg string) *Status {
+	return status.New(c, msg)
+=======
 	"errors"
 	"fmt"
 
@@ -111,6 +130,7 @@ func (s *Status) Err() error {
 // New returns a Status representing c and msg.
 func New(c codes.Code, msg string) *Status {
 	return &Status{s: &spb.Status{Code: int32(c), Message: msg}}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
@@ -135,7 +155,11 @@ func ErrorProto(s *spb.Status) error {
 
 // FromProto returns a Status representing s.
 func FromProto(s *spb.Status) *Status {
+<<<<<<< HEAD
+	return status.FromProto(s)
+=======
 	return &Status{s: proto.Clone(s).(*spb.Status)}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // FromError returns a Status representing err if it was produced from this
@@ -160,6 +184,8 @@ func Convert(err error) *Status {
 	return s
 }
 
+<<<<<<< HEAD
+=======
 // WithDetails returns a new status with the provided details messages appended to the status.
 // If any errors are encountered, it returns nil and the first error encountered.
 func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
@@ -196,6 +222,7 @@ func (s *Status) Details() []interface{} {
 	return details
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // Code returns the Code of the error if it is a Status error, codes.OK if err
 // is nil, or codes.Unknown otherwise.
 func Code(err error) codes.Code {

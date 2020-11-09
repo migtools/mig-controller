@@ -31,6 +31,11 @@ type BuddyInfo struct {
 	Sizes []float64
 }
 
+<<<<<<< HEAD
+// NewBuddyInfo reads the buddyinfo statistics from the specified `proc` filesystem.
+func (fs FS) BuddyInfo() ([]BuddyInfo, error) {
+	file, err := os.Open(fs.proc.Path("buddyinfo"))
+=======
 // NewBuddyInfo reads the buddyinfo statistics.
 func NewBuddyInfo() ([]BuddyInfo, error) {
 	fs, err := NewFS(DefaultMountPoint)
@@ -44,6 +49,7 @@ func NewBuddyInfo() ([]BuddyInfo, error) {
 // NewBuddyInfo reads the buddyinfo statistics from the specified `proc` filesystem.
 func (fs FS) NewBuddyInfo() ([]BuddyInfo, error) {
 	file, err := os.Open(fs.Path("buddyinfo"))
+>>>>>>> cbc9bb05... fixup add vendor back
 	if err != nil {
 		return nil, err
 	}

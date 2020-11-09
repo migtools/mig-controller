@@ -36,7 +36,12 @@ func NewUsageClient(subscriptionID string) UsageClient {
 	return NewUsageClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
+<<<<<<< HEAD
+// NewUsageClientWithBaseURI creates an instance of the UsageClient client using a custom endpoint.  Use this when
+// interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure stack).
+=======
 // NewUsageClientWithBaseURI creates an instance of the UsageClient client.
+>>>>>>> cbc9bb05... fixup add vendor back
 func NewUsageClientWithBaseURI(baseURI string, subscriptionID string) UsageClient {
 	return UsageClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -102,8 +107,12 @@ func (client UsageClient) ListPreparer(ctx context.Context) (*http.Request, erro
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client UsageClient) ListSender(req *http.Request) (*http.Response, error) {
+<<<<<<< HEAD
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
+=======
 	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	return autorest.SendWithSender(client, req, sd...)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -111,7 +120,10 @@ func (client UsageClient) ListSender(req *http.Request) (*http.Response, error) 
 func (client UsageClient) ListResponder(resp *http.Response) (result UsageListResult, err error) {
 	err = autorest.Respond(
 		resp,
+<<<<<<< HEAD
+=======
 		client.ByInspecting(),
+>>>>>>> cbc9bb05... fixup add vendor back
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -183,8 +195,12 @@ func (client UsageClient) ListByLocationPreparer(ctx context.Context, location s
 // ListByLocationSender sends the ListByLocation request. The method will close the
 // http.Response Body if it receives an error.
 func (client UsageClient) ListByLocationSender(req *http.Request) (*http.Response, error) {
+<<<<<<< HEAD
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
+=======
 	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
 	return autorest.SendWithSender(client, req, sd...)
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // ListByLocationResponder handles the response to the ListByLocation request. The method always
@@ -192,7 +208,10 @@ func (client UsageClient) ListByLocationSender(req *http.Request) (*http.Respons
 func (client UsageClient) ListByLocationResponder(resp *http.Response) (result UsageListResult, err error) {
 	err = autorest.Respond(
 		resp,
+<<<<<<< HEAD
+=======
 		client.ByInspecting(),
+>>>>>>> cbc9bb05... fixup add vendor back
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())

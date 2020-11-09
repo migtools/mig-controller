@@ -52,10 +52,18 @@ import (
 )
 
 const (
+<<<<<<< HEAD
+	prefaceTimeout         = 10 * time.Second
+	firstSettingsTimeout   = 2 * time.Second // should be in-flight with preface anyway
+	handlerChunkWriteSize  = 4 << 10
+	defaultMaxStreams      = 250 // TODO: make this 100 as the GFE seems to?
+	maxQueuedControlFrames = 10000
+=======
 	prefaceTimeout        = 10 * time.Second
 	firstSettingsTimeout  = 2 * time.Second // should be in-flight with preface anyway
 	handlerChunkWriteSize = 4 << 10
 	defaultMaxStreams     = 250 // TODO: make this 100 as the GFE seems to?
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var (
@@ -163,6 +171,18 @@ func (s *Server) maxConcurrentStreams() uint32 {
 	return defaultMaxStreams
 }
 
+<<<<<<< HEAD
+// maxQueuedControlFrames is the maximum number of control frames like
+// SETTINGS, PING and RST_STREAM that will be queued for writing before
+// the connection is closed to prevent memory exhaustion attacks.
+func (s *Server) maxQueuedControlFrames() int {
+	// TODO: if anybody asks, add a Server field, and remember to define the
+	// behavior of negative values.
+	return maxQueuedControlFrames
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 type serverInternalState struct {
 	mu          sync.Mutex
 	activeConns map[*serverConn]struct{}
@@ -242,7 +262,11 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 			}
 		}
 		if !haveRequired {
+<<<<<<< HEAD
+			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 or TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256).")
+=======
 			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher.")
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 
@@ -273,7 +297,24 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 		if testHookOnConn != nil {
 			testHookOnConn()
 		}
+<<<<<<< HEAD
+		// The TLSNextProto interface predates contexts, so
+		// the net/http package passes down its per-connection
+		// base context via an exported but unadvertised
+		// method on the Handler. This is for internal
+		// net/http<=>http2 use only.
+		var ctx context.Context
+		type baseContexter interface {
+			BaseContext() context.Context
+		}
+		if bc, ok := h.(baseContexter); ok {
+			ctx = bc.BaseContext()
+		}
 		conf.ServeConn(c, &ServeConnOpts{
+			Context:    ctx,
+=======
+		conf.ServeConn(c, &ServeConnOpts{
+>>>>>>> cbc9bb05... fixup add vendor back
 			Handler:    h,
 			BaseConfig: hs,
 		})
@@ -284,6 +325,13 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 
 // ServeConnOpts are options for the Server.ServeConn method.
 type ServeConnOpts struct {
+<<<<<<< HEAD
+	// Context is the base context to use.
+	// If nil, context.Background is used.
+	Context context.Context
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	// BaseConfig optionally sets the base configuration
 	// for values. If nil, defaults are used.
 	BaseConfig *http.Server
@@ -294,6 +342,16 @@ type ServeConnOpts struct {
 	Handler http.Handler
 }
 
+<<<<<<< HEAD
+func (o *ServeConnOpts) context() context.Context {
+	if o != nil && o.Context != nil {
+		return o.Context
+	}
+	return context.Background()
+}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (o *ServeConnOpts) baseConfig() *http.Server {
 	if o != nil && o.BaseConfig != nil {
 		return o.BaseConfig
@@ -439,7 +497,11 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 }
 
 func serverConnBaseContext(c net.Conn, opts *ServeConnOpts) (ctx context.Context, cancel func()) {
+<<<<<<< HEAD
+	ctx, cancel = context.WithCancel(opts.context())
+=======
 	ctx, cancel = context.WithCancel(context.Background())
+>>>>>>> cbc9bb05... fixup add vendor back
 	ctx = context.WithValue(ctx, http.LocalAddrContextKey, c.LocalAddr())
 	if hs := opts.baseConfig(); hs != nil {
 		ctx = context.WithValue(ctx, http.ServerContextKey, hs)
@@ -482,6 +544,10 @@ type serverConn struct {
 	sawFirstSettings            bool // got the initial SETTINGS frame after the preface
 	needToSendSettingsAck       bool
 	unackedSettings             int    // how many SETTINGS have we sent without ACKs?
+<<<<<<< HEAD
+	queuedControlFrames         int    // control frames in the writeSched queue
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	clientMaxStreams            uint32 // SETTINGS_MAX_CONCURRENT_STREAMS from client (our PUSH_PROMISE limit)
 	advMaxStreams               uint32 // our SETTINGS_MAX_CONCURRENT_STREAMS advertised the client
 	curClientStreams            uint32 // number of open streams initiated by the client
@@ -546,6 +612,12 @@ type stream struct {
 	cancelCtx func()
 
 	// owned by serverConn's serve loop:
+<<<<<<< HEAD
+	bodyBytes        int64 // body bytes seen so far
+	declBodyBytes    int64 // or -1 if undeclared
+	flow             flow  // limits writing from Handler to client
+	inflow           flow  // what the client is allowed to POST/etc to us
+=======
 	bodyBytes        int64   // body bytes seen so far
 	declBodyBytes    int64   // or -1 if undeclared
 	flow             flow    // limits writing from Handler to client
@@ -553,6 +625,7 @@ type stream struct {
 	parent           *stream // or nil
 	numTrailerValues int64
 	weight           uint8
+>>>>>>> cbc9bb05... fixup add vendor back
 	state            streamState
 	resetQueued      bool        // RST_STREAM queued for write; set by sc.resetStream
 	gotTrailerHeader bool        // HEADER frame for trailers was seen
@@ -729,6 +802,10 @@ func (sc *serverConn) readFrames() {
 
 // frameWriteResult is the message passed from writeFrameAsync to the serve goroutine.
 type frameWriteResult struct {
+<<<<<<< HEAD
+	_   incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	wr  FrameWriteRequest // what was written (or attempted)
 	err error             // result of the writeFrame call
 }
@@ -739,7 +816,11 @@ type frameWriteResult struct {
 // serverConn.
 func (sc *serverConn) writeFrameAsync(wr FrameWriteRequest) {
 	err := wr.write.writeFrame(sc)
+<<<<<<< HEAD
+	sc.wroteFrameCh <- frameWriteResult{wr: wr, err: err}
+=======
 	sc.wroteFrameCh <- frameWriteResult{wr, err}
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 func (sc *serverConn) closeAllStreamsOnConnClose() {
@@ -870,6 +951,17 @@ func (sc *serverConn) serve() {
 			}
 		}
 
+<<<<<<< HEAD
+		// If the peer is causing us to generate a lot of control frames,
+		// but not reading them from us, assume they are trying to make us
+		// run out of memory.
+		if sc.queuedControlFrames > sc.srv.maxQueuedControlFrames() {
+			sc.vlogf("http2: too many control frames in send queue, closing connection")
+			return
+		}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		// Start the shutdown timer after sending a GOAWAY. When sending GOAWAY
 		// with no error code (graceful shutdown), don't start the timer until
 		// all open streams have been completed.
@@ -1069,6 +1161,17 @@ func (sc *serverConn) writeFrame(wr FrameWriteRequest) {
 	}
 
 	if !ignoreWrite {
+<<<<<<< HEAD
+		if wr.isControl() {
+			sc.queuedControlFrames++
+			// For extra safety, detect wraparounds, which should not happen,
+			// and pull the plug.
+			if sc.queuedControlFrames < 0 {
+				sc.conn.Close()
+			}
+		}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 		sc.writeSched.Push(wr)
 	}
 	sc.scheduleFrameWrite()
@@ -1113,7 +1216,11 @@ func (sc *serverConn) startFrameWrite(wr FrameWriteRequest) {
 	if wr.write.staysWithinBuffer(sc.bw.Available()) {
 		sc.writingFrameAsync = false
 		err := wr.write.writeFrame(sc)
+<<<<<<< HEAD
+		sc.wroteFrame(frameWriteResult{wr: wr, err: err})
+=======
 		sc.wroteFrame(frameWriteResult{wr, err})
+>>>>>>> cbc9bb05... fixup add vendor back
 	} else {
 		sc.writingFrameAsync = true
 		go sc.writeFrameAsync(wr)
@@ -1186,10 +1293,15 @@ func (sc *serverConn) wroteFrame(res frameWriteResult) {
 // If a frame is already being written, nothing happens. This will be called again
 // when the frame is done being written.
 //
+<<<<<<< HEAD
+// If a frame isn't being written and we need to send one, the best frame
+// to send is selected by writeSched.
+=======
 // If a frame isn't being written we need to send one, the best frame
 // to send is selected, preferring first things that aren't
 // stream-specific (e.g. ACKing settings), and then finding the
 // highest priority stream.
+>>>>>>> cbc9bb05... fixup add vendor back
 //
 // If a frame isn't being written and there's nothing else to send, we
 // flush the write buffer.
@@ -1217,6 +1329,12 @@ func (sc *serverConn) scheduleFrameWrite() {
 		}
 		if !sc.inGoAway || sc.goAwayCode == ErrCodeNo {
 			if wr, ok := sc.writeSched.Pop(); ok {
+<<<<<<< HEAD
+				if wr.isControl() {
+					sc.queuedControlFrames--
+				}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 				sc.startFrameWrite(wr)
 				continue
 			}
@@ -1509,6 +1627,11 @@ func (sc *serverConn) processSettings(f *SettingsFrame) error {
 	if err := f.ForeachSetting(sc.processSetting); err != nil {
 		return err
 	}
+<<<<<<< HEAD
+	// TODO: judging by RFC 7540, Section 6.5.3 each SETTINGS frame should be
+	// acknowledged individually, even if multiple are received before the ACK.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	sc.needToSendSettingsAck = true
 	sc.scheduleFrameWrite()
 	return nil
@@ -2006,7 +2129,11 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 	var trailer http.Header
 	for _, v := range rp.header["Trailer"] {
 		for _, key := range strings.Split(v, ",") {
+<<<<<<< HEAD
+			key = http.CanonicalHeaderKey(textproto.TrimString(key))
+=======
 			key = http.CanonicalHeaderKey(strings.TrimSpace(key))
+>>>>>>> cbc9bb05... fixup add vendor back
 			switch key {
 			case "Transfer-Encoding", "Trailer", "Content-Length":
 				// Bogus. (copy of http1 rules)
@@ -2224,6 +2351,10 @@ func (sc *serverConn) sendWindowUpdate32(st *stream, n int32) {
 // requestBody is the Handler's Request.Body type.
 // Read and Close may be called concurrently.
 type requestBody struct {
+<<<<<<< HEAD
+	_             incomparable
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	stream        *stream
 	conn          *serverConn
 	closed        bool  // for use by Close only
@@ -2307,7 +2438,20 @@ type chunkWriter struct{ rws *responseWriterState }
 
 func (cw chunkWriter) Write(p []byte) (n int, err error) { return cw.rws.writeChunk(p) }
 
+<<<<<<< HEAD
+func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) > 0 }
+
+func (rws *responseWriterState) hasNonemptyTrailers() bool {
+	for _, trailer := range rws.trailers {
+		if _, ok := rws.handlerHeader[trailer]; ok {
+			return true
+		}
+	}
+	return false
+}
+=======
 func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) != 0 }
+>>>>>>> cbc9bb05... fixup add vendor back
 
 // declareTrailer is called for each Trailer header when the
 // response header is written. It notes that a header will need to be
@@ -2352,7 +2496,15 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 			clen = strconv.Itoa(len(p))
 		}
 		_, hasContentType := rws.snapHeader["Content-Type"]
+<<<<<<< HEAD
+		// If the Content-Encoding is non-blank, we shouldn't
+		// sniff the body. See Issue golang.org/issue/31753.
+		ce := rws.snapHeader.Get("Content-Encoding")
+		hasCE := len(ce) > 0
+		if !hasCE && !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
+=======
 		if !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
+>>>>>>> cbc9bb05... fixup add vendor back
 			ctype = http.DetectContentType(p)
 		}
 		var date string
@@ -2407,7 +2559,14 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		rws.promoteUndeclaredTrailers()
 	}
 
+<<<<<<< HEAD
+	// only send trailers if they have actually been defined by the
+	// server handler.
+	hasNonemptyTrailers := rws.hasNonemptyTrailers()
+	endStream := rws.handlerDone && !hasNonemptyTrailers
+=======
 	endStream := rws.handlerDone && !rws.hasTrailers()
+>>>>>>> cbc9bb05... fixup add vendor back
 	if len(p) > 0 || endStream {
 		// only send a 0 byte DATA frame if we're ending the stream.
 		if err := rws.conn.writeDataFromHandler(rws.stream, p, endStream); err != nil {
@@ -2416,7 +2575,11 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		}
 	}
 
+<<<<<<< HEAD
+	if rws.handlerDone && hasNonemptyTrailers {
+=======
 	if rws.handlerDone && rws.hasTrailers() {
+>>>>>>> cbc9bb05... fixup add vendor back
 		err = rws.conn.writeHeaders(rws.stream, &writeResHeaders{
 			streamID:  rws.stream.id,
 			h:         rws.handlerHeader,
@@ -2458,7 +2621,11 @@ const TrailerPrefix = "Trailer:"
 // trailers. That worked for a while, until we found the first major
 // user of Trailers in the wild: gRPC (using them only over http2),
 // and gRPC libraries permit setting trailers mid-stream without
+<<<<<<< HEAD
+// predeclaring them. So: change of plans. We still permit the old
+=======
 // predeclarnig them. So: change of plans. We still permit the old
+>>>>>>> cbc9bb05... fixup add vendor back
 // way, but we also permit this hack: if a Header() key begins with
 // "Trailer:", the suffix of that key is a Trailer. Because ':' is an
 // invalid token byte anyway, there is no ambiguity. (And it's already
@@ -2758,7 +2925,11 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 	// PUSH_PROMISE frames MUST only be sent on a peer-initiated stream that
 	// is in either the "open" or "half-closed (remote)" state.
 	if msg.parent.state != stateOpen && msg.parent.state != stateHalfClosedRemote {
+<<<<<<< HEAD
+		// responseWriter.Push checks that the stream is peer-initiated.
+=======
 		// responseWriter.Push checks that the stream is peer-initiaed.
+>>>>>>> cbc9bb05... fixup add vendor back
 		msg.done <- errStreamClosed
 		return
 	}

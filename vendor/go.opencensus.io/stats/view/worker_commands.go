@@ -95,7 +95,11 @@ func (cmd *unregisterFromViewReq) handleCommand(w *worker) {
 		}
 
 		// Report pending data for this view before removing it.
+<<<<<<< HEAD
+		w.reportView(vi)
+=======
 		w.reportView(vi, time.Now())
+>>>>>>> cbc9bb05... fixup add vendor back
 
 		vi.unsubscribe()
 		if !vi.isSubscribed() {
@@ -103,7 +107,11 @@ func (cmd *unregisterFromViewReq) handleCommand(w *worker) {
 			// The collected data can be cleared.
 			vi.clearRows()
 		}
+<<<<<<< HEAD
+		w.unregisterView(vi)
+=======
 		w.unregisterView(name)
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	cmd.done <- struct{}{}
 }
@@ -163,7 +171,11 @@ func (cmd *recordReq) handleCommand(w *worker) {
 		}
 		ref := w.getMeasureRef(m.Measure().Name())
 		for v := range ref.views {
+<<<<<<< HEAD
+			v.addSample(cmd.tm, m.Value(), cmd.attachments, cmd.t)
+=======
 			v.addSample(cmd.tm, m.Value(), cmd.attachments, time.Now())
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 }

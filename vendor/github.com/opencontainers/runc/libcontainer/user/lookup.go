@@ -2,7 +2,10 @@ package user
 
 import (
 	"errors"
+<<<<<<< HEAD
+=======
 	"syscall"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 var (
@@ -13,6 +16,8 @@ var (
 	ErrNoGroupEntries  = errors.New("no matching entries in group file")
 )
 
+<<<<<<< HEAD
+=======
 func lookupUser(filter func(u User) bool) (User, error) {
 	// Get operating system-specific passwd reader-closer.
 	passwd, err := GetPasswd()
@@ -43,19 +48,27 @@ func CurrentUser() (User, error) {
 	return LookupUid(syscall.Getuid())
 }
 
+>>>>>>> cbc9bb05... fixup add vendor back
 // LookupUser looks up a user by their username in /etc/passwd. If the user
 // cannot be found (or there is no /etc/passwd file on the filesystem), then
 // LookupUser returns an error.
 func LookupUser(username string) (User, error) {
+<<<<<<< HEAD
+	return lookupUser(username)
+=======
 	return lookupUser(func(u User) bool {
 		return u.Name == username
 	})
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // LookupUid looks up a user by their user id in /etc/passwd. If the user cannot
 // be found (or there is no /etc/passwd file on the filesystem), then LookupId
 // returns an error.
 func LookupUid(uid int) (User, error) {
+<<<<<<< HEAD
+	return lookupUid(uid)
+=======
 	return lookupUser(func(u User) bool {
 		return u.Uid == uid
 	})
@@ -89,22 +102,31 @@ func lookupGroup(filter func(g Group) bool) (Group, error) {
 // /etc/group file on the filesystem), then CurrentGroup returns an error.
 func CurrentGroup() (Group, error) {
 	return LookupGid(syscall.Getgid())
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // LookupGroup looks up a group by its name in /etc/group. If the group cannot
 // be found (or there is no /etc/group file on the filesystem), then LookupGroup
 // returns an error.
 func LookupGroup(groupname string) (Group, error) {
+<<<<<<< HEAD
+	return lookupGroup(groupname)
+=======
 	return lookupGroup(func(g Group) bool {
 		return g.Name == groupname
 	})
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // LookupGid looks up a group by its group id in /etc/group. If the group cannot
 // be found (or there is no /etc/group file on the filesystem), then LookupGid
 // returns an error.
 func LookupGid(gid int) (Group, error) {
+<<<<<<< HEAD
+	return lookupGid(gid)
+=======
 	return lookupGroup(func(g Group) bool {
 		return g.Gid == gid
 	})
+>>>>>>> cbc9bb05... fixup add vendor back
 }

@@ -17,7 +17,11 @@ type benchmarker struct {
 
 func newBenchmarker() *benchmarker {
 	return &benchmarker{
+<<<<<<< HEAD
+		measurements: make(map[string]*types.SpecMeasurement),
+=======
 		measurements: make(map[string]*types.SpecMeasurement, 0),
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 }
 

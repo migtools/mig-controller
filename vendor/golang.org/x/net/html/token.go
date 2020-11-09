@@ -296,8 +296,12 @@ func (z *Tokenizer) Buffered() []byte {
 // too many times in succession.
 func readAtLeastOneByte(r io.Reader, b []byte) (int, error) {
 	for i := 0; i < 100; i++ {
+<<<<<<< HEAD
+		if n, err := r.Read(b); n != 0 || err != nil {
+=======
 		n, err := r.Read(b)
 		if n != 0 || err != nil {
+>>>>>>> cbc9bb05... fixup add vendor back
 			return n, err
 		}
 	}
@@ -347,6 +351,10 @@ loop:
 			break loop
 		}
 		if c != '/' {
+<<<<<<< HEAD
+			z.raw.end--
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 			continue loop
 		}
 		if z.readRawEndTag() || z.err != nil {
@@ -1067,6 +1075,14 @@ loop:
 
 // Raw returns the unmodified text of the current token. Calling Next, Token,
 // Text, TagName or TagAttr may change the contents of the returned slice.
+<<<<<<< HEAD
+//
+// The token stream's raw bytes partition the byte stream (up until an
+// ErrorToken). There are no overlaps or gaps between two consecutive token's
+// raw bytes. One implication is that the byte offset of the current token is
+// the sum of the lengths of all previous tokens' raw bytes.
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 func (z *Tokenizer) Raw() []byte {
 	return z.buf[z.raw.start:z.raw.end]
 }

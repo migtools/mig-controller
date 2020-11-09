@@ -17,12 +17,23 @@ import (
 // These constants from [PROTOCOL.certkeys] represent the algorithm names
 // for certificate types supported by this package.
 const (
+<<<<<<< HEAD
+	CertAlgoRSAv01        = "ssh-rsa-cert-v01@openssh.com"
+	CertAlgoDSAv01        = "ssh-dss-cert-v01@openssh.com"
+	CertAlgoECDSA256v01   = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
+	CertAlgoECDSA384v01   = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
+	CertAlgoECDSA521v01   = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
+	CertAlgoSKECDSA256v01 = "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com"
+	CertAlgoED25519v01    = "ssh-ed25519-cert-v01@openssh.com"
+	CertAlgoSKED25519v01  = "sk-ssh-ed25519-cert-v01@openssh.com"
+=======
 	CertAlgoRSAv01      = "ssh-rsa-cert-v01@openssh.com"
 	CertAlgoDSAv01      = "ssh-dss-cert-v01@openssh.com"
 	CertAlgoECDSA256v01 = "ecdsa-sha2-nistp256-cert-v01@openssh.com"
 	CertAlgoECDSA384v01 = "ecdsa-sha2-nistp384-cert-v01@openssh.com"
 	CertAlgoECDSA521v01 = "ecdsa-sha2-nistp521-cert-v01@openssh.com"
 	CertAlgoED25519v01  = "ssh-ed25519-cert-v01@openssh.com"
+>>>>>>> cbc9bb05... fixup add vendor back
 )
 
 // Certificate types distinguish between host and user
@@ -37,6 +48,10 @@ const (
 type Signature struct {
 	Format string
 	Blob   []byte
+<<<<<<< HEAD
+	Rest   []byte `ssh:"rest"`
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // CertTimeInfinity can be used for OpenSSHCertV01.ValidBefore to indicate that
@@ -411,8 +426,13 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	return nil
 }
 
+<<<<<<< HEAD
+// SignCert signs the certificate with an authority, setting the Nonce,
+// SignatureKey, and Signature fields.
+=======
 // SignCert sets c.SignatureKey to the authority's public key and stores a
 // Signature, by authority, in the certificate.
+>>>>>>> cbc9bb05... fixup add vendor back
 func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 	c.Nonce = make([]byte, 32)
 	if _, err := io.ReadFull(rand, c.Nonce); err != nil {
@@ -429,12 +449,23 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 }
 
 var certAlgoNames = map[string]string{
+<<<<<<< HEAD
+	KeyAlgoRSA:        CertAlgoRSAv01,
+	KeyAlgoDSA:        CertAlgoDSAv01,
+	KeyAlgoECDSA256:   CertAlgoECDSA256v01,
+	KeyAlgoECDSA384:   CertAlgoECDSA384v01,
+	KeyAlgoECDSA521:   CertAlgoECDSA521v01,
+	KeyAlgoSKECDSA256: CertAlgoSKECDSA256v01,
+	KeyAlgoED25519:    CertAlgoED25519v01,
+	KeyAlgoSKED25519:  CertAlgoSKED25519v01,
+=======
 	KeyAlgoRSA:      CertAlgoRSAv01,
 	KeyAlgoDSA:      CertAlgoDSAv01,
 	KeyAlgoECDSA256: CertAlgoECDSA256v01,
 	KeyAlgoECDSA384: CertAlgoECDSA384v01,
 	KeyAlgoECDSA521: CertAlgoECDSA521v01,
 	KeyAlgoED25519:  CertAlgoED25519v01,
+>>>>>>> cbc9bb05... fixup add vendor back
 }
 
 // certToPrivAlgo returns the underlying algorithm for a certificate algorithm.
@@ -518,6 +549,15 @@ func parseSignatureBody(in []byte) (out *Signature, rest []byte, ok bool) {
 		return
 	}
 
+<<<<<<< HEAD
+	switch out.Format {
+	case KeyAlgoSKECDSA256, CertAlgoSKECDSA256v01, KeyAlgoSKED25519, CertAlgoSKED25519v01:
+		out.Rest = in
+		return out, nil, ok
+	}
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 	return out, in, ok
 }
 

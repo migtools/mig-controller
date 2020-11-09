@@ -26,7 +26,11 @@ func readDir(dirName string, fn func(dirName, entName string, typ os.FileMode) e
 			continue
 		}
 		if err := fn(dirName, fi.Name(), fi.Mode()&os.ModeType); err != nil {
+<<<<<<< HEAD
+			if err == ErrSkipFiles {
+=======
 			if err == SkipFiles {
+>>>>>>> cbc9bb05... fixup add vendor back
 				skipFiles = true
 				continue
 			}

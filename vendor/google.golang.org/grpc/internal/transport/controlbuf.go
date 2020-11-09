@@ -505,7 +505,13 @@ func (l *loopyWriter) run() (err error) {
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.
 			// 3. A graceful close of connection.
+<<<<<<< HEAD
+			if logger.V(logLevel) {
+				logger.Infof("transport: loopyWriter.run returning. %v", err)
+			}
+=======
 			infof("transport: loopyWriter.run returning. %v", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 			err = nil
 		}
 	}()
@@ -605,7 +611,13 @@ func (l *loopyWriter) headerHandler(h *headerFrame) error {
 	if l.side == serverSide {
 		str, ok := l.estdStreams[h.streamID]
 		if !ok {
+<<<<<<< HEAD
+			if logger.V(logLevel) {
+				logger.Warningf("transport: loopy doesn't recognize the stream: %d", h.streamID)
+			}
+=======
 			warningf("transport: loopy doesn't recognize the stream: %d", h.streamID)
+>>>>>>> cbc9bb05... fixup add vendor back
 			return nil
 		}
 		// Case 1.A: Server is responding back with headers.
@@ -658,7 +670,13 @@ func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.He
 	l.hBuf.Reset()
 	for _, f := range hf {
 		if err := l.hEnc.WriteField(f); err != nil {
+<<<<<<< HEAD
+			if logger.V(logLevel) {
+				logger.Warningf("transport: loopyWriter.writeHeader encountered error while encoding headers: %v", err)
+			}
+=======
 			warningf("transport: loopyWriter.writeHeader encountered error while encoding headers:", err)
+>>>>>>> cbc9bb05... fixup add vendor back
 		}
 	}
 	var (
@@ -857,6 +875,41 @@ func (l *loopyWriter) processData() (bool, error) {
 		return false, nil
 	}
 	var (
+<<<<<<< HEAD
+		buf []byte
+	)
+	// Figure out the maximum size we can send
+	maxSize := http2MaxFrameLen
+	if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota <= 0 { // stream-level flow control.
+		str.state = waitingOnStreamQuota
+		return false, nil
+	} else if maxSize > strQuota {
+		maxSize = strQuota
+	}
+	if maxSize > int(l.sendQuota) { // connection-level flow control.
+		maxSize = int(l.sendQuota)
+	}
+	// Compute how much of the header and data we can send within quota and max frame length
+	hSize := min(maxSize, len(dataItem.h))
+	dSize := min(maxSize-hSize, len(dataItem.d))
+	if hSize != 0 {
+		if dSize == 0 {
+			buf = dataItem.h
+		} else {
+			// We can add some data to grpc message header to distribute bytes more equally across frames.
+			// Copy on the stack to avoid generating garbage
+			var localBuf [http2MaxFrameLen]byte
+			copy(localBuf[:hSize], dataItem.h)
+			copy(localBuf[hSize:], dataItem.d[:dSize])
+			buf = localBuf[:hSize+dSize]
+		}
+	} else {
+		buf = dataItem.d
+	}
+
+	size := hSize + dSize
+
+=======
 		idx int
 		buf []byte
 	)
@@ -880,15 +933,21 @@ func (l *loopyWriter) processData() (bool, error) {
 	if l.sendQuota < uint32(size) { // connection-level flow control.
 		size = int(l.sendQuota)
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 	// Now that outgoing flow controls are checked we can replenish str's write quota
 	str.wq.replenish(size)
 	var endStream bool
 	// If this is the last data message on this stream and all of it can be written in this iteration.
+<<<<<<< HEAD
+	if dataItem.endStream && len(dataItem.h)+len(dataItem.d) <= size {
+		endStream = true
+=======
 	if dataItem.endStream && size == len(buf) {
 		// buf contains either data or it contains header but data is empty.
 		if idx == 1 || len(dataItem.d) == 0 {
 			endStream = true
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 	}
 	if dataItem.onEachWrite != nil {
 		dataItem.onEachWrite()
@@ -896,6 +955,12 @@ func (l *loopyWriter) processData() (bool, error) {
 	if err := l.framer.fr.WriteData(dataItem.streamID, endStream, buf[:size]); err != nil {
 		return false, err
 	}
+<<<<<<< HEAD
+	str.bytesOutStanding += size
+	l.sendQuota -= uint32(size)
+	dataItem.h = dataItem.h[hSize:]
+	dataItem.d = dataItem.d[dSize:]
+=======
 	buf = buf[size:]
 	str.bytesOutStanding += size
 	l.sendQuota -= uint32(size)
@@ -904,6 +969,7 @@ func (l *loopyWriter) processData() (bool, error) {
 	} else {
 		dataItem.d = buf
 	}
+>>>>>>> cbc9bb05... fixup add vendor back
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // All the data from that message was written out.
 		str.itl.dequeue()
@@ -924,3 +990,13 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	return false, nil
 }
+<<<<<<< HEAD
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+=======
+>>>>>>> cbc9bb05... fixup add vendor back

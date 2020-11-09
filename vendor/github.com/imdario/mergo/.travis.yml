@@ -4,4 +4,9 @@ install:
   - go get golang.org/x/tools/cmd/cover
   - go get github.com/mattn/goveralls
 script:
+<<<<<<< HEAD
+  - go test -race -v ./...
+after_script:
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
   - $HOME/gopath/bin/goveralls -service=travis-ci -repotoken $COVERALLS_TOKEN

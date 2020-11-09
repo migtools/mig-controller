@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+// untested sections: 2
+
+=======
+>>>>>>> cbc9bb05... fixup add vendor back
 package matchers
 
 import (
@@ -22,6 +27,23 @@ func (matcher *ContainElementMatcher) Match(actual interface{}) (success bool, e
 	}
 
 	value := reflect.ValueOf(actual)
+<<<<<<< HEAD
+	var valueAt func(int) interface{}
+	if isMap(actual) {
+		keys := value.MapKeys()
+		valueAt = func(i int) interface{} {
+			return value.MapIndex(keys[i]).Interface()
+		}
+	} else {
+		valueAt = func(i int) interface{} {
+			return value.Index(i).Interface()
+		}
+	}
+
+	var lastError error
+	for i := 0; i < value.Len(); i++ {
+		success, err := elemMatcher.Match(valueAt(i))
+=======
 	var keys []reflect.Value
 	if isMap(actual) {
 		keys = value.MapKeys()
@@ -35,6 +57,7 @@ func (matcher *ContainElementMatcher) Match(actual interface{}) (success bool, e
 		} else {
 			success, err = elemMatcher.Match(value.Index(i).Interface())
 		}
+>>>>>>> cbc9bb05... fixup add vendor back
 		if err != nil {
 			lastError = err
 			continue
