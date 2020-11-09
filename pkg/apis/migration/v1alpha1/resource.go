@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	TouchAnnotation = "openshift.io/touch"
-	VeleroNamespace = "openshift-migration"
+	TouchAnnotation             = "openshift.io/touch"
+	VeleroNamespace             = "openshift-migration"
+	OpenshiftMigrationNamespace = "openshift-migration"
 )
 
 // Migration application CR.

@@ -6,12 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"golang.org/x/crypto/ssh"
-	"gopkg.in/yaml.v2"
-	"text/template"
-	//  liberr "github.com/konveyor/controller/pkg/error"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	routev1 "github.com/openshift/api/route/v1"
+	"golang.org/x/crypto/ssh"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	//"k8s.io/apimachinery/pkg/types"
+	"text/template"
 )
 
 type pvc struct {
@@ -603,7 +602,7 @@ func (t *Task) createRsyncClientPods() error {
 				},
 			})
 			containers = append(containers, corev1.Container{
-				Name:  fmt.Sprintf("rsync-client-%s", vol),
+				Name:  "rsync-client",
 				Image: "quay.io/konveyor/rsync-transfer:latest",
 				Env: []corev1.EnvVar{
 					{
@@ -611,7 +610,17 @@ func (t *Task) createRsyncClientPods() error {
 						Value: "changeme",
 					},
 				},
-				Command: []string{"rsync", "-aPvvHh", "--delete", "--port", "2222", "--log-file", "/dev/stdout", fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
+				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+				Command: []string{"rsync",
+					"--archive",
+					"--hard-links",
+					"--human-readable",
+					"--partial",
+					"--delete",
+					"--port", "2222",
+					"--log-file", "/dev/stdout",
+					"--info=COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2",
+					fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          "rsync-client",
@@ -636,7 +645,7 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy: corev1.RestartPolicyOnFailure,
 					Volumes:       volumes,
 					Containers:    containers,
 				},
@@ -654,36 +663,98 @@ func (t *Task) createRsyncClientPods() error {
 	return nil
 }
 
-func (t *Task) haveRsyncClientPodsCompleted() (bool, error) {
+// Create rsync PV progress CR on destination cluster
+func (t *Task) createPVProgressCR() error {
 	// Get client for destination
+	dstClient, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+
+	pvcMap := t.getPVCNamespaceMap()
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			dvp := migapi.DirectVolumeMigrationProgress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Namespace: migapi.OpenshiftMigrationNamespace,
+					// TODO @alpatel, add owner references
+				},
+				Spec: migapi.DirectVolumeMigrationProgressSpec{
+					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
+					PodRef: &corev1.ObjectReference{
+						Namespace: ns,
+						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					},
+				},
+				Status: migapi.DirectVolumeMigrationProgressStatus{},
+			}
+			err = dstClient.Create(context.TODO(), &dvp)
+			if k8serror.IsAlreadyExists(err) {
+				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvp.Namespace, "name", dvp.Name)
+			} else if err != nil {
+				return err
+			}
+			t.Log.Info("Rsync client progress CR created", "name", dvp.Name, "namespace", dvp.Namespace)
+		}
+
+	}
+	return nil
+}
+
+func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	srcClient, err := t.getSourceClient()
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	selector := labels.SelectorFromSet(map[string]string{
-		"app":                   "directvolumemigration-rsync-transfer",
-		"directvolumemigration": "rsync-client",
-	})
+
+	t.Owner.Status.RunningPods = []*corev1.ObjectReference{}
+	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
+	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
+
 	pvcMap := t.getPVCNamespaceMap()
-	for ns, _ := range pvcMap {
-		pods := corev1.PodList{}
-		err = srcClient.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&pods)
-		if err != nil {
-			return false, err
-		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodSucceeded {
-				return false, nil
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			pod := corev1.Pod{}
+			err = srcClient.Get(context.TODO(), types.NamespacedName{
+				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+				Namespace: ns,
+			}, &pod)
+			if err != nil {
+				// todo, need to start thinking about collecting this error and reporting other CR's progress
+				return false, false, err
+			}
+			objRef := &corev1.ObjectReference{
+				Namespace: ns,
+				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+			}
+			switch {
+			case pod.Status.Phase == corev1.PodRunning:
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, objRef)
+			case pod.Status.Phase == corev1.PodFailed:
+				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
+			case pod.Status.Phase == corev1.PodSucceeded:
+				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
 			}
 		}
 	}
-	return true, nil
+
+	// wait for all the running pods to completed before returning failures
+	if len(t.Owner.Status.RunningPods) > 0 {
+		return false, false, nil
+	}
+
+	// we have failed pods, fail the itinerary
+	if len(t.Owner.Status.FailedPods) > 0 {
+		return false, true, nil
+	}
+
+	// all the pods have succeeded
+	if len(t.Owner.Status.SuccessfulPods) == len(t.Owner.Spec.PersistentVolumeClaims) {
+		return true, false, nil
+	}
+
+	return false, false, nil
 }
 
 // Delete rsync resources
@@ -704,6 +775,15 @@ func (t *Task) deleteRsyncResources() error {
 	}
 
 	err = t.findAndDeleteResources(destClient)
+	if err != nil {
+		return err
+	}
+
+	if !t.Owner.Spec.DeleteProgressReportingCRs {
+		return nil
+	}
+
+	err = t.deleteProgressReportingCRs(destClient)
 	if err != nil {
 		return err
 	}
@@ -818,6 +898,25 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		// Delete configmaps
 		for _, cm := range cmList.Items {
 			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) deleteProgressReportingCRs(client compat.Client) error {
+	pvcMap := t.getPVCNamespaceMap()
+
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Namespace: ns,
+				},
+			}, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}

@@ -40,6 +40,7 @@ const (
 	WaitForRsyncTransferPodsRunning = "WaitForRsyncTransferPodsRunning"
 	CreateStunnelClientPods         = "CreateStunnelClientPods"
 	WaitForStunnelClientPodsRunning = "WaitForStunnelClientPodsRunning"
+	CreatePVProgressCRs             = "CreatePVProgressCRs"
 	CreateRsyncClientPods           = "CreateRsyncClientPods"
 	WaitForRsyncClientPodsCompleted = "WaitForRsyncClientPodsCompleted"
 	Verification                    = "Verification"
@@ -98,6 +99,7 @@ var PVCItinerary = Itinerary{
 		{phase: CreateRsyncRoute},
 		{phase: CreateRsyncConfig},
 		{phase: CreateStunnelConfig},
+		{phase: CreatePVProgressCRs},
 		{phase: CreateRsyncTransferPods},
 		{phase: WaitForRsyncTransferPodsRunning},
 		{phase: CreateStunnelClientPods},
@@ -285,6 +287,15 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
+	case CreatePVProgressCRs:
+		err := t.createPVProgressCR()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case CreateRsyncClientPods:
 		err := t.createRsyncClientPods()
 		if err != nil {
@@ -295,9 +306,12 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case WaitForRsyncClientPodsCompleted:
-		completed, err := t.haveRsyncClientPodsCompleted()
+		completed, failed, err := t.haveRsyncClientPodsCompletedOrFailed()
 		if err != nil {
 			return liberr.Wrap(err)
+		}
+		if failed {
+			t.fail(MigrationFailed, []string{"One or more pods are in error state"})
 		}
 		if completed {
 			t.Requeue = NoReQ
