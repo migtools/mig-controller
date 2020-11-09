@@ -38,11 +38,23 @@ spec:
               type: object
             persistentVolumeClaims:
               items:
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  targetAccessModes:
+                    items:
+                      type: string
+                    type: array
+                  targetStorageClass:
+                    type: string
+                required:
+                - targetStorageClass
+                - targetAccessModes
                 type: object
               type: array
             srcMigClusterRef:
-              type: object
-            storageClassMapping:
               type: object
           type: object
         status:

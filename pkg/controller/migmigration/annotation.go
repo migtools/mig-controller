@@ -53,6 +53,9 @@ const (
 	// Designated as a `final` Restore.
 	// The value is the Task.UID().
 	FinalRestoreLabel = "migration-final-restore"
+	// Identifies associated directvolumemigration resource
+	// The value is the Task.UID()
+	DirectVolumeMigrationLabel = "migration-direct-volume"
 	// Identifies the resource as migrated by us
 	// for easy search or application rollback.
 	// The value is the Task.UID().
