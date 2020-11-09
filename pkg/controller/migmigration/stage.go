@@ -489,13 +489,13 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			if c.State.Waiting != nil {
 				initReady = false
 				report.progress = append(
-				            report.progress,
-				            fmt.Sprintf(
-				                         "Pod %s/%s: Container %s %s",
-				                         pod.Namespace,
-				                         pod.Name,
-				                         c.Name,
-				                         c.State.Waiting.Message))
+					report.progress,
+					fmt.Sprintf(
+						"Pod %s/%s: Container %s %s",
+						pod.Namespace,
+						pod.Name,
+						c.Name,
+						c.State.Waiting.Message))
 			}
 			if c.State.Terminated != nil && c.State.Terminated.ExitCode != 0 {
 				initReady = false
@@ -530,14 +530,14 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		if pod.Status.Phase == corev1.PodPending {
 			for _, c := range pod.Status.ContainerStatuses {
 				if c.State.Waiting != nil {
-				        report.progress = append(
-				                    report.progress,
-				                    fmt.Sprintf(
-				                         "Pod %s/%s: Container %s %s",
-				                         pod.Namespace,
-				                         pod.Name,
-				                         c.Name,
-				                         c.State.Waiting.Message))
+					report.progress = append(
+						report.progress,
+						fmt.Sprintf(
+							"Pod %s/%s: Container %s %s",
+							pod.Namespace,
+							pod.Name,
+							c.Name,
+							c.State.Waiting.Message))
 				}
 			}
 		}
@@ -549,6 +549,67 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			hasHealthyClaims(&pod)
 		}
 	}
+	return
+}
+
+// Match number of stage pods in source and destination cluster
+func (t *Task) allStagePodsMatch() (report []string, err error) {
+	dstClient, err := t.getDestinationClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	podDList := corev1.PodList{}
+
+	options := k8sclient.MatchingLabels(t.stagePodLabels())
+	err = dstClient.List(context.TODO(), options, &podDList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	podSList := corev1.PodList{}
+	err = srcClient.List(context.TODO(), options, &podSList)
+
+	dPods := make(map[string]string)
+
+	for _, pod := range podDList.Items {
+		dPods[pod.Name] = pod.Name
+	}
+
+	namespaces := make(map[string]bool)
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		namespaces[srcNamespace] = true
+	}
+
+
+	for _, pod := range podSList.Items {
+		if _, exists := namespaces[pod.Namespace]; exists {
+			if _, exist := dPods[pod.Name]; !exist {
+				report = append(report, pod.Name+" is missing. Migration might fail")
+			}
+		}
+	}
+
+	if len(report) > 0 {
+		return
+	}
+
+	stageReport, err := t.ensureDestinationStagePodsStarted()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if !stageReport.started {
+		report = stageReport.progress
+		return
+	}
+	report = []string{"All the stage pods are restored, waiting for restore to Complete"}
 	return
 }
 
