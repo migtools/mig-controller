@@ -6,13 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"golang.org/x/crypto/ssh"
-	"gopkg.in/yaml.v2"
-	"text/template"
-	//  liberr "github.com/konveyor/controller/pkg/error"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	routev1 "github.com/openshift/api/route/v1"
+	"golang.org/x/crypto/ssh"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	//"k8s.io/apimachinery/pkg/types"
+	"text/template"
 )
 
 type pvc struct {
@@ -676,20 +674,20 @@ func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			dvp := v1alpha1.DirectVolumeMigrationProgress{
+			dvp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
-					Namespace: ns,
+					Namespace: migapi.OpenshiftMigrationNamespace,
 					// TODO @alpatel, add owner references
 				},
-				Spec: v1alpha1.DirectVolumeMigrationProgressSpec{
+				Spec: migapi.DirectVolumeMigrationProgressSpec{
 					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
 					PodRef: &corev1.ObjectReference{
 						Namespace: ns,
 						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					},
 				},
-				Status: v1alpha1.DirectVolumeMigrationProgressStatus{},
+				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
 			err = dstClient.Create(context.TODO(), &dvp)
 			if k8serror.IsAlreadyExists(err) {
@@ -913,7 +911,7 @@ func (t *Task) deleteProgressReportingCRs(client compat.Client) error {
 
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			err := client.Delete(context.TODO(), &v1alpha1.DirectVolumeMigrationProgress{
+			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,
