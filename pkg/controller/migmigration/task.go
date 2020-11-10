@@ -221,7 +221,7 @@ var RollbackItinerary = Itinerary{
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: DeleteMigrated, Step: StepFinal},
 		{Name: EnsureMigratedDeleted, Step: StepFinal},
-		{Name: UnQuiesceApplications, Step: StepFinal, all: Quiesce},
+		{Name: UnQuiesceApplications, Step: StepFinal},
 		{Name: Completed, Step: StepFinal},
 	},
 }
