@@ -504,8 +504,10 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
+		if t.Requeue != FastReQ {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()

@@ -2,7 +2,9 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -103,25 +105,40 @@ func (t *Task) annotateStageResources() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if t.Requeue == FastReQ {
+		return nil
+	}
 	// Pods
 	serviceAccounts, err := t.annotatePods(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if t.Requeue == FastReQ {
+		return nil
 	}
 	// PV & PVCs
 	err = t.annotatePVs(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if t.Requeue == FastReQ {
+		return nil
+	}
 	// Service accounts used by stage pods.
 	err = t.labelServiceAccounts(sourceClient, serviceAccounts)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if t.Requeue == FastReQ {
+		return nil
+	}
 
 	err = t.labelImageStreams(sourceClient)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if t.Requeue == FastReQ {
+		return nil
 	}
 
 	return nil
@@ -164,7 +181,9 @@ func (t *Task) getResticVolumes(client k8sclient.Client, pod corev1.Pod) ([]stri
 
 // Add label to namespaces
 func (t *Task) labelNamespaces(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+	total := len(t.sourceNamespaces())
+	now := time.Now()
+	for i, ns := range t.sourceNamespaces() {
 		namespace := corev1.Namespace{}
 		err := client.Get(
 			context.TODO(),
@@ -178,6 +197,9 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 		if namespace.Labels == nil {
 			namespace.Labels = make(map[string]string)
 		}
+		if _, exist := namespace.GetLabels()[IncludedInStageBackupLabel]; exist {
+			continue
+		}
 		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
@@ -187,7 +209,14 @@ func (t *Task) labelNamespaces(client k8sclient.Client) error {
 			"NS annotations/labels added.",
 			"name",
 			namespace.Name)
+
+		if time.Now().Sub(now) == time.Second*3 {
+			t.Requeue = FastReQ
+			t.setProgress([]string{fmt.Sprintf("%v/%v Namespaces labeled", i, total)})
+			return nil
+		}
 	}
+	t.Requeue = NoReQ
 	return nil
 }
 
@@ -206,7 +235,9 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	for _, pod := range list.Items {
+	total := len(list.Items)
+	now := time.Now()
+	for i, pod := range list.Items {
 		// Annotate PVCs.
 		volumes, verifyVolumes, err := t.getResticVolumes(client, pod)
 		if err != nil {
@@ -216,6 +247,14 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
+
+		if _, exist := pod.Annotations[ResticPvBackupAnnotation]; exist {
+			if _, exist := pod.Annotations[ResticPvVerifyAnnotation]; exist {
+				continue
+			}
+			continue
+		}
+
 		pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
 		pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
 		// Update
@@ -236,8 +275,14 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 		} else {
 			names[sa] = true
 		}
-	}
 
+		if time.Now().Sub(now) == time.Second*3 {
+			t.Requeue = FastReQ
+			t.setProgress([]string{fmt.Sprintf("%v/%v Pod annotations/labels added.", i, total)})
+			return serviceAccounts, nil
+		}
+	}
+	t.Requeue = NoReQ
 	return serviceAccounts, nil
 }
 
@@ -250,7 +295,9 @@ func (t *Task) annotatePods(client k8sclient.Client) (ServiceAccounts, error) {
 // The PvCopyMethodAnnotation annotation is added to PV and PVC as needed by the velero plugin.
 func (t *Task) annotatePVs(client k8sclient.Client) error {
 	pvs := t.getPVs()
-	for _, pv := range pvs.List {
+	total := len(pvs.List)
+	now := time.Now()
+	for i, pv := range pvs.List {
 		pvResource := corev1.PersistentVolume{}
 		err := client.Get(
 			context.TODO(),
@@ -263,6 +310,9 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 		}
 		if pvResource.Annotations == nil {
 			pvResource.Annotations = make(map[string]string)
+		}
+		if _, exist := pvResource.Annotations[IncludedInStageBackupLabel]; exist {
+			continue
 		}
 		// PV action (move|copy) needed by the velero plugin.
 		pvResource.Annotations[PvActionAnnotation] = pv.Selection.Action
@@ -307,6 +357,9 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 		if pvcResource.Labels == nil {
 			pvcResource.Labels = make(map[string]string)
 		}
+		if _, exist := pvcResource.Annotations[IncludedInStageBackupLabel]; exist {
+			continue
+		}
 		pvcResource.Labels[IncludedInStageBackupLabel] = t.UID()
 		if pv.Selection.Action == migapi.PvCopyAction {
 			// PV storageClass annotation needed by the velero plugin.
@@ -329,13 +382,20 @@ func (t *Task) annotatePVs(client k8sclient.Client) error {
 			pv.PVC.Namespace,
 			"name",
 			pv.PVC.Name)
-	}
 
+		if time.Now().Sub(now) == time.Second*3 {
+			t.Requeue = FastReQ
+			t.setProgress([]string{fmt.Sprintf("%v/%v PV annotations/labels added.", i, total), fmt.Sprintf("%v/%v PVC annotations/labels added.", i, total)})
+			return nil
+		}
+	}
+	t.Requeue = NoReQ
 	return nil
 }
 
 // Add label to service accounts.
 func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts ServiceAccounts) error {
+	now := time.Now()
 	for _, ns := range t.sourceNamespaces() {
 		names, found := serviceAccounts[ns]
 		if !found {
@@ -347,12 +407,16 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		for _, sa := range list.Items {
+		total := len(list.Items)
+		for i, sa := range list.Items {
 			if _, found := names[sa.Name]; !found {
 				continue
 			}
 			if sa.Labels == nil {
 				sa.Labels = make(map[string]string)
+			}
+			if _, exist := sa.Labels[IncludedInStageBackupLabel]; exist {
+				continue
 			}
 			sa.Labels[IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.TODO(), &sa)
@@ -365,14 +429,20 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 				sa.Namespace,
 				"name",
 				sa.Name)
+			if time.Now().Sub(now) == time.Second*3 {
+				t.Requeue = FastReQ
+				t.setProgress([]string{fmt.Sprintf("%v/%v SA annotations/labels added in the namespace: %s", i, total, sa.Namespace)})
+				return nil
+			}
 		}
 	}
-
+	t.Requeue = NoReQ
 	return nil
 }
 
 // Add label to ImageStreeams
 func (t *Task) labelImageStreams(client compat.Client) error {
+	now := time.Now()
 	for _, ns := range t.sourceNamespaces() {
 		imageStreamList := imagev1.ImageStreamList{}
 		options := k8sclient.InNamespace(ns)
@@ -381,9 +451,13 @@ func (t *Task) labelImageStreams(client compat.Client) error {
 			log.Trace(err)
 			return err
 		}
-		for _, is := range imageStreamList.Items {
+		total := len(imageStreamList.Items)
+		for i, is := range imageStreamList.Items {
 			if is.Labels == nil {
 				is.Labels = map[string]string{}
+			}
+			if _, exist := is.Labels[IncludedInStageBackupLabel]; exist {
+				continue
 			}
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.Background(), &is)
@@ -396,9 +470,14 @@ func (t *Task) labelImageStreams(client compat.Client) error {
 				is.Namespace,
 				"name",
 				is.Name)
+			if time.Now().Sub(now) == time.Second*3 {
+				t.Requeue = FastReQ
+				t.setProgress([]string{fmt.Sprintf("%v/%v ImageStream labels added. in the namespace: %s", i, total, is.Namespace)})
+				return nil
+			}
 		}
 	}
-
+	t.Requeue = NoReQ
 	return nil
 }
 
