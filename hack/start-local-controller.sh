@@ -11,13 +11,15 @@ fi
 
 # Pull mig-ui route host from disk to set CORS_ALLOWED_ORIGINS 
 MIG_UI_ROUTE_PATH=$KUBECONFIG-ui-route
+LOCAL_UI="localhost"
 MIG_UI_ROUTE=$(cat $MIG_UI_ROUTE_PATH)
 if [ $? -eq 0 ]; then
-    echo "Found mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=$MIG_UI_ROUTE"
-    export CORS_ALLOWED_ORIGINS=${MIG_UI_ROUTE}
+    echo "Found mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${MIG_UI_ROUTE},${LOCAL_UI}"
+    export CORS_ALLOWED_ORIGINS="${MIG_UI_ROUTE},${LOCAL_UI}"
     rm $MIG_UI_ROUTE_PATH
 else
-    echo "Missing mig-ui route domain. Continuing without setting CORS_ALLOWED_ORIGINS."
+    echo "Missing mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${LOCAL_UI}"
+    export CORS_ALLOWED_ORIGINS="${LOCAL_UI}"
 fi
 
 # Start the controller
