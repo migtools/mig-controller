@@ -36,7 +36,7 @@ tilt:
 # Patch MigrationController CR to use local mig-controller + discovery service
 use-local-controller:
 	oc patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "add", "path": "/spec/discovery_api_url_override", "value": "http://localhost:8080" }]'
+	--patch '[{ "op": "add", "path": "/spec/discovery_api_url", "value": "http://localhost:8080" }]'
 	oc patch migrationcontroller migration-controller --type=json \
 	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": false }]'
 
@@ -45,7 +45,7 @@ use-oncluster-controller:
 	oc patch migrationcontroller migration-controller --type=json \
 	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": true }]'
 	oc patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "remove", "path": "/spec/discovery_api_url_override" }]'
+	--patch '[{ "op": "remove", "path": "/spec/discovery_api_url" }]'
 
 # Install CRDs into a cluster
 install: manifests
