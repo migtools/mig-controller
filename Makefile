@@ -19,15 +19,33 @@ manager: generate fmt vet
 # Run against the configured Kubernetes cluster in ~/.kube/config after login as mig controller SA
 run: generate fmt vet
 	./hack/controller-sa-login.sh
-	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} go run -tags "${BUILDTAGS}" ./cmd/manager/main.go
+	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} ./hack/start-local-controller.sh
 
+# Same as `make run`, but skips generate, fmt, vet. Useful for quick iteration.
+run-fast:
+	./hack/controller-sa-login.sh
+	KUBECONFIG=$(KUBECONFIG)-${KUBECONFIG_POSTFIX} ./hack/start-local-controller.sh
 
 # Run against the configured Kubernetes cluster in ~/.kube/config, skip login to mig-controller SA
 run-skip-sa-login: generate fmt vet
-	go run -tags "${BUILDTAGS}" ./cmd/manager/main.go
+	./hack/start-local-controller.sh
 
 tilt:
 	 IMG=${IMG} TEMPLATE=${TEMPLATE} tilt up --hud=false --no-browser --file tools/tilt/Tiltfile
+
+# Patch MigrationController CR to use local mig-controller + discovery service
+use-local-controller:
+	oc patch migrationcontroller migration-controller --type=json \
+	--patch '[{ "op": "add", "path": "/spec/discovery_api_url", "value": "http://localhost:8080" }]'
+	oc patch migrationcontroller migration-controller --type=json \
+	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": false }]'
+
+# Patch MigrationController CR to use on-cluster mig-controller + discovery service
+use-oncluster-controller:
+	oc patch migrationcontroller migration-controller --type=json \
+	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": true }]'
+	oc patch migrationcontroller migration-controller --type=json \
+	--patch '[{ "op": "remove", "path": "/spec/discovery_api_url" }]'
 
 # Install CRDs into a cluster
 install: manifests
