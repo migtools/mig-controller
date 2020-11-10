@@ -158,6 +158,65 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 	return &list
 }
 
+// returns duration of in-progress PVR
+func getPVRDuration(pvr *velero.PodVolumeRestore) (duration string) {
+	if pvr.Status.StartTimestamp != nil {
+		if pvr.Status.CompletionTimestamp == nil {
+			duration = fmt.Sprintf(" (%s)",
+				time.Now().Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
+		} else {
+			duration = fmt.Sprintf(" (%s)",
+				pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
+		}
+	}
+	return
+}
+
+// returns progress information of PVRs
+func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progress []string) {
+	m, keys, msg := make(map[string]string), make([]string, 0), ""
+
+	for _, pvr := range pvrList.Items {
+		switch pvr.Status.Phase {
+		case velero.PodVolumeRestorePhaseInProgress:
+			msg = fmt.Sprintf(
+				"PodVolumeRestore %s/%s: %s out of %s restored%s",
+				pvr.Namespace,
+				pvr.Name,
+				bytesToSI(pvr.Status.Progress.BytesDone),
+				bytesToSI(pvr.Status.Progress.TotalBytes),
+				getPVRDuration(&pvr))
+		case velero.PodVolumeRestorePhaseCompleted:
+			msg = fmt.Sprintf(
+				"PodVolumeRestore %s/%s: Completed, %s out of %s restored%s",
+				pvr.Namespace,
+				pvr.Name,
+				bytesToSI(pvr.Status.Progress.BytesDone),
+				bytesToSI(pvr.Status.Progress.TotalBytes),
+				getPVRDuration(&pvr))
+		case velero.PodVolumeRestorePhaseFailed:
+			msg = fmt.Sprintf(
+				"PodVolumeRestore %s/%s: Failed%s",
+				pvr.Namespace,
+				pvr.Name,
+				getPVRDuration(&pvr))
+		default:
+			msg = fmt.Sprintf(
+				"PodVolumeRestore %s/%s: Waiting for ongoing volume restore(s) to complete",
+				pvr.Namespace,
+				pvr.Name)
+		}
+		m[pvr.Namespace+"/"+pvr.Name] = msg
+		keys = append(keys, pvr.Namespace+"/"+pvr.Name)
+	}
+	// sort the progress array to maintain order everytime it's updated
+	sort.Strings(keys)
+	for _, k := range keys {
+		progress = append(progress, m[k])
+	}
+	return
+}
+
 // Get whether a resource has completed on the destination cluster.
 func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	completed := false
@@ -165,63 +224,6 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	progress := []string{}
 
 	pvrs := t.getPodVolumeRestoresForRestore(restore)
-
-	getPodVolumeRestoresProgress := func(pvrList *velero.PodVolumeRestoreList) (progress []string) {
-		getDuration := func(pvr *velero.PodVolumeRestore) (duration string) {
-			if pvr.Status.StartTimestamp != nil {
-				if pvr.Status.CompletionTimestamp == nil {
-					duration = fmt.Sprintf(" (%s)",
-						time.Now().Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
-				} else {
-					duration = fmt.Sprintf(" (%s)",
-						pvr.Status.CompletionTimestamp.Sub(pvr.Status.StartTimestamp.Time).Round(time.Second))
-				}
-			}
-			return
-		}
-
-		m, keys, msg := make(map[string]string), make([]string, 0), ""
-
-		for _, pvr := range pvrList.Items {
-			switch pvr.Status.Phase {
-			case velero.PodVolumeRestorePhaseInProgress:
-				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: %s out of %s restored%s",
-					pvr.Namespace,
-					pvr.Name,
-					bytesToSI(pvr.Status.Progress.BytesDone),
-					bytesToSI(pvr.Status.Progress.TotalBytes),
-					getDuration(&pvr))
-			case velero.PodVolumeRestorePhaseCompleted:
-				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Completed, %s out of %s restored%s",
-					pvr.Namespace,
-					pvr.Name,
-					bytesToSI(pvr.Status.Progress.BytesDone),
-					bytesToSI(pvr.Status.Progress.TotalBytes),
-					getDuration(&pvr))
-			case velero.PodVolumeRestorePhaseFailed:
-				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Failed%s",
-					pvr.Namespace,
-					pvr.Name,
-					getDuration(&pvr))
-			default:
-				msg = fmt.Sprintf(
-					"PodVolumeRestore %s/%s: Waiting for ongoing volume restore(s) to complete",
-					pvr.Namespace,
-					pvr.Name)
-			}
-			m[pvr.Namespace+"/"+pvr.Name] = msg
-			keys = append(keys, pvr.Namespace+"/"+pvr.Name)
-		}
-		// sort the progress array to maintain order everytime it's updated
-		sort.Strings(keys)
-		for _, k := range keys {
-			progress = append(progress, m[k])
-		}
-		return
-	}
 
 	switch restore.Status.Phase {
 	case velero.RestorePhaseNew:
