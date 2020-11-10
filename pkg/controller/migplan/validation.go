@@ -34,6 +34,8 @@ const (
 	InvalidStorageRef                          = "InvalidStorageRef"
 	SourceClusterNotReady                      = "SourceClusterNotReady"
 	DestinationClusterNotReady                 = "DestinationClusterNotReady"
+	SourceClusterNoRegistryPath                = "SourceClusterNoRegistryPath"
+	DestinationClusterNoRegistryPath           = "DestinationClusterNoRegistryPath"
 	StorageNotReady                            = "StorageNotReady"
 	NsListEmpty                                = "NamespaceListEmpty"
 	InvalidDestinationCluster                  = "InvalidDestinationCluster"
@@ -82,15 +84,15 @@ const (
 
 // Reasons
 const (
-	NotSet         = "NotSet"
-	NotFound       = "NotFound"
-	KeyNotFound    = "KeyNotFound"
-	NotDistinct    = "NotDistinct"
-	LimitExceeded  = "LimitExceeded"
-	NotDone        = "NotDone"
-	Done           = "Done"
-	Conflict       = "Conflict"
-	NotHealthy     = "NotHealthy"
+	NotSet        = "NotSet"
+	NotFound      = "NotFound"
+	KeyNotFound   = "KeyNotFound"
+	NotDistinct   = "NotDistinct"
+	LimitExceeded = "LimitExceeded"
+	NotDone       = "NotDone"
+	Done          = "Done"
+	Conflict      = "Conflict"
+	NotHealthy    = "NotHealthy"
 )
 
 // Statuses
@@ -342,6 +344,20 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 		return nil
 	}
 
+	// No Registry Path
+	registryPath, err := cluster.GetRegistryPath(r)
+	if !plan.Spec.IndirectImageMigration && (err != nil || registryPath == "") {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     SourceClusterNoRegistryPath,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSet,
+			Message: fmt.Sprintf("Direct image migration is selected and the source cluster %s is missing a configured Registry Path",
+				path.Join(ref.Namespace, ref.Name)),
+		})
+		return nil
+	}
+
 	return nil
 }
 
@@ -399,6 +415,20 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `dstMigClusterRef` does not have a `Ready` condition, subject: %s",
 				path.Join(plan.Spec.DestMigClusterRef.Namespace, plan.Spec.DestMigClusterRef.Name)),
+		})
+		return nil
+	}
+
+	// No Registry Path
+	registryPath, err := cluster.GetRegistryPath(r)
+	if !plan.Spec.IndirectImageMigration && (err != nil || registryPath == "") {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     DestinationClusterNoRegistryPath,
+			Status:   True,
+			Category: Critical,
+			Reason:   NotSet,
+			Message: fmt.Sprintf("Direct image migration is selected and the destination cluster %s is missing a configured Registry Path",
+				path.Join(ref.Namespace, ref.Name)),
 		})
 		return nil
 	}
