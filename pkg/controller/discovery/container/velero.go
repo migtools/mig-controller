@@ -397,7 +397,11 @@ func (r *PodVolumeBackup) Create(e event.CreateEvent) bool {
 	if !cast {
 		return false
 	}
-	backup := model.PodVolumeBackup{}
+	backup := model.PodVolumeBackup{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	backup.With(object)
 	r.ds.Create(&backup)
 
@@ -410,7 +414,11 @@ func (r *PodVolumeBackup) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	backup := model.PodVolumeBackup{}
+	backup := model.PodVolumeBackup{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	backup.With(object)
 	r.ds.Update(&backup)
 
@@ -423,7 +431,11 @@ func (r *PodVolumeBackup) Delete(e event.DeleteEvent) bool {
 	if !cast {
 		return false
 	}
-	backup := model.PodVolumeBackup{}
+	backup := model.PodVolumeBackup{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	backup.With(object)
 	r.ds.Delete(&backup)
 
@@ -530,7 +542,11 @@ func (r *PodVolumeRestore) Create(e event.CreateEvent) bool {
 	if !cast {
 		return false
 	}
-	restore := model.PodVolumeRestore{}
+	restore := model.PodVolumeRestore{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	restore.With(object)
 	r.ds.Create(&restore)
 
@@ -543,7 +559,11 @@ func (r *PodVolumeRestore) Update(e event.UpdateEvent) bool {
 	if !cast {
 		return false
 	}
-	restore := model.PodVolumeRestore{}
+	restore := model.PodVolumeRestore{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	restore.With(object)
 	r.ds.Update(&restore)
 
@@ -556,7 +576,11 @@ func (r *PodVolumeRestore) Delete(e event.DeleteEvent) bool {
 	if !cast {
 		return false
 	}
-	restore := model.PodVolumeRestore{}
+	restore := model.PodVolumeRestore{
+		Base: model.Base{
+			Cluster: r.ds.Cluster.PK,
+		},
+	}
 	restore.With(object)
 	r.ds.Delete(&restore)
 
