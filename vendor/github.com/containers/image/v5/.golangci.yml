@@ -1,4 +1,0 @@
----
-run:
-  concurrency: 6
-  deadline: 5m
