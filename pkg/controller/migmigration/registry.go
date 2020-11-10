@@ -21,11 +21,6 @@ const (
 	MigRegistryDirAnnotationKey string = "openshift.io/migration-registry-dir"
 )
 
-// Registry label for controller-created migration registry resources
-const (
-	MigrationRegistryLabel = "migration-registry"
-)
-
 // Returns the right backup/restore annotations including registry-specific ones
 func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error) {
 	annotations := t.Annotations
