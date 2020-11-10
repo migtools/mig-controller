@@ -381,6 +381,6 @@ func (r *Conditions) RecordEvents(obj runtime.Object, recorder record.EventRecor
 		default:
 			eventType = kapi.EventTypeNormal
 		}
-		recorder.Event(obj, cond.Reason, eventType, cond.Message)
+		recorder.Event(obj, eventType, cond.Type, cond.Message)
 	}
 }
