@@ -9,17 +9,20 @@ if [ "$INCLUSTER_CONTROLLER_ENABLED" == "true" ]; then
     echo
 fi
 
+# CORS rules for enabling local UI to communicate with local mig-controller
+LOCAL_UI_CORS='//127.0.0.1(:|$) //localhost(:|$)'
+
 # Pull mig-ui route host from disk to set CORS_ALLOWED_ORIGINS 
 MIG_UI_ROUTE_PATH=$KUBECONFIG-ui-route
-LOCAL_UI="localhost"
 MIG_UI_ROUTE=$(cat $MIG_UI_ROUTE_PATH)
+
 if [ $? -eq 0 ]; then
-    echo "Found mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${MIG_UI_ROUTE},${LOCAL_UI}"
-    export CORS_ALLOWED_ORIGINS="${MIG_UI_ROUTE},${LOCAL_UI}"
+    export CORS_ALLOWED_ORIGINS="${MIG_UI_ROUTE} ${LOCAL_UI_CORS}"
+    echo "Found mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}"
     rm $MIG_UI_ROUTE_PATH
 else
-    echo "Missing mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${LOCAL_UI}"
-    export CORS_ALLOWED_ORIGINS="${LOCAL_UI}"
+    export CORS_ALLOWED_ORIGINS="${LOCAL_UI_CORS}"
+    echo "Missing mig-ui route domain. Setting discovery service CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}"
 fi
 
 # Start the controller
