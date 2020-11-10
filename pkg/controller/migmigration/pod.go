@@ -147,32 +147,41 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 // Delete the running Velero pods.
 // Needed to stop any pending tasks after Velero CR deletion
 func (t *Task) restartVeleroPods() error {
-	// Exit early if no stale CRs were deleted
-	if !t.Owner.Status.HasCondition(StaleVeleroCRsDeleted) {
-		return nil
+	// Restart source cluster Velero pod if needed
+	if t.Owner.Status.HasCondition(StaleSrcVeleroCRsDeleted) {
+		err := t.deleteVeleroPodsForCluster(t.PlanResources.SrcMigCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
+	// Restart target cluster Velero pod if needed
+	if t.Owner.Status.HasCondition(StaleDestVeleroCRsDeleted) {
+		err := t.deleteVeleroPodsForCluster(t.PlanResources.DestMigCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
 
-	// Delete Velero Pods on both clusters
-	clusters := t.getBothClusters()
-	for _, cluster := range clusters {
-		veleroPods, err := t.findVeleroPods(cluster)
+func (t *Task) deleteVeleroPodsForCluster(cluster *migapi.MigCluster) error {
+	veleroPods, err := t.findVeleroPods(cluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	clusterClient, err := cluster.GetClient(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, pod := range veleroPods {
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		err = clusterClient.Delete(
+			context.TODO(),
+			&pod)
 		if err != nil {
 			return liberr.Wrap(err)
-		}
-		clusterClient, err := cluster.GetClient(t.Client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		for _, pod := range veleroPods {
-			if pod.Status.Phase != corev1.PodRunning {
-				continue
-			}
-			err = clusterClient.Delete(
-				context.TODO(),
-				&pod)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
 		}
 	}
 	return nil
@@ -180,8 +189,8 @@ func (t *Task) restartVeleroPods() error {
 
 // Determine if Velero Pod is running.
 func (t *Task) haveVeleroPodsStarted() (bool, error) {
-	// Verify Velero restart is needed before continuing check
-	if !t.Owner.Status.HasCondition(StaleVeleroCRsDeleted) {
+	// Verify Velero restart was needed before performing check
+	if !t.Owner.Status.HasAnyCondition(StaleSrcVeleroCRsDeleted, StaleDestVeleroCRsDeleted) {
 		return true, nil
 	}
 
@@ -232,7 +241,8 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 	}
 
 	// Remove the condition notifying the user that Velero will be restarted
-	t.Owner.Status.DeleteCondition(StaleVeleroCRsDeleted)
+	t.Owner.Status.DeleteCondition(StaleSrcVeleroCRsDeleted)
+	t.Owner.Status.DeleteCondition(StaleDestVeleroCRsDeleted)
 	return true, nil
 }
 

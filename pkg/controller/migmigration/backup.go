@@ -405,25 +405,38 @@ func (t *Task) deleteCorrelatedBackups() error {
 // Delete stale Velero Backups/Restores, set condition indicating
 // Velero restart should be performed later if anything was deleted.
 func (t *Task) deleteStaleVeleroCRs() error {
-	totalDeleted := 0
-	nBackupsDeleted, err := t.deleteStaleBackups()
+	// Delete source cluster Velero Backups
+	nBackupsDeleted, nInProgressBackupsDeleted, err := t.deleteStaleBackups()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	totalDeleted += nBackupsDeleted
-	nRestoresDeleted, err := t.deleteStaleRestores()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	totalDeleted += nRestoresDeleted
-
-	if totalDeleted > 0 {
+	// Only set condition if 'InProgress' backups were deleted
+	if nInProgressBackupsDeleted > 0 {
 		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     StaleVeleroCRsDeleted,
+			Type:     StaleSrcVeleroCRsDeleted,
 			Status:   True,
 			Category: migapi.Required,
-			Message: fmt.Sprintf("Deleted stale Velero CRs: %v Backups,  %v Restores. "+
-				"Velero will be restarted.", nBackupsDeleted, nRestoresDeleted),
+			Message: fmt.Sprintf(
+				"Deleted %v stale Velero Backups. "+
+					"Velero will be restarted on the source cluster.",
+				nBackupsDeleted),
+			Durable: true,
+		})
+	}
+	// Delete target cluster Velero Restores
+	nRestoresDeleted, nInProgressRestoresDeleted, err := t.deleteStaleRestores()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// Only set condition if 'InProgress' restores were deleted
+	if nInProgressRestoresDeleted > 0 {
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     StaleDestVeleroCRsDeleted,
+			Status:   True,
+			Category: migapi.Required,
+			Message: fmt.Sprintf("Deleted %v stale Velero Restores. "+
+				"Velero will be restarted on the target cluster.",
+				nRestoresDeleted),
 			Durable: true,
 		})
 	}
@@ -433,19 +446,16 @@ func (t *Task) deleteStaleVeleroCRs() error {
 // Delete stale Restic CRs, set condition indicating
 // Restic Pod restarts may be needed, but we leave this up to the user.
 func (t *Task) deleteStaleResticCRs() error {
-	totalDeleted := 0
 	pvbsDeleted, err := t.deleteStalePVBs()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	totalDeleted += pvbsDeleted
 	pvrsDeleted, err := t.deleteStalePVRs()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	totalDeleted += pvrsDeleted
 
-	if totalDeleted > 0 {
+	if pvbsDeleted > 0 || pvrsDeleted > 0 {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StaleResticCRsDeleted,
 			Status:   True,
@@ -482,11 +492,13 @@ func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
 
 // Delete stale Velero Backups in the controller namespace to empty
 // the work queue for next migration.
-func (t *Task) deleteStaleBackups() (int, error) {
+func (t *Task) deleteStaleBackups() (int, int, error) {
 	nDeleted := 0
+	nInProgressDeleted := 0
+
 	srcClient, err := t.getSourceClient()
 	if err != nil {
-		return 0, liberr.Wrap(err)
+		return 0, 0, liberr.Wrap(err)
 	}
 
 	list := velero.BackupList{}
@@ -495,7 +507,7 @@ func (t *Task) deleteStaleBackups() (int, error) {
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
 	if err != nil {
-		return 0, liberr.Wrap(err)
+		return 0, 0, liberr.Wrap(err)
 	}
 	for _, backup := range list.Items {
 		// Skip delete unless phase is "", "New" or "InProgress"
@@ -514,7 +526,7 @@ func (t *Task) deleteStaleBackups() (int, error) {
 		// Skip if correlation label points to an existing, running migration
 		isRunning, err := t.migrationUIDisRunning(migMigrationUID)
 		if err != nil {
-			return nDeleted, liberr.Wrap(err)
+			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		if isRunning {
 			continue
@@ -532,18 +544,25 @@ func (t *Task) deleteStaleBackups() (int, error) {
 		}
 		err = srcClient.Create(context.TODO(), deleteBackupRequest)
 		if err != nil {
-			return nDeleted, liberr.Wrap(err)
+			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		// Also delete the backup CR directly
 		// This should work since backup is still in-progress.
+		t.Log.Info(fmt.Sprintf(
+			"Deleting stale Velero Backup %v/%v (phase %v) from source cluster",
+			backup.Namespace, backup.Name, backup.Status.Phase))
 		err = srcClient.Delete(context.TODO(), &backup)
 		if err != nil && !k8serrors.IsNotFound(err) {
-			return nDeleted, liberr.Wrap(err)
+			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		nDeleted++
+		// Separate count for InProgress, used to determine if restart needed
+		if backup.Status.Phase == velero.BackupPhaseInProgress {
+			nInProgressDeleted++
+		}
 	}
 
-	return nDeleted, err
+	return nDeleted, nInProgressDeleted, err
 }
 
 // Delete stale Velero PodVolumeBackups in the controller namespace to empty
@@ -608,6 +627,9 @@ func (t *Task) deleteStalePVBs() (int, error) {
 		}
 
 		// Delete the PVB
+		t.Log.Info(fmt.Sprintf(
+			"Deleting stale Velero PodVolumeBackup %v/%v (phase %v) from source cluster",
+			pvb.Namespace, pvb.Name, pvb.Status.Phase))
 		err = srcClient.Delete(context.TODO(), &pvb)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)

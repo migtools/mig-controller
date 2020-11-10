@@ -398,11 +398,13 @@ func (t *Task) deleteCorrelatedRestores() error {
 
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
-func (t *Task) deleteStaleRestores() (int, error) {
+func (t *Task) deleteStaleRestores() (int, int, error) {
 	nDeleted := 0
+	nInProgressDeleted := 0
+
 	destClient, err := t.getDestinationClient()
 	if err != nil {
-		return 0, liberr.Wrap(err)
+		return 0, 0, liberr.Wrap(err)
 	}
 
 	list := velero.RestoreList{}
@@ -411,7 +413,7 @@ func (t *Task) deleteStaleRestores() (int, error) {
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
 	if err != nil {
-		return 0, liberr.Wrap(err)
+		return 0, 0, liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
 		// Skip delete unless phase is "", "New" or "InProgress"
@@ -430,20 +432,27 @@ func (t *Task) deleteStaleRestores() (int, error) {
 		// Skip if correlation label points to an existing, running migration
 		isRunning, err := t.migrationUIDisRunning(migMigrationUID)
 		if err != nil {
-			return nDeleted, liberr.Wrap(err)
+			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		if isRunning {
 			continue
 		}
 		// Delete the Restore
+		t.Log.Info(fmt.Sprintf(
+			"Deleting stale Velero Restore %v/%v from destination cluster",
+			restore.Namespace, restore.Name))
 		err = destClient.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
-			return nDeleted, liberr.Wrap(err)
+			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		nDeleted++
+		// Separate count for InProgress, used to determine if restart needed
+		if restore.Status.Phase == velero.RestorePhaseInProgress {
+			nInProgressDeleted++
+		}
 	}
 
-	return nDeleted, nil
+	return nDeleted, nInProgressDeleted, nil
 }
 
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
@@ -509,6 +518,9 @@ func (t *Task) deleteStalePVRs() (int, error) {
 		}
 
 		// Delete the PVR
+		t.Log.Info(fmt.Sprintf(
+			"Deleting stale Velero PodVolumeRestore %v/%v (phase %v) from destination cluster",
+			pvr.Namespace, pvr.Name, pvr.Status.Phase))
 		err = destClient.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
