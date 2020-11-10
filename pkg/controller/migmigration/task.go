@@ -441,6 +441,7 @@ func (t *Task) Run() error {
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
+			t.setInitialBackupPartialFailureWarning(backup)
 			if len(reasons) > 0 {
 				t.fail(InitialBackupFailed, reasons)
 			} else {
@@ -591,6 +592,7 @@ func (t *Task) Run() error {
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
+			t.setStageBackupPartialFailureWarning(backup)
 			if len(reasons) > 0 {
 				t.fail(StageBackupFailed, reasons)
 			} else {
@@ -666,6 +668,7 @@ func (t *Task) Run() error {
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
 			t.setResticConditions(restore)
+			t.setStageRestorePartialFailureWarning(restore)
 			if len(reasons) > 0 {
 				t.fail(StageRestoreFailed, reasons)
 			} else {
@@ -751,6 +754,7 @@ func (t *Task) Run() error {
 		}
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
+			t.setFinalRestorePartialFailureWarning(restore)
 			if len(reasons) > 0 {
 				t.fail(FinalRestoreFailed, reasons)
 			} else {

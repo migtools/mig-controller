@@ -265,7 +265,6 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 			"Backup: %s/%s failed.",
 			backup.Namespace,
 			backup.Name)
-		reasons = append(reasons, message)
 		progress = append(progress, message)
 		progress = append(
 			progress,
