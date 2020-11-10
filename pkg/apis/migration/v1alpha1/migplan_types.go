@@ -48,7 +48,7 @@ const (
 	ClosedIndexField = "closed"
 )
 
-// MigPlanHook hold a referene to a MigHook along with the desired phase to run it in
+// MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
 	Reference          *kapi.ObjectReference `json:"reference"`
 	Phase              string                `json:"phase"`
@@ -231,15 +231,15 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 // Registry
 //
 
-// Registry label for controller-created migration registry resources
+// Registry labels for controller-created migration registry resources
 const (
-	MigrationRegistryLabel = "migration-registry"
+	MigrationRegistryLabel = "migration.openshift.io/migration-registry"
 )
 
 // Build a credentials Secret as desired for the source cluster.
 func (r *MigPlan) BuildRegistrySecret(client k8sclient.Client, storage *MigStorage) (*kapi.Secret, error) {
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	secret := &kapi.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       labels,
@@ -271,7 +271,7 @@ func (r *MigPlan) UpdateRegistrySecret(client k8sclient.Client, storage *MigStor
 func (r *MigPlan) GetRegistrySecret(client k8sclient.Client) (*kapi.Secret, error) {
 	list := kapi.SecretList{}
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -295,7 +295,7 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 // Build a Registry Deployment.
 func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name, dirName, registryImage string) *appsv1.Deployment {
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	labels["app"] = name
 	labels["migplan"] = string(r.UID)
 	deployment := &appsv1.Deployment{
@@ -359,17 +359,19 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 	deployment.Spec = appsv1.DeploymentSpec{
 		Replicas: pointer.Int32Ptr(1),
 		Selector: metav1.SetAsLabelSelector(map[string]string{
-			"app":        name,
-			"deployment": name,
-			"migplan":    string(r.UID),
+			"app":                  name,
+			"deployment":           name,
+			"migplan":              string(r.UID),
+			MigrationRegistryLabel: True,
 		}),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Time{},
 				Labels: map[string]string{
-					"app":        name,
-					"deployment": name,
-					"migplan":    string(r.UID),
+					"app":                  name,
+					"deployment":           name,
+					"migplan":              string(r.UID),
+					MigrationRegistryLabel: True,
 				},
 			},
 			Spec: kapi.PodSpec{
@@ -434,7 +436,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 func (r *MigPlan) GetRegistryDeployment(client k8sclient.Client) (*appsv1.Deployment, error) {
 	list := appsv1.DeploymentList{}
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
@@ -477,7 +479,7 @@ func (r *MigPlan) EqualsRegistryDeployment(a, b *appsv1.Deployment) bool {
 // Build a Registry Service as desired for the specified cluster.
 func (r *MigPlan) BuildRegistryService(name string) *kapi.Service {
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	labels["app"] = name
 	service := &kapi.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -513,7 +515,7 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, error) {
 	list := kapi.ServiceList{}
 	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = string(r.UID)
+	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
