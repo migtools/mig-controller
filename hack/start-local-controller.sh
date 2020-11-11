@@ -14,7 +14,7 @@ LOCAL_UI_CORS='//127.0.0.1(:|$) //localhost(:|$)'
 
 # Pull mig-ui route host from disk to set CORS_ALLOWED_ORIGINS 
 MIG_UI_ROUTE_PATH=$KUBECONFIG-ui-route
-MIG_UI_ROUTE=$(cat $MIG_UI_ROUTE_PATH)
+MIG_UI_ROUTE=$(cat $MIG_UI_ROUTE_PATH 2>/dev/null)
 
 if [ $? -eq 0 ]; then
     export CORS_ALLOWED_ORIGINS="${MIG_UI_ROUTE} ${LOCAL_UI_CORS}"
