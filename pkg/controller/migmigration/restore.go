@@ -398,17 +398,17 @@ func (t *Task) deleteCorrelatedRestores() error {
 
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
-func (t *Task) deleteStaleRestores() (int, int, error) {
+func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, int, error) {
 	nDeleted := 0
 	nInProgressDeleted := 0
 
-	destClient, err := t.getDestinationClient()
+	clusterClient, err := cluster.GetClient(t.Client)
 	if err != nil {
 		return 0, 0, liberr.Wrap(err)
 	}
 
 	list := velero.RestoreList{}
-	err = destClient.List(
+	err = clusterClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -439,9 +439,9 @@ func (t *Task) deleteStaleRestores() (int, int, error) {
 		}
 		// Delete the Restore
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero Restore %v/%v from destination cluster",
-			restore.Namespace, restore.Name))
-		err = destClient.Delete(context.TODO(), &restore)
+			"Deleting stale Velero Restore %v/%v [phase=%v] from MigCluster %v/%v",
+			restore.Namespace, restore.Name, restore.Status.Phase, cluster.Namespace, cluster.Name))
+		err = clusterClient.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
@@ -457,15 +457,15 @@ func (t *Task) deleteStaleRestores() (int, int, error) {
 
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration.
-func (t *Task) deleteStalePVRs() (int, error) {
+func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error) {
 	nDeleted := 0
-	destClient, err := t.getDestinationClient()
+	clusterClient, err := cluster.GetClient(t.Client)
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
 
 	list := velero.PodVolumeRestoreList{}
-	err = destClient.List(
+	err = clusterClient.List(
 		context.TODO(),
 		k8sclient.InNamespace(migapi.VeleroNamespace),
 		&list)
@@ -487,7 +487,7 @@ func (t *Task) deleteStalePVRs() (int, error) {
 				continue
 			}
 			restore := velero.Restore{}
-			err := destClient.Get(
+			err := clusterClient.Get(
 				context.TODO(),
 				types.NamespacedName{
 					Namespace: migapi.VeleroNamespace,
@@ -519,9 +519,9 @@ func (t *Task) deleteStalePVRs() (int, error) {
 
 		// Delete the PVR
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero PodVolumeRestore %v/%v (phase %v) from destination cluster",
-			pvr.Namespace, pvr.Name, pvr.Status.Phase))
-		err = destClient.Delete(context.TODO(), &pvr)
+			"Deleting stale Velero PodVolumeRestore %v/%v [phase=%v] from MigCluster %v/%v",
+			pvr.Namespace, pvr.Name, pvr.Status.Phase, cluster.Namespace, cluster.Name))
+		err = clusterClient.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
 		}
