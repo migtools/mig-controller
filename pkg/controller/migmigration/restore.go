@@ -188,7 +188,7 @@ func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progres
 				getPVRDuration(&pvr))
 		case velero.PodVolumeRestorePhaseCompleted:
 			msg = fmt.Sprintf(
-				"PodVolumeRestore %s/%s: Completed, %s out of %s restored%s",
+				"PodVolumeRestore %s/%s: %s out of %s restored%s",
 				pvr.Namespace,
 				pvr.Name,
 				bytesToSI(pvr.Status.Progress.BytesDone),
@@ -230,7 +230,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Backup %s/%s: Not started yet",
+				"Backup %s/%s: Not started",
 				restore.Namespace,
 				restore.Name))
 	case velero.RestorePhaseInProgress:

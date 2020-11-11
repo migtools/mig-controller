@@ -207,7 +207,7 @@ func getPodVolumeBackupsProgress(pvbList *velero.PodVolumeBackupList) (progress 
 				getPVBDuration(&pvb))
 		case velero.PodVolumeBackupPhaseCompleted:
 			msg = fmt.Sprintf(
-				"PodVolumeBackup %s/%s: Completed, %s out of %s backed up%s",
+				"PodVolumeBackup %s/%s: %s out of %s backed up%s",
 				pvb.Namespace,
 				pvb.Name,
 				bytesToSI(pvb.Status.Progress.BytesDone),
@@ -249,7 +249,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Backup %s/%s: Not started yet",
+				"Backup %s/%s: Not started",
 				backup.Namespace,
 				backup.Name))
 	case velero.BackupPhaseInProgress:
@@ -270,9 +270,11 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Backup %s/%s: Completed%s",
+				"Backup %s/%s: %d out of estimated total of %d objects backed up%s",
 				backup.Namespace,
 				backup.Name,
+				backup.Status.Progress.ItemsBackedUp,
+				backup.Status.Progress.TotalItems,
 				getBackupDuration(backup)))
 		progress = append(
 			progress,
