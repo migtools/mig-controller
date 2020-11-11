@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
@@ -67,7 +68,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("miganalytic_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -97,12 +98,15 @@ var _ reconcile.Reconciler = &ReconcileMigAnalytic{}
 // ReconcileMigAnalytic reconciles a MigAnalytic object
 type ReconcileMigAnalytic struct {
 	client.Client
+	record.EventRecorder
+
 	scheme *runtime.Scheme
 }
 
 func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("analytic", request)
 
 	// Fetch the MigAnalytic instance
 	analytic := &migapi.MigAnalytic{}
@@ -118,6 +122,8 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", analytic.Status.Conditions)
+		analytic.Status.Conditions.RecordEvents(analytic, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -160,7 +166,7 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	// Ready
 	analytic.Status.SetReady(
 		!analytic.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The analytic is ready.")
 
 	// End staging conditions.
 	analytic.Status.EndStagingConditions()
