@@ -80,7 +80,7 @@ func (r ReconcileMigHook) validateTargetCluster(hook *migapi.MigHook) error {
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  "Only 'source' and 'destination' are accepted as values for spec.targetCluster.",
+			Message:  "Only `source` and `destination` are accepted as values for spec.targetCluster.",
 		})
 	}
 	return nil
