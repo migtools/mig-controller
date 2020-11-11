@@ -422,7 +422,7 @@ func (t *Task) deleteStaleVeleroCRs() error {
 			Status:   True,
 			Category: migapi.Required,
 			Message: fmt.Sprintf(
-				"Deleted %v stale Velero Backups, %v stale Velero Restores. "+
+				"Deleted stale Velero CRs: %v Backups, %v Restores. "+
 					"Velero will be restarted on source MigCluster %v/%v.",
 				nBackupsDeleted, nRestoresDeleted, srcCluster.Namespace, srcCluster.Name),
 			Durable: true,
@@ -445,7 +445,7 @@ func (t *Task) deleteStaleVeleroCRs() error {
 			Type:     StaleDestVeleroCRsDeleted,
 			Status:   True,
 			Category: migapi.Required,
-			Message: fmt.Sprintf("Deleted %v stale Velero Backups, %v stale Velero Restores. "+
+			Message: fmt.Sprintf("Deleted stale Velero CRs: %v Backups, %v Restores. "+
 				"Velero will be restarted on target MigCluster %v/%v.",
 				nBackupsDeleted, nRestoresDeleted, dstCluster.Namespace, dstCluster.Name),
 			Durable: true,
