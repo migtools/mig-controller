@@ -14,11 +14,9 @@ MIG_KUBECONFIG=$KUBECONFIG-$KUBECONFIG_POSTFIX
 MIG_UI_ROUTE_PATH=$MIG_KUBECONFIG-ui-route
 
 # Interrogate mig-ui route to set CORS_ALLOWED_ORIGINS 
-MIG_UI_ROUTE_HOST=$(oc get route migration -n openshift-migration migration -o=jsonpath='{.items[0].spec.host}')
+MIG_UI_ROUTE_HOST=$(oc get route migration -n openshift-migration -o=jsonpath='{.spec.host}' 2>/dev/null)
 if [ $? -eq 0 ]; then
     echo "${MIG_UI_ROUTE_HOST}" > ${MIG_UI_ROUTE_PATH}
-else
-    echo "Missing mig-ui route domain. Continuing without setting CORS_ALLOWED_ORIGINS."
 fi
 
 # Create copy of original KUBECONFIG that will be logged in with mig-controller SA token
