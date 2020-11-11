@@ -82,7 +82,6 @@ func reportGVK(plan *migapi.MigPlan, incompatibleMapping map[string][]schema.Gro
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     GVKsIncompatible,
 			Status:   True,
-			Reason:   NotCompatible,
 			Category: Warn,
 			Message:  "Some namespaces contain GVKs incompatible with destination cluster. See: `incompatibleNamespaces` for details.",
 		})

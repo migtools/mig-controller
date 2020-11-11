@@ -88,15 +88,9 @@ const (
 	NotDistinct    = "NotDistinct"
 	LimitExceeded  = "LimitExceeded"
 	NotDone        = "NotDone"
-	NotSupported   = "NotSupported"
-	ErrorsDetected = "ErrorsDetected"
-	NotAvailable   = "NotAvailable"
-	NotAccessible  = "NotAccessible"
-	NotCompatible  = "NotCompatible"
 	Done           = "Done"
 	Conflict       = "Conflict"
 	NotHealthy     = "NotHealthy"
-	NotReady       = "NotReady"
 )
 
 // Statuses
@@ -218,7 +212,6 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageNotReady,
 			Status:   True,
-			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `migStorageRef` does not have a `Ready` condition, subject: %s.",
 				path.Join(plan.Spec.MigStorageRef.Namespace, plan.Spec.MigStorageRef.Name)),
@@ -342,7 +335,6 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     SourceClusterNotReady,
 			Status:   True,
-			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `srcMigClusterRef` does not have a `Ready` condition, subject: %s",
 				path.Join(plan.Spec.SrcMigClusterRef.Namespace, plan.Spec.SrcMigClusterRef.Name)),
@@ -404,7 +396,6 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     DestinationClusterNotReady,
 			Status:   True,
-			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `dstMigClusterRef` does not have a `Ready` condition, subject: %s",
 				path.Join(plan.Spec.DestMigClusterRef.Namespace, plan.Spec.DestMigClusterRef.Name)),
@@ -655,7 +646,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvNoSupportedAction,
 			Status:   True,
-			Reason:   NotSupported,
 			Category: Warn,
 			Message:  "PV in `persistentVolumes` [] with no `SupportedActions`.",
 			Items:    unsupported,
@@ -675,7 +665,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidAccessMode,
 			Status:   True,
-			Reason:   ErrorsDetected,
 			Category: Error,
 			Message:  "PV in `persistentVolumes` [] has an invalid `accessMode`.",
 			Items:    invalidAccessMode,
@@ -696,7 +685,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvWarnAccessModeUnavailable,
 			Status:   True,
-			Reason:   NotAvailable,
 			Category: Warn,
 			Message:  "AccessMode for PVC in `persistentVolumes` [] unavailable in chosen storage class.",
 			Items:    unavailableAccessMode,
@@ -716,7 +704,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvInvalidCopyMethod,
 			Status:   True,
-			Reason:   ErrorsDetected,
 			Category: Error,
 			Message:  "PV in `persistentVolumes` [] has an invalid `copyMethod`.",
 			Items:    invalidCopyMethod,
@@ -726,7 +713,6 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvWarnCopyMethodSnapshot,
 			Status:   True,
-			Reason:   NotCompatible,
 			Category: Warn,
 			Message: "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen " +
 				"storage class is compatible with the source volume's storage type for Snapshot support.",
@@ -1008,7 +994,6 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     HookNotReady,
 				Status:   True,
-				Reason:   NotReady,
 				Category: Critical,
 				Message:  "One or more referenced hooks are not ready.",
 			})
@@ -1186,7 +1171,6 @@ func (r *NfsValidation) validate() error {
 		r.Plan.Status.SetCondition(migapi.Condition{
 			Type:     NfsNotAccessible,
 			Status:   True,
-			Reason:   NotAccessible,
 			Category: Warn,
 			Message:  "NFS servers [] not accessible on the destination cluster.",
 			Items:    notAccessible,

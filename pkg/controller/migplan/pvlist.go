@@ -372,7 +372,6 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 				plan.Status.SetCondition(migapi.Condition{
 					Type:     PvWarnNoCephAvailable,
 					Status:   True,
-					Reason:   NotAvailable,
 					Category: Warn,
 					Message: "Ceph is not available on destination. If this is desired, please install the rook" +
 						" operator. The following PVs will use the default storage class instead: []",
