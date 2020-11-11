@@ -42,11 +42,8 @@ const (
 const (
 	NotSet              = "NotSet"
 	NotFound            = "NotFound"
-	NotReady            = "NotReady"
 	Cancel              = "Cancel"
 	ErrorsDetected      = "ErrorsDetected"
-	UnhealthyState      = "UnhealthyState"
-	HealthyState        = "HealthyState"
 )
 
 // Statuses
@@ -118,7 +115,6 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     PlanNotReady,
 			Status:   True,
-			Reason:   NotReady,
 			Category: Critical,
 			Message: fmt.Sprintf("The referenced `migPlanRef` does not have a `Ready` condition, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
@@ -201,7 +197,6 @@ func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMi
 			migration.Status.SetCondition(migapi.Condition{
 				Type:     RegistriesUnhealthy,
 				Status:   True,
-				Reason:   UnhealthyState,
 				Category: migapi.Critical,
 				Message:  message,
 				Durable:  true,
@@ -218,7 +213,6 @@ func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     RegistriesHealthy,
 		Status:   True,
-		Reason:   HealthyState,
 		Category: migapi.Required,
 		Message:  "The migration registries are healthy.",
 		Durable:  true,

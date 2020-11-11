@@ -178,7 +178,6 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     ResticErrors,
 			Status:   True,
-			Reason:   ErrorsDetected,
 			Category: migapi.Warn,
 			Message: fmt.Sprintf("There were errors found in %d Restic volume restores. See restore `%s` for details",
 				len(restore.Status.PodVolumeRestoreErrors), restore.Name),
@@ -189,7 +188,6 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     ResticVerifyErrors,
 			Status:   True,
-			Reason:   ErrorsDetected,
 			Category: migapi.Warn,
 			Message: fmt.Sprintf("There were verify errors found in %d Restic volume restores. See restore `%s` for details",
 				len(restore.Status.PodVolumeRestoreVerifyErrors), restore.Name),

@@ -273,7 +273,6 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.D
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Postponed,
 		Status:   True,
-		Reason:   Postponed,
 		Category: Critical,
 		Message:  fmt.Sprintf("Postponed %d seconds to ensure migrations run serially and in order.", requeueAfter/time.Second),
 	})

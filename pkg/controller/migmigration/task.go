@@ -851,7 +851,6 @@ func (t *Task) init() error {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StageNoOp,
 			Status:   True,
-			Reason:   StageNoOp,
 			Category: migapi.Warn,
 			Message:  "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated.",
 			Durable:  true,
