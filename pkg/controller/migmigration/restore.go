@@ -230,7 +230,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Backup %s/%s: Not started",
+				"Restore %s/%s: Not started",
 				restore.Namespace,
 				restore.Name))
 	case velero.RestorePhaseInProgress:
