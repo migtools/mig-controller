@@ -44,9 +44,7 @@ const (
 	NotFound            = "NotFound"
 	NotReady            = "NotReady"
 	Cancel              = "Cancel"
-	ClosedState         = "ClosedState"
 	ErrorsDetected      = "ErrorsDetected"
-	FinalMigrationState = "FinalMigrationState"
 	UnhealthyState      = "UnhealthyState"
 	HealthyState        = "HealthyState"
 )
@@ -132,7 +130,6 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     PlanClosed,
 			Status:   True,
-			Reason:   ClosedState,
 			Category: Critical,
 			Message: fmt.Sprintf("The associated migration plan is closed, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
@@ -182,7 +179,6 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     HasFinalMigration,
 			Status:   True,
-			Reason:   FinalMigrationState,
 			Category: Critical,
 			Message: fmt.Sprintf("The associated MigPlan already has a final migration, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
