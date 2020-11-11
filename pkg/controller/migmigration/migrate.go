@@ -79,13 +79,24 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	if task.Phase == Completed {
 		migration.Status.DeleteCondition(Running)
 		failed := task.Owner.Status.FindCondition(Failed)
-		if failed == nil {
+		warnings := task.Owner.Status.FindConditionByCategory(migapi.Warn)
+		if failed == nil && len(warnings) == 0 {
 			migration.Status.SetCondition(migapi.Condition{
 				Type:     Succeeded,
 				Status:   True,
 				Reason:   task.Phase,
 				Category: Advisory,
 				Message:  "The migration has completed successfully.",
+				Durable:  true,
+			})
+		}
+		if failed == nil && len(warnings) > 0 {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     SucceededWithWarnings,
+				Status:   True,
+				Reason:   task.Phase,
+				Category: Advisory,
+				Message:  "The migration has completed with warning, please look at `Warn` conditions.",
 				Durable:  true,
 			})
 		}

@@ -24,6 +24,7 @@ const (
 	Postponed                          = "Postponed"
 	Running                            = "Running"
 	Succeeded                          = "Succeeded"
+	SucceededWithWarnings              = "SucceededWithWarnings"
 	Failed                             = "Failed"
 	ResticErrors                       = "ResticErrors"
 	ResticVerifyErrors                 = "ResticVerifyErrors"
