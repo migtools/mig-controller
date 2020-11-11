@@ -265,6 +265,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 			"Backup: %s/%s failed.",
 			backup.Namespace,
 			backup.Name)
+		reasons = append(reasons, message)
 		progress = append(progress, message)
 		progress = append(
 			progress,
@@ -275,7 +276,6 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 			"Backup: %s/%s partially failed.",
 			backup.Namespace,
 			backup.Name)
-		reasons = append(reasons, message)
 		progress = append(progress, message)
 		progress = append(
 			progress,
@@ -293,6 +293,36 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 
 	t.setProgress(progress)
 	return completed, reasons
+}
+
+// Set warning conditions on migmigration if there were any partial failures
+func (t *Task) setInitialBackupPartialFailureWarning(backup *velero.Backup) {
+	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
+		message := fmt.Sprintf(
+			"Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     VeleroInitialBackupPartiallyFailed,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
+	}
+}
+
+// Set warning conditions on migmigration if there were any partial failures
+func (t *Task) setStageBackupPartialFailureWarning(backup *velero.Backup) {
+	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
+		message := fmt.Sprintf(
+			"Stage Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     VeleroStageBackupPartiallyFailed,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
+	}
 }
 
 // Get the existing BackupStorageLocation on the source cluster.

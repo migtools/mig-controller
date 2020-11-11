@@ -317,36 +317,6 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 }
 
 // Set warning conditions on migmigration if there were any partial failures
-func (t *Task) setInitialBackupPartialFailureWarning(backup *velero.Backup) {
-	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
-		message := fmt.Sprintf(
-			"Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
-		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     VeleroInitialBackupPartiallyFailed,
-			Status:   True,
-			Category: migapi.Warn,
-			Message:  message,
-			Durable:  true,
-		})
-	}
-}
-
-// Set warning conditions on migmigration if there were any partial failures
-func (t *Task) setStageBackupPartialFailureWarning(backup *velero.Backup) {
-	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
-		message := fmt.Sprintf(
-			"Stage Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
-		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     VeleroStageBackupPartiallyFailed,
-			Status:   True,
-			Category: migapi.Warn,
-			Message:  message,
-			Durable:  true,
-		})
-	}
-}
-
-// Set warning conditions on migmigration if there were any partial failures
 func (t *Task) setStageRestorePartialFailureWarning(restore *velero.Restore) {
 	if restore.Status.Phase == velero.RestorePhasePartiallyFailed {
 		message := fmt.Sprintf(

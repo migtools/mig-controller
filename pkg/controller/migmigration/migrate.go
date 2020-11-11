@@ -96,7 +96,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 				Status:   True,
 				Reason:   task.Phase,
 				Category: Advisory,
-				Message:  "The migration has completed with warning, please look at `Warn` conditions.",
+				Message:  "The migration has completed with warnings, please look at `Warn` conditions.",
 				Durable:  true,
 			})
 		}
