@@ -84,8 +84,9 @@ func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageEnsured,
 			Status:   True,
+			Reason:   Done,
 			Category: migapi.Required,
-			Message:  StorageEnsuredMessage,
+			Message:  "The storage resources have been created.",
 		})
 	}
 
