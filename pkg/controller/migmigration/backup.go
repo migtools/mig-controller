@@ -296,7 +296,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	case velero.BackupPhaseFailed:
 		completed = true
 		message := fmt.Sprintf(
-			"Backup: %s/%s failed.",
+			"Backup %s/%s: failed.",
 			backup.Namespace,
 			backup.Name)
 		reasons = append(reasons, message)
@@ -307,7 +307,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	case velero.BackupPhasePartiallyFailed:
 		completed = true
 		message := fmt.Sprintf(
-			"Backup: %s/%s partially failed.",
+			"Backup %s/%s: partially failed.",
 			backup.Namespace,
 			backup.Name)
 		reasons = append(reasons, message)
@@ -320,7 +320,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		reasons = append(
 			reasons,
 			fmt.Sprintf(
-				"Backup: %s/%s validation failed.",
+				"Backup %s/%s: validation failed.",
 				backup.Namespace,
 				backup.Name))
 		completed = true

@@ -261,7 +261,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	case velero.RestorePhaseFailed:
 		completed = true
 		message := fmt.Sprintf(
-			"Restore: %s/%s failed.",
+			"Restore %s/%s: Failed.",
 			restore.Namespace,
 			restore.Name)
 		reasons = append(reasons, message)
@@ -273,7 +273,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		completed = true
 		message := fmt.Sprintf(
 			fmt.Sprintf(
-				"Restore: %s/%s partially failed.",
+				"Restore %s/%s: partially failed.",
 				restore.Namespace,
 				restore.Name))
 		reasons = append(reasons, message)
@@ -286,7 +286,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		reasons = append(
 			reasons,
 			fmt.Sprintf(
-				"Restore: %s/%s validation failed.",
+				"Restore %s/%s: validation failed.",
 				restore.Namespace,
 				restore.Name))
 		completed = true
