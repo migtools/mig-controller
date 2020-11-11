@@ -82,7 +82,6 @@ const (
 
 // Reasons
 const (
-	Duplicate      = "Duplicate"
 	NotSet         = "NotSet"
 	NotFound       = "NotFound"
 	KeyNotFound    = "KeyNotFound"
@@ -91,7 +90,6 @@ const (
 	NotDone        = "NotDone"
 	NotSupported   = "NotSupported"
 	ErrorsDetected = "ErrorsDetected"
-	Missing        = "Missing"
 	NotAvailable   = "NotAvailable"
 	NotAccessible  = "NotAccessible"
 	NotCompatible  = "NotCompatible"
@@ -99,10 +97,6 @@ const (
 	Conflict       = "Conflict"
 	NotHealthy     = "NotHealthy"
 	NotReady       = "NotReady"
-	Incorrect      = "Incorrect"
-	SuspendedState = "SuspendedState"
-	ClosedState    = "ClosedState"
-	UnknownPhase   = "UnknownPhase"
 )
 
 // Statuses
@@ -1034,7 +1028,6 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     HookPhaseUnknown,
 				Status:   True,
-				Reason:   UnknownPhase,
 				Category: Critical,
 				Message:  "One or more referenced hooks are in an unknown phase.",
 			})
@@ -1049,7 +1042,6 @@ func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     HookPhaseDuplicate,
 			Status:   True,
-			Reason:   Duplicate,
 			Category: Critical,
 			Message:  "Only one hook may be specified per phase.",
 		})
