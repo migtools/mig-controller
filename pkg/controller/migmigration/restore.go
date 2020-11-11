@@ -158,7 +158,7 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 	return &list
 }
 
-// returns duration of in-progress PVR
+// getPVRDuration returns duration of in-progress PVR
 func getPVRDuration(pvr *velero.PodVolumeRestore) (duration string) {
 	if pvr.Status.StartTimestamp != nil {
 		if pvr.Status.CompletionTimestamp == nil {
@@ -172,7 +172,9 @@ func getPVRDuration(pvr *velero.PodVolumeRestore) (duration string) {
 	return
 }
 
-// returns progress information of PVRs
+// getPodVolumeRestoresProgress returns progress information of PVRs
+// Given a list of PVRs, iterates over the list, reads progress reported in status field of PVR,
+// converts to compatible progress messages and returns an ordered list of formatted messages
 func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progress []string) {
 	m, keys, msg := make(map[string]string), make([]string, 0), ""
 

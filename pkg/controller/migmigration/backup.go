@@ -163,7 +163,7 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	return nil, nil
 }
 
-// returns duration of in-progress PVB
+// getPVBDuration returns duration of in-progress PVB
 func getPVBDuration(pvb *velero.PodVolumeBackup) (duration string) {
 	if pvb.Status.StartTimestamp != nil {
 		if pvb.Status.CompletionTimestamp == nil {
@@ -177,7 +177,7 @@ func getPVBDuration(pvb *velero.PodVolumeBackup) (duration string) {
 	return
 }
 
-// returns duration of in-progress Backup
+// getBackupDuration returns duration of in-progress Backup
 func getBackupDuration(bkp *velero.Backup) (duration string) {
 	if bkp.Status.StartTimestamp != nil {
 		if bkp.Status.CompletionTimestamp == nil {
@@ -191,7 +191,9 @@ func getBackupDuration(bkp *velero.Backup) (duration string) {
 	return
 }
 
-// returns progress information of PVB resources
+// getPodVolumeBackupsProgress returns progress information of PVB resources
+// Given a list of PVBs, iterates over the list, reads progress reported in status field of PVB,
+// converts to compatible progress messages and returns an ordered list of formatted messages
 func getPodVolumeBackupsProgress(pvbList *velero.PodVolumeBackupList) (progress []string) {
 	m, keys, msg := make(map[string]string), make([]string, 0), ""
 
@@ -236,6 +238,16 @@ func getPodVolumeBackupsProgress(pvbList *velero.PodVolumeBackupList) (progress 
 	return
 }
 
+// getBackupStats returns backup progress statistics
+func getBackupStats(backup *velero.Backup) (itemsBackedUp int, totalItems int) {
+	if backup.Status.Progress == nil {
+		return
+	}
+	totalItems = backup.Status.Progress.TotalItems
+	itemsBackedUp = backup.Status.Progress.ItemsBackedUp
+	return
+}
+
 // Get whether a backup has completed on the source cluster.
 func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 	completed := false
@@ -253,28 +265,30 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 				backup.Namespace,
 				backup.Name))
 	case velero.BackupPhaseInProgress:
+		itemsBackedUp, totalItems := getBackupStats(backup)
 		progress = append(
 			progress,
 			fmt.Sprintf(
 				"Backup %s/%s: %d out of estimated total of %d objects backed up%s",
 				backup.Namespace,
 				backup.Name,
-				backup.Status.Progress.ItemsBackedUp,
-				backup.Status.Progress.TotalItems,
+				itemsBackedUp,
+				totalItems,
 				getBackupDuration(backup)))
 		progress = append(
 			progress,
 			getPodVolumeBackupsProgress(pvbs)...)
 	case velero.BackupPhaseCompleted:
 		completed = true
+		itemsBackedUp, totalItems := getBackupStats(backup)
 		progress = append(
 			progress,
 			fmt.Sprintf(
 				"Backup %s/%s: %d out of estimated total of %d objects backed up%s",
 				backup.Namespace,
 				backup.Name,
-				backup.Status.Progress.ItemsBackedUp,
-				backup.Status.Progress.TotalItems,
+				itemsBackedUp,
+				totalItems,
 				getBackupDuration(backup)))
 		progress = append(
 			progress,
