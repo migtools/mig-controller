@@ -24,6 +24,8 @@ const (
 	Created                         = ""
 	Started                         = "Started"
 	CleanStaleAnnotations           = "CleanStaleAnnotations"
+	CleanStaleVeleroCRs             = "CleanStaleVeleroCRs"
+	CleanStaleResticCRs             = "CleanStaleResticCRs"
 	CleanStaleStagePods             = "CleanStaleStagePods"
 	WaitForStaleStagePodsTerminated = "WaitForStaleStagePodsTerminated"
 	StartRefresh                    = "StartRefresh"
@@ -48,8 +50,10 @@ const (
 	StagePodsCreated                = "StagePodsCreated"
 	StagePodsFailed                 = "StagePodsFailed"
 	SourceStagePodsFailed           = "SourceStagePodsFailed"
+	RestartVelero                   = "RestartVelero"
+	WaitForVeleroReady              = "WaitForVeleroReady"
 	RestartRestic                   = "RestartRestic"
-	ResticRestarted                 = "ResticRestarted"
+	WaitForResticReady              = "WaitForResticReady"
 	QuiesceApplications             = "QuiesceApplications"
 	EnsureQuiesced                  = "EnsureQuiesced"
 	UnQuiesceApplications           = "UnQuiesceApplications"
@@ -114,18 +118,21 @@ var StageItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleResticCRs, Step: StepPrepare},
+		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
+		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
-		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs},
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
 		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
-		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
+		{Name: WaitForVeleroReady, Step: StepStageBackup},
+		{Name: WaitForResticReady, Step: StepStageBackup, all: HasPVs},
 		{Name: WaitForRegistriesReady, Step: StepStageBackup},
+		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
@@ -149,11 +156,16 @@ var FinalItinerary = Itinerary{
 		{Name: StartRefresh, Step: StepPrepare},
 		{Name: WaitForRefresh, Step: StepPrepare},
 		{Name: CleanStaleAnnotations, Step: StepPrepare},
+		{Name: CleanStaleResticCRs, Step: StepPrepare},
+		{Name: CleanStaleVeleroCRs, Step: StepPrepare},
+		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare},
-		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
+		{Name: WaitForVeleroReady, Step: StepPrepare},
+		{Name: WaitForResticReady, Step: StepPrepare, any: HasPVs},
 		{Name: WaitForRegistriesReady, Step: StepPrepare},
+		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: PreBackupHooks, Step: StepBackup},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
@@ -162,8 +174,6 @@ var FinalItinerary = Itinerary{
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs},
 		{Name: StagePodsCreated, Step: StepStageBackup, all: HasStagePods},
 		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
-		{Name: RestartRestic, Step: StepStageBackup, all: HasStagePods},
-		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureStageBackup, Step: StepStageBackup, any: HasPVs | HasISs},
@@ -320,6 +330,24 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		}
+	case CleanStaleResticCRs:
+		t.Requeue = PollReQ
+		err := t.deleteStaleResticCRs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CleanStaleVeleroCRs:
+		t.Requeue = PollReQ
+		err := t.deleteStaleVeleroCRs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
 		}
 	case CreateRegistries:
 		t.Requeue = PollReQ
@@ -483,8 +511,29 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case ResticRestarted:
+	case RestartVelero:
+		err := t.restartVeleroPods()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = PollReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case WaitForResticReady:
 		started, err := t.haveResticPodsStarted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if started {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+		}
+	case WaitForVeleroReady:
+		started, err := t.haveVeleroPodsStarted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -778,14 +827,14 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case DeleteBackups:
-		if err := t.deleteBackups(); err != nil {
+		if err := t.deleteCorrelatedBackups(); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
 	case DeleteRestores:
-		if err := t.deleteRestores(); err != nil {
+		if err := t.deleteCorrelatedRestores(); err != nil {
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {

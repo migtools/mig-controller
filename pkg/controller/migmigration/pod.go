@@ -144,6 +144,108 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 	return true, nil
 }
 
+// Delete the running Velero pods.
+// Needed to stop any pending tasks after Velero CR deletion
+func (t *Task) restartVeleroPods() error {
+	// Restart source cluster Velero pod if needed
+	if t.Owner.Status.HasCondition(StaleSrcVeleroCRsDeleted) {
+		err := t.deleteVeleroPodsForCluster(t.PlanResources.SrcMigCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	// Restart target cluster Velero pod if needed
+	if t.Owner.Status.HasCondition(StaleDestVeleroCRsDeleted) {
+		err := t.deleteVeleroPodsForCluster(t.PlanResources.DestMigCluster)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (t *Task) deleteVeleroPodsForCluster(cluster *migapi.MigCluster) error {
+	veleroPods, err := t.findVeleroPods(cluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	clusterClient, err := cluster.GetClient(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, pod := range veleroPods {
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		err = clusterClient.Delete(
+			context.TODO(),
+			&pod)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+// Determine if Velero Pod is running.
+func (t *Task) haveVeleroPodsStarted() (bool, error) {
+	// Verify Velero restart was needed before performing check
+	if !t.Owner.Status.HasAnyCondition(StaleSrcVeleroCRsDeleted, StaleDestVeleroCRsDeleted) {
+		return true, nil
+	}
+
+	clients, err := t.getBothClients()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+
+	for _, client := range clients {
+		list := corev1.PodList{}
+		deployment := appsv1.Deployment{}
+		selector := labels.SelectorFromSet(map[string]string{
+			"component": "velero",
+		})
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     migapi.VeleroNamespace,
+				LabelSelector: selector,
+			},
+			&list)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		err = client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      "velero",
+				Namespace: migapi.VeleroNamespace,
+			},
+			&deployment)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		for _, pod := range list.Items {
+			if pod.DeletionTimestamp != nil {
+				return false, nil
+			}
+			if pod.Status.Phase != corev1.PodRunning {
+				return false, nil
+			}
+		}
+		if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
+			return false, nil
+		}
+	}
+
+	// Remove the condition notifying the user that Velero will be restarted
+	t.Owner.Status.DeleteCondition(StaleSrcVeleroCRsDeleted)
+	t.Owner.Status.DeleteCondition(StaleDestVeleroCRsDeleted)
+	return true, nil
+}
+
 // Find all velero pods on the specified cluster.
 func (t *Task) findVeleroPods(cluster *migapi.MigCluster) ([]corev1.Pod, error) {
 	client, err := cluster.GetClient(t.Client)
