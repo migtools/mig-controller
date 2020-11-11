@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -47,7 +48,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migmigration_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -116,6 +117,8 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 // ReconcileMigMigration reconciles a MigMigration object
 type ReconcileMigMigration struct {
 	client.Client
+	record.EventRecorder
+
 	scheme *runtime.Scheme
 }
 
@@ -143,10 +146,12 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Set values.
-	log.SetValues("migration", migration.Name)
+	log.SetValues("migration", request)
 
 	// Report reconcile error.
 	defer func() {
+		log.Info("CR", "conditions", migration.Status.Conditions)
+		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(err) {
 			return
 		}
@@ -207,7 +212,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.Status.SetReady(
 		migration.Status.Phase != Completed &&
 			!migration.Status.HasBlockerCondition(),
-		ReadyMessage)
+		"The migration is ready.")
 
 	// End staging conditions.
 	migration.Status.EndStagingConditions()
@@ -269,7 +274,7 @@ func (r *ReconcileMigMigration) postpone(migration *migapi.MigMigration) (time.D
 		Type:     Postponed,
 		Status:   True,
 		Category: Critical,
-		Message:  fmt.Sprintf(PostponedMessage, requeueAfter/time.Second),
+		Message:  fmt.Sprintf("Postponed %d seconds to ensure migrations run serially and in order.", requeueAfter/time.Second),
 	})
 
 	return requeueAfter, nil

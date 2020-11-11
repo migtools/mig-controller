@@ -85,7 +85,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 				Status:   True,
 				Reason:   task.Phase,
 				Category: Advisory,
-				Message:  SucceededMessage,
+				Message:  "The migration has completed successfully.",
 				Durable:  true,
 			})
 		}
@@ -93,7 +93,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	}
 
 	phase, n, total := task.Itinerary.progressReport(task.Phase)
-	message := fmt.Sprintf(RunningMessage, n, total)
+	message := fmt.Sprintf("Step: %d/%d", n, total)
 	migration.Status.SetCondition(migapi.Condition{
 		Type:     Running,
 		Status:   True,

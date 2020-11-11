@@ -104,7 +104,8 @@ func (t *Task) reportHealthCondition() {
 			Status:   True,
 			Category: migapi.Warn,
 			Reason:   ErrorsDetected,
-			Message:  fmt.Sprintf(UnhealthyNamespacesMessage, destination),
+			Message: fmt.Sprintf("'%s' cluster has unhealthy namespaces. See status.namespaces for details.",
+				destination),
 		})
 	}
 }

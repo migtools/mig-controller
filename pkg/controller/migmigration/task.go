@@ -747,7 +747,7 @@ func (t *Task) Run() error {
 			Status:   True,
 			Reason:   Cancel,
 			Category: Advisory,
-			Message:  CancelInProgressMessage,
+			Message:  "The migration is being canceled.",
 			Durable:  true,
 		})
 		if err = t.next(); err != nil {
@@ -798,7 +798,7 @@ func (t *Task) Run() error {
 			Status:   True,
 			Reason:   Cancel,
 			Category: Advisory,
-			Message:  CanceledMessage,
+			Message:  "The migration has been canceled.",
 			Durable:  true,
 		})
 		if err = t.next(); err != nil {
@@ -852,7 +852,7 @@ func (t *Task) init() error {
 			Type:     StageNoOp,
 			Status:   True,
 			Category: migapi.Warn,
-			Message:  StageNoOpMessage,
+			Message:  "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated.",
 			Durable:  true,
 		})
 	}
@@ -1008,7 +1008,7 @@ func (t *Task) fail(nextPhase string, reasons []string) {
 		Status:   True,
 		Reason:   t.Phase,
 		Category: Advisory,
-		Message:  FailedMessage,
+		Message:  "The migration has failed.  See: Errors.",
 		Durable:  true,
 	})
 	t.Phase = nextPhase

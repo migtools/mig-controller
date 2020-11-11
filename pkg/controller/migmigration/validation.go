@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -39,36 +40,16 @@ const (
 
 // Reasons
 const (
-	NotSet         = "NotSet"
-	NotFound       = "NotFound"
-	Cancel         = "Cancel"
-	ErrorsDetected = "ErrorsDetected"
+	NotSet              = "NotSet"
+	NotFound            = "NotFound"
+	Cancel              = "Cancel"
+	ErrorsDetected      = "ErrorsDetected"
 )
 
 // Statuses
 const (
 	True  = migapi.True
 	False = migapi.False
-)
-
-// Messages
-const (
-	ReadyMessage               = "The migration is ready."
-	InvalidPlanRefMessage      = "The `migPlanRef` must reference a `migplan`."
-	PlanNotReadyMessage        = "The referenced `migPlanRef` does not have a `Ready` condition."
-	PlanClosedMessage          = "The associated migration plan is closed."
-	HasFinalMigrationMessage   = "The associated MigPlan already has a final migration."
-	PostponedMessage           = "Postponed %d seconds to ensure migrations run serially and in order."
-	CanceledMessage            = "The migration has been canceled."
-	CancelInProgressMessage    = "The migration is being canceled."
-	RunningMessage             = "Step: %d/%d"
-	FailedMessage              = "The migration has failed.  See: Errors."
-	SucceededMessage           = "The migration has completed successfully."
-	UnhealthyNamespacesMessage = "'%s' cluster has unhealthy namespaces. See status.namespaces for details."
-	ResticErrorsMessage        = "There were errors found in %d Restic volume restores. See restore `%s` for details"
-	ResticVerifyErrorsMessage  = "There were verify errors found in %d Restic volume restores. See restore `%s` for details"
-	StageNoOpMessage           = "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated."
-	RegistriesHealthyMessage   = "The migration registries are healthy."
 )
 
 // Validate the plan resource.
@@ -106,7 +87,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Status:   True,
 			Reason:   NotSet,
 			Category: Critical,
-			Message:  InvalidPlanRefMessage,
+			Message:  fmt.Sprintf("The `migPlanRef` must reference a valid `migplan`."),
 		})
 		return nil, nil
 	}
@@ -123,7 +104,8 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Status:   True,
 			Reason:   NotFound,
 			Category: Critical,
-			Message:  InvalidPlanRefMessage,
+			Message: fmt.Sprintf("The `migPlanRef` must reference a valid `migplan`, subject: %s.",
+				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
 		return plan, nil
 	}
@@ -134,7 +116,8 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Type:     PlanNotReady,
 			Status:   True,
 			Category: Critical,
-			Message:  PlanNotReadyMessage,
+			Message: fmt.Sprintf("The referenced `migPlanRef` does not have a `Ready` condition, subject: %s.",
+				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
 	}
 
@@ -144,7 +127,8 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Type:     PlanClosed,
 			Status:   True,
 			Category: Critical,
-			Message:  PlanClosedMessage,
+			Message: fmt.Sprintf("The associated migration plan is closed, subject: %s.",
+				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
 	}
 
@@ -192,7 +176,8 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 			Type:     HasFinalMigration,
 			Status:   True,
 			Category: Critical,
-			Message:  HasFinalMigrationMessage,
+			Message: fmt.Sprintf("The associated MigPlan already has a final migration, subject: %s.",
+				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
 	}
 
@@ -229,7 +214,7 @@ func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
 		Type:     RegistriesHealthy,
 		Status:   True,
 		Category: migapi.Required,
-		Message:  RegistriesHealthyMessage,
+		Message:  "The migration registries are healthy.",
 		Durable:  true,
 	})
 }
