@@ -169,7 +169,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -202,6 +201,7 @@ func (t *Task) Run() error {
 			if len(failedISList) > 0 {
 				t.fail(MigrationFailed, failedISList)
 			} else {
+				t.Requeue = PollReQ
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}
