@@ -72,6 +72,7 @@ var PhaseDescriptions = map[string]string{
 	DeleteMigrated:                  "Rolling back. Deleting migrated resources from target cluster.",
 	DeleteBackups:                   "Deleting Velero Backups created during migration.",
 	DeleteRestores:                  "Deleting Velero Restores created during migration.",
+	DeleteHookJobs:                  "Deleting user-defined hook Jobs and Pods created during migration.",
 	MigrationFailed:                 "Migration failed.",
 	Canceling:                       "Migration cancellation in progress.",
 	Canceled:                        "Migration canceled.",
