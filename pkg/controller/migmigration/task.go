@@ -30,7 +30,6 @@ const (
 	WaitForRefresh                         = "WaitForRefresh"
 	CreateRegistries                       = "CreateRegistries"
 	CreateDirectImageMigration             = "CreateDirectImageMigration"
-	DirectImageMigrationStarted            = "DirectImageMigrationStarted"
 	WaitForDirectImageMigrationToComplete  = "WaitForDirectImageMigrationToComplete"
 	EnsureCloudSecretPropagated            = "EnsureCloudSecretPropagated"
 	PreBackupHooks                         = "PreBackupHooks"
@@ -132,10 +131,9 @@ var StageItinerary = Itinerary{
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: CreateDirectImageMigration, Step: StepDirectImage, all: DirectImage},
-		{Name: DirectImageMigrationStarted, Step: StepDirectImage, all: DirectImage},
-		{Name: CreateDirectVolumeMigration, Step: StepDirectVolume, all: DirectVolume},
-		{Name: DirectVolumeMigrationStarted, Step: StepDirectVolume, all: DirectVolume},
+		{Name: CreateDirectImageMigration, Step: StepPrepare, all: DirectImage},
+		{Name: CreateDirectVolumeMigration, Step: StepPrepare, all: DirectVolume},
+		{Name: DirectVolumeMigrationStarted, Step: StepPrepare, all: DirectVolume},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -187,8 +185,8 @@ var FinalItinerary = Itinerary{
 		{Name: ResticRestarted, Step: StepStageBackup, all: HasStagePods},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
-		{Name: CreateDirectVolumeMigration, Step: StepDirectVolume, all: DirectVolume},
-		{Name: DirectVolumeMigrationStarted, Step: StepDirectVolume, all: DirectVolume},
+		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume},
+		{Name: DirectVolumeMigrationStarted, Step: StepStageBackup, all: DirectVolume},
 		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
 		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
@@ -391,7 +389,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -412,6 +409,7 @@ func (t *Task) Run() error {
 			if len(reasons) > 0 {
 				t.fail(MigrationFailed, reasons)
 			} else {
+				t.Requeue = FastReQ
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}
