@@ -149,12 +149,14 @@ func (t *Task) buildDirectImageStreamMigration(is imagev1.ImageStream, destNsNam
 }
 
 func (t *Task) setDirectImageStreamOwnerReference(dism *migapi.DirectImageStreamMigration) {
+	trueVar := true
 	for i := range dism.OwnerReferences {
 		ref := &dism.OwnerReferences[i]
 		if ref.Kind == t.Owner.Kind {
 			ref.APIVersion = t.Owner.APIVersion
 			ref.Name = t.Owner.Name
 			ref.UID = t.Owner.UID
+			ref.Controller = &trueVar
 			return
 		}
 	}
@@ -164,6 +166,7 @@ func (t *Task) setDirectImageStreamOwnerReference(dism *migapi.DirectImageStream
 			Kind:       t.Owner.Kind,
 			Name:       t.Owner.Name,
 			UID:        t.Owner.UID,
+			Controller: &trueVar,
 		},
 	}
 }
