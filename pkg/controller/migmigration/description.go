@@ -22,6 +22,8 @@ var PhaseDescriptions = map[string]string{
 	StartRefresh:                    "Starting refresh on MigPlan, MigStorage and MigCluster resources",
 	WaitForRefresh:                  "Waiting for refresh of MigPlan, MigStorage and MigCluster resources to complete",
 	CleanStaleAnnotations:           "Removing leftover migration annotations and labels from PVs, PVCs, Pods, ImageStreams, and Namespaces. Annotations and labels provide migration instructions to Velero, Velero Plugins and Restic.",
+	CleanStaleResticCRs:             "Deleting incomplete Restic PodVolumeBackups and PodVolumeRestores created by past migration attempts.",
+	CleanStaleVeleroCRs:             "Deleting incomplete Velero Backups and Restores created by past migration attempts.",
 	CleanStaleStagePods:             "Deleting any leftover stage Pods.",
 	WaitForStaleStagePodsTerminated: "Waiting for leftover stage Pod deletion to finish.",
 	CreateRegistries:                "Creating migration registries on source and target clusters.",
