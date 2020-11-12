@@ -202,6 +202,19 @@ func (r *Conditions) FindCondition(cndType string) *Condition {
 	return condition
 }
 
+func (r *Conditions) FindConditionByCategory(cndCategory string) []*Condition {
+	cndList := []*Condition{}
+	if r.List == nil {
+		return cndList
+	}
+	for _, c := range r.List {
+		if c.Category == cndCategory {
+			cndList = append(cndList, &c)
+		}
+	}
+	return cndList
+}
+
 // Set (add/update) the specified condition to the collection.
 func (r *Conditions) SetCondition(condition Condition) {
 	if r.List == nil {

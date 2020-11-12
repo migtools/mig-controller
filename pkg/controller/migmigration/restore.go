@@ -273,7 +273,6 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 				"Restore: %s/%s partially failed.",
 				restore.Namespace,
 				restore.Name))
-		reasons = append(reasons, message)
 		progress = append(progress, message)
 		progress = append(
 			progress,
@@ -313,6 +312,36 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 			Message: fmt.Sprintf("There were verify errors found in %d Restic volume restores. See restore `%s` for details",
 				len(restore.Status.PodVolumeRestoreVerifyErrors), restore.Name),
 			Durable: true,
+		})
+	}
+}
+
+// Set warning conditions on migmigration if there were any partial failures
+func (t *Task) setStageRestorePartialFailureWarning(restore *velero.Restore) {
+	if restore.Status.Phase == velero.RestorePhasePartiallyFailed {
+		message := fmt.Sprintf(
+			"Stage Restore: %s/%s partially failed on dest cluster", restore.GetNamespace(), restore.GetName())
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     VeleroStageRestorePartiallyFailed,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
+	}
+}
+
+// Set warning conditions on migmigration if there were any partial failures
+func (t *Task) setFinalRestorePartialFailureWarning(restore *velero.Restore) {
+	if restore.Status.Phase == velero.RestorePhasePartiallyFailed {
+		message := fmt.Sprintf(
+			"Final Restore: %s/%s partially failed on dest cluster", restore.GetNamespace(), restore.GetName())
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     VeleroFinalRestorePartiallyFailed,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
 		})
 	}
 }
