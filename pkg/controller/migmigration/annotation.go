@@ -98,49 +98,49 @@ func (t *Task) annotateStageResources() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	itemsUpdate := 0
+	itemsUpdated := 0
 	// Namespaces
-	itemsUpdate, err = t.labelNamespaces(sourceClient, itemsUpdate)
+	itemsUpdated, err = t.labelNamespaces(sourceClient, itemsUpdated)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if itemsUpdate > 50 {
+	if itemsUpdated > 50 {
 		t.Requeue = FastReQ
 		return nil
 	}
 	// Pods
-	itemsUpdate, serviceAccounts, err := t.annotatePods(sourceClient, itemsUpdate)
+	itemsUpdated, serviceAccounts, err := t.annotatePods(sourceClient, itemsUpdated)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if itemsUpdate > 50 {
+	if itemsUpdated > 50 {
 		t.Requeue = FastReQ
 		return nil
 	}
 	// PV & PVCs
-	itemsUpdate, err = t.annotatePVs(sourceClient, itemsUpdate)
+	itemsUpdated, err = t.annotatePVs(sourceClient, itemsUpdated)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if itemsUpdate > 50 {
+	if itemsUpdated > 50 {
 		t.Requeue = FastReQ
 		return nil
 	}
 	// Service accounts used by stage pods.
-	itemsUpdate, err = t.labelServiceAccounts(sourceClient, serviceAccounts, itemsUpdate)
+	itemsUpdated, err = t.labelServiceAccounts(sourceClient, serviceAccounts, itemsUpdated)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if itemsUpdate > 50 {
+	if itemsUpdated > 50 {
 		t.Requeue = FastReQ
 		return nil
 	}
 
-	itemsUpdate, err = t.labelImageStreams(sourceClient, itemsUpdate)
+	itemsUpdated, err = t.labelImageStreams(sourceClient, itemsUpdated)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	if itemsUpdate > 50 {
+	if itemsUpdated > 50 {
 		t.Requeue = FastReQ
 		return nil
 	}
