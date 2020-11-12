@@ -799,10 +799,17 @@ func (t *Task) Run() error {
 			Message:  "The migration is being canceled.",
 			Durable:  true,
 		})
-		if err = t.next(); err != nil {
+
+		// Stops all the jobs for the hooks by killing the jobs and corresponding pods
+		status, err := t.stopHookJobs()
+		if err != nil {
 			return liberr.Wrap(err)
 		}
-
+		if status {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	case MigrationFailed:
 		t.Phase = Completed
 		t.Step = StepFinal

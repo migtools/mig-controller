@@ -74,6 +74,49 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 	return true, nil
 }
 
+func (t *Task) stopHookJobs() (bool, error) {
+	var client k8sclient.Client
+	var err error
+
+	migHook := migapi.MigHook{}
+	for _, hook := range t.PlanResources.MigPlan.Spec.Hooks {
+		if hook.Reference == nil {
+			continue
+		}
+
+		err = t.Client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      hook.Reference.Name,
+				Namespace: hook.Reference.Namespace,
+			},
+			&migHook)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		client, err = t.getHookClient(migHook)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+
+		// Get the job for the hook and kill it.
+		runningJob, err := migHook.GetPhaseJob(client, hook.Phase, string(t.Owner.UID))
+		if runningJob == nil && err == nil {
+			// No active Job for hook
+			continue
+		} else {
+			err = client.Delete(context.TODO(), runningJob,
+				k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			if err != nil {
+				t.Log.Error(err, fmt.Sprintf("Job %s could not be deleted", runningJob.Name))
+			}
+		}
+
+	}
+	return true, nil
+}
+
 func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
 	runningJob, err := migHook.GetPhaseJob(client, hook.Phase, string(t.Owner.UID))
 	if runningJob == nil && err == nil {
