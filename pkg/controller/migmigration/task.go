@@ -417,7 +417,7 @@ func (t *Task) Run() error {
 				}
 			}
 		}
-		t.Requeue = NoReQ
+		t.Requeue = PollReQ
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
