@@ -22,14 +22,20 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type PVCToMigrate struct {
+	Name               string                            `json:"name,omitempty"`
+	Namespace          string                            `json:"namespace,omitempty"`
+	TargetStorageClass string                            `json:"targetStorageClass,omitEmpty"`
+	TargetAccessModes  []kapi.PersistentVolumeAccessMode `json:"targetAccessModes,omitEmpty"`
+}
+
 // DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
 type DirectVolumeMigrationSpec struct {
-	SrcMigClusterRef            *kapi.ObjectReference   `json:"srcMigClusterRef,omitempty"`
-	DestMigClusterRef           *kapi.ObjectReference   `json:"destMigClusterRef,omitempty"`
-	PersistentVolumeClaims      []*kapi.ObjectReference `json:"persistentVolumeClaims,omitempty"`
-	StorageClassMapping         map[string]string       `json:"storageClassMapping,omitempty"`
-	CreateDestinationNamespaces bool                    `json:"createDestinationNamespaces,omitempty"`
-	DeleteProgressReportingCRs  bool                    `json:"deleteProgressReportingCRs,omitempty"`
+	SrcMigClusterRef            *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef           *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+	PersistentVolumeClaims      []PVCToMigrate        `json:"persistentVolumeClaims,omitempty"`
+	CreateDestinationNamespaces bool                  `json:"createDestinationNamespaces,omitempty"`
+	DeleteProgressReportingCRs  bool                  `json:"deleteProgressReportingCRs,omitempty"`
 }
 
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
