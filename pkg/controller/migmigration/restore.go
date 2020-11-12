@@ -247,6 +247,11 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
+		stageReport, err := t.allStagePodsMatch()
+		if err != nil {
+			log.Trace(err)
+		}
+		progress = append(progress, stageReport...)
 	case velero.RestorePhaseCompleted:
 		completed = true
 		progress = append(
@@ -259,6 +264,11 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
+		stageReport, err := t.allStagePodsMatch()
+		if err != nil {
+			log.Trace(err)
+		}
+		progress = append(progress, stageReport...)
 	case velero.RestorePhaseFailed:
 		completed = true
 		message := fmt.Sprintf(
@@ -281,6 +291,11 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
+		stageReport, err := t.allStagePodsMatch()
+		if err != nil {
+			log.Trace(err)
+		}
+		progress = append(progress, stageReport...)
 	case velero.RestorePhaseFailedValidation:
 		reasons = restore.Status.ValidationErrors
 		reasons = append(

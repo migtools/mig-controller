@@ -45,6 +45,8 @@ type PodStartReport struct {
 	reasons []string
 	// all pods started.
 	started bool
+	// Progress of the stage pod
+	progress []string
 }
 
 // BuildStagePods - creates a list of stage pods from a list of pods
@@ -424,7 +426,6 @@ func (t *Task) ensureDestinationStagePodsStarted() (report PodStartReport, err e
 }
 
 func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, err error) {
-	progress := []string{}
 	hasHealthyClaims := func(pod *corev1.Pod) (healthy bool) {
 		healthy = true
 		for _, vol := range pod.Spec.Volumes {
@@ -480,38 +481,135 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 	if err != nil {
 		return
 	}
-	report.started = true
+	report.started = false
 	for _, pod := range podList.Items {
-		ready := false
-		for _, c := range pod.Status.ContainerStatuses {
-			if c.Ready {
-				ready = true
-				break
+		initReady := true
+		for _, c := range pod.Status.InitContainerStatuses {
+			// If the init contianer is waiting, then nothing can happen.
+			if c.State.Waiting != nil {
+				initReady = false
+				report.progress = append(
+					report.progress,
+					fmt.Sprintf(
+						"Pod %s/%s: Container %s %s",
+						pod.Namespace,
+						pod.Name,
+						c.Name,
+						c.State.Waiting.Message))
+			}
+			if c.State.Terminated != nil && c.State.Terminated.ExitCode != 0 {
+				initReady = false
+				report.progress = append(
+					report.progress,
+					fmt.Sprintf(
+						"Pod %s/%s: init container failed to finish",
+						pod.Namespace,
+						pod.Name))
 			}
 		}
-		if !ready {
-			progress = append(
-				progress,
-				fmt.Sprintf(
-					"Pod %s/%s: Not running. Phase %s",
-					pod.Namespace,
-					pod.Name,
-					pod.Status.Phase))
-			report.started = false
-			if !hasHealthyClaims(&pod) {
-				report.failed = true
-			}
-		} else {
-			progress = append(
-				progress,
+		if !initReady {
+			// If init container is not finished or started running warn the user.
+			return
+		}
+
+		// if Pod is running, then move on
+		// pod succeeded phase should never occur for a stage pod
+		if pod.Status.Phase == corev1.PodRunning {
+			report.progress = append(
+				report.progress,
 				fmt.Sprintf(
 					"Pod %s/%s: Running",
 					pod.Namespace,
 					pod.Name))
+			report.started = true
 
+			return
+		}
+
+		// handle pod pending status
+		if pod.Status.Phase == corev1.PodPending {
+			for _, c := range pod.Status.ContainerStatuses {
+				if c.State.Waiting != nil {
+					report.progress = append(
+						report.progress,
+						fmt.Sprintf(
+							"Pod %s/%s: Container %s %s",
+							pod.Namespace,
+							pod.Name,
+							c.Name,
+							c.State.Waiting.Message))
+				}
+			}
+		}
+
+		//TODO: [shurley] eventually, this should cause us to backoff and re-try to the create the pod.
+		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodUnknown {
+			report.failed = true
+			report.progress = append(report.progress, report.reasons...)
+			hasHealthyClaims(&pod)
 		}
 	}
-	t.setProgress(progress)
+	return
+}
+
+// Match number of stage pods in source and destination cluster
+func (t *Task) allStagePodsMatch() (report []string, err error) {
+	dstClient, err := t.getDestinationClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+
+	podDList := corev1.PodList{}
+
+	options := k8sclient.MatchingLabels(t.stagePodLabels())
+	err = dstClient.List(context.TODO(), options, &podDList)
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	podSList := corev1.PodList{}
+	err = srcClient.List(context.TODO(), options, &podSList)
+
+	dPods := make(map[string]string)
+
+	for _, pod := range podDList.Items {
+		dPods[pod.Name] = pod.Name
+	}
+
+	namespaces := make(map[string]bool)
+	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
+		namespaces[srcNamespace] = true
+	}
+
+
+	for _, pod := range podSList.Items {
+		if _, exists := namespaces[pod.Namespace]; exists {
+			if _, exist := dPods[pod.Name]; !exist {
+				report = append(report, pod.Name+" is missing. Migration might fail")
+			}
+		}
+	}
+
+	if len(report) > 0 {
+		return
+	}
+
+	stageReport, err := t.ensureDestinationStagePodsStarted()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	if !stageReport.started {
+		report = stageReport.progress
+		return
+	}
+	report = []string{"All the stage pods are restored, waiting for restore to Complete"}
 	return
 }
 
