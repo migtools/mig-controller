@@ -78,6 +78,7 @@ const (
 	DeleteMigrated                  = "DeleteMigrated"
 	DeleteBackups                   = "DeleteBackups"
 	DeleteRestores                  = "DeleteRestores"
+	DeleteHookJobs                  = "DeleteHookJobs"
 	MigrationFailed                 = "MigrationFailed"
 	Canceling                       = "Canceling"
 	Canceled                        = "Canceled"
@@ -203,6 +204,7 @@ var CancelItinerary = Itinerary{
 		{Name: DeleteBackups, Step: StepFinal},
 		{Name: DeleteRestores, Step: StepFinal},
 		{Name: DeleteRegistries, Step: StepFinal},
+		{Name: DeleteHookJobs, Step: StepFinal},
 		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: Canceled, Step: StepFinal},
@@ -803,10 +805,9 @@ func (t *Task) Run() error {
 			Message:  "The migration is being canceled.",
 			Durable:  true,
 		})
-		if err = t.next(); err != nil {
+		if err := t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-
 	case MigrationFailed:
 		t.Phase = Completed
 		t.Step = StepFinal
@@ -843,6 +844,17 @@ func (t *Task) Run() error {
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
+		}
+	case DeleteHookJobs:
+		// Stops all the jobs for the hooks by killing the jobs and corresponding pods
+		status, err := t.stopHookJobs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if status {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)
