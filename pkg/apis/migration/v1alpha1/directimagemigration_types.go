@@ -147,6 +147,13 @@ func (r *DirectImageMigration) HasErrors() bool {
 	return len(r.Status.Errors) > 0
 }
 
+// HasCompleted gets whether a DirectImageMigration has completed and a list of errors, if any
+func (r *DirectImageMigration) HasCompleted() (bool, []string) {
+	completed := r.Status.Phase == "Completed"
+	reasons := r.Status.Errors
+	return completed, reasons
+}
+
 func init() {
 	SchemeBuilder.Register(&DirectImageMigration{}, &DirectImageMigrationList{})
 }

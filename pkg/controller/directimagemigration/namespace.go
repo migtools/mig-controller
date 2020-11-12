@@ -20,6 +20,7 @@ import (
 	"context"
 	liberr "github.com/konveyor/controller/pkg/error"
 	corev1 "k8s.io/api/core/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -63,7 +64,9 @@ func (t *Task) ensureDestinationNamespaces() error {
 			},
 		}
 		err = destClient.Create(context.TODO(), &destNs)
-		if err != nil {
+		if k8serror.IsAlreadyExists(err) {
+			t.Log.Info("Namespace already exists on destination", "name", destNsName)
+		} else if err != nil {
 			return liberr.Wrap(err)
 		}
 	}
