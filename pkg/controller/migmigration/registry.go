@@ -24,34 +24,36 @@ const (
 // Returns the right backup/restore annotations including registry-specific ones
 func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error) {
 	annotations := t.Annotations
-	registryService, err := t.PlanResources.MigPlan.GetRegistryService(client)
-	if err != nil {
-		return nil, err
-	}
-	if registryService == nil {
-		return nil, liberr.Wrap(errors.New("migration registry service not found"))
-	}
-	registryDC, err := t.PlanResources.MigPlan.GetRegistryDeployment(client)
-	if err != nil {
-		return nil, err
-	}
-	if registryDC == nil {
-		return nil, liberr.Wrap(errors.New("migration registry DeploymentConfig not found"))
-	}
+	if t.PlanResources.MigPlan.Spec.IndirectImageMigration {
+		registryService, err := t.PlanResources.MigPlan.GetRegistryService(client)
+		if err != nil {
+			return nil, err
+		}
+		if registryService == nil {
+			return nil, liberr.Wrap(errors.New("migration registry service not found"))
+		}
+		registryDC, err := t.PlanResources.MigPlan.GetRegistryDeployment(client)
+		if err != nil {
+			return nil, err
+		}
+		if registryDC == nil {
+			return nil, liberr.Wrap(errors.New("migration registry DeploymentConfig not found"))
+		}
 
-	if registryDC.DeletionTimestamp != nil {
-		return nil, liberr.Wrap(errors.New(fmt.Sprintf("Deployment %s/%s is being garbage collected with deletion timestamp %s", registryDC.Namespace, registryDC.Name, registryDC.DeletionTimestamp)))
-	}
+		if registryDC.DeletionTimestamp != nil {
+			return nil, liberr.Wrap(errors.New(fmt.Sprintf("Deployment %s/%s is being garbage collected with deletion timestamp %s", registryDC.Namespace, registryDC.Name, registryDC.DeletionTimestamp)))
+		}
 
-	if len(registryService.Spec.Ports) == 0 {
-		return nil, liberr.Wrap(errors.New("Migration Registry service port not found"))
-	}
-	annotations[MigRegistryAnnotationKey] = fmt.Sprintf("%s:%d", registryService.Spec.ClusterIP,
-		registryService.Spec.Ports[0].Port)
-	for _, container := range registryDC.Spec.Template.Spec.Containers {
-		for _, envVar := range container.Env {
-			if envVar.Name == "REGISTRY_STORAGE_S3_ROOTDIRECTORY" {
-				annotations[MigRegistryDirAnnotationKey] = envVar.Value
+		if len(registryService.Spec.Ports) == 0 {
+			return nil, liberr.Wrap(errors.New("Migration Registry service port not found"))
+		}
+		annotations[MigRegistryAnnotationKey] = fmt.Sprintf("%s:%d", registryService.Spec.ClusterIP,
+			registryService.Spec.Ports[0].Port)
+		for _, container := range registryDC.Spec.Template.Spec.Containers {
+			for _, envVar := range container.Env {
+				if envVar.Name == "REGISTRY_STORAGE_S3_ROOTDIRECTORY" {
+					annotations[MigRegistryDirAnnotationKey] = envVar.Value
+				}
 			}
 		}
 	}
