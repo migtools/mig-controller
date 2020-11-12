@@ -36,10 +36,10 @@ func (t *Task) createDestinationPVCs() error {
 		if err != nil {
 			return err
 		}
-		destStorageClass := t.getDestinationStorageClass(*srcPVC.Spec.StorageClassName)
 
 		newSpec := srcPVC.Spec
-		newSpec.StorageClassName = &destStorageClass
+		newSpec.StorageClassName = &pvc.TargetStorageClass
+		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
 
 		// Create pvc on destination with same metadata + spec
@@ -59,15 +59,6 @@ func (t *Task) createDestinationPVCs() error {
 		}
 	}
 	return nil
-}
-
-func (t *Task) getDestinationStorageClass(sourceStorageClass string) string {
-	// TODO: Set sane default
-	defaultStorageClass := "gp2"
-	if destStorageClass, ok := t.Owner.Spec.StorageClassMapping[sourceStorageClass]; ok {
-		return destStorageClass
-	}
-	return defaultStorageClass
 }
 
 func (t *Task) getDestinationPVCs() error {
