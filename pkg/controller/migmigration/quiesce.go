@@ -144,7 +144,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 
 // Scales DeploymentConfig back up on source cluster
 func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string) error {
-	for _, ns := range t.sourceNamespaces() {
+	for _, ns := range namespaces {
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
