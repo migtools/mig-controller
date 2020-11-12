@@ -116,6 +116,7 @@ func (r ReconcileDirectVolumeMigration) validateSrcCluster(direct *migapi.Direct
 		direct.Status.SetCondition(migapi.Condition{
 			Type:     SourceClusterNotReady,
 			Status:   True,
+			Reason:   NotReady,
 			Category: Critical,
 			Message:  SourceClusterNotReadyMessage,
 		})
@@ -171,6 +172,7 @@ func (r ReconcileDirectVolumeMigration) validateDestCluster(direct *migapi.Direc
 		direct.Status.SetCondition(migapi.Condition{
 			Type:     DestinationClusterNotReady,
 			Status:   True,
+			Reason:   NotReady,
 			Category: Critical,
 			Message:  DestinationClusterNotReadyMessage,
 		})

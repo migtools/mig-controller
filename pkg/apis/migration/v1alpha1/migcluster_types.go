@@ -598,3 +598,11 @@ type apiServerConfig struct {
 	ImagePolicyConfig imagePolicyConfig `json:"imagePolicyConfig"`
 	RoutingConfig     routingConfig     `json:"routingConfig"`
 }
+
+// Get object reference for migcluster
+func (r *MigCluster) GetObjectReference() *kapi.ObjectReference {
+	return &kapi.ObjectReference{
+		Name:      r.Name,
+		Namespace: r.Namespace,
+	}
+}
