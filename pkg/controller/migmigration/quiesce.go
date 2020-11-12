@@ -15,7 +15,7 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// All quiesce functionality should be put here
+// Quiesce applications on source cluster
 func (t *Task) quiesceApplications() error {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -53,37 +53,57 @@ func (t *Task) quiesceApplications() error {
 	return nil
 }
 
-// All quiesce undo functionality should be put here
-func (t *Task) unQuiesceApplications() error {
-	client, err := t.getSourceClient()
+func (t *Task) unQuiesceSrcApplications() error {
+	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceCronJobs(client)
+	err = t.unQuiesceApplications(srcClient, t.sourceNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeploymentConfigs(client)
+	return nil
+}
+
+func (t *Task) unQuiesceDestApplications() error {
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeployments(client)
+	err = t.unQuiesceApplications(destClient, t.destinationNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceStatefulSets(client)
+	return nil
+}
+
+// Unquiesce applications using client and namespace list given
+func (t *Task) unQuiesceApplications(client k8sclient.Client, namespaces []string) error {
+	err := t.unQuiesceCronJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceReplicaSets(client)
+	err = t.unQuiesceDeploymentConfigs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDaemonSets(client)
+	err = t.unQuiesceDeployments(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceJobs(client)
+	err = t.unQuiesceStatefulSets(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = t.unQuiesceReplicaSets(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = t.unQuiesceDaemonSets(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = t.unQuiesceJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -123,7 +143,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 }
 
 // Scales DeploymentConfig back up on source cluster
-func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client) error {
+func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
@@ -191,8 +211,8 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 }
 
 // Scales all Deployments back up
-func (t *Task) unQuiesceDeployments(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := appsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -259,8 +279,8 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 }
 
 // Scales all StatefulSets back up
-func (t *Task) unQuiesceStatefulSets(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -330,8 +350,8 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 }
 
 // Scales all ReplicaSets back up
-func (t *Task) unQuiesceReplicaSets(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := appsv1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -406,8 +426,8 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 }
 
 // Scales all DaemonSets back up
-func (t *Task) unQuiesceDaemonSets(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -470,8 +490,8 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 }
 
 // Undo quiescence on all CronJobs
-func (t *Task) unQuiesceCronJobs(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := batchv1beta.CronJobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), options, &list)
@@ -530,8 +550,8 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 }
 
 // Scales all Jobs back up
-func (t *Task) unQuiesceJobs(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(

@@ -56,7 +56,8 @@ const (
 	WaitForResticReady              = "WaitForResticReady"
 	QuiesceApplications             = "QuiesceApplications"
 	EnsureQuiesced                  = "EnsureQuiesced"
-	UnQuiesceApplications           = "UnQuiesceApplications"
+	UnQuiesceSrcApplications        = "UnQuiesceSrcApplications"
+	UnQuiesceDestApplications       = "UnQuiesceDestApplications"
 	WaitForRegistriesReady          = "WaitForRegistriesReady"
 	EnsureStageBackup               = "EnsureStageBackup"
 	StageBackupCreated              = "StageBackupCreated"
@@ -190,6 +191,7 @@ var FinalItinerary = Itinerary{
 		{Name: PreRestoreHooks, Step: StepRestore},
 		{Name: EnsureFinalRestore, Step: StepRestore},
 		{Name: FinalRestoreCreated, Step: StepRestore},
+		{Name: UnQuiesceDestApplications, Step: StepRestore},
 		{Name: PostRestoreHooks, Step: StepRestore},
 		{Name: DeleteRegistries, Step: StepFinal},
 		{Name: Verification, Step: StepFinal, all: HasVerify},
@@ -233,7 +235,7 @@ var RollbackItinerary = Itinerary{
 		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
 		{Name: DeleteMigrated, Step: StepFinal},
 		{Name: EnsureMigratedDeleted, Step: StepFinal},
-		{Name: UnQuiesceApplications, Step: StepFinal},
+		{Name: UnQuiesceSrcApplications, Step: StepFinal},
 		{Name: Completed, Step: StepFinal},
 	},
 }
@@ -568,8 +570,16 @@ func (t *Task) Run() error {
 		} else {
 			t.Requeue = PollReQ
 		}
-	case UnQuiesceApplications:
-		err := t.unQuiesceApplications()
+	case UnQuiesceSrcApplications:
+		err := t.unQuiesceSrcApplications()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case UnQuiesceDestApplications:
+		err := t.unQuiesceDestApplications()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
