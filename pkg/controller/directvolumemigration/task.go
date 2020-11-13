@@ -86,8 +86,8 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 	return phase, n, total
 }
 
-var PVCItinerary = Itinerary{
-	Name: "PVC",
+var VolumeMigration = Itinerary{
+	Name: "VolumeMigration",
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
@@ -151,7 +151,7 @@ func (t *Task) init() error {
 	if t.failed() {
 		t.Itinerary = FailedItinerary
 	} else {
-		t.Itinerary = PVCItinerary
+		t.Itinerary = VolumeMigration
 	}
 	return nil
 }

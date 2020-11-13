@@ -48,7 +48,7 @@ type DirectVolumeMigrationStatus struct {
 	Errors         []string                `json:"errors,omitempty"`
 	SuccessfulPods []*kapi.ObjectReference `json:"successfulPods,omitempty"`
 	FailedPods     []*kapi.ObjectReference `json:"failedPods,omitempty"`
-	RunningPods    []*kapi.ObjectReference `json:"runningPods,omitempty"`
+	RunningPods    []*RunningPod           `json:"runningPods,omitempty"`
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
@@ -75,6 +75,12 @@ type DirectVolumeMigrationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []DirectVolumeMigration `json:"items"`
+}
+
+type RunningPod struct {
+	kapi.ObjectReference        `json:",inline"`
+	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
 }
 
 func (r *DirectVolumeMigration) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
