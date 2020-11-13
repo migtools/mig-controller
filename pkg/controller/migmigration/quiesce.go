@@ -167,7 +167,10 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 				return liberr.Wrap(err)
 			}
 			delete(dc.Annotations, ReplicasAnnotation)
-			dc.Spec.Replicas = int32(number)
+			// Only set replica count if currently 0
+			if dc.Spec.Replicas == 0 {
+				dc.Spec.Replicas = int32(number)
+			}
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -236,7 +239,10 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			}
 			delete(deployment.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
-			deployment.Spec.Replicas = &restoredReplicas
+			// Only change replica count if currently == 0
+			if *deployment.Spec.Replicas == 0 {
+				deployment.Spec.Replicas = &restoredReplicas
+			}
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -304,7 +310,10 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			}
 			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
-			set.Spec.Replicas = &restoredReplicas
+			// Only change replica count if currently == 0
+			if *set.Spec.Replicas == 0 {
+				set.Spec.Replicas = &restoredReplicas
+			}
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -379,7 +388,10 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 			}
 			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
-			set.Spec.Replicas = &restoredReplicas
+			// Only change replica count if currently == 0
+			if *set.Spec.Replicas == 0 {
+				set.Spec.Replicas = &restoredReplicas
+			}
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -450,6 +462,11 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
+			// Only change node selector if set to our quiesce nodeselector
+			_, isQuiesced := set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector]
+			if !isQuiesced {
+				continue
+			}
 			delete(set.Annotations, NodeSelectorAnnotation)
 			set.Spec.Template.Spec.NodeSelector = nodeSelector
 			err = client.Update(context.TODO(), &set)
@@ -502,6 +519,7 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) e
 			if r.Annotations == nil {
 				continue
 			}
+			// Only unsuspend if our suspend annotation is present
 			if _, exist := r.Annotations[SuspendAnnotation]; !exist {
 				continue
 			}
@@ -575,7 +593,10 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			}
 			delete(job.Annotations, ReplicasAnnotation)
 			parallelReplicas := int32(number)
-			job.Spec.Parallelism = &parallelReplicas
+			// Only change parallelism if currently == 0
+			if *job.Spec.Parallelism == 0 {
+				job.Spec.Parallelism = &parallelReplicas
+			}
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
 				return liberr.Wrap(err)
