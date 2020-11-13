@@ -578,6 +578,10 @@ func (m *MigCluster) SetRegistryPath(c k8sclient.Client) error {
 
 func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 	if len(m.Spec.ExposedRegistryPath) > 0 {
+		splitPath := strings.Split(m.Spec.ExposedRegistryPath, "//")
+		if len(splitPath) == 2 {
+			return splitPath[1], nil
+		}
 		return m.Spec.ExposedRegistryPath, nil
 	} else if !m.Spec.IsHostCluster {
 		// not host cluster and no path specified, return empty path
