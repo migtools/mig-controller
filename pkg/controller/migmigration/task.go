@@ -103,7 +103,7 @@ const (
 	StepStageBackup  = "StageBackup"
 	StepStageRestore = "StageRestore"
 	StepRestore      = "Restore"
-	StepFinal        = "Final"
+	StepCleanup      = "Cleanup"
 )
 
 // Itinerary defines itinerary
@@ -142,11 +142,11 @@ var StageItinerary = Itinerary{
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, any: HasPVs | HasISs},
 		{Name: EnsureStageRestore, Step: StepStageRestore, any: HasPVs | HasISs},
 		{Name: StageRestoreCreated, Step: StepStageRestore, any: HasPVs | HasISs},
-		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
-		{Name: EnsureStagePodsTerminated, Step: StepFinal, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
-		{Name: Completed, Step: StepFinal},
+		{Name: DeleteRegistries, Step: StepCleanup},
+		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
+		{Name: EnsureStagePodsTerminated, Step: StepCleanup, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
+		{Name: Completed, Step: StepCleanup},
 	},
 }
 
@@ -193,34 +193,34 @@ var FinalItinerary = Itinerary{
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
 		{Name: PostRestoreHooks, Step: StepRestore},
-		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: Verification, Step: StepFinal, all: HasVerify},
-		{Name: Completed, Step: StepFinal},
+		{Name: DeleteRegistries, Step: StepCleanup},
+		{Name: Verification, Step: StepCleanup, all: HasVerify},
+		{Name: Completed, Step: StepCleanup},
 	},
 }
 
 var CancelItinerary = Itinerary{
 	Name: "Cancel",
 	Phases: []Phase{
-		{Name: Canceling, Step: StepFinal},
-		{Name: DeleteBackups, Step: StepFinal},
-		{Name: DeleteRestores, Step: StepFinal},
-		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: DeleteHookJobs, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
-		{Name: Canceled, Step: StepFinal},
-		{Name: Completed, Step: StepFinal},
+		{Name: Canceling, Step: StepCleanup},
+		{Name: DeleteBackups, Step: StepCleanup},
+		{Name: DeleteRestores, Step: StepCleanup},
+		{Name: DeleteRegistries, Step: StepCleanup},
+		{Name: DeleteHookJobs, Step: StepCleanup},
+		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
+		{Name: Canceled, Step: StepCleanup},
+		{Name: Completed, Step: StepCleanup},
 	},
 }
 
 var FailedItinerary = Itinerary{
 	Name: "Failed",
 	Phases: []Phase{
-		{Name: MigrationFailed, Step: StepFinal},
-		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
-		{Name: Completed, Step: StepFinal},
+		{Name: MigrationFailed, Step: StepCleanup},
+		{Name: DeleteRegistries, Step: StepCleanup},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
+		{Name: Completed, Step: StepCleanup},
 	},
 }
 
@@ -308,7 +308,7 @@ func (t *Task) Run() error {
 		return err
 	}
 
-	defer t.updatePipeline(t.Step)
+	defer t.updatePipeline()
 
 	// Run the current phase.
 	switch t.Phase {
@@ -821,7 +821,7 @@ func (t *Task) Run() error {
 		}
 	case MigrationFailed:
 		t.Phase = Completed
-		t.Step = StepFinal
+		t.Step = StepCleanup
 	case DeleteMigrated:
 		err := t.deleteMigrated()
 		if err != nil {
@@ -937,7 +937,7 @@ func (t *Task) init() error {
 }
 
 func (t *Task) initPipeline() {
-	for _, phase := range FinalItinerary.Phases {
+	for _, phase := range t.Itinerary.Phases {
 		t.Owner.Status.AddStep(&migapi.Step{
 			Name:    phase.Step,
 			Message: "Not started",
@@ -955,13 +955,11 @@ func (t *Task) initPipeline() {
 	}
 }
 
-func (t *Task) updatePipeline(prevStep string) {
-	oldStep := t.Owner.Status.FindStep(prevStep)
+func (t *Task) updatePipeline() {
 	currentStep := t.Owner.Status.FindStep(t.Step)
-	if oldStep != nil && oldStep != currentStep {
-		oldStep.MarkCompleted()
-		if t.failed() {
-			oldStep.Failed = true
+	for _, step := range t.Owner.Status.Pipeline {
+		if currentStep != step && step.MarkedStarted() {
+			step.MarkCompleted()
 		}
 	}
 	if currentStep != nil {
@@ -998,7 +996,7 @@ func (t *Task) next() error {
 	}
 	if current == -1 {
 		t.Phase = Completed
-		t.Step = StepFinal
+		t.Step = StepCleanup
 		return nil
 	}
 	for n := current + 1; n < len(t.Itinerary.Phases); n++ {
@@ -1022,7 +1020,7 @@ func (t *Task) next() error {
 		return nil
 	}
 	t.Phase = Completed
-	t.Step = StepFinal
+	t.Step = StepCleanup
 	return nil
 }
 
@@ -1087,8 +1085,17 @@ func (t *Task) fail(nextPhase string, reasons []string) {
 		Message:  "The migration has failed.  See: Errors.",
 		Durable:  true,
 	})
+	t.failCurrentStep()
 	t.Phase = nextPhase
-	t.Step = StepFinal
+	t.Step = StepCleanup
+}
+
+// Marks current step failed
+func (t *Task) failCurrentStep() {
+	currentStep := t.Owner.Status.FindStep(t.Step)
+	if currentStep != nil {
+		currentStep.Failed = true
+	}
 }
 
 // Add errors.
