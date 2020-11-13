@@ -139,7 +139,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if itemsUpdated > 50 {
 		return false, nil
 	}
-	return false, nil
+	return true, nil
 }
 
 // Gets a list of restic volumes and restic verify volumes for a pod
