@@ -500,11 +500,11 @@ func (t *Task) Run() error {
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
-		err := t.annotateStageResources()
+		finished, err := t.annotateStageResources()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if t.Requeue != FastReQ {
+		if finished {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}

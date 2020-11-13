@@ -93,59 +93,53 @@ type ServiceAccounts map[string]map[string]bool
 // is referenced by the velero.Backup label selector.
 // The IncludedInStageBackupLabel label is added to Namespaces to prevent the
 // velero.Backup from being empty which causes the Restore to fail.
-func (t *Task) annotateStageResources() error {
+func (t *Task) annotateStageResources() (bool, error) {
 	sourceClient, err := t.getSourceClient()
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	itemsUpdated := 0
 	// Namespaces
 	itemsUpdated, err = t.labelNamespaces(sourceClient, itemsUpdated)
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	if itemsUpdated > 50 {
-		t.Requeue = FastReQ
-		return nil
+		return false, nil
 	}
 	// Pods
 	itemsUpdated, serviceAccounts, err := t.annotatePods(sourceClient, itemsUpdated)
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	if itemsUpdated > 50 {
-		t.Requeue = FastReQ
-		return nil
+		return false, nil
 	}
 	// PV & PVCs
 	itemsUpdated, err = t.annotatePVs(sourceClient, itemsUpdated)
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	if itemsUpdated > 50 {
-		t.Requeue = FastReQ
-		return nil
+		return false, nil
 	}
 	// Service accounts used by stage pods.
 	itemsUpdated, err = t.labelServiceAccounts(sourceClient, serviceAccounts, itemsUpdated)
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	if itemsUpdated > 50 {
-		t.Requeue = FastReQ
-		return nil
+		return false, nil
 	}
 
 	itemsUpdated, err = t.labelImageStreams(sourceClient, itemsUpdated)
 	if err != nil {
-		return liberr.Wrap(err)
+		return false, liberr.Wrap(err)
 	}
 	if itemsUpdated > 50 {
-		t.Requeue = FastReQ
-		return nil
+		return false, nil
 	}
-	t.Requeue = NoReQ
-	return nil
+	return false, nil
 }
 
 // Gets a list of restic volumes and restic verify volumes for a pod
