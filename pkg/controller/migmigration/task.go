@@ -325,12 +325,13 @@ func (t *Task) Run() error {
 			}
 		}
 	case WaitForRefresh:
-		t.Requeue = PollReQ
 		refreshed := t.waitForRefresh()
 		if refreshed {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Requeue = PollReQ
 		}
 	case CleanStaleResticCRs:
 		err := t.deleteStaleResticCRs()
