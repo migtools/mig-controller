@@ -315,7 +315,6 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case StartRefresh:
-		t.Requeue = PollReQ
 		started, err := t.startRefresh()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -334,7 +333,6 @@ func (t *Task) Run() error {
 			}
 		}
 	case CleanStaleResticCRs:
-		t.Requeue = PollReQ
 		err := t.deleteStaleResticCRs()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -343,7 +341,6 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case CleanStaleVeleroCRs:
-		t.Requeue = PollReQ
 		err := t.deleteStaleVeleroCRs()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -352,7 +349,6 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case CreateRegistries:
-		t.Requeue = PollReQ
 		nEnsured, err := t.ensureMigRegistries()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -366,7 +362,6 @@ func (t *Task) Run() error {
 		}
 
 	case WaitForRegistriesReady:
-		t.Requeue = PollReQ
 		// First registry health check happens here
 		// After this, registry health is continuously checked in validation.go
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
@@ -383,7 +378,6 @@ func (t *Task) Run() error {
 		}
 
 	case DeleteRegistries:
-		t.Requeue = PollReQ
 		err := t.deleteImageRegistryResources()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -467,7 +461,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -476,7 +469,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -485,7 +477,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -511,7 +502,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -520,7 +510,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -581,7 +570,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -656,7 +644,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = PollReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
