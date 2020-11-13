@@ -3,7 +3,7 @@ kind: DirectVolumeMigrationProgress
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: directpvmigrationprogress-sample
+  name: directvolumemigrationprogress-sample
 spec:
   # Add fields here
   foo: bar
