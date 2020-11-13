@@ -358,8 +358,6 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
-		} else {
-			t.Requeue = PollReQ
 		}
 
 	case WaitForRegistriesReady:
