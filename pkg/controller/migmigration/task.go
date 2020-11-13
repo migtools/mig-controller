@@ -227,16 +227,16 @@ var FailedItinerary = Itinerary{
 var RollbackItinerary = Itinerary{
 	Name: "Rollback",
 	Phases: []Phase{
-		{Name: Rollback, Step: StepFinal},
-		{Name: DeleteBackups, Step: StepFinal},
-		{Name: DeleteRestores, Step: StepFinal},
-		{Name: DeleteRegistries, Step: StepFinal},
-		{Name: EnsureStagePodsDeleted, Step: StepFinal},
-		{Name: EnsureAnnotationsDeleted, Step: StepFinal, any: HasPVs | HasISs},
-		{Name: DeleteMigrated, Step: StepFinal},
-		{Name: EnsureMigratedDeleted, Step: StepFinal},
-		{Name: UnQuiesceSrcApplications, Step: StepFinal},
-		{Name: Completed, Step: StepFinal},
+		{Name: Rollback, Step: StepCleanup},
+		{Name: DeleteBackups, Step: StepCleanup},
+		{Name: DeleteRestores, Step: StepCleanup},
+		{Name: DeleteRegistries, Step: StepCleanup},
+		{Name: EnsureStagePodsDeleted, Step: StepCleanup},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
+		{Name: DeleteMigrated, Step: StepCleanup},
+		{Name: EnsureMigratedDeleted, Step: StepCleanup},
+		{Name: UnQuiesceSrcApplications, Step: StepCleanup},
+		{Name: Completed, Step: StepCleanup},
 	},
 }
 
