@@ -182,6 +182,26 @@ _staging_ ends.
 
 All `Conditions` methods are idempotent and most support _varargs_.
 
-# Plan Controller
+## User Experience
 
-# Migration Controller
+The impact of new changes in MTC on the overall user experience of migrations _must_ be taken into account. 
+
+### Progress Reporting
+
+Migrations in production environments can take a significant amount of time due to the huge scale of deployed resources. The easiest way to provide better user experience in such cases is by making the migration process transparent to the end user. Migration controller provides a way to report information about ongoing work back to the user in the status field of _MigMigration_ CR in the form of progress messages. Consider leveraging this existing progress reporting mechanism to improve visibility into the migration process.
+
+Progress messages are arrays of strings and are associated with Migration Steps. The progress messages are written to the _MigMigration_ CR at the end of every reconciliation. Until then, they are stored in-memory in `Task.Status.Pipeline`. To report a progress message, simply use `task.setProgress(string [])` function. This sets the array of progress messages in-memory and they will applied before next reconcile returns.
+
+The standard format followed for each progress message in the array is:
+
+```
+<kind> <namespace>/<name>: <message>
+```
+
+For instance, if migration controller is waiting for a stage pod to come up, the progress message would look like:
+
+```
+Pod test-app/stage-pod-1: Pending
+```
+
+Please note that the Migration UI is designed to read the progress messages set through the `t.setProgress()` function. Only progress messages that follow the above format will be parsed by the UI.
