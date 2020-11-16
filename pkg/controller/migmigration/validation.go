@@ -35,9 +35,9 @@ const (
 	StageNoOp                          = "StageNoOp"
 	RegistriesHealthy                  = "RegistriesHealthy"
 	RegistriesUnhealthy                = "RegistriesUnhealthy"
-	StaleSrcVeleroCRsDeleted  = "StaleSrcVeleroCRsDeleted"
-	StaleDestVeleroCRsDeleted = "StaleDestVeleroCRsDeleted"
-	StaleResticCRsDeleted     = "StaleResticCRsDeleted"
+	StaleSrcVeleroCRsDeleted           = "StaleSrcVeleroCRsDeleted"
+	StaleDestVeleroCRsDeleted          = "StaleDestVeleroCRsDeleted"
+	StaleResticCRsDeleted              = "StaleResticCRsDeleted"
 )
 
 // Categories
@@ -48,10 +48,10 @@ const (
 
 // Reasons
 const (
-	NotSet              = "NotSet"
-	NotFound            = "NotFound"
-	Cancel              = "Cancel"
-	ErrorsDetected      = "ErrorsDetected"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	Cancel         = "Cancel"
+	ErrorsDetected = "ErrorsDetected"
 )
 
 // Statuses

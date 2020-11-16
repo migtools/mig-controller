@@ -665,12 +665,6 @@ func (t *Task) createRsyncClientPods() error {
 
 // Create rsync PV progress CR on destination cluster
 func (t *Task) createPVProgressCR() error {
-	// Get client for destination
-	dstClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-
 	pvcMap := t.getPVCNamespaceMap()
 	trueRef := true
 	for ns, vols := range pvcMap {
@@ -699,7 +693,7 @@ func (t *Task) createPVProgressCR() error {
 				},
 				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
-			err = dstClient.Create(context.TODO(), &dvp)
+			err := t.Client.Create(context.TODO(), &dvp)
 			if k8serror.IsAlreadyExists(err) {
 				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvp.Namespace, "name", dvp.Name)
 			} else if err != nil {
@@ -713,11 +707,6 @@ func (t *Task) createPVProgressCR() error {
 }
 
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return false, false, err
-	}
-
 	t.Owner.Status.RunningPods = []*migapi.RunningPod{}
 	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
 	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
@@ -726,7 +715,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{}
-			err = destClient.Get(context.TODO(), types.NamespacedName{
+			err := t.Client.Get(context.TODO(), types.NamespacedName{
 				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 				Namespace: migapi.OpenshiftMigrationNamespace,
 			}, &dvmp)
@@ -741,7 +730,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 			switch {
 			case dvmp.Status.PodPhase == corev1.PodRunning:
 				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.RunningPod{
-					ObjectReference:             *objRef,
+					ObjectReference:             objRef,
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
@@ -797,7 +786,7 @@ func (t *Task) deleteRsyncResources() error {
 		return nil
 	}
 
-	err = t.deleteProgressReportingCRs(destClient)
+	err = t.deleteProgressReportingCRs(t.Client)
 	if err != nil {
 		return err
 	}
@@ -920,7 +909,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 	return nil
 }
 
-func (t *Task) deleteProgressReportingCRs(client compat.Client) error {
+func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 	pvcMap := t.getPVCNamespaceMap()
 
 	for ns, vols := range pvcMap {
