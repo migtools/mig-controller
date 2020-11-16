@@ -740,11 +740,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b5a2e948698ffab2ff77d93ec1fdee21e2b316d748a24c7d367f1a78a472d75e"
+  digest = "1:7fe1e10e0c3c8d9e4a82a533449056b3d65ff1c7b8fd609aee30785149882cd4"
   name = "github.com/konveyor/openshift-velero-plugin"
   packages = ["velero-plugins/imagecopy"]
   pruneopts = "T"
-  revision = "f5883b430041b3a3c25c7e6c47106cb60022c3dc"
+  revision = "30e45cf53cbe5a9b6e73b42cd53d69f3e678d118"
 
 [[projects]]
   digest = "1:3804a3a02964db8e6db3e5e7960ac1c1a9b12835642dd4f4ac4e56c749ec73eb"
