@@ -672,12 +672,22 @@ func (t *Task) createPVProgressCR() error {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
+	trueRef := true
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
 			dvp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: migapi.OpenshiftMigrationNamespace,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: t.Owner.APIVersion,
+							Kind:       t.Owner.Kind,
+							Name:       t.Owner.Name,
+							UID:        t.Owner.UID,
+							Controller: &trueRef,
+						},
+					},
 					// TODO @alpatel, add owner references
 				},
 				Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -703,23 +713,23 @@ func (t *Task) createPVProgressCR() error {
 }
 
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
-	srcClient, err := t.getSourceClient()
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return false, false, err
 	}
 
-	t.Owner.Status.RunningPods = []*corev1.ObjectReference{}
+	t.Owner.Status.RunningPods = []*migapi.RunningPod{}
 	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
 	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
 
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			pod := corev1.Pod{}
-			err = srcClient.Get(context.TODO(), types.NamespacedName{
+			dvmp := migapi.DirectVolumeMigrationProgress{}
+			err = destClient.Get(context.TODO(), types.NamespacedName{
 				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
-				Namespace: ns,
-			}, &pod)
+				Namespace: migapi.OpenshiftMigrationNamespace,
+			}, &dvmp)
 			if err != nil {
 				// todo, need to start thinking about collecting this error and reporting other CR's progress
 				return false, false, err
@@ -729,11 +739,15 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 			}
 			switch {
-			case pod.Status.Phase == corev1.PodRunning:
-				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, objRef)
-			case pod.Status.Phase == corev1.PodFailed:
+			case dvmp.Status.PodPhase == corev1.PodRunning:
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.RunningPod{
+					ObjectReference:             *objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
+			case dvmp.Status.PodPhase == corev1.PodFailed:
 				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
-			case pod.Status.Phase == corev1.PodSucceeded:
+			case dvmp.Status.PodPhase == corev1.PodSucceeded:
 				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
 			}
 		}
