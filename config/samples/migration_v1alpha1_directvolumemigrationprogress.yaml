@@ -5,10 +5,11 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: directvolumemigrationprogress-sample
 spec:
-  # Add fields here
+  # [!] Change clusterRef to point to the cluster where the pod is running
   clusterRef:
-    name: host
+    name: sample-source-3110
     namespace: openshift-migration
+  # [!] Change podRef to point to the name and namespace of the running pod
   podRef:
-    name: rsync-sample-client
-    namespace: pvc-migrate-client
+    name: directmigration-sample-pod-0
+    namespace: openshift-migration

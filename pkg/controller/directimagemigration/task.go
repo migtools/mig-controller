@@ -201,7 +201,6 @@ func (t *Task) Run() error {
 			if len(failedISList) > 0 {
 				t.fail(MigrationFailed, failedISList)
 			} else {
-				t.Requeue = FastReQ
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}

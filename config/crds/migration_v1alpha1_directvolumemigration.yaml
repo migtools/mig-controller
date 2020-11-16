@@ -39,10 +39,6 @@ spec:
             persistentVolumeClaims:
               items:
                 properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
                   targetAccessModes:
                     items:
                       type: string
@@ -75,6 +71,11 @@ spec:
               type: string
             runningPods:
               items:
+                properties:
+                  lastObservedProgressPercent:
+                    type: string
+                  lastObservedTransferRate:
+                    type: string
                 type: object
               type: array
             startTimestamp:

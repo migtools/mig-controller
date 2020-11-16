@@ -23,10 +23,9 @@ import (
 )
 
 type PVCToMigrate struct {
-	Name               string                            `json:"name,omitempty"`
-	Namespace          string                            `json:"namespace,omitempty"`
-	TargetStorageClass string                            `json:"targetStorageClass,omitEmpty"`
-	TargetAccessModes  []kapi.PersistentVolumeAccessMode `json:"targetAccessModes,omitEmpty"`
+	*kapi.ObjectReference `json:",inline"`
+	TargetStorageClass    string                            `json:"targetStorageClass"`
+	TargetAccessModes     []kapi.PersistentVolumeAccessMode `json:"targetAccessModes,omitEmpty"`
 }
 
 // DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
@@ -78,7 +77,7 @@ type DirectVolumeMigrationList struct {
 }
 
 type RunningPod struct {
-	kapi.ObjectReference        `json:",inline"`
+	*kapi.ObjectReference       `json:",inline"`
 	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
 	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
 }

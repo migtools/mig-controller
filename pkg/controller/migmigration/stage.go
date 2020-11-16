@@ -587,7 +587,6 @@ func (t *Task) allStagePodsMatch() (report []string, err error) {
 		namespaces[srcNamespace] = true
 	}
 
-
 	for _, pod := range podSList.Items {
 		if _, exists := namespaces[pod.Namespace]; exists {
 			if _, exist := dPods[pod.Name]; !exist {

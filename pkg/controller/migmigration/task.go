@@ -24,8 +24,9 @@ const (
 	Created                                = ""
 	Started                                = "Started"
 	CleanStaleAnnotations                  = "CleanStaleAnnotations"
-	CleanStaleVeleroCRs             = "CleanStaleVeleroCRs"
-	CleanStaleResticCRs             = "CleanStaleResticCRs"CleanStaleStagePods                    = "CleanStaleStagePods"
+	CleanStaleVeleroCRs                    = "CleanStaleVeleroCRs"
+	CleanStaleResticCRs                    = "CleanStaleResticCRs"
+	CleanStaleStagePods                    = "CleanStaleStagePods"
 	WaitForStaleStagePodsTerminated        = "WaitForStaleStagePodsTerminated"
 	StartRefresh                           = "StartRefresh"
 	WaitForRefresh                         = "WaitForRefresh"
@@ -50,14 +51,15 @@ const (
 	EnsureStagePodsFromOrphanedPVCs        = "EnsureStagePodsFromOrphanedPVCs"
 	StagePodsCreated                       = "StagePodsCreated"
 	StagePodsFailed                        = "StagePodsFailed"
-	SourceStagePodsFailed                  = "SourceStagePodsFailed"RestartVelero                   = "RestartVelero"
-	WaitForVeleroReady              = "WaitForVeleroReady"
+	SourceStagePodsFailed                  = "SourceStagePodsFailed"
+	RestartVelero                          = "RestartVelero"
+	WaitForVeleroReady                     = "WaitForVeleroReady"
 	RestartRestic                          = "RestartRestic"
-	WaitForResticReady              = "WaitForResticReady"
+	WaitForResticReady                     = "WaitForResticReady"
 	QuiesceApplications                    = "QuiesceApplications"
 	EnsureQuiesced                         = "EnsureQuiesced"
-	UnQuiesceSrcApplications        = "UnQuiesceSrcApplications"
-	UnQuiesceDestApplications       = "UnQuiesceDestApplications"
+	UnQuiesceSrcApplications               = "UnQuiesceSrcApplications"
+	UnQuiesceDestApplications              = "UnQuiesceDestApplications"
 	WaitForRegistriesReady                 = "WaitForRegistriesReady"
 	EnsureStageBackup                      = "EnsureStageBackup"
 	StageBackupCreated                     = "StageBackupCreated"
@@ -68,7 +70,6 @@ const (
 	StageRestoreCreated                    = "StageRestoreCreated"
 	StageRestoreFailed                     = "StageRestoreFailed"
 	CreateDirectVolumeMigration            = "CreateDirectVolumeMigration"
-	DirectVolumeMigrationStarted           = "DirectVolumeMigrationStarted"
 	WaitForDirectVolumeMigrationToComplete = "WaitForDirectVolumeMigrationToComplete"
 	DirectVolumeMigrationFailed            = "DirectVolumeMigrationFailed"
 	EnsureFinalRestore                     = "EnsureFinalRestore"
@@ -82,7 +83,8 @@ const (
 	DeleteRegistries                       = "DeleteRegistries"
 	DeleteMigrated                         = "DeleteMigrated"
 	DeleteBackups                          = "DeleteBackups"
-	DeleteRestores                         = "DeleteRestores"DeleteHookJobs                  = "DeleteHookJobs"
+	DeleteRestores                         = "DeleteRestores"
+	DeleteHookJobs                         = "DeleteHookJobs"
 	MigrationFailed                        = "MigrationFailed"
 	Canceling                              = "Canceling"
 	Canceled                               = "Canceled"
@@ -136,10 +138,8 @@ var StageItinerary = Itinerary{
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
-		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: CreateDirectImageMigration, Step: StepPrepare, all: DirectImage},
-		{Name: CreateDirectVolumeMigration, Step: StepPrepare, all: DirectVolume},
-		{Name: DirectVolumeMigrationStarted, Step: StepPrepare, all: DirectVolume},
+		{Name: CreateDirectImageMigration, Step: StepStageBackup, all: DirectImage},
+		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -147,7 +147,7 @@ var StageItinerary = Itinerary{
 		{Name: AnnotateResources, Step: StepStageBackup, any: HasPVs | HasISs},
 		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: WaitForResticReady, Step: StepStageBackup, all: HasPVs},
-		{Name: WaitForRegistriesReady, Step: StepStageBackup},
+		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage},
 		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
@@ -183,8 +183,6 @@ var FinalItinerary = Itinerary{
 		{Name: WaitForVeleroReady, Step: StepPrepare},
 		{Name: WaitForResticReady, Step: StepPrepare, any: HasPVs},
 		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage},
-		{Name: CreateDirectImageMigration, Step: StepDirectImage, all: DirectImage},
-		{Name: DirectImageMigrationStarted, Step: StepDirectImage, all: DirectImage},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: PreBackupHooks, Step: StepBackup},
 		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage},
@@ -198,7 +196,6 @@ var FinalItinerary = Itinerary{
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
 		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume},
-		{Name: DirectVolumeMigrationStarted, Step: StepStageBackup, all: DirectVolume},
 		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
 		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
@@ -632,19 +629,6 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case DirectVolumeMigrationStarted:
-		dvm, err := t.getDirectVolumeMigration()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		// Make sure it exists
-		if dvm == nil {
-			return errors.New("direct volume migration not found")
-		}
-		// FIXME: currently a placefiller
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
