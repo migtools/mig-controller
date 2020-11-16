@@ -35,6 +35,7 @@ __3. Install migration components__
 
 Follow [mig-operator](https://github.com/konveyor/mig-operator) instructions to install migration components. 
 
+
 __4. Stop any running instances of mig-controller connected to the active cluster__
 
 After installing migration components, make sure mig-controller is stopped so that we can connect a locally built copy to the cluster. 
@@ -58,7 +59,17 @@ spec:
 
 After making this edit, wait for mig-operator to remove the mig-controller Pod.
 
-__5.  Use `make run` to run the controller from your terminal.__
+__5. Enable local mig-controller integration with mig-ui__
+
+If desired, reconfigure mig-ui to communicate with your locally running mig-controller.
+
+```bash
+# Patches MigrationController CR to use local mig-controller + discovery service.
+# Will set `discovery_api_url: http://localhost:8080` in mig-ui-config configmap.
+make use-local-controller
+```
+
+__6.  Use `make run` to run the controller from your terminal.__
 
 The controller will connect to OpenShift using your currently active kubeconfig. You may need to run `oc login` first.
 
@@ -85,11 +96,14 @@ There are several useful Makefile targets for mig-controller that developers sho
 | Command | Description |
 | --- | --- |
 | `make run` | Build a controller manager binary and run the controller against the active cluster |
+| `make run-fast` | Same as make run, but skips generate, fmt, vet. Useful for quick iteration |
+| `make use-local-controller` | Patches MigrationController CR to use local mig-controller + discovery service |
+| `make use-oncluster-controller` | Patches MigrationController CR to use on-cluster mig-controller + discovery service |
 | `make manager` | Build a controller manager binary |
 | `make install` | Install generated CRDs onto the active cluster |
 | `make manifests` | Generate updated CRDs from types.go files, RBAC from annotations in controller, deploy manifest YAML |
 | `make samples` | Copy annotated sample CR contents from config/samples to migsamples, which is .gitignored and safe to keep data in |
-| `make docker-build` | Build the controller-manager into a container image. Requires support for multi-stage builds, which may require moby-engine |
+| `make docker-build` | Build the controller-manager into a container image. Requires support for multi-stage builds. |
 
 ---
 ## Invoking CI on pull requests
