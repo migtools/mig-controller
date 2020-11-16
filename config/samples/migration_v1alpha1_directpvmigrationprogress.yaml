@@ -3,7 +3,11 @@ kind: DirectVolumeMigrationProgress
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: directpvmigrationprogress-sample
+  name: directvolumemigrationprogress-sample
 spec:
-  # Add fields here
-  foo: bar
+  clusterRef:
+    name: sample-source-3110
+    namespace: openshift-migration
+  podRef:
+    name: directmigration-sample-pod-0
+    namespace: openshift-migration
