@@ -120,6 +120,11 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Exit early if the MigAnalytic already has a ready condition
+	if analytic.Status.IsReady() {
+		return reconcile.Result{}, nil
+	}
+
 	// Report reconcile error.
 	defer func() {
 		log.Info("CR", "conditions", analytic.Status.Conditions)
