@@ -60,8 +60,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectVolumeMigrationProgress{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(GetDVMRefFromDPMP),
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &migrationv1alpha1.DirectVolumeMigration{},
 		})
 	if err != nil {
 		return err
