@@ -105,6 +105,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	case dvmc.Started:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
 		progress = append(progress, fmt.Sprintf("direct volume migration started at %v. ", dvm.Status.StartTimestamp))
+		progress = append(progress, t.getDVMProgress(dvm.Status.RunningPods)...)
 	case dvmc.Completed:
 		progress = append(progress, fmt.Sprintf("%v/%v volume migrations were successful", successfulPods, totalVolumes))
 		completed = true
@@ -115,6 +116,21 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 		progress = append(progress, volumeProgress)
 	}
 	return completed, failureReasons, progress
+}
+
+func (t *Task) getDVMProgress(runningPods []*migapi.RunningPod) []string {
+	progress := []string{}
+	for _, pod := range runningPods {
+		p := fmt.Sprintf("rsync client pod %s is running", path.Join(pod.Namespace, pod.Name))
+		if pod.LastObservedProgressPercent != "" {
+			p += fmt.Sprintf(" progress percent %s", pod.LastObservedProgressPercent)
+		}
+		if pod.LastObservedTransferRate != "" {
+			p += fmt.Sprintf(" transfer rate %s", pod.LastObservedTransferRate)
+		}
+		progress = append(progress, p)
+	}
+	return progress
 }
 
 func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
