@@ -526,12 +526,12 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 		Log.Trace(err)
 		return err
 	}
-	p.Destination, err = p.buildPods(h, object.Spec.SrcMigClusterRef)
+	p.Source, err = p.buildPods(h, object.Spec.SrcMigClusterRef)
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	p.Source, err = p.buildPods(h, object.Spec.DestMigClusterRef)
+	p.Destination, err = p.buildPods(h, object.Spec.DestMigClusterRef)
 	if err != nil {
 		Log.Trace(err)
 		return err
