@@ -91,6 +91,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to DirectImageMigrations
+	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &migapi.MigMigration{},
+	})
+	if err != nil {
+		return err
+	}
+
 	// Indexes
 	indexer := mgr.GetFieldIndexer()
 

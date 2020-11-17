@@ -8,6 +8,7 @@ import (
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	path "path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -54,7 +55,7 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 			CreateDestinationNamespaces: true,
 		},
 	}
-	t.setDirectVolumeMigrationOwnerReferences(dvm)
+	migapi.SetOwnerReference(t.Owner, t.Owner, dvm)
 	return dvm
 }
 
@@ -141,27 +142,4 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 		return &pvcList
 	}
 	return nil
-}
-
-func (t *Task) setDirectVolumeMigrationOwnerReferences(dvm *migapi.DirectVolumeMigration) {
-	trueVar := true
-	for i := range dvm.OwnerReferences {
-		ref := &dvm.OwnerReferences[i]
-		if ref.Kind == t.Owner.Kind {
-			ref.APIVersion = t.Owner.APIVersion
-			ref.Name = t.Owner.Name
-			ref.UID = t.Owner.UID
-			ref.Controller = &trueVar
-			return
-		}
-	}
-	dvm.OwnerReferences = []metav1.OwnerReference{
-		{
-			APIVersion: t.Owner.APIVersion,
-			Kind:       t.Owner.Kind,
-			Name:       t.Owner.Name,
-			UID:        t.Owner.UID,
-			Controller: &trueVar,
-		},
-	}
 }

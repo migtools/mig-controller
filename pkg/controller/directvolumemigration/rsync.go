@@ -666,23 +666,12 @@ func (t *Task) createRsyncClientPods() error {
 // Create rsync PV progress CR on destination cluster
 func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
-	trueRef := true
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
-			dvp := migapi.DirectVolumeMigrationProgress{
+			dvmp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: migapi.OpenshiftMigrationNamespace,
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: t.Owner.APIVersion,
-							Kind:       t.Owner.Kind,
-							Name:       t.Owner.Name,
-							UID:        t.Owner.UID,
-							Controller: &trueRef,
-						},
-					},
-					// TODO @alpatel, add owner references
 				},
 				Spec: migapi.DirectVolumeMigrationProgressSpec{
 					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
@@ -693,13 +682,14 @@ func (t *Task) createPVProgressCR() error {
 				},
 				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
-			err := t.Client.Create(context.TODO(), &dvp)
+			migapi.SetOwnerReference(t.Owner, t.Owner, &dvmp)
+			err := t.Client.Create(context.TODO(), &dvmp)
 			if k8serror.IsAlreadyExists(err) {
-				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvp.Namespace, "name", dvp.Name)
+				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvmp.Namespace, "name", dvmp.Name)
 			} else if err != nil {
 				return err
 			}
-			t.Log.Info("Rsync client progress CR created", "name", dvp.Name, "namespace", dvp.Namespace)
+			t.Log.Info("Rsync client progress CR created", "name", dvmp.Name, "namespace", dvmp.Namespace)
 		}
 
 	}

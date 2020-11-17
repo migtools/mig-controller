@@ -70,31 +70,8 @@ func (t *Task) buildDirectImageMigration() *migapi.DirectImageMigration {
 			Namespaces:        t.PlanResources.MigPlan.Spec.Namespaces,
 		},
 	}
-	t.setDirectImageOwnerReference(dim)
+	migapi.SetOwnerReference(t.Owner, t.Owner, dim)
 	return dim
-}
-
-func (t *Task) setDirectImageOwnerReference(dim *migapi.DirectImageMigration) {
-	trueVar := true
-	for i := range dim.OwnerReferences {
-		ref := &dim.OwnerReferences[i]
-		if ref.Kind == t.Owner.Kind {
-			ref.APIVersion = t.Owner.APIVersion
-			ref.Name = t.Owner.Name
-			ref.UID = t.Owner.UID
-			ref.Controller = &trueVar
-			return
-		}
-	}
-	dim.OwnerReferences = []metav1.OwnerReference{
-		{
-			APIVersion: t.Owner.APIVersion,
-			Kind:       t.Owner.Kind,
-			Name:       t.Owner.Name,
-			UID:        t.Owner.UID,
-			Controller: &trueVar,
-		},
-	}
 }
 
 // Set warning condition on migmigration if DirectImageMigration fails
