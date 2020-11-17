@@ -1,11 +1,10 @@
-# Build the manager binary
-FROM golang:1.14.4 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7 AS builder
 
 # Copy in the go src
-WORKDIR /go/src/github.com/konveyor/mig-controller
-COPY pkg/    pkg/
-COPY cmd/    cmd/
-COPY vendor/ vendor/
+ENV GOPATH=$APP_ROOT
+COPY pkg    $APP_ROOT/src/github.com/konveyor/mig-controller/pkg
+COPY cmd    $APP_ROOT/src/github.com/konveyor/mig-controller/cmd
+COPY vendor $APP_ROOT/src/github.com/konveyor/mig-controller/vendor
 
 # Build
 RUN CGO_ENABLED=1 GOOS=linux go build -a -o manager github.com/konveyor/mig-controller/cmd/manager
@@ -13,5 +12,5 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -o manager github.com/konveyor/mig-cont
 # Copy the controller-manager into a thin image
 FROM registry.access.redhat.com/ubi8-minimal
 WORKDIR /
-COPY --from=builder /go/src/github.com/konveyor/mig-controller/manager .
+COPY --from=builder /opt/app-root/src/manager .
 ENTRYPOINT ["/manager"]
