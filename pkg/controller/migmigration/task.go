@@ -252,7 +252,7 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteRestores, Step: StepCleanup},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanup},
-		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, all: HasStageBackup},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
 		{Name: DeleteMigrated, Step: StepCleanup},
 		{Name: EnsureMigratedDeleted, Step: StepCleanup},
 		{Name: UnQuiesceSrcApplications, Step: StepCleanup},
