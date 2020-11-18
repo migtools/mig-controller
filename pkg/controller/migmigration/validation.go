@@ -32,6 +32,7 @@ const (
 	VeleroStageBackupPartiallyFailed   = "VeleroStageBackupPartiallyFailed"
 	VeleroStageRestorePartiallyFailed  = "VeleroStageRestorePartiallyFailed"
 	VeleroFinalRestorePartiallyFailed  = "VeleroFinalRestorePartiallyFailed"
+	DirectImageMigrationFailed         = "DirectImageMigrationFailed"
 	StageNoOp                          = "StageNoOp"
 	RegistriesHealthy                  = "RegistriesHealthy"
 	RegistriesUnhealthy                = "RegistriesUnhealthy"
