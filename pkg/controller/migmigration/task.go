@@ -1000,7 +1000,7 @@ func (t *Task) init() error {
 		return err
 	}
 
-	anyPVs, _ := t.hasPVs()
+	anyPVs := t.hasPVs()
 	if t.stage() && (!anyPVs && !hasImageStreams) {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StageNoOp,
@@ -1115,7 +1115,7 @@ func (t *Task) next() error {
 
 // Evaluate `all` flags.
 func (t *Task) allFlags(phase Phase) (bool, error) {
-	anyPVs, moveSnapshotPVs := t.hasPVs()
+	anyPVs := t.hasPVs()
 	if phase.all&HasPVs != 0 && !anyPVs {
 		return false, nil
 	}
@@ -1147,7 +1147,7 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&IndirectVolume != 0 && !t.indirectVolumeMigration() {
 		return false, nil
 	}
-	if phase.all&HasStageBackup != 0 && !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+	if phase.all&HasStageBackup != 0 && !t.hasStageBackup(hasImageStream, anyPVs) {
 		return false, nil
 	}
 
@@ -1156,7 +1156,7 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 
 // Evaluate `any` flags.
 func (t *Task) anyFlags(phase Phase) (bool, error) {
-	anyPVs, moveSnapshotPVs := t.hasPVs()
+	anyPVs := t.hasPVs()
 	if phase.any&HasPVs != 0 && anyPVs {
 		return true, nil
 	}
@@ -1188,7 +1188,7 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&IndirectVolume != 0 && t.indirectVolumeMigration() {
 		return true, nil
 	}
-	if phase.any&HasStageBackup != 0 && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+	if phase.any&HasStageBackup != 0 && t.hasStageBackup(hasImageStream, anyPVs) {
 		return true, nil
 	}
 	return phase.any == uint16(0), nil
@@ -1313,19 +1313,22 @@ func (t *Task) getPVCs() map[k8sclient.ObjectKey]migapi.PV {
 }
 
 // Get whether the associated plan lists not skipped PVs.
-// First return value is PVs overall, and second is limited to Move or snapshot copy PVs
-func (t *Task) hasPVs() (bool, bool) {
-	var anyPVs bool
+func (t *Task) hasPVs() bool {
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		if pv.Selection.Action == migapi.PvMoveAction ||
-			pv.Selection.Action == migapi.PvCopyAction && pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
-			return true, true
-		}
 		if pv.Selection.Action != migapi.PvSkipAction {
-			anyPVs = true
+			return true
 		}
 	}
-	return anyPVs, false
+	return false
+}
+
+func (t *Task) areAnyPVsUsingMoveOrSnapshotMethod() bool {
+	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
+		if pv.Selection.Action == migapi.PvMoveAction || (pv.Selection.Action == migapi.PvCopyAction && pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod) {
+			return true
+		}
+	}
+	return false
 }
 
 // Get whether the associated plan has PVs to be directly migrated
@@ -1388,8 +1391,8 @@ func (t *Task) directVolumeMigration() bool {
 }
 
 // Returns true if the migration requires a stage backup
-func (t *Task) hasStageBackup(hasIS, anyPVs, moveSnapshotPVs bool) bool {
-	return hasIS && t.indirectImageMigration() || anyPVs && t.indirectVolumeMigration() || moveSnapshotPVs
+func (t *Task) hasStageBackup(hasIS, anyPVs bool) bool {
+	return hasIS && t.indirectImageMigration() || anyPVs && t.indirectVolumeMigration() || t.areAnyPVsUsingMoveOrSnapshotMethod()
 }
 
 // Get both source and destination clusters.
