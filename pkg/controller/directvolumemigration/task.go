@@ -112,7 +112,7 @@ var VolumeMigration = Itinerary{
 }
 
 var FailedItinerary = Itinerary{
-	Name: "Failed",
+	Name: "VolumeMigrationFailed",
 	Steps: []Step{
 		{phase: MigrationFailed},
 		{phase: Completed},
