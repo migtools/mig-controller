@@ -13,6 +13,7 @@ const (
 	PodLimit          = "POD_LIMIT"
 	PvLimit           = "PV_LIMIT"
 	ExcludedResources = "EXCLUDED_RESOURCES"
+	ISResource        = "imagestreams"
 )
 
 // Included resource defaults
@@ -22,7 +23,7 @@ var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"namespaces",
-	"imagestreams",
+	ISResource,
 	"secrets",
 	"configmaps",
 	"pods",

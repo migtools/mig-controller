@@ -105,7 +105,13 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
 	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
-	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedStageResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	var includedResources mapset.Set
+	if t.indirectImageMigration() {
+		includedResources = settings.IncludedStageResources
+	} else {
+		includedResources = settings.IncludedStageResources.Difference(mapset.NewSetFromSlice([]interface{}{settings.ISResource}))
+	}
+	newBackup.Spec.IncludedResources = toStringSlice(includedResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
 	err = client.Create(context.TODO(), newBackup)
