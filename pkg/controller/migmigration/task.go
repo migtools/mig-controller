@@ -428,12 +428,12 @@ func (t *Task) Run() error {
 
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(MigrationFailed, reasons)
-			} else {
-				t.Requeue = FastReQ
-				if err = t.next(); err != nil {
-					return liberr.Wrap(err)
-				}
+				t.setDirectImageMigrationWarning(dim)
+				// Once supported, add reasons to Status.Warnings for the Step
+			}
+			t.Requeue = FastReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
 			}
 		}
 		t.Requeue = PollReQ

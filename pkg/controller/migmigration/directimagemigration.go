@@ -18,6 +18,8 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,5 +94,20 @@ func (t *Task) setDirectImageOwnerReference(dim *migapi.DirectImageMigration) {
 			UID:        t.Owner.UID,
 			Controller: &trueVar,
 		},
+	}
+}
+
+// Set warning condition on migmigration if DirectImageMigration fails
+func (t *Task) setDirectImageMigrationWarning(dim *migapi.DirectImageMigration) {
+	if len(dim.Status.Errors) > 0 {
+		message := fmt.Sprintf(
+			"DirectImageMigration (dim): %s/%s failed. See dim Status.Errors for details.", dim.GetNamespace(), dim.GetName())
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     DirectImageMigrationFailed,
+			Status:   True,
+			Category: migapi.Warn,
+			Message:  message,
+			Durable:  true,
+		})
 	}
 }
