@@ -78,6 +78,9 @@ const (
 	StagePodLabel = "migration.openshift.io/is-stage-pod"
 )
 
+// Bucket limit for number of items annotated in one Reconcile
+const NumberOfItems = 50
+
 // Set of Service Accounts.
 // Keyed by namespace (name) with value of map keyed by SA name.
 type ServiceAccounts map[string]map[string]bool
@@ -104,7 +107,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if itemsUpdated > 50 {
+	if itemsUpdated > NumberOfItems {
 		return false, nil
 	}
 	// Pods
@@ -112,7 +115,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if itemsUpdated > 50 {
+	if itemsUpdated > NumberOfItems {
 		return false, nil
 	}
 	// PV & PVCs
@@ -120,7 +123,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if itemsUpdated > 50 {
+	if itemsUpdated > NumberOfItems {
 		return false, nil
 	}
 	// Service accounts used by stage pods.
@@ -128,7 +131,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if itemsUpdated > 50 {
+	if itemsUpdated > NumberOfItems {
 		return false, nil
 	}
 
@@ -136,7 +139,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if itemsUpdated > 50 {
+	if itemsUpdated > NumberOfItems {
 		return false, nil
 	}
 	return true, nil
@@ -207,7 +210,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 			"name",
 			namespace.Name)
 		itemsUpdated++
-		if itemsUpdated > 50 {
+		if itemsUpdated > NumberOfItems {
 			t.setProgress([]string{fmt.Sprintf("%v/%v Namespaces labeled", i, total)})
 			return itemsUpdated, nil
 		}
@@ -271,7 +274,7 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 			names[sa] = true
 		}
 
-		if itemsUpdated > 50 {
+		if itemsUpdated > NumberOfItems {
 			t.setProgress([]string{fmt.Sprintf("%v/%v Pod annotations/labels added.", i, total)})
 			return itemsUpdated, serviceAccounts, nil
 		}
@@ -375,7 +378,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			"name",
 			pv.PVC.Name)
 		itemsUpdated++
-		if itemsUpdated > 50 {
+		if itemsUpdated > NumberOfItems {
 			t.setProgress([]string{fmt.Sprintf("%v/%v PV annotations/labels added.", i, total), fmt.Sprintf("%v/%v PVC annotations/labels added.", i, total)})
 			return itemsUpdated, nil
 		}
@@ -420,7 +423,7 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 				"name",
 				sa.Name)
 			itemsUpdated++
-			if itemsUpdated > 50 {
+			if itemsUpdated > NumberOfItems {
 				t.setProgress([]string{fmt.Sprintf("%v/%v SA annotations/labels added in the namespace: %s", i, total, sa.Namespace)})
 				return itemsUpdated, nil
 			}
@@ -459,7 +462,7 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 				"name",
 				is.Name)
 			itemsUpdated++
-			if itemsUpdated > 50 {
+			if itemsUpdated > NumberOfItems {
 				t.setProgress([]string{fmt.Sprintf("%v/%v ImageStream labels added. in the namespace: %s", i, total, is.Namespace)})
 				return itemsUpdated, nil
 			}
