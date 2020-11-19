@@ -33,6 +33,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	}
 
 	// Result
+	direct.Status.PhaseDescription = task.PhaseDescription
 	direct.Status.Phase = task.Phase
 	direct.Status.Itinerary = task.Itinerary.Name
 

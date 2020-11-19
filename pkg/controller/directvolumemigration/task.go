@@ -60,6 +60,8 @@ const (
 type Step struct {
 	// A phase name.
 	phase string
+	// phaseDescription is a human readable description of the phase
+	phaseDescription string
 	// Step included when ALL flags evaluate true.
 	all uint8
 	// Step included when ANY flag evaluates true.
@@ -89,33 +91,33 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 var VolumeMigration = Itinerary{
 	Name: "VolumeMigration",
 	Steps: []Step{
-		{phase: Created},
-		{phase: Started},
-		{phase: Prepare},
-		{phase: CreateDestinationNamespaces},
-		{phase: DestinationNamespacesCreated},
-		{phase: CreateDestinationPVCs},
-		{phase: DestinationPVCsCreated},
-		{phase: CreateRsyncRoute},
-		{phase: CreateRsyncConfig},
-		{phase: CreateStunnelConfig},
-		{phase: CreatePVProgressCRs},
-		{phase: CreateRsyncTransferPods},
-		{phase: WaitForRsyncTransferPodsRunning},
-		{phase: CreateStunnelClientPods},
-		{phase: WaitForStunnelClientPodsRunning},
-		{phase: CreateRsyncClientPods},
-		{phase: WaitForRsyncClientPodsCompleted},
-		{phase: DeleteRsyncResources},
-		{phase: Completed},
+		{phase: Created, phaseDescription: "The DVM controller just saw DVM CR being created"},
+		{phase: Started, phaseDescription: "The DVM controller is starting to work on the DVM CR"},
+		{phase: Prepare, phaseDescription: "The DVM controller prepares the environment for volume migration, currently it is a no-op"},
+		{phase: CreateDestinationNamespaces, phaseDescription: "Creating destination namespaces, no-op if they exist"},
+		{phase: DestinationNamespacesCreated, phaseDescription: "Checking if the destination namespace is created, currently it is a no-op"},
+		{phase: CreateDestinationPVCs, phaseDescription: "Creating PVCs to be migrated on the destination namespace, no-op if they exist"},
+		{phase: DestinationPVCsCreated, phaseDescription: "Check if all the PVCs that were created are Bound, currently a no-op"},
+		{phase: CreateRsyncRoute, phaseDescription: "Creating one route per namespace for rsync on the destination cluster"},
+		{phase: CreateRsyncConfig, phaseDescription: "Creating configmap and secrets on both source and destination clusters for rsync configuration"},
+		{phase: CreateStunnelConfig, phaseDescription: "Creating configmap and secrets for stunnel certs used to connect to rsync on both source and destionation cluster"},
+		{phase: CreatePVProgressCRs, phaseDescription: "Creating direct volume migration progress CR to get progress percent and transfer rate"},
+		{phase: CreateRsyncTransferPods, phaseDescription: "Creating rsync daemon pods on the destination cluster"},
+		{phase: WaitForRsyncTransferPodsRunning, phaseDescription: "Wait for the rsync daemon pod to be running"},
+		{phase: CreateStunnelClientPods, phaseDescription: "Create stunnel client pods on the source cluster"},
+		{phase: WaitForStunnelClientPodsRunning, phaseDescription: "Waiting for the stunnel client pods to be running"},
+		{phase: CreateRsyncClientPods, phaseDescription: "Create Rsync client pods"},
+		{phase: WaitForRsyncClientPodsCompleted, phaseDescription: "Wait for the rsync client pods to be completed"},
+		{phase: DeleteRsyncResources, phaseDescription: "Delete all the resources created while running this migration"},
+		{phase: Completed, phaseDescription: "The migration has completed, phase check status.Itinerary to determined if it failed"},
 	},
 }
 
 var FailedItinerary = Itinerary{
 	Name: "VolumeMigrationFailed",
 	Steps: []Step{
-		{phase: MigrationFailed},
-		{phase: Completed},
+		{phase: MigrationFailed, phaseDescription: "The migration attempt failed, please see errors for more details"},
+		{phase: Completed, phaseDescription: "The migration has completed, phase check status.Itinerary to determined if it failed"},
 	},
 }
 
@@ -129,15 +131,16 @@ var FailedItinerary = Itinerary{
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log         logr.Logger
-	Client      k8sclient.Client
-	Owner       *migapi.DirectVolumeMigration
-	SSHKeys     *sshKeys
-	RsyncRoutes map[string]string
-	Phase       string
-	Requeue     time.Duration
-	Itinerary   Itinerary
-	Errors      []string
+	Log              logr.Logger
+	Client           k8sclient.Client
+	Owner            *migapi.DirectVolumeMigration
+	SSHKeys          *sshKeys
+	RsyncRoutes      map[string]string
+	Phase            string
+	PhaseDescription string
+	Requeue          time.Duration
+	Itinerary        Itinerary
+	Errors           []string
 }
 
 type sshKeys struct {
@@ -358,14 +361,17 @@ func (t *Task) next() error {
 	}
 	if current == -1 {
 		t.Phase = Completed
+		t.PhaseDescription = t.Itinerary.Steps[len(t.Itinerary.Steps)-1].phaseDescription
 		return nil
 	}
 	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
 		next := t.Itinerary.Steps[n]
 		t.Phase = next.phase
+		t.PhaseDescription = next.phaseDescription
 		return nil
 	}
 	t.Phase = Completed
+	t.PhaseDescription = t.Itinerary.Steps[len(t.Itinerary.Steps)-1].phaseDescription
 	return nil
 }
 

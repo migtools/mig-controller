@@ -69,6 +69,8 @@ spec:
               type: string
             phase:
               type: string
+            phaseDescription:
+              type: string
             runningPods:
               items:
                 properties:
@@ -87,6 +89,7 @@ spec:
               type: array
           required:
           - observedDigest
+          - phaseDescription
           type: object
   version: v1alpha1
 status:
