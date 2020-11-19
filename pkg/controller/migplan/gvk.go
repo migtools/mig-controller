@@ -1,6 +1,9 @@
 package migplan
 
 import (
+	"fmt"
+	"strings"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
@@ -23,6 +26,16 @@ func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
 	incompatibleMapping, err := gvkCompare.Compare()
 	if err != nil {
 		err = liberr.Wrap(err)
+	}
+
+	if len(gvkCompare.EmptyNamespaces) == 0 {
+		msg := fmt.Sprintf("Following namespaces are not empty [%s]. Elapsed time %f", strings.Join(gvkCompare.EmptyNamespaces, ", "), gvkCompare.Elapsed)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsEmpty,
+			Status:   True,
+			Category: Warn,
+			Message:  msg,
+		})
 	}
 
 	reportGVK(plan, incompatibleMapping)

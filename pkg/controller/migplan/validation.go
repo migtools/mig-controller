@@ -43,6 +43,7 @@ const (
 	NsNotFoundOnDestinationCluster             = "NamespaceNotFoundOnDestinationCluster"
 	NsLimitExceeded                            = "NamespaceLimitExceeded"
 	NsLengthExceeded                           = "NamespaceLengthExceeded"
+	NsEmpty                                    = "NamespacesEmpty"
 	NsHaveNodeSelectors                        = "NamespacesHaveNodeSelectors"
 	PodLimitExceeded                           = "PodLimitExceeded"
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"

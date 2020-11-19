@@ -335,6 +335,7 @@ func (t *Task) Run() error {
 	t.Requeue = FastReQ
 	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
+	// Init method
 	err := t.init()
 	if err != nil {
 		return err

@@ -3,6 +3,7 @@ package gvk
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -59,6 +60,8 @@ type Compare struct {
 	DstDiscovery          discovery.DiscoveryInterface
 	SrcClient             dynamic.Interface
 	CohabitatingResources map[string]*CohabitatingResource
+	EmptyNamespaces       []string
+	Elapsed               float64
 }
 
 // Compare GVKs on both clusters, find incompatible GVKs
@@ -79,16 +82,30 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
+	nanoToMilli := 1e6
+	start := time.Now()
+	err = r.checkForEmptyNamespaces(preferredSrcResourceList)
+	if err != nil {
+		return nil, err
+	}
+	r.Elapsed = float64(time.Since(start) / nanoToMilli)
+
 	resourcesDiff := r.compareResources(preferredSrcResourceList, dstResourceList)
-	incompatibleGVKs, err := convertToGVRList(resourcesDiff)
+	incompatibleGVRs, err := convertToGVRList(resourcesDiff)
 	if err != nil {
 		return nil, err
 	}
 
 	// Don't report an incompatibleGVK if user settings will skip resource anyways
+	filteredGVRs := r.filterGVRList(incompatibleGVRs)
+
+	return r.collectIncompatibleMapping(filteredGVRs)
+}
+
+func (r *Compare) filterGVRList(gvrList []schema.GroupVersionResource) []schema.GroupVersionResource {
 	excludedResources := toStringSlice(settings.ExcludedInitialResources.Union(toSet(r.Plan.Status.ExcludedResources)))
-	filteredGVKs := []schema.GroupVersionResource{}
-	for _, gvr := range incompatibleGVKs {
+	filteredGVRs := []schema.GroupVersionResource{}
+	for _, gvr := range gvrList {
 		skip := false
 		for _, resource := range excludedResources {
 			if strings.EqualFold(gvr.Resource, resource) {
@@ -96,11 +113,41 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 			}
 		}
 		if !skip {
-			filteredGVKs = append(filteredGVKs, gvr)
+			filteredGVRs = append(filteredGVRs, gvr)
 		}
 	}
 
-	return r.collectIncompatibleMapping(filteredGVKs)
+	return filteredGVRs
+}
+
+// Check for empty namespaces and list them in the compare store
+func (r *Compare) checkForEmptyNamespaces(resourceList []*metav1.APIResourceList) error {
+	gvrList, err := convertToGVRList(resourceList)
+	if err != nil {
+		return err
+	}
+	filteredGVRs := r.filterGVRList(gvrList)
+	nsList := r.Plan.GetSourceNamespaces()
+	for _, ns := range nsList {
+		empty := true
+		for _, gvr := range filteredGVRs {
+			list, err := r.SrcClient.Resource(gvr).Namespace(ns).List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(list.Items) > 0 {
+				empty = false
+				break
+			}
+		}
+
+		if empty {
+			r.EmptyNamespaces = append(r.EmptyNamespaces, ns)
+		}
+	}
+
+	return nil
 }
 
 func toStringSlice(set mapset.Set) []string {
