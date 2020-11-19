@@ -653,7 +653,7 @@ func (t *Task) Run() error {
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
 		if completed {
 			if len(reasons) > 0 {
-				t.fail(DirectVolumeMigrationFailed, reasons)
+				t.setDirectVolumeMigrationFailureWarning(dvm)
 			} else {
 				t.setProgress(progress)
 				if err = t.next(); err != nil {

@@ -645,7 +645,7 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes:       volumes,
 					Containers:    containers,
 				},
