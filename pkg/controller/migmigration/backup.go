@@ -339,7 +339,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 func (t *Task) setInitialBackupPartialFailureWarning(backup *velero.Backup) {
 	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
 		message := fmt.Sprintf(
-			"Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
+			"Backup %s/%s: partially failed on source cluster", backup.GetNamespace(), backup.GetName())
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     VeleroInitialBackupPartiallyFailed,
 			Status:   True,
@@ -354,7 +354,7 @@ func (t *Task) setInitialBackupPartialFailureWarning(backup *velero.Backup) {
 func (t *Task) setStageBackupPartialFailureWarning(backup *velero.Backup) {
 	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
 		message := fmt.Sprintf(
-			"Stage Backup: %s/%s partially failed on source cluster", backup.GetNamespace(), backup.GetName())
+			"Stage Backup %s/%s: partially failed on source cluster", backup.GetNamespace(), backup.GetName())
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     VeleroStageBackupPartiallyFailed,
 			Status:   True,
