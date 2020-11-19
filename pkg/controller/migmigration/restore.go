@@ -339,7 +339,7 @@ func (t *Task) setResticConditions(restore *velero.Restore) {
 func (t *Task) setStageRestorePartialFailureWarning(restore *velero.Restore) {
 	if restore.Status.Phase == velero.RestorePhasePartiallyFailed {
 		message := fmt.Sprintf(
-			"Stage Restore: %s/%s partially failed on dest cluster", restore.GetNamespace(), restore.GetName())
+			"Stage Restore %s/%s: partially failed on destination cluster", restore.GetNamespace(), restore.GetName())
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     VeleroStageRestorePartiallyFailed,
 			Status:   True,
@@ -354,7 +354,7 @@ func (t *Task) setStageRestorePartialFailureWarning(restore *velero.Restore) {
 func (t *Task) setFinalRestorePartialFailureWarning(restore *velero.Restore) {
 	if restore.Status.Phase == velero.RestorePhasePartiallyFailed {
 		message := fmt.Sprintf(
-			"Final Restore: %s/%s partially failed on dest cluster", restore.GetNamespace(), restore.GetName())
+			"Final Restore %s/%s: partially failed on destination cluster", restore.GetNamespace(), restore.GetName())
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     VeleroFinalRestorePartiallyFailed,
 			Status:   True,
