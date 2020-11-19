@@ -126,7 +126,7 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 	message := fmt.Sprintf(
 		"Direct Volume Migration: one or more volumes failed in dvm %s/%s", dvm.GetNamespace(), dvm.GetName())
 	t.Owner.Status.SetCondition(migapi.Condition{
-		Type:     DirectVolumeMigrationsFailed,
+		Type:     DirectVolumeMigrationFailed,
 		Status:   True,
 		Category: migapi.Warn,
 		Message:  message,
