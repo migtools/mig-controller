@@ -1035,6 +1035,14 @@ func (t *Task) updatePipeline() {
 			step.MarkCompleted()
 		}
 	}
+	// mark steps skipped
+	for _, step := range t.Owner.Status.Pipeline {
+		if step == currentStep {
+			break
+		} else if !step.MarkedStarted() {
+			step.Skipped = true
+		}
+	}
 	if currentStep != nil {
 		currentStep.MarkStarted()
 		currentStep.Phase = t.Phase
