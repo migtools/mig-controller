@@ -656,6 +656,7 @@ func (t *Task) Run() error {
 				t.setDirectVolumeMigrationFailureWarning(dvm)
 			} else {
 				t.setProgress(progress)
+				t.Owner.Status.FindStep(t.Step).Message = dvm.Status.PhaseDescription
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}
@@ -1039,6 +1040,9 @@ func (t *Task) updatePipeline() {
 			step.MarkCompleted()
 		}
 	}
+
+	defer t.Owner.Status.ReflectPipeline()
+
 	// mark steps skipped
 	for _, step := range t.Owner.Status.Pipeline {
 		if step == currentStep {
@@ -1050,6 +1054,9 @@ func (t *Task) updatePipeline() {
 	if currentStep != nil {
 		currentStep.MarkStarted()
 		currentStep.Phase = t.Phase
+		if currentStep.Name == StepDirectVolume {
+			return
+		}
 		if desc, found := PhaseDescriptions[t.Phase]; found {
 			currentStep.Message = desc
 		} else {
@@ -1059,7 +1066,6 @@ func (t *Task) updatePipeline() {
 			currentStep.MarkCompleted()
 		}
 	}
-	t.Owner.Status.ReflectPipeline()
 }
 
 func (t *Task) setProgress(progress []string) {
@@ -1217,8 +1223,8 @@ func (t *Task) failCurrentStep() {
 
 // Add errors.
 func (t *Task) addErrors(errors []string) {
-	for _, error := range errors {
-		t.Errors = append(t.Errors, error)
+	for _, e := range errors {
+		t.Errors = append(t.Errors, e)
 	}
 }
 
