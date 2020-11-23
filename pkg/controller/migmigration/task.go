@@ -108,14 +108,18 @@ const (
 
 // Migration steps
 const (
-	StepPrepare      = "Prepare"
-	StepDirectImage  = "DirectImage"
-	StepDirectVolume = "DirectVolume"
-	StepBackup       = "Backup"
-	StepStageBackup  = "StageBackup"
-	StepStageRestore = "StageRestore"
-	StepRestore      = "Restore"
-	StepCleanup      = "Cleanup"
+	StepPrepare          = "Prepare"
+	StepDirectImage      = "DirectImage"
+	StepDirectVolume     = "DirectVolume"
+	StepBackup           = "Backup"
+	StepStageBackup      = "StageBackup"
+	StepStageRestore     = "StageRestore"
+	StepRestore          = "Restore"
+	StepCleanup          = "Cleanup"
+	StepCleanupVelero    = "CleanupVelero"
+	StepCleanupHelpers   = "CleanupHelpers"
+	StepCleanupMigrated  = "CleanupMigrated"
+	StepCleanupUnquiesce = "CleanupUnquiesce"
 )
 
 // Itinerary defines itinerary
@@ -222,13 +226,13 @@ var FinalItinerary = Itinerary{
 var CancelItinerary = Itinerary{
 	Name: "Cancel",
 	Phases: []Phase{
-		{Name: Canceling, Step: StepCleanup},
-		{Name: DeleteBackups, Step: StepCleanup},
-		{Name: DeleteRestores, Step: StepCleanup},
-		{Name: DeleteRegistries, Step: StepCleanup},
-		{Name: DeleteHookJobs, Step: StepCleanup},
-		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
-		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, all: HasStageBackup},
+		{Name: Canceling, Step: StepCleanupVelero},
+		{Name: DeleteBackups, Step: StepCleanupVelero},
+		{Name: DeleteRestores, Step: StepCleanupVelero},
+		{Name: DeleteRegistries, Step: StepCleanupHelpers},
+		{Name: DeleteHookJobs, Step: StepCleanupHelpers},
+		{Name: EnsureStagePodsDeleted, Step: StepCleanupHelpers, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, all: HasStageBackup},
 		{Name: Canceled, Step: StepCleanup},
 		{Name: Completed, Step: StepCleanup},
 	},
@@ -237,9 +241,9 @@ var CancelItinerary = Itinerary{
 var FailedItinerary = Itinerary{
 	Name: "Failed",
 	Phases: []Phase{
-		{Name: MigrationFailed, Step: StepCleanup},
-		{Name: DeleteRegistries, Step: StepCleanup},
-		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, all: HasStageBackup},
+		{Name: MigrationFailed, Step: StepCleanupHelpers},
+		{Name: DeleteRegistries, Step: StepCleanupHelpers},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, all: HasStageBackup},
 		{Name: Completed, Step: StepCleanup},
 	},
 }
@@ -247,15 +251,15 @@ var FailedItinerary = Itinerary{
 var RollbackItinerary = Itinerary{
 	Name: "Rollback",
 	Phases: []Phase{
-		{Name: Rollback, Step: StepCleanup},
-		{Name: DeleteBackups, Step: StepCleanup},
-		{Name: DeleteRestores, Step: StepCleanup},
-		{Name: DeleteRegistries, Step: StepCleanup},
-		{Name: EnsureStagePodsDeleted, Step: StepCleanup},
-		{Name: EnsureAnnotationsDeleted, Step: StepCleanup, any: HasPVs | HasISs},
-		{Name: DeleteMigrated, Step: StepCleanup},
-		{Name: EnsureMigratedDeleted, Step: StepCleanup},
-		{Name: UnQuiesceSrcApplications, Step: StepCleanup},
+		{Name: Rollback, Step: StepCleanupVelero},
+		{Name: DeleteBackups, Step: StepCleanupVelero},
+		{Name: DeleteRestores, Step: StepCleanupVelero},
+		{Name: DeleteRegistries, Step: StepCleanupHelpers},
+		{Name: EnsureStagePodsDeleted, Step: StepCleanupHelpers},
+		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, any: HasPVs | HasISs},
+		{Name: DeleteMigrated, Step: StepCleanupMigrated},
+		{Name: EnsureMigratedDeleted, Step: StepCleanupMigrated},
+		{Name: UnQuiesceSrcApplications, Step: StepCleanupUnquiesce},
 		{Name: Completed, Step: StepCleanup},
 	},
 }
