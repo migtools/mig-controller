@@ -81,6 +81,9 @@ func (s *MigMigrationStatus) ReflectPipeline() {
 		if step.Failed {
 			step.Message = "Failed"
 		}
+		if step.Skipped {
+			step.Message = "Skipped"
+		}
 	}
 }
 
@@ -93,6 +96,7 @@ type Step struct {
 	Message  string   `json:"message,omitempty"`
 	Progress []string `json:"progress,omitempty"`
 	Failed   bool     `json:"failed,omitempty"`
+	Skipped  bool     `json:"skipped,omitempty"`
 }
 
 // +genclient
