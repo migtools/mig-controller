@@ -199,9 +199,11 @@ func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progres
 				getPVRDuration(&pvr))
 		case velero.PodVolumeRestorePhaseFailed:
 			msg = fmt.Sprintf(
-				"PodVolumeRestore %s/%s: Failed%s",
+				"PodVolumeRestore %s/%s: Failed. %s out of %s restored%s",
 				pvr.Namespace,
 				pvr.Name,
+				bytesToSI(pvr.Status.Progress.BytesDone),
+				bytesToSI(pvr.Status.Progress.TotalBytes),
 				getPVRDuration(&pvr))
 		default:
 			msg = fmt.Sprintf(
