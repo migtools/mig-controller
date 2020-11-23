@@ -697,9 +697,9 @@ func (t *Task) createPVProgressCR() error {
 }
 
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
-	t.Owner.Status.RunningPods = []*migapi.RunningPod{}
-	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
-	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
+	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
+	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
+	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
 
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
@@ -719,15 +719,23 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 			}
 			switch {
 			case dvmp.Status.PodPhase == corev1.PodRunning:
-				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.RunningPod{
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.PodProgress{
 					ObjectReference:             objRef,
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
 			case dvmp.Status.PodPhase == corev1.PodFailed:
-				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
+				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, &migapi.PodProgress{
+					ObjectReference:             objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
 			case dvmp.Status.PodPhase == corev1.PodSucceeded:
-				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
+				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, &migapi.PodProgress{
+					ObjectReference:             objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
 			}
 		}
 	}

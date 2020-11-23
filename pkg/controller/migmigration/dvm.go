@@ -105,13 +105,13 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	switch {
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-		progress = append(progress, t.getDVMProgressForRunningPods(dvm.Status.RunningPods)...)
+		progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
 	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
-		progress = append(progress, t.getDVMProgressForSucceededPods(dvm.Status.SuccessfulPods)...)
+		progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
-		progress = append(progress, t.getDVMProgressForFailedPods(dvm.Status.FailedPods)...)
+		progress = append(progress, t.getDVMPodProgress(dvm.Status.FailedPods, "Failed")...)
 		completed = true
 	default:
 		progress = append(progress, volumeProgress)
@@ -134,10 +134,15 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 	})
 }
 
-func (t *Task) getDVMProgressForRunningPods(runningPods []*migapi.RunningPod) []string {
+func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []string {
 	progress := []string{}
-	for _, pod := range runningPods {
-		p := fmt.Sprintf("Rsync Client Pod %s: Running", path.Join(pod.Namespace, pod.Name))
+	for _, pod := range pods {
+		p := fmt.Sprintf("Rsync Client Pod %s: %s", state, path.Join(pod.Namespace, pod.Name))
+		if state == "Completed" {
+			pod.LastObservedProgressPercent = "100%"
+			// TODO: last observed transfer rate is not relevant here, overall transfer rate should be displayed
+			pod.LastObservedTransferRate = ""
+		}
 		if pod.LastObservedProgressPercent != "" {
 			p += fmt.Sprintf(", progress percent %s", pod.LastObservedProgressPercent)
 		}
@@ -145,23 +150,6 @@ func (t *Task) getDVMProgressForRunningPods(runningPods []*migapi.RunningPod) []
 			p += fmt.Sprintf(", transfer rate %s", pod.LastObservedTransferRate)
 		}
 		progress = append(progress, p)
-	}
-	return progress
-}
-
-func (t *Task) getDVMProgressForSucceededPods(pods []*kapi.ObjectReference) []string {
-	// TODO: need to add the over all transfer rate for each PV
-	progress := []string{}
-	for _, pod := range pods {
-		progress = append(progress, fmt.Sprintf("Rsync Client Pod %s: Succeeded", path.Join(pod.Namespace, pod.Name)))
-	}
-	return progress
-}
-
-func (t *Task) getDVMProgressForFailedPods(pods []*kapi.ObjectReference) []string {
-	progress := []string{}
-	for _, pod := range pods {
-		progress = append(progress, fmt.Sprintf("Rsync Client Pod %s: Failed", path.Join(pod.Namespace, pod.Name)))
 	}
 	return progress
 }
