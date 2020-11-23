@@ -8,6 +8,7 @@ import (
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	path "path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -54,7 +55,7 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 			CreateDestinationNamespaces: true,
 		},
 	}
-	t.setDirectVolumeMigrationOwnerReferences(dvm)
+	migapi.SetOwnerReference(t.Owner, t.Owner, dvm)
 	return dvm
 }
 
@@ -100,20 +101,36 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	}
 
 	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed", totalVolumes, successfulPods, runningPods, failedPods)
-	switch dvm.Status.Phase {
-	case dvmc.Started:
+	switch {
+	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
 		progress = append(progress, fmt.Sprintf("direct volume migration started at %v. ", dvm.Status.StartTimestamp))
-	case dvmc.Completed:
+		progress = append(progress, t.getDVMProgress(dvm.Status.RunningPods)...)
+	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
 		progress = append(progress, fmt.Sprintf("%v/%v volume migrations were successful", successfulPods, totalVolumes))
 		completed = true
-	case dvmc.MigrationFailed:
+	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
 		completed = true
 	default:
 		progress = append(progress, volumeProgress)
 	}
 	return completed, failureReasons, progress
+}
+
+func (t *Task) getDVMProgress(runningPods []*migapi.RunningPod) []string {
+	progress := []string{}
+	for _, pod := range runningPods {
+		p := fmt.Sprintf("rsync client pod %s is running", path.Join(pod.Namespace, pod.Name))
+		if pod.LastObservedProgressPercent != "" {
+			p += fmt.Sprintf(" progress percent %s", pod.LastObservedProgressPercent)
+		}
+		if pod.LastObservedTransferRate != "" {
+			p += fmt.Sprintf(" transfer rate %s", pod.LastObservedTransferRate)
+		}
+		progress = append(progress, p)
+	}
+	return progress
 }
 
 func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
@@ -141,27 +158,4 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 		return &pvcList
 	}
 	return nil
-}
-
-func (t *Task) setDirectVolumeMigrationOwnerReferences(dvm *migapi.DirectVolumeMigration) {
-	trueVar := true
-	for i := range dvm.OwnerReferences {
-		ref := &dvm.OwnerReferences[i]
-		if ref.Kind == t.Owner.Kind {
-			ref.APIVersion = t.Owner.APIVersion
-			ref.Name = t.Owner.Name
-			ref.UID = t.Owner.UID
-			ref.Controller = &trueVar
-			return
-		}
-	}
-	dvm.OwnerReferences = []metav1.OwnerReference{
-		{
-			APIVersion: t.Owner.APIVersion,
-			Kind:       t.Owner.Kind,
-			Name:       t.Owner.Name,
-			UID:        t.Owner.UID,
-			Controller: &trueVar,
-		},
-	}
 }
