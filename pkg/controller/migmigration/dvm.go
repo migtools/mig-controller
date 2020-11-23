@@ -106,7 +106,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
 		progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
-	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
+	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
