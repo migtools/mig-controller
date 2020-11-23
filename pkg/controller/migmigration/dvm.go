@@ -138,11 +138,6 @@ func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []str
 	progress := []string{}
 	for _, pod := range pods {
 		p := fmt.Sprintf("Rsync Client Pod %s: %s", state, path.Join(pod.Namespace, pod.Name))
-		if state == "Completed" {
-			pod.LastObservedProgressPercent = "100%"
-			// TODO: last observed transfer rate is not relevant here, overall transfer rate should be displayed
-			pod.LastObservedTransferRate = ""
-		}
 		if pod.LastObservedProgressPercent != "" {
 			p += fmt.Sprintf(", progress percent %s", pod.LastObservedProgressPercent)
 		}

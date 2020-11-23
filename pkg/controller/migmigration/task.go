@@ -649,6 +649,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
+		t.Owner.Status.FindStep(t.Step).Message = dvm.Status.PhaseDescription
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
 		if completed {
@@ -656,7 +657,6 @@ func (t *Task) Run() error {
 				t.setDirectVolumeMigrationFailureWarning(dvm)
 			} else {
 				t.setProgress(progress)
-				t.Owner.Status.FindStep(t.Step).Message = dvm.Status.PhaseDescription
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}

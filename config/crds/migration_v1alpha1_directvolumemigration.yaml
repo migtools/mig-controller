@@ -61,6 +61,11 @@ spec:
               type: array
             failedPods:
               items:
+                properties:
+                  lastObservedProgressPercent:
+                    type: string
+                  lastObservedTransferRate:
+                    type: string
                 type: object
               type: array
             itinerary:
@@ -85,6 +90,11 @@ spec:
               type: string
             successfulPods:
               items:
+                properties:
+                  lastObservedProgressPercent:
+                    type: string
+                  lastObservedTransferRate:
+                    type: string
                 type: object
               type: array
           required:
