@@ -21,6 +21,7 @@ const (
 	Created                      = ""
 	Started                      = "Started"
 	Prepare                      = "Prepare"
+	CleanStaleRsyncResources     = "CleanStaleRsyncResources"
 	CreateDestinationNamespaces  = "CreateDestinationNamespaces"
 	DestinationNamespacesCreated = "DestinationNamespacesCreated"
 	CreateDestinationPVCs        = "CreateDestinationPVCs"
@@ -92,6 +93,7 @@ var VolumeMigration = Itinerary{
 		{phase: Created},
 		{phase: Started},
 		{phase: Prepare},
+		{phase: CleanStaleRsyncResources},
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
@@ -171,6 +173,18 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case Prepare:
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CleanStaleRsyncResources:
+		// TODO Need to add some labels during DVM run to differentiate
+		// deletion of rsync resources that are active vs stale. Using
+		// one label for both is the wrong approach.
+		err := t.deleteRsyncResources()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}

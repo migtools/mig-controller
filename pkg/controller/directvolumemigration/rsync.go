@@ -786,6 +786,7 @@ func (t *Task) deleteRsyncResources() error {
 
 func (t *Task) findAndDeleteResources(client compat.Client) error {
 	// Find all resources with the app label
+	// TODO: This label set should include a DVM run-specific UID.
 	selector := labels.SelectorFromSet(map[string]string{
 		"app": "directvolumemigration-rsync-transfer",
 	})
