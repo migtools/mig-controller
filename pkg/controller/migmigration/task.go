@@ -649,7 +649,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-		t.Owner.Status.FindStep(t.Step).Message = dvm.Status.PhaseDescription
+		t.setStepDescription(dvm.Status.PhaseDescription)
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
 		if completed {
@@ -1425,6 +1425,10 @@ func (t *Task) getBothClientsWithNamespaces() ([]compat.Client, [][]string, erro
 	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
 
 	return clientList, namespaceList, nil
+}
+
+func (t *Task) setStepDescription(desc string) {
+	t.Owner.Status.FindStep(t.Step).Message = desc
 }
 
 // GetStepForPhase returns which high level step current phase belongs to
