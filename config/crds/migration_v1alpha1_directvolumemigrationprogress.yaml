@@ -11,16 +11,16 @@ spec:
     name: Cluster
     type: string
   - JSONPath: .spec.podRef.name
-    name: PodName
+    name: Pod Name
     type: string
-  - JSONPath: .spec.podRef.Namespace
-    name: PodNamespace
+  - JSONPath: .spec.podRef.namespace
+    name: Pod Namespace
     type: string
   - JSONPath: .status.lastObservedProgressPercent
-    name: ProgressPercent
+    name: Progress Percent
     type: string
   - JSONPath: .status.lastObservedTransferRate
-    name: TransferRate
+    name: Transfer Rate
     type: string
   - JSONPath: .metadata.creationTimestamp
     name: age

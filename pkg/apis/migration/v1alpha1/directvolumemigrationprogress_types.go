@@ -47,10 +47,10 @@ type DirectVolumeMigrationProgressStatus struct {
 // DirectVolumeMigrationProgress is the Schema for the directvolumemigrationprogresses API
 // +kubebuilder:resource:path=directvolumemigrationprogresses,shortName=dvmp
 // +kubebuilder:printcolumn:name="Cluster",type=string,JSONPath=".spec.clusterRef.name"
-// +kubebuilder:printcolumn:name="PodName",type=string,JSONPath=".spec.podRef.name"
-// +kubebuilder:printcolumn:name="PodNamespace",type=string,JSONPath=".spec.podRef.Namespace"
-// +kubebuilder:printcolumn:name="ProgressPercent",type=string,JSONPath=".status.lastObservedProgressPercent"
-// +kubebuilder:printcolumn:name="TransferRate",type=string,JSONPath=".status.lastObservedTransferRate"
+// +kubebuilder:printcolumn:name="Pod Name",type=string,JSONPath=".spec.podRef.name"
+// +kubebuilder:printcolumn:name="Pod Namespace",type=string,JSONPath=".spec.podRef.namespace"
+// +kubebuilder:printcolumn:name="Progress Percent",type=string,JSONPath=".status.lastObservedProgressPercent"
+// +kubebuilder:printcolumn:name="Transfer Rate",type=string,JSONPath=".status.lastObservedTransferRate"
 // +kubebuilder:printcolumn:name="age",type=string,JSONPath=".metadata.creationTimestamp"
 // +k8s:openapi-gen=true
 type DirectVolumeMigrationProgress struct {
