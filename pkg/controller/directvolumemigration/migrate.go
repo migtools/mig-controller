@@ -17,10 +17,11 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 
 	// Run
 	task := Task{
-		Log:    log,
-		Client: r,
-		Owner:  direct,
-		Phase:  direct.Status.Phase,
+		Log:              log,
+		Client:           r,
+		Owner:            direct,
+		Phase:            direct.Status.Phase,
+		PhaseDescription: direct.Status.PhaseDescription,
 	}
 	err := task.Run()
 	if err != nil {
