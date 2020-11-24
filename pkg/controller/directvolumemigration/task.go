@@ -109,7 +109,7 @@ var VolumeMigration = Itinerary{
 		{phase: CreateRsyncClientPods, phaseDescription: "Create Rsync client pods"},
 		{phase: WaitForRsyncClientPodsCompleted, phaseDescription: "Wait for the rsync client pods to be completed"},
 		{phase: DeleteRsyncResources, phaseDescription: "Delete all the resources created while running this migration"},
-		{phase: Completed, phaseDescription: "The migration has completed, phase check status.Itinerary to determined if it failed"},
+		{phase: Completed, phaseDescription: "Complete"},
 	},
 }
 
@@ -117,7 +117,7 @@ var FailedItinerary = Itinerary{
 	Name: "VolumeMigrationFailed",
 	Steps: []Step{
 		{phase: MigrationFailed, phaseDescription: "The migration attempt failed, please see errors for more details"},
-		{phase: Completed, phaseDescription: "The migration has completed, phase check status.Itinerary to determined if it failed"},
+		{phase: Completed, phaseDescription: "Complete"},
 	},
 }
 

@@ -105,7 +105,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	switch {
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigrationFailed":
+	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
@@ -138,9 +138,9 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []string {
 	progress := []string{}
 	for _, pod := range pods {
-		p := fmt.Sprintf("Rsync Client Pod %s: %s", state, path.Join(pod.Namespace, pod.Name))
+		p := fmt.Sprintf("Rsync Client Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
 		if pod.LastObservedProgressPercent != "" {
-			p += fmt.Sprintf(", progress percent %s", pod.LastObservedProgressPercent)
+			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)
 		}
 		if pod.LastObservedTransferRate != "" {
 			p += fmt.Sprintf(", transfer rate %s", pod.LastObservedTransferRate)
