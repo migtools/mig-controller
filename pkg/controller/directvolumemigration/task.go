@@ -313,10 +313,10 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if failed {
-			t.fail(MigrationFailed, []string{"One or more pods are in error state"})
-		}
 		if completed {
+			if failed {
+				t.fail(MigrationFailed, []string{"One or more pods are in error state"})
+			}
 			t.Requeue = NoReQ
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)

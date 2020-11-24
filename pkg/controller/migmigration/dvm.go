@@ -138,6 +138,9 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []string {
 	progress := []string{}
 	for _, pod := range pods {
+		if state == "Completed" {
+			state = ""
+		}
 		p := fmt.Sprintf("Rsync Client Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
 		if pod.LastObservedProgressPercent != "" {
 			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)

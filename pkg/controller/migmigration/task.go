@@ -657,11 +657,10 @@ func (t *Task) Run() error {
 			step.MarkCompleted()
 			if len(reasons) > 0 {
 				t.setDirectVolumeMigrationFailureWarning(dvm)
-			} else {
-				t.setProgress(progress)
-				if err = t.next(); err != nil {
-					return liberr.Wrap(err)
-				}
+			}
+			t.setProgress(progress)
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
 			}
 		} else {
 			t.setProgress(progress)
