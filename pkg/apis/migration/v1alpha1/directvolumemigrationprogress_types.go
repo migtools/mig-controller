@@ -51,7 +51,7 @@ type DirectVolumeMigrationProgressStatus struct {
 // +kubebuilder:printcolumn:name="Pod Namespace",type=string,JSONPath=".spec.podRef.namespace"
 // +kubebuilder:printcolumn:name="Progress Percent",type=string,JSONPath=".status.lastObservedProgressPercent"
 // +kubebuilder:printcolumn:name="Transfer Rate",type=string,JSONPath=".status.lastObservedTransferRate"
-// +kubebuilder:printcolumn:name="age",type=string,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="age",type=date,JSONPath=".metadata.creationTimestamp"
 // +k8s:openapi-gen=true
 type DirectVolumeMigrationProgress struct {
 	metav1.TypeMeta   `json:",inline"`
