@@ -653,6 +653,9 @@ func (t *Task) Run() error {
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
 		if completed {
+			step := t.Owner.Status.FindStep(t.Step)
+			step.MarkCompleted()
+			step.Message = "Completed"
 			if len(reasons) > 0 {
 				t.setDirectVolumeMigrationFailureWarning(dvm)
 			} else {

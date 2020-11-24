@@ -105,17 +105,18 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	switch {
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-		progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
 	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigrationFailed":
-		progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
-		progress = append(progress, t.getDVMPodProgress(dvm.Status.FailedPods, "Failed")...)
 		completed = true
 	default:
 		progress = append(progress, volumeProgress)
 	}
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.FailedPods, "Failed")...)
+
 	// sort the progress report so we dont have flapping for the same progress info
 	sort.Sort(sort.StringSlice(progress))
 	return completed, failureReasons, progress
