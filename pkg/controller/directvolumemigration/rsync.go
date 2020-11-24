@@ -784,6 +784,110 @@ func (t *Task) deleteRsyncResources() error {
 	return nil
 }
 
+func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return err, false
+	}
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return err, false
+	}
+	err, deleted := t.areRsyncResourcesDeleted(srcClient)
+	if err != nil {
+		return err, false
+	}
+	if !deleted {
+		return nil, false
+	}
+	err, deleted = t.areRsyncResourcesDeleted(destClient)
+	if err != nil {
+		return err, false
+	}
+	if !deleted {
+		return nil, false
+	}
+	return nil, true
+}
+
+func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
+	selector := labels.SelectorFromSet(map[string]string{
+		"app": "directvolumemigration-rsync-transfer",
+	})
+	pvcMap := t.getPVCNamespaceMap()
+	for ns, _ := range pvcMap {
+		podList := corev1.PodList{}
+		cmList := corev1.ConfigMapList{}
+		svcList := corev1.ServiceList{}
+		secretList := corev1.SecretList{}
+		routeList := routev1.RouteList{}
+
+		// Get Pod list
+		err := client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&podList)
+		if err != nil {
+			return err, false
+		}
+		// Get Secret list
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&secretList)
+		if err != nil {
+			return err, false
+		}
+
+		// Get configmap list
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&cmList)
+		if err != nil {
+			return err, false
+		}
+
+		// Get svc list
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&svcList)
+		if err != nil {
+			return err, false
+		}
+
+		// Get route list
+		err = client.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&routeList)
+		if err != nil {
+			return err, false
+		}
+		if len(routeList.Items) > 0 || len(svcList.Items) > 0 || len(cmList.Items) > 0 || len(secretList.Items) > 0 || len(podList.Items) > 0 {
+			return nil, false
+		}
+	}
+	return nil, true
+
+}
+
 func (t *Task) findAndDeleteResources(client compat.Client) error {
 	// Find all resources with the app label
 	// TODO: This label set should include a DVM run-specific UID.

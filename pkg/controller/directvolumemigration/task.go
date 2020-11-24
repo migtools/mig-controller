@@ -37,18 +37,19 @@ const (
 	CreateStunnelPodOnSource        = "CreateStunnelPodOnSource"
 	EnsureStunnelPodOnSourceHealthy = "EnsureStunnelPodOnSourceHealthy"
 	//Next two phases are on destination
-	CreateRsyncTransferPods         = "CreateRsyncTransferPods"
-	WaitForRsyncTransferPodsRunning = "WaitForRsyncTransferPodsRunning"
-	CreateStunnelClientPods         = "CreateStunnelClientPods"
-	WaitForStunnelClientPodsRunning = "WaitForStunnelClientPodsRunning"
-	CreatePVProgressCRs             = "CreatePVProgressCRs"
-	CreateRsyncClientPods           = "CreateRsyncClientPods"
-	WaitForRsyncClientPodsCompleted = "WaitForRsyncClientPodsCompleted"
-	Verification                    = "Verification"
-	DeleteRsyncResources            = "DeleteRsyncResources"
-	EnsureRsyncPodsTerminated       = "EnsureRsyncPodsTerminated"
-	Completed                       = "Completed"
-	MigrationFailed                 = "MigrationFailed"
+	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
+	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
+	CreateStunnelClientPods              = "CreateStunnelClientPods"
+	WaitForStunnelClientPodsRunning      = "WaitForStunnelClientPodsRunning"
+	CreatePVProgressCRs                  = "CreatePVProgressCRs"
+	CreateRsyncClientPods                = "CreateRsyncClientPods"
+	WaitForRsyncClientPodsCompleted      = "WaitForRsyncClientPodsCompleted"
+	Verification                         = "Verification"
+	DeleteRsyncResources                 = "DeleteRsyncResources"
+	WaitForRsyncResourcesTerminated      = "WaitForRsyncResourcesTerminated"
+	WaitForStaleRsyncResourcesTerminated = "WaitForStaleRsyncResourcesTerminated"
+	Completed                            = "Completed"
+	MigrationFailed                      = "MigrationFailed"
 )
 
 // Flags
@@ -94,6 +95,7 @@ var VolumeMigration = Itinerary{
 		{phase: Started},
 		{phase: Prepare},
 		{phase: CleanStaleRsyncResources},
+		{phase: WaitForStaleRsyncResourcesTerminated},
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
@@ -109,6 +111,7 @@ var VolumeMigration = Itinerary{
 		{phase: CreateRsyncClientPods},
 		{phase: WaitForRsyncClientPodsCompleted},
 		{phase: DeleteRsyncResources},
+		{phase: WaitForRsyncResourcesTerminated},
 		{phase: Completed},
 	},
 }
@@ -188,6 +191,18 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case WaitForStaleRsyncResourcesTerminated:
+		err, deleted := t.waitForRsyncResourcesDeleted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if deleted {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+		t.Requeue = PollReQ
 	case CreateDestinationNamespaces:
 		// Create all of the namespaces the migrated PVCs are in are created on the
 		// destination
@@ -344,6 +359,18 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case WaitForRsyncResourcesTerminated:
+		err, deleted := t.waitForRsyncResourcesDeleted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if deleted {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+		t.Requeue = PollReQ
 	case Completed:
 	default:
 		t.Requeue = NoReQ
