@@ -649,21 +649,20 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-		t.setStepDescription(dvm.Status.PhaseDescription)
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
+		PhaseDescriptions[t.Phase] = dvm.Status.PhaseDescription
+		t.setProgress(progress)
 		if completed {
 			step := t.Owner.Status.FindStep(t.Step)
 			step.MarkCompleted()
 			if len(reasons) > 0 {
 				t.setDirectVolumeMigrationFailureWarning(dvm)
 			}
-			t.setProgress(progress)
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.setProgress(progress)
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackup:
@@ -1041,9 +1040,6 @@ func (t *Task) updatePipeline() {
 			step.MarkCompleted()
 		}
 	}
-
-	defer t.Owner.Status.ReflectPipeline()
-
 	// mark steps skipped
 	for _, step := range t.Owner.Status.Pipeline {
 		if step == currentStep {
@@ -1067,6 +1063,7 @@ func (t *Task) updatePipeline() {
 			currentStep.MarkCompleted()
 		}
 	}
+	t.Owner.Status.ReflectPipeline()
 }
 
 func (t *Task) setProgress(progress []string) {
@@ -1425,10 +1422,6 @@ func (t *Task) getBothClientsWithNamespaces() ([]compat.Client, [][]string, erro
 	namespaceList := [][]string{t.sourceNamespaces(), t.destinationNamespaces()}
 
 	return clientList, namespaceList, nil
-}
-
-func (t *Task) setStepDescription(desc string) {
-	t.Owner.Status.FindStep(t.Step).Message = desc
 }
 
 // GetStepForPhase returns which high level step current phase belongs to
