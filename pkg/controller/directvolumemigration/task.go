@@ -191,18 +191,6 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case WaitForStaleRsyncResourcesTerminated:
-		err, deleted := t.waitForRsyncResourcesDeleted()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if deleted {
-			t.Requeue = NoReQ
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		}
-		t.Requeue = PollReQ
 	case CreateDestinationNamespaces:
 		// Create all of the namespaces the migrated PVCs are in are created on the
 		// destination
@@ -359,7 +347,7 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case WaitForRsyncResourcesTerminated:
+	case WaitForStaleRsyncResourcesTerminated, WaitForRsyncResourcesTerminated:
 		err, deleted := t.waitForRsyncResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
