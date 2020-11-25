@@ -6,12 +6,31 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: directvolumemigrationprogresses.migration.openshift.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.clusterRef.name
+    name: Cluster
+    type: string
+  - JSONPath: .spec.podRef.name
+    name: Pod Name
+    type: string
+  - JSONPath: .spec.podRef.namespace
+    name: Pod Namespace
+    type: string
+  - JSONPath: .status.lastObservedProgressPercent
+    name: Progress Percent
+    type: string
+  - JSONPath: .status.lastObservedTransferRate
+    name: Transfer Rate
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: age
+    type: date
   group: migration.openshift.io
   names:
     kind: DirectVolumeMigrationProgress
     plural: directvolumemigrationprogresses
     shortNames:
-    - dmvp
+    - dvmp
   scope: Namespaced
   validation:
     openAPIV3Schema:

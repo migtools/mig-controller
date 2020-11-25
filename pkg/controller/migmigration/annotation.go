@@ -132,7 +132,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 		return false, liberr.Wrap(err)
 	}
 
-  if itemsUpdated > AnnotationsPerReconcile {
+	if itemsUpdated > AnnotationsPerReconcile {
 		return false, nil
 	}
 

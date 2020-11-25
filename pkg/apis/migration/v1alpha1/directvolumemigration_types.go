@@ -40,14 +40,15 @@ type DirectVolumeMigrationSpec struct {
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
 type DirectVolumeMigrationStatus struct {
 	Conditions
-	ObservedDigest string                  `json:"observedDigest"`
-	StartTimestamp *metav1.Time            `json:"startTimestamp,omitempty"`
-	Phase          string                  `json:"phase,omitempty"`
-	Itinerary      string                  `json:"itinerary,omitempty"`
-	Errors         []string                `json:"errors,omitempty"`
-	SuccessfulPods []*kapi.ObjectReference `json:"successfulPods,omitempty"`
-	FailedPods     []*kapi.ObjectReference `json:"failedPods,omitempty"`
-	RunningPods    []*RunningPod           `json:"runningPods,omitempty"`
+	ObservedDigest   string         `json:"observedDigest"`
+	StartTimestamp   *metav1.Time   `json:"startTimestamp,omitempty"`
+	PhaseDescription string         `json:"phaseDescription"`
+	Phase            string         `json:"phase,omitempty"`
+	Itinerary        string         `json:"itinerary,omitempty"`
+	Errors           []string       `json:"errors,omitempty"`
+	SuccessfulPods   []*PodProgress `json:"successfulPods,omitempty"`
+	FailedPods       []*PodProgress `json:"failedPods,omitempty"`
+	RunningPods      []*PodProgress `json:"runningPods,omitempty"`
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
@@ -76,7 +77,7 @@ type DirectVolumeMigrationList struct {
 	Items           []DirectVolumeMigration `json:"items"`
 }
 
-type RunningPod struct {
+type PodProgress struct {
 	*kapi.ObjectReference       `json:",inline"`
 	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
 	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`

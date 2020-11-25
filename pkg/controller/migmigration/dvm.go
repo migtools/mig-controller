@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	path "path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sort"
 )
 
 func (t *Task) createDirectVolumeMigration() error {
@@ -104,10 +105,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	switch {
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-		progress = append(progress, fmt.Sprintf("direct volume migration started at %v. ", dvm.Status.StartTimestamp))
-		progress = append(progress, t.getDVMProgress(dvm.Status.RunningPods)...)
 	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
-		progress = append(progress, fmt.Sprintf("%v/%v volume migrations were successful", successfulPods, totalVolumes))
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
@@ -115,18 +113,40 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	default:
 		progress = append(progress, volumeProgress)
 	}
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
+	progress = append(progress, t.getDVMPodProgress(dvm.Status.FailedPods, "Failed")...)
+
+	// sort the progress report so we dont have flapping for the same progress info
+	sort.Sort(sort.StringSlice(progress))
 	return completed, failureReasons, progress
 }
 
-func (t *Task) getDVMProgress(runningPods []*migapi.RunningPod) []string {
+// Set warning conditions on migmigration if there were any partial failures
+func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMigration) {
+	message := fmt.Sprintf(
+		"Direct Volume Migration: one or more volumes failed in dvm %s/%s", dvm.GetNamespace(), dvm.GetName())
+	t.Owner.Status.SetCondition(migapi.Condition{
+		Type:     DirectVolumeMigrationFailed,
+		Status:   True,
+		Category: migapi.Warn,
+		Message:  message,
+		Durable:  true,
+	})
+}
+
+func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []string {
 	progress := []string{}
-	for _, pod := range runningPods {
-		p := fmt.Sprintf("rsync client pod %s is running", path.Join(pod.Namespace, pod.Name))
+	for _, pod := range pods {
+		if state == "Completed" {
+			state = ""
+		}
+		p := fmt.Sprintf("Rsync Client Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
 		if pod.LastObservedProgressPercent != "" {
-			p += fmt.Sprintf(" progress percent %s", pod.LastObservedProgressPercent)
+			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)
 		}
 		if pod.LastObservedTransferRate != "" {
-			p += fmt.Sprintf(" transfer rate %s", pod.LastObservedTransferRate)
+			p += fmt.Sprintf(", transfer rate %s", pod.LastObservedTransferRate)
 		}
 		progress = append(progress, p)
 	}

@@ -129,15 +129,16 @@ var FailedItinerary = Itinerary{
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log         logr.Logger
-	Client      k8sclient.Client
-	Owner       *migapi.DirectVolumeMigration
-	SSHKeys     *sshKeys
-	RsyncRoutes map[string]string
-	Phase       string
-	Requeue     time.Duration
-	Itinerary   Itinerary
-	Errors      []string
+	Log              logr.Logger
+	Client           k8sclient.Client
+	Owner            *migapi.DirectVolumeMigration
+	SSHKeys          *sshKeys
+	RsyncRoutes      map[string]string
+	Phase            string
+	PhaseDescription string
+	Requeue          time.Duration
+	Itinerary        Itinerary
+	Errors           []string
 }
 
 type sshKeys struct {
@@ -310,10 +311,10 @@ func (t *Task) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if failed {
-			t.fail(MigrationFailed, []string{"One or more pods are in error state"})
-		}
 		if completed {
+			if failed {
+				t.fail(MigrationFailed, []string{"One or more pods are in error state"})
+			}
 			t.Requeue = NoReQ
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
@@ -358,14 +359,17 @@ func (t *Task) next() error {
 	}
 	if current == -1 {
 		t.Phase = Completed
+		t.PhaseDescription = phaseDescriptions[t.Phase]
 		return nil
 	}
 	for n := current + 1; n < len(t.Itinerary.Steps); n++ {
 		next := t.Itinerary.Steps[n]
 		t.Phase = next.phase
+		t.PhaseDescription = phaseDescriptions[t.Phase]
 		return nil
 	}
 	t.Phase = Completed
+	t.PhaseDescription = phaseDescriptions[t.Phase]
 	return nil
 }
 

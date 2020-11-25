@@ -645,7 +645,7 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
+					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes:       volumes,
 					Containers:    containers,
 				},
@@ -697,9 +697,9 @@ func (t *Task) createPVProgressCR() error {
 }
 
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
-	t.Owner.Status.RunningPods = []*migapi.RunningPod{}
-	t.Owner.Status.FailedPods = []*corev1.ObjectReference{}
-	t.Owner.Status.SuccessfulPods = []*corev1.ObjectReference{}
+	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
+	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
+	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
 
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
@@ -719,35 +719,31 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 			}
 			switch {
 			case dvmp.Status.PodPhase == corev1.PodRunning:
-				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.RunningPod{
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, &migapi.PodProgress{
 					ObjectReference:             objRef,
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
 			case dvmp.Status.PodPhase == corev1.PodFailed:
-				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, objRef)
+				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, &migapi.PodProgress{
+					ObjectReference:             objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
 			case dvmp.Status.PodPhase == corev1.PodSucceeded:
-				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, objRef)
+				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, &migapi.PodProgress{
+					ObjectReference:             objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
 			}
 		}
 	}
 
-	// wait for all the running pods to completed before returning failures
-	if len(t.Owner.Status.RunningPods) > 0 {
-		return false, false, nil
-	}
+	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
+	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 
-	// we have failed pods, fail the itinerary
-	if len(t.Owner.Status.FailedPods) > 0 {
-		return false, true, nil
-	}
-
-	// all the pods have succeeded
-	if len(t.Owner.Status.SuccessfulPods) == len(t.Owner.Spec.PersistentVolumeClaims) {
-		return true, false, nil
-	}
-
-	return false, false, nil
+	return isCompleted, hasAnyFailed, nil
 }
 
 // Delete rsync resources

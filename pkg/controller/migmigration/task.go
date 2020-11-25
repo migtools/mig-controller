@@ -651,17 +651,18 @@ func (t *Task) Run() error {
 		}
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
+		PhaseDescriptions[t.Phase] = dvm.Status.PhaseDescription
+		t.setProgress(progress)
 		if completed {
+			step := t.Owner.Status.FindStep(t.Step)
+			step.MarkCompleted()
 			if len(reasons) > 0 {
-				t.fail(DirectVolumeMigrationFailed, reasons)
-			} else {
-				t.setProgress(progress)
-				if err = t.next(); err != nil {
-					return liberr.Wrap(err)
-				}
+				t.setDirectVolumeMigrationFailureWarning(dvm)
+			}
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
 			}
 		} else {
-			t.setProgress(progress)
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackup:
@@ -1050,6 +1051,9 @@ func (t *Task) updatePipeline() {
 	if currentStep != nil {
 		currentStep.MarkStarted()
 		currentStep.Phase = t.Phase
+		if currentStep.Name == StepDirectVolume {
+			return
+		}
 		if desc, found := PhaseDescriptions[t.Phase]; found {
 			currentStep.Message = desc
 		} else {
@@ -1217,8 +1221,8 @@ func (t *Task) failCurrentStep() {
 
 // Add errors.
 func (t *Task) addErrors(errors []string) {
-	for _, error := range errors {
-		t.Errors = append(t.Errors, error)
+	for _, e := range errors {
+		t.Errors = append(t.Errors, e)
 	}
 }
 
