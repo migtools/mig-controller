@@ -21,6 +21,7 @@ const (
 	Created                      = ""
 	Started                      = "Started"
 	Prepare                      = "Prepare"
+	CleanStaleRsyncResources     = "CleanStaleRsyncResources"
 	CreateDestinationNamespaces  = "CreateDestinationNamespaces"
 	DestinationNamespacesCreated = "DestinationNamespacesCreated"
 	CreateDestinationPVCs        = "CreateDestinationPVCs"
@@ -36,18 +37,19 @@ const (
 	CreateStunnelPodOnSource        = "CreateStunnelPodOnSource"
 	EnsureStunnelPodOnSourceHealthy = "EnsureStunnelPodOnSourceHealthy"
 	//Next two phases are on destination
-	CreateRsyncTransferPods         = "CreateRsyncTransferPods"
-	WaitForRsyncTransferPodsRunning = "WaitForRsyncTransferPodsRunning"
-	CreateStunnelClientPods         = "CreateStunnelClientPods"
-	WaitForStunnelClientPodsRunning = "WaitForStunnelClientPodsRunning"
-	CreatePVProgressCRs             = "CreatePVProgressCRs"
-	CreateRsyncClientPods           = "CreateRsyncClientPods"
-	WaitForRsyncClientPodsCompleted = "WaitForRsyncClientPodsCompleted"
-	Verification                    = "Verification"
-	DeleteRsyncResources            = "DeleteRsyncResources"
-	EnsureRsyncPodsTerminated       = "EnsureRsyncPodsTerminated"
-	Completed                       = "Completed"
-	MigrationFailed                 = "MigrationFailed"
+	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
+	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
+	CreateStunnelClientPods              = "CreateStunnelClientPods"
+	WaitForStunnelClientPodsRunning      = "WaitForStunnelClientPodsRunning"
+	CreatePVProgressCRs                  = "CreatePVProgressCRs"
+	CreateRsyncClientPods                = "CreateRsyncClientPods"
+	WaitForRsyncClientPodsCompleted      = "WaitForRsyncClientPodsCompleted"
+	Verification                         = "Verification"
+	DeleteRsyncResources                 = "DeleteRsyncResources"
+	WaitForRsyncResourcesTerminated      = "WaitForRsyncResourcesTerminated"
+	WaitForStaleRsyncResourcesTerminated = "WaitForStaleRsyncResourcesTerminated"
+	Completed                            = "Completed"
+	MigrationFailed                      = "MigrationFailed"
 )
 
 // Flags
@@ -92,6 +94,8 @@ var VolumeMigration = Itinerary{
 		{phase: Created},
 		{phase: Started},
 		{phase: Prepare},
+		{phase: CleanStaleRsyncResources},
+		{phase: WaitForStaleRsyncResourcesTerminated},
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
@@ -107,6 +111,7 @@ var VolumeMigration = Itinerary{
 		{phase: CreateRsyncClientPods},
 		{phase: WaitForRsyncClientPodsCompleted},
 		{phase: DeleteRsyncResources},
+		{phase: WaitForRsyncResourcesTerminated},
 		{phase: Completed},
 	},
 }
@@ -172,6 +177,18 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case Prepare:
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CleanStaleRsyncResources:
+		// TODO Need to add some labels during DVM run to differentiate
+		// deletion of rsync resources that are active vs stale. Using
+		// one label for both is the wrong approach.
+		err := t.deleteRsyncResources()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -331,6 +348,18 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case WaitForStaleRsyncResourcesTerminated, WaitForRsyncResourcesTerminated:
+		err, deleted := t.waitForRsyncResourcesDeleted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if deleted {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+		t.Requeue = PollReQ
 	case Completed:
 	default:
 		t.Requeue = NoReQ
