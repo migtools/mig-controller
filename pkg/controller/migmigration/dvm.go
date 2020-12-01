@@ -62,7 +62,7 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	labels[DirectVolumeMigrationLabel] = t.UID()
 	// Get DVM with label
 	list := migapi.DirectVolumeMigrationList{}
-	err = t.Client.List(
+	err := t.Client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
 		&list)
