@@ -26,11 +26,7 @@ func (t *Task) createDirectVolumeMigration() error {
 	if dvm == nil {
 		return errors.New("failed to build directvolumeclaim list")
 	}
-	client, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-	err = client.Create(context.TODO(), dvm)
+	err = t.Client.Create(context.TODO(), dvm)
 	return err
 
 }
@@ -65,12 +61,8 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	labels := t.Owner.GetCorrelationLabels()
 	labels[DirectVolumeMigrationLabel] = t.UID()
 	// Get DVM with label
-	client, err := t.getDestinationClient()
-	if err != nil {
-		return nil, err
-	}
 	list := migapi.DirectVolumeMigrationList{}
-	err = client.List(
+	err := t.Client.List(
 		context.TODO(),
 		k8sclient.MatchingLabels(labels),
 		&list)
