@@ -104,14 +104,17 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 	// Create rsync client pod on source
 }
 
-// Generate SSH keys to be used
-// TODO: Need to determine if this has already been generated and
-// not to regenerate
-func (t *Task) generateSSHKeys() error {
-	// Check if already generated
-	if t.SSHKeys != nil {
-		return nil
-	}
+func (t *Task) getSSHKeySecret() (*corev1.Secret, error) {
+	secret := corev1.Secret{}
+
+	key := types.NamespacedName{Name: "directvolumemigration-ssh-keys", Namespace: migapi.OpenshiftMigrationNamespace}
+	err := t.Client.Get(context.TODO(), key, &secret)
+	return &secret, err
+}
+
+// Generate SSH keys to be used and ensure secret is created in controller
+// namespace
+func (t *Task) generateSSHKeySecret() error {
 	// Private Key generation
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
@@ -127,6 +130,24 @@ func (t *Task) generateSSHKeys() error {
 	t.SSHKeys = &sshKeys{
 		PublicKey:  &privateKey.PublicKey,
 		PrivateKey: privateKey,
+	}
+	publicRsaKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      "directvolumemigration-ssh-keys",
+			Labels: map[string]string{
+				"app": "directvolumemigration-rsync-transfer",
+			},
+		},
+		Data: map[string][]byte{
+			"pubKey": pubKeyBytes,
+		},
 	}
 	return nil
 }
