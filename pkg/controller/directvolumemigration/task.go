@@ -1,7 +1,6 @@
 package directvolumemigration
 
 import (
-	"crypto/rsa"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -137,18 +136,12 @@ type Task struct {
 	Log              logr.Logger
 	Client           k8sclient.Client
 	Owner            *migapi.DirectVolumeMigration
-	SSHKeys          *sshKeys
 	RsyncRoutes      map[string]string
 	Phase            string
 	PhaseDescription string
 	Requeue          time.Duration
 	Itinerary        Itinerary
 	Errors           []string
-}
-
-type sshKeys struct {
-	PublicKey  *rsa.PublicKey
-	PrivateKey *rsa.PrivateKey
 }
 
 func (t *Task) init() error {

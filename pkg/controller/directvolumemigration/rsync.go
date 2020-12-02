@@ -148,10 +148,6 @@ func (t *Task) generateSSHKeySecret() error {
 		return err
 	}
 
-	t.SSHKeys = &sshKeys{
-		PublicKey:  &privateKey.PublicKey,
-		PrivateKey: privateKey,
-	}
 	publicRsaKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		return err
