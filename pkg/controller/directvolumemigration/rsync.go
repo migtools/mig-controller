@@ -109,12 +109,33 @@ func (t *Task) getSSHKeySecret() (*corev1.Secret, error) {
 
 	key := types.NamespacedName{Name: "directvolumemigration-ssh-keys", Namespace: migapi.OpenshiftMigrationNamespace}
 	err := t.Client.Get(context.TODO(), key, &secret)
-	return &secret, err
+	if k8serror.IsNotFound(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &secret, nil
+}
+
+func (t *Task) getPubKeyBytes() ([]byte, error) {
+	sec, err := t.getSSHKeySecret()
+	if err != nil {
+		return nil, err
+	}
+	return sec.Data["pubKey"], nil
 }
 
 // Generate SSH keys to be used and ensure secret is created in controller
 // namespace
 func (t *Task) generateSSHKeySecret() error {
+	sec, err := t.getSSHKeySecret()
+	if err != nil {
+		return err
+	}
+	// If secret already exists, skip
+	if sec != nil {
+		return nil
+	}
 	// Private Key generation
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
@@ -139,7 +160,7 @@ func (t *Task) generateSSHKeySecret() error {
 	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 			Name:      "directvolumemigration-ssh-keys",
 			Labels: map[string]string{
 				"app": "directvolumemigration-rsync-transfer",
@@ -149,7 +170,8 @@ func (t *Task) generateSSHKeySecret() error {
 			"pubKey": pubKeyBytes,
 		},
 	}
-	return nil
+	err = t.Client.Create(context.TODO(), &secret)
+	return err
 }
 
 func (t *Task) createRsyncConfig() error {
@@ -351,7 +373,7 @@ func (t *Task) createRsyncTransferRoute() error {
 // Transfer pod which runs rsyncd
 func (t *Task) createRsyncTransferPods() error {
 	// Ensure SSH Keys exist
-	err := t.generateSSHKeys()
+	err := t.generateSSHKeySecret()
 	if err != nil {
 		return err
 	}
@@ -373,12 +395,10 @@ func (t *Task) createRsyncTransferPods() error {
 
 	// Generate pubkey bytes
 	// TODO: Use a secret for this so we aren't regenerating every time
-	publicRsaKey, err := ssh.NewPublicKey(t.SSHKeys.PublicKey)
+	pubKeyBytes, err := t.getPubKeyBytes()
 	if err != nil {
 		return err
 	}
-
-	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
 	mode := int32(0600)
 
 	// Loop through namespaces and create transfer pod
