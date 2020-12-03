@@ -97,9 +97,10 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	switch {
 	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration":
+	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration" && dvm.Status.HasCondition(dvmc.Succeeded):
+		// completed successfully
 		completed = true
-	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.Itinerary == "VolumeMigrationFailed":
+	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.HasCondition(dvmc.Failed):
 		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
 		completed = true
 	default:
@@ -117,7 +118,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 // Set warning conditions on migmigration if there were any partial failures
 func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMigration) {
 	message := fmt.Sprintf(
-		"Direct Volume Migration: one or more volumes failed in dvm %s/%s", dvm.GetNamespace(), dvm.GetName())
+		"DirectImageMigration (dvm): %s/%s failed. See in dvm status.Errors", dvm.GetNamespace(), dvm.GetName())
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     DirectVolumeMigrationFailed,
 		Status:   True,
