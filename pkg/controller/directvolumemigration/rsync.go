@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	random"math/rand"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	routev1 "github.com/openshift/api/route/v1"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"text/template"
+	"time"
 )
 
 type pvc struct {
@@ -143,6 +145,15 @@ func (t *Task) createRsyncConfig() error {
 		return err
 	}
 
+	err = t.createRsyncPassword(destClient)
+	if err != nil {
+		return err
+	}
+	password, err := t.getRsyncPassword(destClient)
+	if err != nil {
+		return err
+	}
+
 	// Create rsync configmap/secret on source + destination
 	// Create rsync secret (which contains user/pass for rsync transfer pod) in
 	// each namespace being migrated
@@ -159,7 +170,7 @@ func (t *Task) createRsyncConfig() error {
 			SshUser:   "root",
 			Namespace: ns,
 			PVCList:   pvcList,
-			Password:  "changeme",
+			Password:  string(password),
 		}
 		var tpl bytes.Buffer
 		temp, err := template.New("config").Parse(rsyncConfigTemplate)
@@ -217,7 +228,7 @@ func (t *Task) createRsyncConfig() error {
 				},
 			},
 			Data: map[string][]byte{
-				"RSYNC_PASSWORD": []byte("changeme"),
+				"RSYNC_PASSWORD": password,
 			},
 		}
 		err = srcClient.Create(context.TODO(), &srcSecret)
@@ -235,7 +246,7 @@ func (t *Task) createRsyncConfig() error {
 				},
 			},
 			Data: map[string][]byte{
-				"credentials": []byte("root:changeme"),
+				"credentials": []byte("root:" + string(password)),
 			},
 		}
 		err = destClient.Create(context.TODO(), &destSecret)
@@ -565,6 +576,65 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	return route.Spec.Host, nil
 }
 
+func (t *Task) createRsyncPassword(destClient compat.Client) error {
+	var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	random.Seed(time.Now().UnixNano())
+	password := make([]byte, 6)
+	for i := range password {
+		password[i] = letters[random.Intn(len(letters))]
+	}
+
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: migapi.OpenshiftMigrationNamespace,
+			Name:      "rsync-pass",
+			Labels: map[string]string{
+				"app": "directvolumemigration-rsync-transfer",
+			},
+		},
+		Data: map[string][]byte{
+			"password": password,
+		},
+	}
+	err := destClient.Create(context.TODO(), &secret)
+	if k8serror.IsAlreadyExists(err) {
+		t.Log.Info("Secret already exists on destination", "namespace", migapi.OpenshiftMigrationNamespace)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Task) getRsyncPassword(destClient compat.Client) ([]byte, error){
+	rsyncSecret := corev1.Secret{}
+	key := types.NamespacedName{Name: "rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace}
+	err := destClient.Get(context.TODO(), key, &rsyncSecret)
+	if err != nil {
+		return nil, err
+	}
+	return rsyncSecret.Data["password"], nil
+}
+
+func (t *Task) deleteRsyncPassword(client compat.Client) error {
+
+	secret := corev1.Secret{}
+	err := client.Get(
+		context.TODO(),
+		types.NamespacedName{Name: "rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace},
+		&secret)
+	if k8serror.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+	if err != nil && !k8serror.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
 // Create rsync client pods
 func (t *Task) createRsyncClientPods() error {
 	// Get client for destination
@@ -574,6 +644,14 @@ func (t *Task) createRsyncClientPods() error {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return err
+	}
+	password, err := t.getRsyncPassword(destClient)
+	if err != nil {
+		return err
+	}
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -607,7 +685,7 @@ func (t *Task) createRsyncClientPods() error {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "RSYNC_PASSWORD",
-						Value: "changeme",
+						Value: string(password),
 					},
 				},
 				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
@@ -764,6 +842,11 @@ func (t *Task) deleteRsyncResources() error {
 	}
 
 	err = t.findAndDeleteResources(destClient)
+	if err != nil {
+		return err
+	}
+
+	err = t.deleteRsyncPassword(destClient)
 	if err != nil {
 		return err
 	}
