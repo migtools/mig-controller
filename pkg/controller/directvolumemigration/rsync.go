@@ -959,7 +959,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete pods
 		for _, pod := range podList.Items {
-			err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
@@ -967,7 +967,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete secrets
 		for _, secret := range secretList.Items {
-			err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
@@ -975,7 +975,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete routes
 		for _, route := range routeList.Items {
-			err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
@@ -983,7 +983,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete svcs
 		for _, svc := range svcList.Items {
-			err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
@@ -991,7 +991,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete configmaps
 		for _, cm := range cmList.Items {
-			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
@@ -1010,7 +1010,7 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,
 				},
-			}, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
+			}, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
 			}
