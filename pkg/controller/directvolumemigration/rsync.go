@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	random"math/rand"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	routev1 "github.com/openshift/api/route/v1"
@@ -18,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	random "math/rand"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"text/template"
 	"time"
@@ -145,11 +145,12 @@ func (t *Task) createRsyncConfig() error {
 		return err
 	}
 
-	err = t.createRsyncPassword(destClient)
+	err = t.createRsyncPassword()
 	if err != nil {
 		return err
 	}
-	password, err := t.getRsyncPassword(destClient)
+	time.Sleep(time.Second)
+	password, err := t.getRsyncPassword()
 	if err != nil {
 		return err
 	}
@@ -170,7 +171,7 @@ func (t *Task) createRsyncConfig() error {
 			SshUser:   "root",
 			Namespace: ns,
 			PVCList:   pvcList,
-			Password:  string(password),
+			Password:  password,
 		}
 		var tpl bytes.Buffer
 		temp, err := template.New("config").Parse(rsyncConfigTemplate)
@@ -228,7 +229,7 @@ func (t *Task) createRsyncConfig() error {
 				},
 			},
 			Data: map[string][]byte{
-				"RSYNC_PASSWORD": password,
+				"RSYNC_PASSWORD": []byte(password),
 			},
 		}
 		err = srcClient.Create(context.TODO(), &srcSecret)
@@ -246,7 +247,7 @@ func (t *Task) createRsyncConfig() error {
 				},
 			},
 			Data: map[string][]byte{
-				"credentials": []byte("root:" + string(password)),
+				"credentials": []byte("root:" + password),
 			},
 		}
 		err = destClient.Create(context.TODO(), &destSecret)
@@ -576,7 +577,7 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	return route.Spec.Host, nil
 }
 
-func (t *Task) createRsyncPassword(destClient compat.Client) error {
+func (t *Task) createRsyncPassword() error {
 	var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	random.Seed(time.Now().UnixNano())
 	password := make([]byte, 6)
@@ -587,49 +588,49 @@ func (t *Task) createRsyncPassword(destClient compat.Client) error {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
-			Name:      "rsync-pass",
+			Name:      "directvolumemigration-rsync-pass",
 			Labels: map[string]string{
 				"app": "directvolumemigration-rsync-transfer",
 			},
 		},
-		Data: map[string][]byte{
-			"password": password,
+		StringData: map[string]string{
+			corev1.BasicAuthPasswordKey: string(password),
 		},
+		Type: corev1.SecretTypeBasicAuth,
 	}
-	err := destClient.Create(context.TODO(), &secret)
+	err := t.Client.Create(context.TODO(), &secret)
 	if k8serror.IsAlreadyExists(err) {
-		t.Log.Info("Secret already exists on destination", "namespace", migapi.OpenshiftMigrationNamespace)
+		t.Log.Info("Secret already exists on host", "name", "directvolumemigration-rsync-pass", "namespace", migapi.OpenshiftMigrationNamespace)
 	} else if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Task) getRsyncPassword(destClient compat.Client) ([]byte, error){
+func (t *Task) getRsyncPassword() (string, error) {
 	rsyncSecret := corev1.Secret{}
-	key := types.NamespacedName{Name: "rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace}
-	err := destClient.Get(context.TODO(), key, &rsyncSecret)
+	key := types.NamespacedName{Name: "directvolumemigration-rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace}
+	err := t.Client.Get(context.TODO(), key, &rsyncSecret)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return rsyncSecret.Data["password"], nil
+	if pass, ok := rsyncSecret.StringData[corev1.BasicAuthPasswordKey]; ok {
+		return pass, nil
+	}
+	return "", nil
 }
 
-func (t *Task) deleteRsyncPassword(client compat.Client) error {
-
-	secret := corev1.Secret{}
-	err := client.Get(
-		context.TODO(),
-		types.NamespacedName{Name: "rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace},
-		&secret)
+func (t *Task) deleteRsyncPassword() error {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: migapi.OpenshiftMigrationNamespace,
+			Name:      "directvolumemigration-rsync-pass",
+		},
+	}
+	err := t.Client.Delete(context.TODO(), secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if k8serror.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-	if err != nil && !k8serror.IsNotFound(err) {
+		t.Log.Info("Secret is not found", "name", "directvolumemigration-rsync-pass", "namespace", migapi.OpenshiftMigrationNamespace)
+	} else if err != nil {
 		return err
 	}
 	return nil
@@ -644,11 +645,7 @@ func (t *Task) createRsyncClientPods() error {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-	password, err := t.getRsyncPassword(destClient)
+	password, err := t.getRsyncPassword()
 	if err != nil {
 		return err
 	}
@@ -685,7 +682,7 @@ func (t *Task) createRsyncClientPods() error {
 				Env: []corev1.EnvVar{
 					{
 						Name:  "RSYNC_PASSWORD",
-						Value: string(password),
+						Value: password,
 					},
 				},
 				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
@@ -846,7 +843,7 @@ func (t *Task) deleteRsyncResources() error {
 		return err
 	}
 
-	err = t.deleteRsyncPassword(destClient)
+	err = t.deleteRsyncPassword()
 	if err != nil {
 		return err
 	}
