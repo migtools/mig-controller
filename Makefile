@@ -1,6 +1,8 @@
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/ocpmigrate/mig-controller:latest
 GOOS ?= `go env GOOS`
+GOBIN ?= ${GOPATH}/bin
+GO111MODULE = auto
 KUBECONFIG_POSTFIX ?= mig-controller
 BUILDTAGS ?= containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp exclude_graphdriver_overlay
 
@@ -56,10 +58,12 @@ deploy: manifests
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
 
+# Provide CRDs that work back to k8s 1.11
+CRD_OPTIONS ?= "crd:trivialVersions=true"
+
 # Generate manifests e.g. CRD, Webhooks
 manifests:
-	${CONTROLLER_GEN} crd
-	${CONTROLLER_GEN} webhook
+	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases output:crd:dir=config/crds
 
 # Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
 samples:
@@ -72,15 +76,15 @@ fmt:
 
 # Run go vet against code
 vet:
-	go vet -tags "${BUILDTAGS}" ./pkg/... ./cmd/...
+	go vet -tags "${BUILDTAGS}" -structtag=false ./pkg/... ./cmd/...
 
 # Generate code
 generate: conversion-gen controller-gen
 	${CONTROLLER_GEN} object:headerFile="./hack/boilerplate.go.txt" paths="./..."
 
 # Generate conversion functions
-conversion-gen:
-	./hack/conversion-gen-${GOOS} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i github.com/konveyor/mig-controller/pkg/compat/conversion/...
+conversion-gen:  conversion-gen-dl
+	${CONVERSION_GEN} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i github.com/konveyor/mig-controller/pkg/compat/conversion/...
 
 # Build the docker image
 #docker-build: test
@@ -108,4 +112,21 @@ ifeq (, $(shell which controller-gen))
 CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+# find or download controller-gen
+# download controller-gen if necessary
+conversion-gen-dl:
+ifeq (, $(shell which conversion-gen))
+	@{ \
+	set -e ;\
+	CONVERSION_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONVERSION_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get k8s.io/code-generator/cmd/conversion-gen@v0.18.12 ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONVERSION_GEN=$(GOBIN)/conversion-gen
+else
+CONVERSION_GEN=$(shell which conversion-gen)
 endif

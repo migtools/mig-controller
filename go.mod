@@ -7,7 +7,6 @@ require (
 	github.com/Azure/azure-sdk-for-go v48.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.10
 	github.com/Azure/go-autorest/autorest/adal v0.9.5
-	github.com/appscode/jsonpatch v1.0.1 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
 	github.com/containers/image/v5 v5.7.0
 	github.com/deckarep/golang-set v1.7.1
@@ -17,18 +16,14 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-logr/logr v0.3.0
-	github.com/go-logr/zapr v0.3.0 // indirect
 	github.com/google/uuid v1.1.2
-	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/joho/godotenv v1.3.0
-	github.com/konveyor/controller v0.1.0
+	github.com/konveyor/controller v0.2.1
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20201023200114-f5883b430041
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/gomega v1.7.0
 	github.com/openshift/api v0.0.0-20200210091934-a0e53e94816b
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
-	github.com/pborman/uuid v1.2.1 // indirect
-	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/satori/go.uuid v1.2.0 // indirect
@@ -39,14 +34,12 @@ require (
 	google.golang.org/api v0.35.0
 	google.golang.org/genproto v0.0.0-20201106154455-f9bfe239b0ba // indirect
 	google.golang.org/grpc v1.33.2 // indirect
-	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.17.4
 	k8s.io/apimachinery v0.17.4
 	k8s.io/client-go v0.17.4
 	k8s.io/utils v0.0.0-20191218082557-f07c713de883
 	sigs.k8s.io/controller-runtime v0.1.11
-	sigs.k8s.io/testing_frameworks v0.1.2 // indirect
 )
 
 // Use fork

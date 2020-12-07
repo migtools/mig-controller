@@ -67,7 +67,7 @@ type Condition struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 	Durable            bool        `json:"durable,omitempty"`
 	Items              []string    `json:"-"`
-	staged             bool
+	staged             bool        `json:"-"`
 }
 
 // Update this condition with another's fields.
@@ -138,7 +138,7 @@ func (r *Condition) BuildItems() {
 //
 type Conditions struct {
 	List    []Condition `json:"conditions"`
-	staging bool
+	staging bool        `json:"-"`
 }
 
 // Begin staging conditions.

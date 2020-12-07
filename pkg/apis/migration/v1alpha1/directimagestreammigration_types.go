@@ -35,7 +35,7 @@ type DirectImageStreamMigrationSpec struct {
 
 // DirectImageStreamMigrationStatus defines the observed state of DirectImageStreamMigration
 type DirectImageStreamMigrationStatus struct {
-	Conditions
+	Conditions     `json:","`
 	ObservedDigest string       `json:"observedDigest,omitempty"`
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 	Phase          string       `json:"phase,omitempty"`

@@ -40,14 +40,14 @@ type MigMigrationSpec struct {
 
 // MigMigrationStatus defines the observed state of MigMigration
 type MigMigrationStatus struct {
-	Conditions
-	UnhealthyResources
-	ObservedDigest string       `json:"observedDigest,omitempty"`
-	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
-	Phase          string       `json:"phase,omitempty"`
-	Pipeline       []*Step      `json:"pipeline,omitempty"`
-	Itinerary      string       `json:"itinerary,omitempty"`
-	Errors         []string     `json:"errors,omitempty"`
+	Conditions         `json:",inline"`
+	UnhealthyResources `json:",inline"`
+	ObservedDigest     string       `json:"observedDigest,omitempty"`
+	StartTimestamp     *metav1.Time `json:"startTimestamp,omitempty"`
+	Phase              string       `json:"phase,omitempty"`
+	Pipeline           []*Step      `json:"pipeline,omitempty"`
+	Itinerary          string       `json:"itinerary,omitempty"`
+	Errors             []string     `json:"errors,omitempty"`
 }
 
 // FindStep find step by name
@@ -89,7 +89,7 @@ func (s *MigMigrationStatus) ReflectPipeline() {
 
 // Step defines a task in a step of migration
 type Step struct {
-	Timed
+	Timed `json:"-"`
 
 	Name     string   `json:"name"`
 	Phase    string   `json:"phase,omitempty"`

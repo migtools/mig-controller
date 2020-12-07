@@ -39,7 +39,7 @@ type DirectVolumeMigrationSpec struct {
 
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
 type DirectVolumeMigrationStatus struct {
-	Conditions
+	Conditions       `json:","`
 	ObservedDigest   string         `json:"observedDigest"`
 	StartTimestamp   *metav1.Time   `json:"startTimestamp,omitempty"`
 	PhaseDescription string         `json:"phaseDescription"`

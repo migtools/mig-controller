@@ -449,8 +449,8 @@ github.com/klauspost/pgzip v1.2.5/go.mod h1:Ch1tH69qFZu15pkjo5kYi6mth2Zzwzt50oCQ
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konsorten/go-windows-terminal-sequences v1.0.3/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
-github.com/konveyor/controller v0.1.0 h1:wXhmN3bd/PRl/T7B9PbyTKzsgvhEj77m+LFXU1ZF+OM=
-github.com/konveyor/controller v0.1.0/go.mod h1:LNhWL5MsBqimZfxDNxTybJh5KpvqVGjx1MyBpszzX1o=
+github.com/konveyor/controller v0.2.1 h1:jdq70foYAHgW/yeK3f/tNTl3J2CNTHgEtub0kag+Ncs=
+github.com/konveyor/controller v0.2.1/go.mod h1:aso92+DdNzDJe1ua8kcecnllOT839EVpmPReMe8NPXE=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20201023200114-f5883b430041 h1:VdoJMOh1fTXidAAK1PVr7qBnMqS0+AjcOD0JSeKZ9zM=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20201023200114-f5883b430041/go.mod h1:p6Ae2tyPPmoHOEnTD0I891ux1oXZgadp1FO6fLnG+4o=
 github.com/konveyor/velero v0.0.0-20201026230312-8bd8ce8744d5 h1:DnHS/R5DrV9hIXEIhjNWCVlqMz+ZWXtHMJhIEKxEkww=
