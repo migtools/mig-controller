@@ -244,13 +244,15 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case CreateRsyncConfig:
-		err := t.createRsyncConfig()
+		created, err := t.createRsyncConfig()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		t.Requeue = NoReQ
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
+		if created {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case CreateStunnelConfig:
 		err := t.createStunnelConfig()
