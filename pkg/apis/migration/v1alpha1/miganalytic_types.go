@@ -35,7 +35,7 @@ type MigAnalyticSpec struct {
 
 // MigAnalyticStatus defines the observed state of MigAnalytic
 type MigAnalyticStatus struct {
-	Conditions
+	Conditions         `json:","`
 	ObservedGeneration int64           `json:"observedGeneration,omitempty"`
 	Analytics          MigAnalyticPlan `json:"analytics,omitempty"`
 }

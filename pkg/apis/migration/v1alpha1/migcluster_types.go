@@ -73,7 +73,7 @@ type MigClusterSpec struct {
 
 // MigClusterStatus defines the observed state of MigCluster
 type MigClusterStatus struct {
-	Conditions
+	Conditions     `json:","`
 	ObservedDigest string `json:"observedDigest,omitempty"`
 	RegistryPath   string `json:"registryPath,omitempty"`
 }

@@ -72,8 +72,8 @@ type MigPlanSpec struct {
 
 // MigPlanStatus defines the observed state of MigPlan
 type MigPlanStatus struct {
-	UnhealthyResources
-	Conditions
+	UnhealthyResources `json:",inline"`
+	Conditions         `json:",inline"`
 	Incompatible       `json:",inline"`
 	ObservedDigest     string         `json:"observedDigest,omitempty"`
 	ExcludedResources  []string       `json:"excludedResources,omitempty"`
@@ -686,7 +686,7 @@ type PV struct {
 	Selection    Selection             `json:"selection"`
 	PVC          PVC                   `json:"pvc,omitempty"`
 	NFS          *kapi.NFSVolumeSource `json:"-"`
-	staged       bool
+	staged       bool                  `json:"-"`
 }
 
 // PVC
@@ -745,9 +745,9 @@ func (r *PV) Update(pv PV) {
 // plan.Spec.EndPvStaging()
 //
 type PersistentVolumes struct {
-	List    []PV `json:"persistentVolumes,omitempty"`
-	index   map[string]int
-	staging bool
+	List    []PV           `json:"persistentVolumes,omitempty"`
+	index   map[string]int `json:"-"`
+	staging bool           `json:"-"`
 }
 
 // Allocate collections.

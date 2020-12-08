@@ -45,7 +45,7 @@ type MigHookSpec struct {
 
 // MigHookStatus defines the observed state of MigHook
 type MigHookStatus struct {
-	Conditions
+	Conditions         `json:","`
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 

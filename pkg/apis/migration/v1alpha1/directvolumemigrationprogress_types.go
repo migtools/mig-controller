@@ -33,7 +33,7 @@ type DirectVolumeMigrationProgressSpec struct {
 
 // DirectVolumeMigrationProgressStatus defines the observed state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressStatus struct {
-	Conditions
+	Conditions                  `json:",omitempty"`
 	PodPhase                    kapi.PodPhase `json:"phase,omitempty"`
 	LogMessage                  string        `json:"logMessage,omitempty"`
 	ObservedDigest              string        `json:"observedDigest,omitempty"`

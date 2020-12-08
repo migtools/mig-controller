@@ -44,7 +44,7 @@ type MigStorageSpec struct {
 
 // MigStorageStatus defines the observed state of MigStorage
 type MigStorageStatus struct {
-	Conditions
+	Conditions     `json:",inline"`
 	ObservedDigest string `json:"observedDigest,omitempty"`
 }
 
