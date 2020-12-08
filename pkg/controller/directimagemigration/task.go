@@ -17,8 +17,6 @@ limitations under the License.
 package directimagemigration
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -173,42 +171,21 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case WaitingForDirectImageStreamMigrationsToComplete:
-		// Get the DirectImageStreamMigration CRs
-		directISMigList, err := t.getDirectImageStreamMigrations()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		completed := true
-		failedISList := []string{}
-		// iterate over DirectImageStreamMigrations
-		for _, directISMig := range directISMigList {
-			imageStreamCompleted, reasons := directISMig.HasCompleted()
-			t.Log.Info("is migrations", "name", directISMig.Name, "completed", imageStreamCompleted, "phase", directISMig.Status.Phase)
-			if !imageStreamCompleted {
-				completed = false
-			}
-			if len(reasons) > 0 {
-				msg := fmt.Sprintf("Copying ImageStream %v/%v failed. DirectImageStreamMigration: %v, errors: %v",
-					directISMig.Spec.ImageStreamRef.Namespace,
-					directISMig.Spec.ImageStreamRef.Name,
-					directISMig.Name,
-					strings.Join(reasons, ","),
-				)
-				failedISList = append(failedISList, msg)
-			}
-		}
+		completed, reasons := t.checkDISMCompletion()
+
 		if completed {
-			if len(failedISList) > 0 {
-				t.fail(MigrationFailed, failedISList)
+			if len(reasons) > 0 {
+				t.fail(MigrationFailed, reasons)
 			} else {
 				if err = t.next(); err != nil {
 					return liberr.Wrap(err)
 				}
 			}
+		} else {
+			// Don't move on if any are still in progress
+			// Fail if any are failed, Succeed if all are successful
+			t.Requeue = NoReQ
 		}
-		// Don't move on if any are still in progress
-		// Fail if any are failed, Succeed if all are successful
-		t.Requeue = NoReQ
 	case Completed:
 	default:
 		t.Requeue = NoReQ

@@ -427,7 +427,8 @@ func (t *Task) Run() error {
 			return errors.New("DirectImageMigration not found")
 		}
 
-		completed, reasons := dim.HasCompleted()
+		completed, reasons, progress := dim.HasCompleted()
+		t.setProgress(progress)
 		t.Log.Info("is migrations", "name", dim.Name, "completed", completed, "phase", dim.Status.Phase)
 
 		if completed {
@@ -435,12 +436,12 @@ func (t *Task) Run() error {
 				t.setDirectImageMigrationWarning(dim)
 				// Once supported, add reasons to Status.Warnings for the Step
 			}
-			t.Requeue = FastReQ
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Requeue = PollReQ
 		}
-		t.Requeue = PollReQ
 	case EnsureCloudSecretPropagated:
 		count := 0
 		for _, cluster := range t.getBothClusters() {
