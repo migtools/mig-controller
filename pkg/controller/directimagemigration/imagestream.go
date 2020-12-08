@@ -46,7 +46,7 @@ func (t *Task) listImageStreams() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	var isRefList []migapi.ImageStreamListItem
+	var isRefList []*migapi.ImageStreamListItem
 	// Get list namespaces to iterate over
 	for srcNsName, destNsName := range t.Owner.GetNamespaceMapping() {
 		isList := imagev1.ImageStreamList{}
@@ -58,17 +58,20 @@ func (t *Task) listImageStreams() error {
 			return liberr.Wrap(err)
 		}
 		for _, is := range isList.Items {
+			objRef := &kapi.ObjectReference{
+				Namespace: is.Namespace,
+				Name:      is.Name,
+			}
 			isRefList = append(
 				isRefList,
-				migapi.ImageStreamListItem{
-					Name:          is.Name,
-					Namespace:     is.Namespace,
-					DestNamespace: destNsName,
+				&migapi.ImageStreamListItem{
+					ObjectReference: objRef,
+					DestNamespace:   destNsName,
 				},
 			)
 		}
 	}
-	t.Owner.Status.ImageStreams = isRefList
+	t.Owner.Status.NewISs = isRefList
 	return nil
 }
 func (t *Task) createDirectImageStreamMigrations() error {
@@ -78,7 +81,10 @@ func (t *Task) createDirectImageStreamMigrations() error {
 		return liberr.Wrap(err)
 	}
 	// Get list namespaces to iterate over
-	for n, isRef := range t.Owner.Status.ImageStreams {
+	for n, isRef := range t.Owner.Status.NewISs {
+		if isRef.DirectMigration != nil {
+			continue
+		}
 		imageStream := imagev1.ImageStream{}
 		err := srcClient.Get(
 			context.TODO(),
@@ -89,11 +95,11 @@ func (t *Task) createDirectImageStreamMigrations() error {
 			&imageStream)
 		switch {
 		case errors.IsNotFound(err):
-			t.Owner.Status.ImageStreams[n].NotFound = true
+			t.Owner.Status.NewISs[n].NotFound = true
 		case err != nil:
 			return liberr.Wrap(err)
 		default:
-			t.Owner.Status.ImageStreams[n].NotFound = false
+			t.Owner.Status.NewISs[n].NotFound = false
 		}
 		dismList := migapi.DirectImageStreamMigrationList{}
 		err = t.Client.List(
@@ -103,7 +109,7 @@ func (t *Task) createDirectImageStreamMigrations() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if t.Owner.Status.ImageStreams[n].NotFound {
+		if t.Owner.Status.NewISs[n].NotFound {
 			for _, dism := range dismList.Items {
 				// Delete
 				err := t.Client.Delete(context.TODO(), &dism)
@@ -121,6 +127,12 @@ func (t *Task) createDirectImageStreamMigrations() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		objRef := &kapi.ObjectReference{
+			Namespace: imageStreamMigration.Namespace,
+			Name:      imageStreamMigration.Name,
+		}
+		t.Owner.Status.NewISs[n].DirectMigration = objRef
+
 	}
 	return nil
 }
@@ -146,4 +158,48 @@ func (t *Task) buildDirectImageStreamMigration(is imagev1.ImageStream, destNsNam
 		imageStreamMigration.Spec.DestNamespace = destNsName
 	}
 	return imageStreamMigration
+}
+
+func (t *Task) checkDISMCompletion() (bool, []string) {
+	newISs := []*migapi.ImageStreamListItem{}
+	for _, item := range t.Owner.Status.NewISs {
+		if item.NotFound {
+			t.Owner.Status.DeletedISs = append(t.Owner.Status.DeletedISs, item)
+			continue
+		}
+		dism := migapi.DirectImageStreamMigration{}
+		err := t.Client.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Namespace: item.DirectMigration.Namespace,
+				Name:      item.DirectMigration.Name,
+			},
+			&dism)
+		// If retrieving the dism failed, consider that the associated ImageStream failed migration
+		if err != nil {
+			item.Errors = append(item.Errors, err.Error())
+			t.Owner.Status.FailedISs = append(t.Owner.Status.FailedISs, item)
+			continue
+		}
+		dismCompleted, dismErrors := dism.HasCompleted()
+		switch {
+		case dismCompleted && len(dismErrors) == 0:
+			t.Owner.Status.SuccessfulISs = append(t.Owner.Status.SuccessfulISs, item)
+		case dismCompleted:
+			item.Errors = append(item.Errors, dismErrors...)
+			t.Owner.Status.FailedISs = append(t.Owner.Status.FailedISs, item)
+		default:
+			newISs = append(newISs, item)
+		}
+	}
+	t.Owner.Status.NewISs = newISs
+
+	completed := len(t.Owner.Status.NewISs) == 0
+	reasons := []string{}
+	if completed {
+		for _, item := range t.Owner.Status.FailedISs {
+			reasons = append(reasons, item.Errors...)
+		}
+	}
+	return completed, reasons
 }

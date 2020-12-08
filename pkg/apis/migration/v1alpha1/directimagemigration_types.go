@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"path"
 	"strings"
 
 	imagev1 "github.com/openshift/api/image/v1"
@@ -35,19 +37,23 @@ type DirectImageMigrationSpec struct {
 // DirectImageMigrationStatus defines the observed state of DirectImageMigration
 type DirectImageMigrationStatus struct {
 	Conditions     `json:","`
-	ImageStreams   []ImageStreamListItem `json:"imageStreams,omitempty"`
-	ObservedDigest string                `json:"observedDigest,omitempty"`
-	StartTimestamp *metav1.Time          `json:"startTimestamp,omitempty"`
-	Phase          string                `json:"phase,omitempty"`
-	Itinerary      string                `json:"itinerary,omitempty"`
-	Errors         []string              `json:"errors,omitempty"`
+	ObservedDigest string                 `json:"observedDigest,omitempty"`
+	StartTimestamp *metav1.Time           `json:"startTimestamp,omitempty"`
+	Phase          string                 `json:"phase,omitempty"`
+	Itinerary      string                 `json:"itinerary,omitempty"`
+	Errors         []string               `json:"errors,omitempty"`
+	NewISs         []*ImageStreamListItem `json:"newISs,omitempty"`
+	SuccessfulISs  []*ImageStreamListItem `json:"successfulISs,omitempty"`
+	DeletedISs     []*ImageStreamListItem `json:"deletedISs,omitempty"`
+	FailedISs      []*ImageStreamListItem `json:"failedISs,omitempty"`
 }
 
 type ImageStreamListItem struct {
-	Namespace     string `json:"namespace,omitempty"`
-	Name          string `json:"name,omitempty"`
-	DestNamespace string `json:"destNamespace,omitempty"`
-	NotFound      bool   `json:"notFound,omitempty"`
+	*kapi.ObjectReference `json:",inline"`
+	DestNamespace         string                `json:"destNamespace,omitempty"`
+	NotFound              bool                  `json:"notFound,omitempty"`
+	DirectMigration       *kapi.ObjectReference `json:"directMigration,omitempty"`
+	Errors                []string              `json:"errors,omitempty"`
 }
 
 // +genclient
@@ -147,11 +153,57 @@ func (r *DirectImageMigration) HasErrors() bool {
 	return len(r.Status.Errors) > 0
 }
 
-// HasCompleted gets whether a DirectImageMigration has completed and a list of errors, if any
-func (r *DirectImageMigration) HasCompleted() (bool, []string) {
+// HasCompleted gets whether a DirectImageMigration has completed, a list of errors, if any, and progress results
+func (r *DirectImageMigration) HasCompleted() (bool, []string, []string) {
 	completed := r.Status.Phase == "Completed"
 	reasons := r.Status.Errors
-	return completed, reasons
+	progress := []string{}
+
+	successfulISs := 0
+	deletedISs := 0
+	failedISs := 0
+	newISs := 0
+	deletedMsg := ""
+	if r.Status.SuccessfulISs != nil {
+		successfulISs = len(r.Status.SuccessfulISs)
+	}
+	if r.Status.DeletedISs != nil {
+		deletedISs = len(r.Status.DeletedISs)
+		if len(r.Status.DeletedISs) > 0 {
+			deletedMsg = fmt.Sprintf("; %v deleted", deletedISs)
+		}
+	}
+	if r.Status.FailedISs != nil {
+		failedISs = len(r.Status.FailedISs)
+	}
+	if r.Status.NewISs != nil {
+		newISs = len(r.Status.NewISs)
+	}
+
+	totalISs := successfulISs + deletedISs + failedISs + newISs
+	dimProgress := fmt.Sprintf("%v total ImageStreams; %v running; %v successful; %v failed%v",
+		totalISs,
+		newISs,
+		successfulISs,
+		failedISs,
+		deletedMsg)
+	progress = append(progress, dimProgress)
+
+	progress = append(progress, r.getDISMProgress(r.Status.NewISs, "Running")...)
+	progress = append(progress, r.getDISMProgress(r.Status.SuccessfulISs, "Completed")...)
+	progress = append(progress, r.getDISMProgress(r.Status.FailedISs, "Failed")...)
+	progress = append(progress, r.getDISMProgress(r.Status.DeletedISs, "Deleted")...)
+
+	return completed, reasons, progress
+}
+
+func (r *DirectImageMigration) getDISMProgress(items []*ImageStreamListItem, state string) []string {
+	progress := []string{}
+	for _, item := range items {
+		is := fmt.Sprintf("ImageStream %s (dism %s): %s ", path.Join(item.Namespace, item.Name), path.Join(item.DirectMigration.Namespace, item.DirectMigration.Name), state)
+		progress = append(progress, is)
+	}
+	return progress
 }
 
 func init() {
