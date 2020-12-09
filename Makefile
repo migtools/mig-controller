@@ -63,7 +63,9 @@ CRD_OPTIONS ?= "crd:trivialVersions=true"
 
 # Generate manifests e.g. CRD, Webhooks
 manifests:
-	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases output:crd:dir=config/crds
+	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases 
+	mv config/migration.openshift.io*yaml config/crds
+	rm -rf config/crds/bases
 
 # Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
 samples:

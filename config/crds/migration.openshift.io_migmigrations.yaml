@@ -196,6 +196,8 @@ spec:
                     items:
                       type: string
                     type: array
+                  skipped:
+                    type: boolean
                 required:
                 - name
                 type: object
