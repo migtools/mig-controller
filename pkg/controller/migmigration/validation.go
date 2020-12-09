@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sort"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -158,12 +159,27 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 	if err != nil {
 		return nil
 	}
+
+	// Sort migrations by timestamp, newest first.
+	sort.Slice(migrations, func(i, j int) bool {
+		ts1 := migrations[i].CreationTimestamp
+		ts2 := migrations[j].CreationTimestamp
+		return ts1.Time.After(ts2.Time)
+	})
+
 	hasCondition := false
 	for _, m := range migrations {
-		// ignore canceled
+		// Ignore self, stage migrations, canceled migrations
 		if m.UID == migration.UID || m.Spec.Stage || m.Spec.Canceled {
 			continue
 		}
+
+		// If newest migration is a successful rollback, allow further migrations
+		if m.Spec.Rollback && m.Status.HasCondition(Succeeded) {
+			hasCondition = false
+			break
+		}
+
 		// Stage
 		if migration.Spec.Stage {
 			if m.Status.HasAnyCondition(Running, Succeeded, Failed) {
