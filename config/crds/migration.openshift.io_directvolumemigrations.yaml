@@ -335,7 +335,6 @@ spec:
                 type: object
               type: array
           required:
-          - conditions
           - observedDigest
           - phaseDescription
           type: object

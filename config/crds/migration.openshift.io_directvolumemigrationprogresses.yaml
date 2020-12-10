@@ -180,8 +180,6 @@ spec:
               description: PodPhase is a label for the condition of a pod at the current
                 time.
               type: string
-          required:
-          - conditions
           type: object
       type: object
   version: v1alpha1
