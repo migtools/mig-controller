@@ -137,7 +137,7 @@ func (r *Condition) BuildItems() {
 //     "Resource Ready.")
 //
 type Conditions struct {
-	List    []Condition `json:"conditions"`
+	List    []Condition `json:"conditions,omitempty"`
 	staging bool        `json:"-"`
 }
 
