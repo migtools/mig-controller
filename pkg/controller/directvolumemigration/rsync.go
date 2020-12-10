@@ -641,6 +641,39 @@ func (t *Task) deleteRsyncPassword() error {
 	return nil
 }
 
+//Returns a map of PVCNamespacedName to the pod.NodeName
+func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
+	nodeNameMap := map[string]string{}
+	pvcMap := t.getPVCNamespaceMap()
+
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+
+	for ns, _ := range pvcMap {
+
+		nsPodList := corev1.PodList{}
+		err = srcClient.List(context.TODO(), k8sclient.InNamespace(ns), &nsPodList)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pod := range nsPodList.Items {
+			if pod.Status.Phase == corev1.PodRunning {
+				for _, vol := range pod.Spec.Volumes {
+					if vol.PersistentVolumeClaim != nil {
+						pvcNsName := pod.ObjectMeta.Namespace + "/" + vol.PersistentVolumeClaim.ClaimName
+						nodeNameMap[pvcNsName] = pod.Spec.NodeName
+					}
+				}
+			}
+		}
+	}
+
+	return nodeNameMap, nil
+}
+
 // Create rsync client pods
 func (t *Task) createRsyncClientPods() error {
 	// Get client for destination
@@ -654,6 +687,11 @@ func (t *Task) createRsyncClientPods() error {
 	if err != nil {
 		return err
 	}
+	pvcNodeMap, err := t.getPVCNodeNameMap()
+	if err != nil {
+		return err
+	}
+
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -728,6 +766,7 @@ func (t *Task) createRsyncClientPods() error {
 					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes:       volumes,
 					Containers:    containers,
+					NodeName:      pvcNodeMap[ns+"/"+vol],
 				},
 			}
 			err = srcClient.Create(context.TODO(), &clientPod)
