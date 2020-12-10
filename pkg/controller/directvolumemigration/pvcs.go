@@ -5,7 +5,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (t *Task) areSourcePVCsUnattached() error {
@@ -38,6 +40,7 @@ func (t *Task) createDestinationPVCs() error {
 		}
 
 		newSpec := srcPVC.Spec
+		srcPVC.Labels["owner"] = "directvolumemigration"
 		newSpec.StorageClassName = &pvc.TargetStorageClass
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
@@ -72,7 +75,60 @@ func (t *Task) createDestinationPVCs() error {
 	return nil
 }
 
-func (t *Task) getDestinationPVCs() error {
+func (t *Task) getDestinationPVCs() (bool, error) {
 	// Ensure PVCs are bound and not in pending state
-	return nil
+	// Get client for destination
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return false, err
+	}
+
+	pvcMap := t.getPVCNamespaceMap()
+	selector := labels.SelectorFromSet(map[string]string{
+		"owner": "directvolumemigration",
+	})
+	for ns, _ := range pvcMap {
+		pvcList := corev1.PersistentVolumeClaimList{}
+		err = destClient.List(
+			context.TODO(),
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			},
+			&pvcList)
+		if err != nil {
+			return false, err
+		}
+		for _, pvc := range pvcList.Items {
+			t.Log.Info("mounted PVC", pvc.Name, pvc.Status.Phase)
+			if pvc.Status.Phase != corev1.ClaimBound {
+				return false, nil
+			}
+		}
+	}
+
+	//selector = labels.SelectorFromSet(map[string]string{
+	//	"app":     "directvolumemigration-rsync-transfer",
+	//	"owner":   "directvolumemigration",
+	//	"purpose": "rsync",
+	//})
+	//for ns, _ := range pvcMap {
+	//	pods := corev1.PodList{}
+	//	err = destClient.List(
+	//		context.TODO(),
+	//		&k8sclient.ListOptions{
+	//			Namespace:     ns,
+	//			LabelSelector: selector,
+	//		},
+	//		&pods)
+	//	if err != nil {
+	//		return false, err
+	//	}
+	//	podToPVC := make(map[string]string)
+	//	for _, pod := range pods.Items {
+	//		t.Log.Info("mounted PVC", "mount", pod.Spec.Volumes)
+	//
+	//	}
+	//}
+	return true, nil
 }
