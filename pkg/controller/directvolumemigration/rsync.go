@@ -645,29 +645,32 @@ func (t *Task) deleteRsyncPassword() error {
 func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 	nodeNameMap := map[string]string{}
 	pvcMap := t.getPVCNamespaceMap()
-	nsPodList := corev1.PodList{}
+
 	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return nil, err
 	}
 
 	for ns, _ := range pvcMap {
+
+		nsPodList := corev1.PodList{}
 		err = srcClient.List(context.TODO(), k8sclient.InNamespace(ns), &nsPodList)
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	for _, pod := range nsPodList.Items {
-		if pod.Status.Phase == corev1.PodRunning {
-			for _, vol := range pod.Spec.Volumes {
-				if vol.PersistentVolumeClaim != nil {
-					pvcNsName := pod.ObjectMeta.Namespace + "/" + vol.PersistentVolumeClaim.ClaimName
-					nodeNameMap[pvcNsName] = pod.Spec.NodeName
+		for _, pod := range nsPodList.Items {
+			if pod.Status.Phase == corev1.PodRunning {
+				for _, vol := range pod.Spec.Volumes {
+					if vol.PersistentVolumeClaim != nil {
+						pvcNsName := pod.ObjectMeta.Namespace + "/" + vol.PersistentVolumeClaim.ClaimName
+						nodeNameMap[pvcNsName] = pod.Spec.NodeName
+					}
 				}
 			}
 		}
 	}
+
 	return nodeNameMap, nil
 }
 
@@ -684,6 +687,11 @@ func (t *Task) createRsyncClientPods() error {
 	if err != nil {
 		return err
 	}
+	pvcNodeMap, err := t.getPVCNodeNameMap()
+	if err != nil {
+		return err
+	}
+
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -693,12 +701,6 @@ func (t *Task) createRsyncClientPods() error {
 
 		trueBool := true
 		runAsUser := int64(0)
-
-		pvcNodeMap, err := t.getPVCNodeNameMap()
-
-		if err != nil {
-			return err
-		}
 
 		// Add PVC volume mounts
 		for _, vol := range vols {
