@@ -100,35 +100,12 @@ func (t *Task) getDestinationPVCs() (bool, error) {
 			return false, err
 		}
 		for _, pvc := range pvcList.Items {
-			t.Log.Info("mounted PVC", pvc.Name, pvc.Status.Phase)
-			if pvc.Status.Phase != corev1.ClaimBound {
+			if pvc.Status.Phase == corev1.ClaimLost {
+				t.Log.Info("The PVC in lost state", pvc.Name, pvc.Status.Phase)
+			} else if pvc.Status.Phase != corev1.ClaimBound {
 				return false, nil
 			}
 		}
 	}
-
-	//selector = labels.SelectorFromSet(map[string]string{
-	//	"app":     "directvolumemigration-rsync-transfer",
-	//	"owner":   "directvolumemigration",
-	//	"purpose": "rsync",
-	//})
-	//for ns, _ := range pvcMap {
-	//	pods := corev1.PodList{}
-	//	err = destClient.List(
-	//		context.TODO(),
-	//		&k8sclient.ListOptions{
-	//			Namespace:     ns,
-	//			LabelSelector: selector,
-	//		},
-	//		&pods)
-	//	if err != nil {
-	//		return false, err
-	//	}
-	//	podToPVC := make(map[string]string)
-	//	for _, pod := range pods.Items {
-	//		t.Log.Info("mounted PVC", "mount", pod.Spec.Volumes)
-	//
-	//	}
-	//}
 	return true, nil
 }
