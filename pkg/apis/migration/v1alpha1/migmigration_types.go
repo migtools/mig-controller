@@ -89,7 +89,7 @@ func (s *MigMigrationStatus) ReflectPipeline() {
 
 // Step defines a task in a step of migration
 type Step struct {
-	Timed `json:"-"`
+	Timed `json:",inline"`
 
 	Name     string   `json:"name"`
 	Phase    string   `json:"phase,omitempty"`
