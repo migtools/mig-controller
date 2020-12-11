@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
@@ -348,13 +349,28 @@ func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	// Sort migrations by timestamp, newest first.
+	sort.Slice(migrations, func(i, j int) bool {
+		ts1 := migrations[i].CreationTimestamp
+		ts2 := migrations[j].CreationTimestamp
+		return ts1.Time.After(ts2.Time)
+	})
+
 	for _, m := range migrations {
+		// If a migration is running, plan should be suspended
 		if m.Status.HasCondition(migctl.Running) {
 			suspended = true
 			break
 		}
-		if m.Status.HasCondition(migctl.Succeeded) && !m.Spec.Stage {
+		// If the newest final migration is successful, suspend plan
+		if m.Status.HasCondition(migctl.Succeeded) && !m.Spec.Stage && !m.Spec.Rollback {
 			suspended = true
+			break
+		}
+		// If the newest migration is a successful rollback, unsuspend plan
+		if m.Status.HasCondition(migctl.Succeeded) && m.Spec.Rollback {
+			suspended = false
 			break
 		}
 	}
