@@ -15,7 +15,7 @@ const (
 	Role = "ROLE"
 	// CAM role.
 	// Only migration controllers should be loaded.
-	CamRole = "cam"
+	MtcRole = "mtc"
 	// Discovery role.
 	// Only the discovery should be loaded.
 	DiscoveryRole = "discovery"
@@ -83,10 +83,10 @@ func (r *_Settings) loadRoles() error {
 		for _, role := range strings.Split(s, ",") {
 			role = strings.ToLower(strings.TrimSpace(role))
 			switch role {
-			case CamRole, DiscoveryRole:
+			case MtcRole, DiscoveryRole:
 				r.Roles[role] = true
 			default:
-				list := strings.Join([]string{CamRole, DiscoveryRole}, "|")
+				list := strings.Join([]string{MtcRole, DiscoveryRole}, "|")
 				return errors.New(
 					fmt.Sprintf(
 						"%s must be (%s)",
@@ -96,7 +96,7 @@ func (r *_Settings) loadRoles() error {
 		}
 	} else {
 		r.Roles[DiscoveryRole] = true
-		r.Roles[CamRole] = true
+		r.Roles[MtcRole] = true
 	}
 
 	return nil
