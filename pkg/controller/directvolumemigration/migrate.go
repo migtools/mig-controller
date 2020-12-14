@@ -12,29 +12,34 @@ import (
 
 func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration) (time.Duration, error) {
 
-	// Ready
-	migration, err := direct.GetMigrationForDVM(r)
-	if err != nil {
-		return 0, liberr.Wrap(err)
-	}
-	if migration == nil {
-		log.Info("Migration not found for DVM", "name", direct.Name)
-		return 0, liberr.Wrap(err)
-	}
+	migration := migapi.MigMigration{}
+	planResources := &migapi.PlanResources{}
 
-	plan, err := migration.GetPlan(r)
-	if err != nil {
-		return 0, liberr.Wrap(err)
-	}
-	if !plan.Status.IsReady() {
-		log.Info("Plan not ready.", "name", migration.Name)
-		return 0, liberr.Wrap(err)
-	}
+	if len(direct.OwnerReferences) > 0{
+		// Ready
+		migration, err := direct.GetMigrationForDVM(r)
+		if err != nil {
+			return 0, liberr.Wrap(err)
+		}
+		if migration == nil {
+			log.Info("Migration not found for DVM", "name", direct.Name)
+			return 0, liberr.Wrap(err)
+		}
 
-	// Resources
-	planResources, err := plan.GetRefResources(r)
-	if err != nil {
-		return 0, liberr.Wrap(err)
+		plan, err := migration.GetPlan(r)
+		if err != nil {
+			return 0, liberr.Wrap(err)
+		}
+		if !plan.Status.IsReady() {
+			log.Info("Plan not ready.", "name", migration.Name)
+			return 0, liberr.Wrap(err)
+		}
+
+		// Resources
+		planResources, err = plan.GetRefResources(r)
+		if err != nil {
+			return 0, liberr.Wrap(err)
+		}
 	}
 
 	// Started
@@ -52,7 +57,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 		PlanResources:    planResources,
 		MigrationUID:     string(migration.UID),
 	}
-	err = task.Run()
+	err := task.Run()
 	if err != nil {
 		if errors.IsConflict(err) {
 			return FastReQ, nil

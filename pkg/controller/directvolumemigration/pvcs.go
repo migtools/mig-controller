@@ -48,9 +48,8 @@ func (t *Task) createDestinationPVCs() error {
 			pvcLabels = make(map[string]string)
 		}
 
-		pvcLabels[MigMigrationLabel] = t.MigrationUID
-		pvcLabels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
-
+		pvcLabels[MigratedByMigrationLabel] = t.MigrationUID
+		pvcLabels[MigratedByPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
 		// Create pvc on destination with same metadata + spec
 		destPVC := corev1.PersistentVolumeClaim{

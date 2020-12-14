@@ -75,7 +75,7 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 
 	pvcMap := t.getPVCNamespaceMap()
 	dvmLabels := t.getDVMLabels()
-	dvmLabels["purpose"] = Rsync
+	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	selector := labels.SelectorFromSet(dvmLabels)
 
 	for ns, _ := range pvcMap {
@@ -275,7 +275,7 @@ func (t *Task) createRsyncTransferRoute() error {
 	}
 	pvcMap := t.getPVCNamespaceMap()
 	dvmLabels := t.getDVMLabels()
-	dvmLabels["purpose"] = Rsync
+	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
@@ -289,7 +289,7 @@ func (t *Task) createRsyncTransferRoute() error {
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name:       Stunnel,
+						Name:       DirectVolumeMigrationStunnel,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       int32(2222),
 						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
@@ -475,7 +475,7 @@ func (t *Task) createRsyncTransferPods() error {
 		})
 
 		dvmLabels := t.getDVMLabels()
-		dvmLabels["purpose"] = Rsync
+		dvmLabels["purpose"] = DirectVolumeMigrationRsync
 
 		transferPod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -516,7 +516,7 @@ func (t *Task) createRsyncTransferPods() error {
 						Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
 						Ports: []corev1.ContainerPort{
 							{
-								Name:          Stunnel,
+								Name:          DirectVolumeMigrationStunnel,
 								Protocol:      corev1.ProtocolTCP,
 								ContainerPort: int32(2222),
 							},
@@ -755,7 +755,7 @@ func (t *Task) createRsyncClientPods() error {
 					fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          RsyncClient,
+						Name:          DirectVolumeMigrationRsyncClient,
 						Protocol:      corev1.ProtocolTCP,
 						ContainerPort: int32(22),
 					},
@@ -773,7 +773,7 @@ func (t *Task) createRsyncClientPods() error {
 					Namespace: ns,
 					Labels: map[string]string{
 						"app":                   DirectVolumeMigrationRsyncTransfer,
-						"directvolumemigration": RsyncClient,
+						"directvolumemigration": DirectVolumeMigrationRsyncClient,
 					},
 				},
 				Spec: corev1.PodSpec{

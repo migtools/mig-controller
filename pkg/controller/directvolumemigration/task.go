@@ -64,17 +64,12 @@ const (
 	DirectVolumeMigrationStunnelCerts       = "directvolumemigration-stunnel-certs"
 	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
 	DirectVolumeMigrationStunnelTransfer    = "directvolumemigration-stunnel-transfer"
-	// Identifies associated migplan
-	// to allow migplan restored resources rollback
-	// The value is Task.PlanResources.MigPlan.UID
-	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
-	// Identifies the resource as migrated by us
-	// for easy search or application rollback.
-	// The value is the Task.UID().
-	MigMigrationLabel = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
-	Rsync             = "rsync"
-	RsyncClient       = "rsync-client"
-	Stunnel           = "stunnel"
+	DirectVolumeMigrationRsync              = "rsync"
+	DirectVolumeMigrationRsyncClient        = "rsync-client"
+	DirectVolumeMigrationStunnel            = "stunnel"
+	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"      // (migplan UID)
+	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+
 )
 
 // Flags

@@ -2,7 +2,8 @@ package v1alpha1
 
 import (
 	"context"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	liberr "github.com/konveyor/controller/pkg/error"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 
 	imagev1 "github.com/openshift/api/image/v1"
@@ -134,7 +135,7 @@ func GetStorage(client k8sclient.Client, ref *kapi.ObjectReference) (*MigStorage
 
 // Get a referenced Migration for DVM.
 // Return nil if the reference cannot be resolved.
-func GetMigrationForDVM(client k8sclient.Client, owners []v1.OwnerReference) (*MigMigration, error) {
+func GetMigrationForDVM(client k8sclient.Client, owners []metav1.OwnerReference) (*MigMigration, error) {
 	if len(owners) == 0 {
 		return nil, nil
 	}
@@ -145,22 +146,15 @@ func GetMigrationForDVM(client k8sclient.Client, owners []v1.OwnerReference) (*M
 			Name:      migrationName,
 			Namespace: OpenshiftMigrationNamespace,
 		}, &migrationObject)
-	//objectList := MigMigrationList{}
-	//err := client.List(context.TODO(), &k8sclient.ListOptions{
-	//	LabelSelector: k8sLabels.SelectorFromSet(dvmLabels),
-	//}, &objectList)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil
 		} else {
-			return nil, err
+			return nil, liberr.Wrap(err)
 		}
 	}
-
-	if &migrationObject == nil {
-		return nil, nil
-	}
+	
 	return &migrationObject, nil
 }
 
