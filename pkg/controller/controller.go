@@ -73,7 +73,7 @@ func AddToManager(m manager.Manager) error {
 		}
 		return nil
 	}
-	if settings.Settings.HasRole(settings.CamRole) {
+	if settings.Settings.HasRole(settings.MtcRole) {
 		err := load(CamControllers)
 		if err != nil {
 			return err
