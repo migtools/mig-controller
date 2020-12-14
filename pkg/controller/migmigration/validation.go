@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -250,6 +251,7 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}
 	unHealthyClusterName := ""
+	reason := ""
 
 	plan, err := migration.GetPlan(c)
 	if err != nil {
@@ -265,7 +267,6 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 	}
 
 	clusters := []*migapi.MigCluster{srcCluster, destCluster}
-
 	for _, cluster := range clusters {
 
 		if !cluster.Status.IsReady() {
@@ -290,35 +291,38 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 			return nEnsured, message, nil
 		}
 
-		registryStatusUnhealthy, podObj := isRegistryPodUnHealthy(registryPods)
-
+		registryStatusUnhealthy, podObj, state := isRegistryPodUnHealthy(registryPods)
 		if !registryStatusUnhealthy {
 			nEnsured++
 		} else {
 			unHealthyPod = podObj
 			unHealthyClusterName = cluster.ObjectMeta.Name
+			reason = state
 		}
 	}
 
 	if nEnsured != 2 {
-		message := fmt.Sprintf("Migration Registry Pod %s/%s is in unhealthy state on cluster %s",
-			unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName)
+		message := fmt.Sprintf("Migration Registry Pod %s/%s is in unhealthy state on cluster %s, the Pod is in %s state",
+			unHealthyPod.Namespace, unHealthyPod.Name, unHealthyClusterName, reason)
+		if reason == "ImagePullBackOff" {
+			return nEnsured, message, errors.New(reason)
+		}
 		return nEnsured, message, nil
 	}
 
 	return nEnsured, "", nil
 }
 
-func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod) {
+func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod, string) {
 	unHealthyPod := corev1.Pod{}
 	for _, registryPod := range registryPods.Items {
 		for _, containerStatus := range registryPod.Status.ContainerStatuses {
 			if !containerStatus.Ready {
-				return true, registryPod
+				return true, registryPod, containerStatus.State.Waiting.Reason
 			}
 		}
 	}
-	return false, unHealthyPod
+	return false, unHealthyPod, "Ready"
 }
 
 func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
