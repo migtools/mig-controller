@@ -74,12 +74,10 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
+	dvmLabels := t.getDVMLabels()
+	dvmLabels["purpose"] = Rsync
+	selector := labels.SelectorFromSet(dvmLabels)
 
-	selector := labels.SelectorFromSet(map[string]string{
-		"app":     "directvolumemigration-rsync-transfer",
-		"owner":   "directvolumemigration",
-		"purpose": "rsync",
-	})
 	for ns, _ := range pvcMap {
 		pods := corev1.PodList{}
 		err = destClient.List(
@@ -187,9 +185,9 @@ func (t *Task) createRsyncConfig() error {
 		configMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-rsync-config",
+				Name:      DirectVolumeMigrationRsyncConfig,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 		}
@@ -224,9 +222,9 @@ func (t *Task) createRsyncConfig() error {
 		srcSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-rsync-creds",
+				Name:      DirectVolumeMigrationRsyncCreds,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Data: map[string][]byte{
@@ -242,9 +240,9 @@ func (t *Task) createRsyncConfig() error {
 		destSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-rsync-creds",
+				Name:      DirectVolumeMigrationRsyncCreds,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Data: map[string][]byte{
@@ -276,30 +274,29 @@ func (t *Task) createRsyncTransferRoute() error {
 		return err
 	}
 	pvcMap := t.getPVCNamespaceMap()
+	dvmLabels := t.getDVMLabels()
+	dvmLabels["purpose"] = Rsync
+
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "directvolumemigration-rsync-transfer-svc",
+				Name:      DirectVolumeMigrationRsyncTransferSvc,
 				Namespace: ns,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name:       "stunnel",
+						Name:       Stunnel,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       int32(2222),
 						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
 					},
 				},
-				Selector: map[string]string{
-					"app":     "directvolumemigration-rsync-transfer",
-					"purpose": "rsync",
-					"owner":   "directvolumemigration",
-				},
-				Type: corev1.ServiceTypeClusterIP,
+				Selector: dvmLabels,
+				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
 		err = destClient.Create(context.TODO(), &svc)
@@ -310,16 +307,16 @@ func (t *Task) createRsyncTransferRoute() error {
 		}
 		route := routev1.Route{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "directvolumemigration-rsync-transfer-route",
+				Name:      DirectVolumeMigrationRsyncTransferRoute,
 				Namespace: ns,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Spec: routev1.RouteSpec{
 				To: routev1.RouteTargetReference{
 					Kind: "Service",
-					Name: "directvolumemigration-rsync-transfer-svc",
+					Name: DirectVolumeMigrationRsyncTransferSvc,
 				},
 				Port: &routev1.RoutePort{
 					TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
@@ -393,7 +390,7 @@ func (t *Task) createRsyncTransferPods() error {
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "directvolumemigration-stunnel-config",
+							Name: DirectVolumeMigrationStunnelConfig,
 						},
 					},
 				},
@@ -402,7 +399,7 @@ func (t *Task) createRsyncTransferPods() error {
 				Name: "stunnel-certs",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "directvolumemigration-stunnel-certs",
+						SecretName: DirectVolumeMigrationStunnelCerts,
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "tls.crt",
@@ -424,7 +421,7 @@ func (t *Task) createRsyncTransferPods() error {
 				Name: "rsync-creds",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName:  "directvolumemigration-rsync-creds",
+						SecretName:  DirectVolumeMigrationRsyncCreds,
 						DefaultMode: &mode,
 						Items: []corev1.KeyToPath{
 							{
@@ -440,7 +437,7 @@ func (t *Task) createRsyncTransferPods() error {
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "directvolumemigration-rsync-config",
+							Name: DirectVolumeMigrationRsyncConfig,
 						},
 					},
 				},
@@ -477,17 +474,14 @@ func (t *Task) createRsyncTransferPods() error {
 			SubPath:   "rsyncd.secrets",
 		})
 
-		labels := map[string]string{
-			"app":     "directvolumemigration-rsync-transfer",
-			"owner":   "directvolumemigration",
-			"purpose": "rsync",
-		}
+		dvmLabels := t.getDVMLabels()
+		dvmLabels["purpose"] = Rsync
 
 		transferPod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "directvolumemigration-rsync-transfer",
+				Name:      DirectVolumeMigrationRsyncTransfer,
 				Namespace: ns,
-				Labels:    labels,
+				Labels:    dvmLabels,
 			},
 			Spec: corev1.PodSpec{
 				Volumes: volumes,
@@ -522,7 +516,7 @@ func (t *Task) createRsyncTransferPods() error {
 						Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
 						Ports: []corev1.ContainerPort{
 							{
-								Name:          "stunnel",
+								Name:          Stunnel,
 								Protocol:      corev1.ProtocolTCP,
 								ContainerPort: int32(2222),
 							},
@@ -580,7 +574,7 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	}
 	route := routev1.Route{}
 
-	key := types.NamespacedName{Name: "directvolumemigration-rsync-transfer-route", Namespace: namespace}
+	key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
 	err = destClient.Get(context.TODO(), key, &route)
 	if err != nil {
 		return "", err
@@ -599,9 +593,9 @@ func (t *Task) createRsyncPassword() (string, error) {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
-			Name:      "directvolumemigration-rsync-pass",
+			Name:      DirectVolumeMigrationRsyncPass,
 			Labels: map[string]string{
-				"app": "directvolumemigration-rsync-transfer",
+				"app": DirectVolumeMigrationRsyncTransfer,
 			},
 		},
 		StringData: map[string]string{
@@ -620,10 +614,10 @@ func (t *Task) createRsyncPassword() (string, error) {
 
 func (t *Task) getRsyncPassword() (string, error) {
 	rsyncSecret := corev1.Secret{}
-	key := types.NamespacedName{Name: "directvolumemigration-rsync-pass", Namespace: migapi.OpenshiftMigrationNamespace}
+	key := types.NamespacedName{Name: DirectVolumeMigrationRsyncPass, Namespace: migapi.OpenshiftMigrationNamespace}
 	err := t.Client.Get(context.TODO(), key, &rsyncSecret)
 	if k8serror.IsNotFound(err) {
-		t.Log.Info("Secret is not found", "name", "directvolumemigration-rsync-pass", "namespace", migapi.OpenshiftMigrationNamespace)
+		t.Log.Info("Secret is not found", "name", DirectVolumeMigrationRsyncPass, "namespace", migapi.OpenshiftMigrationNamespace)
 		return "", nil
 	}
 	if err != nil {
@@ -639,12 +633,12 @@ func (t *Task) deleteRsyncPassword() error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
-			Name:      "directvolumemigration-rsync-pass",
+			Name:      DirectVolumeMigrationRsyncPass,
 		},
 	}
 	err := t.Client.Delete(context.TODO(), secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if k8serror.IsNotFound(err) {
-		t.Log.Info("Secret is not found", "name", "directvolumemigration-rsync-pass", "namespace", migapi.OpenshiftMigrationNamespace)
+		t.Log.Info("Secret is not found", "name", DirectVolumeMigrationRsyncPass, "namespace", migapi.OpenshiftMigrationNamespace)
 	} else if err != nil {
 		return err
 	}
@@ -715,7 +709,7 @@ func (t *Task) createRsyncClientPods() error {
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
-		key := types.NamespacedName{Name: "directvolumemigration-rsync-transfer-svc", Namespace: ns}
+		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferSvc, Namespace: ns}
 		srcClient.Get(context.TODO(), key, &svc)
 		ip := svc.Spec.ClusterIP
 
@@ -761,7 +755,7 @@ func (t *Task) createRsyncClientPods() error {
 					fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
 				Ports: []corev1.ContainerPort{
 					{
-						Name:          "rsync-client",
+						Name:          RsyncClient,
 						Protocol:      corev1.ProtocolTCP,
 						ContainerPort: int32(22),
 					},
@@ -778,8 +772,8 @@ func (t *Task) createRsyncClientPods() error {
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
 					Namespace: ns,
 					Labels: map[string]string{
-						"app":                   "directvolumemigration-rsync-transfer",
-						"directvolumemigration": "rsync-client",
+						"app":                   DirectVolumeMigrationRsyncTransfer,
+						"directvolumemigration": RsyncClient,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -952,7 +946,7 @@ func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
 
 func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 	selector := labels.SelectorFromSet(map[string]string{
-		"app": "directvolumemigration-rsync-transfer",
+		"app": DirectVolumeMigrationRsyncTransfer,
 	})
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, _ := range pvcMap {
@@ -1032,7 +1026,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 	// Find all resources with the app label
 	// TODO: This label set should include a DVM run-specific UID.
 	selector := labels.SelectorFromSet(map[string]string{
-		"app": "directvolumemigration-rsync-transfer",
+		"app": DirectVolumeMigrationRsyncTransfer,
 	})
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, _ := range pvcMap {

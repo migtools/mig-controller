@@ -2,6 +2,7 @@ package directvolumemigration
 
 import (
 	"fmt"
+	liberr "github.com/konveyor/controller/pkg/error"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -10,6 +11,32 @@ import (
 )
 
 func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration) (time.Duration, error) {
+
+	// Ready
+	migration, err := direct.GetMigrationForDVM(r)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+	if migration == nil {
+		log.Info("Migration not found for DVM", "name", direct.Name)
+		return 0, liberr.Wrap(err)
+	}
+
+	plan, err := migration.GetPlan(r)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+	if !plan.Status.IsReady() {
+		log.Info("Plan not ready.", "name", migration.Name)
+		return 0, liberr.Wrap(err)
+	}
+
+	// Resources
+	planResources, err := plan.GetRefResources(r)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+
 	// Started
 	if direct.Status.StartTimestamp == nil {
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
@@ -22,8 +49,10 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 		Owner:            direct,
 		Phase:            direct.Status.Phase,
 		PhaseDescription: direct.Status.PhaseDescription,
+		PlanResources:    planResources,
+		MigrationUID:     string(migration.UID),
 	}
-	err := task.Run()
+	err = task.Run()
 	if err != nil {
 		if errors.IsConflict(err) {
 			return FastReQ, nil

@@ -42,12 +42,22 @@ func (t *Task) createDestinationPVCs() error {
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
 
+		//Add src labels and rollback labels
+		pvcLabels := srcPVC.Labels
+		if pvcLabels == nil {
+			pvcLabels = make(map[string]string)
+		}
+
+		pvcLabels[MigMigrationLabel] = t.MigrationUID
+		pvcLabels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+
+
 		// Create pvc on destination with same metadata + spec
 		destPVC := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvc.Name,
 				Namespace: pvc.Namespace,
-				Labels:    srcPVC.Labels,
+				Labels:    pvcLabels,
 			},
 			Spec: newSpec,
 		}

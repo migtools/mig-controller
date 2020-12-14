@@ -162,9 +162,9 @@ func (t *Task) createStunnelConfig() error {
 		clientConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-stunnel-config",
+				Name:      DirectVolumeMigrationStunnelConfig,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 		}
@@ -176,9 +176,9 @@ func (t *Task) createStunnelConfig() error {
 		destConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-stunnel-config",
+				Name:      DirectVolumeMigrationStunnelConfig,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 		}
@@ -293,9 +293,9 @@ func (t *Task) setupCerts() error {
 		srcSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
-				Name:      "directvolumemigration-stunnel-certs",
+				Name:      DirectVolumeMigrationStunnelCerts,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Data: map[string][]byte{
@@ -339,13 +339,17 @@ func (t *Task) createStunnelClientPods() error {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
+
+	dvmLabels := t.getDVMLabels()
+	dvmLabels["purpose"] = Stunnel
+
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "directvolumemigration-rsync-transfer-svc",
+				Name:      DirectVolumeMigrationRsyncTransferSvc,
 				Namespace: ns,
 				Labels: map[string]string{
-					"app": "directvolumemigration-rsync-transfer",
+					"app": DirectVolumeMigrationRsyncTransfer,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -357,12 +361,8 @@ func (t *Task) createStunnelClientPods() error {
 						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
 					},
 				},
-				Selector: map[string]string{
-					"app":     "directvolumemigration-rsync-transfer",
-					"purpose": "stunnel",
-					"owner":   "directvolumemigration",
-				},
-				Type: corev1.ServiceTypeClusterIP,
+				Selector: dvmLabels,
+				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
 		volumes := []corev1.Volume{
@@ -371,7 +371,7 @@ func (t *Task) createStunnelClientPods() error {
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "directvolumemigration-stunnel-config",
+							Name: DirectVolumeMigrationStunnelConfig,
 						},
 					},
 				},
@@ -380,7 +380,7 @@ func (t *Task) createStunnelClientPods() error {
 				Name: "stunnel-certs",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "directvolumemigration-stunnel-certs",
+						SecretName: DirectVolumeMigrationStunnelCerts,
 						Items: []corev1.KeyToPath{
 							{
 								Key:  "tls.crt",
@@ -432,16 +432,14 @@ func (t *Task) createStunnelClientPods() error {
 			},
 		})
 
-		labels := map[string]string{
-			"app":     "directvolumemigration-rsync-transfer",
-			"owner":   "directvolumemigration",
-			"purpose": "stunnel",
-		}
+		dvmLabels := t.getDVMLabels()
+		dvmLabels["purpose"] = Stunnel
+
 		clientPod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "directvolumemigration-stunnel-transfer",
+				Name:      DirectVolumeMigrationStunnelTransfer,
 				Namespace: ns,
-				Labels:    labels,
+				Labels:    dvmLabels,
 			},
 			Spec: corev1.PodSpec{
 				Volumes:    volumes,
@@ -476,11 +474,10 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 
 	pvcMap := t.getPVCNamespaceMap()
 
-	selector := labels.SelectorFromSet(map[string]string{
-		"app":     "directvolumemigration-rsync-transfer",
-		"owner":   "directvolumemigration",
-		"purpose": "stunnel",
-	})
+	dvmLabels := t.getDVMLabels()
+	dvmLabels["purpose"] = Stunnel
+	selector := labels.SelectorFromSet(dvmLabels)
+
 	for ns, _ := range pvcMap {
 		pods := corev1.PodList{}
 		err = srcClient.List(

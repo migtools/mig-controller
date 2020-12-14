@@ -52,6 +52,31 @@ const (
 	MigrationFailed                      = "MigrationFailed"
 )
 
+// labels
+const (
+	DirectVolumeMigration                   = "directvolumemigration"
+	DirectVolumeMigrationRsyncTransfer      = "directvolumemigration-rsync-transfer"
+	DirectVolumeMigrationRsyncConfig        = "directvolumemigration-rsync-config"
+	DirectVolumeMigrationRsyncCreds         = "directvolumemigration-rsync-creds"
+	DirectVolumeMigrationRsyncTransferSvc   = "directvolumemigration-rsync-transfer-svc"
+	DirectVolumeMigrationRsyncTransferRoute = "directvolumemigration-rsync-transfer-route"
+	DirectVolumeMigrationStunnelConfig      = "directvolumemigration-stunnel-config"
+	DirectVolumeMigrationStunnelCerts       = "directvolumemigration-stunnel-certs"
+	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
+	DirectVolumeMigrationStunnelTransfer    = "directvolumemigration-stunnel-transfer"
+	// Identifies associated migplan
+	// to allow migplan restored resources rollback
+	// The value is Task.PlanResources.MigPlan.UID
+	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
+	// Identifies the resource as migrated by us
+	// for easy search or application rollback.
+	// The value is the Task.UID().
+	MigMigrationLabel = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+	Rsync             = "rsync"
+	RsyncClient       = "rsync-client"
+	Stunnel           = "stunnel"
+)
+
 // Flags
 // TODO: are there any phases to skip?
 /*const (
@@ -141,6 +166,8 @@ type Task struct {
 	RsyncRoutes      map[string]string
 	Phase            string
 	PhaseDescription string
+	PlanResources    *migapi.PlanResources
+	MigrationUID     string
 	Requeue          time.Duration
 	Itinerary        Itinerary
 	Errors           []string
@@ -453,4 +480,14 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+// Get DVM labels for the migration
+func (t *Task) getDVMLabels() map[string]string {
+	dvmLabels := make(map[string]string)
+
+	dvmLabels["app"] = DirectVolumeMigrationRsyncTransfer
+	dvmLabels["owner"] = DirectVolumeMigration
+
+	return dvmLabels
 }
