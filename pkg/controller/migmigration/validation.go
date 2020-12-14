@@ -318,7 +318,10 @@ func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod, stri
 	for _, registryPod := range registryPods.Items {
 		for _, containerStatus := range registryPod.Status.ContainerStatuses {
 			if !containerStatus.Ready {
-				return true, registryPod, containerStatus.State.Waiting.Reason
+				if containerStatus.State.Waiting != nil {
+					return true, registryPod, containerStatus.State.Waiting.Reason
+				}
+				return true, registryPod, "Running"
 			}
 		}
 	}
