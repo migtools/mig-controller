@@ -53,9 +53,10 @@ const (
 
 // migration-cluster-config configmap
 const (
-	ClusterConfigMapName = "migration-cluster-config"
-	RegistryImageKey     = "REGISTRY_IMAGE"
-	StagePodImageKey     = "STAGE_IMAGE"
+	ClusterConfigMapName  = "migration-cluster-config"
+	RegistryImageKey      = "REGISTRY_IMAGE"
+	StagePodImageKey      = "STAGE_IMAGE"
+	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -153,6 +154,21 @@ func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", RegistryImageKey))
 	}
 	return registryImage, nil
+}
+
+// GetRsyncTransferImage gets a MigCluster specific rsync transfer image from ConfigMap
+func (m *MigCluster) GetRsyncTransferImage(c k8sclient.Client) (string, error) {
+	clusterConfig := &corev1.ConfigMap{}
+	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
+	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	rsyncImage, ok := clusterConfig.Data[RsyncTransferImageKey]
+	if !ok {
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", RsyncTransferImageKey))
+	}
+	return rsyncImage, nil
 }
 
 // Test the connection settings by building a client.

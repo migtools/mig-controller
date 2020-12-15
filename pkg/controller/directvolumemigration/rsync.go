@@ -353,6 +353,16 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+
+	// Get transfer image
+	cluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return err
+	}
+	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
+	if err != nil {
+		return err
+	}
 	// one transfer pod should be created per namespace and should mount all
 	// PVCs that are being written to in that namespace
 
@@ -484,7 +494,7 @@ func (t *Task) createRsyncTransferPods() error {
 				Containers: []corev1.Container{
 					{
 						Name:  "rsyncd",
-						Image: "quay.io/konveyor/rsync-transfer:latest",
+						Image: transferImage,
 						Env: []corev1.EnvVar{
 							{
 								Name:  "SSH_PUBLIC_KEY",
@@ -508,7 +518,7 @@ func (t *Task) createRsyncTransferPods() error {
 					},
 					{
 						Name:    "stunnel",
-						Image:   "quay.io/konveyor/rsync-transfer:latest",
+						Image:   transferImage,
 						Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
 						Ports: []corev1.ContainerPort{
 							{
@@ -682,6 +692,16 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
+	// Get transfer image for cluster
+	cluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return err
+	}
+	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
+	if err != nil {
+		return err
+	}
+
 	pvcMap := t.getPVCNamespaceMap()
 	password, err := t.getRsyncPassword()
 	if err != nil {
@@ -721,7 +741,7 @@ func (t *Task) createRsyncClientPods() error {
 			})
 			containers = append(containers, corev1.Container{
 				Name:  "rsync-client",
-				Image: "quay.io/konveyor/rsync-transfer:latest",
+				Image: transferImage,
 				Env: []corev1.EnvVar{
 					{
 						Name:  "RSYNC_PASSWORD",
