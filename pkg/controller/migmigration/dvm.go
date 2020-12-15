@@ -118,7 +118,7 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 // Set warning conditions on migmigration if there were any partial failures
 func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMigration) {
 	message := fmt.Sprintf(
-		"DirectImageMigration (dvm): %s/%s failed. See in dvm status.Errors", dvm.GetNamespace(), dvm.GetName())
+		"DirectVolumeMigration (dvm): %s/%s failed. See in dvm status.Errors", dvm.GetNamespace(), dvm.GetName())
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     DirectVolumeMigrationFailed,
 		Status:   True,
