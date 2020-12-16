@@ -52,6 +52,26 @@ const (
 	MigrationFailed                      = "MigrationFailed"
 )
 
+// labels
+const (
+	DirectVolumeMigration                   = "directvolumemigration"
+	DirectVolumeMigrationRsyncTransfer      = "directvolumemigration-rsync-transfer"
+	DirectVolumeMigrationRsyncConfig        = "directvolumemigration-rsync-config"
+	DirectVolumeMigrationRsyncCreds         = "directvolumemigration-rsync-creds"
+	DirectVolumeMigrationRsyncTransferSvc   = "directvolumemigration-rsync-transfer-svc"
+	DirectVolumeMigrationRsyncTransferRoute = "directvolumemigration-rsync-transfer-route"
+	DirectVolumeMigrationStunnelConfig      = "directvolumemigration-stunnel-config"
+	DirectVolumeMigrationStunnelCerts       = "directvolumemigration-stunnel-certs"
+	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
+	DirectVolumeMigrationStunnelTransfer    = "directvolumemigration-stunnel-transfer"
+	DirectVolumeMigrationRsync              = "rsync"
+	DirectVolumeMigrationRsyncClient        = "rsync-client"
+	DirectVolumeMigrationStunnel            = "stunnel"
+	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"      // (migplan UID)
+	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+
+)
+
 // Flags
 // TODO: are there any phases to skip?
 /*const (
@@ -141,6 +161,8 @@ type Task struct {
 	RsyncRoutes      map[string]string
 	Phase            string
 	PhaseDescription string
+	PlanResources    *migapi.PlanResources
+	MigrationUID     string
 	Requeue          time.Duration
 	Itinerary        Itinerary
 	Errors           []string
@@ -453,4 +475,14 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+// Get DVM labels for the migration
+func (t *Task) buildDVMLabels() map[string]string {
+	dvmLabels := make(map[string]string)
+
+	dvmLabels["app"] = DirectVolumeMigrationRsyncTransfer
+	dvmLabels["owner"] = DirectVolumeMigration
+
+	return dvmLabels
 }

@@ -91,6 +91,10 @@ func (r *DirectVolumeMigration) GetDestinationCluster(client k8sclient.Client) (
 	return GetCluster(client, r.Spec.DestMigClusterRef)
 }
 
+func (r *DirectVolumeMigration) GetMigrationForDVM(client k8sclient.Client) (*MigMigration, error) {
+	return GetMigrationForDVM(client, r.OwnerReferences)
+}
+
 // Add (de-duplicated) errors.
 func (r *DirectVolumeMigration) AddErrors(errors []string) {
 	m := map[string]bool{}
