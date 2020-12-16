@@ -651,6 +651,20 @@ func (r *MigPlan) IsResourceExcluded(resource string) bool {
 	return false
 }
 
+// IsImageMigrationDisabled returns whether this MigPlan has disabled Image Migration
+// Currently this is only implemented site-wide via the ExcludedResources list. This
+// This will change to an explicit controller boolean env var at some point.
+func (r *MigPlan) IsImageMigrationDisabled() bool {
+	return r.IsResourceExcluded(settings.ISResource)
+}
+
+// IsVolumeMigrationDisabled returns whether this MigPlan has disabled Volume Migration
+// Currently this is only implemented site-wide via the ExcludedResources list. This
+// This will change to an explicit controller boolean env var at some point.
+func (r *MigPlan) IsVolumeMigrationDisabled() bool {
+	return r.IsResourceExcluded(settings.PVResource)
+}
+
 //
 //
 // PV list
