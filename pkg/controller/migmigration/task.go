@@ -104,6 +104,8 @@ const (
 	DirectVolume   = 0x080 // Only when using direct volume migration
 	IndirectVolume = 0x100 // Only when using indirect volume migration
 	HasStageBackup = 0x200 // True when stage backup is needed
+	EnableImage    = 0x400 // True when disable_image_migration is unset
+	EnableVolume   = 0x800 // True when disable_volume is unset
 )
 
 // Migration steps
@@ -141,9 +143,9 @@ var StageItinerary = Itinerary{
 		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
-		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
-		{Name: CreateDirectImageMigration, Step: StepStageBackup, all: DirectImage},
-		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume},
+		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
+		{Name: CreateDirectImageMigration, Step: StepStageBackup, all: DirectImage | EnableImage},
+		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume | EnableVolume},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -151,7 +153,7 @@ var StageItinerary = Itinerary{
 		{Name: AnnotateResources, Step: StepStageBackup, all: HasStageBackup},
 		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: WaitForResticReady, Step: StepStageBackup, all: HasPVs},
-		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage},
+		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage | EnableImage | HasISs},
 		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
@@ -160,8 +162,8 @@ var StageItinerary = Itinerary{
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageRestore, Step: StepStageRestore, all: HasStageBackup},
 		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
-		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage},
-		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume},
+		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage | EnableImage},
+		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepCleanup, all: HasStagePods},
@@ -183,13 +185,13 @@ var FinalItinerary = Itinerary{
 		{Name: RestartVelero, Step: StepPrepare},
 		{Name: CleanStaleStagePods, Step: StepPrepare},
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
-		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage},
+		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
 		{Name: WaitForVeleroReady, Step: StepPrepare},
 		{Name: WaitForResticReady, Step: StepPrepare, any: HasPVs},
-		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage},
+		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
 		{Name: PreBackupHooks, Step: StepBackup},
-		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage},
+		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage | EnableImage},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -199,7 +201,7 @@ var FinalItinerary = Itinerary{
 		{Name: AnnotateResources, Step: StepStageBackup, all: HasStageBackup},
 		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
 		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
-		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume},
+		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume | EnableVolume},
 		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
 		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
@@ -207,8 +209,8 @@ var FinalItinerary = Itinerary{
 		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: EnsureStagePodsDeleted, Step: StepStageRestore, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepStageRestore, all: HasStagePods},
-		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage},
-		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume},
+		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage | EnableImage},
+		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
 		{Name: EnsureAnnotationsDeleted, Step: StepRestore, all: HasStageBackup},
 		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
 		{Name: PostBackupHooks, Step: StepRestore},
@@ -1146,7 +1148,7 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if phase.all&HasISs != 0 && hasImageStream {
+	if phase.all&HasISs != 0 && !hasImageStream {
 		return false, nil
 	}
 	if phase.all&DirectImage != 0 && !t.directImageMigration() {
@@ -1155,10 +1157,16 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&IndirectImage != 0 && !t.indirectImageMigration() {
 		return false, nil
 	}
+	if phase.all&EnableImage != 0 && t.PlanResources.MigPlan.IsImageMigrationDisabled() {
+		return false, nil
+	}
 	if phase.all&DirectVolume != 0 && !t.directVolumeMigration() {
 		return false, nil
 	}
 	if phase.all&IndirectVolume != 0 && !t.indirectVolumeMigration() {
+		return false, nil
+	}
+	if phase.all&EnableVolume != 0 && t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
 		return false, nil
 	}
 	if phase.all&HasStageBackup != 0 && !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
@@ -1196,11 +1204,17 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&IndirectImage != 0 && t.indirectImageMigration() {
 		return true, nil
 	}
+	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() {
+		return false, nil
+	}
 	if phase.any&DirectVolume != 0 && t.directVolumeMigration() {
 		return true, nil
 	}
 	if phase.any&IndirectVolume != 0 && t.indirectVolumeMigration() {
 		return true, nil
+	}
+	if phase.any&EnableVolume != 0 && !t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
+		return false, nil
 	}
 	if phase.any&HasStageBackup != 0 && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
 		return true, nil

@@ -14,14 +14,16 @@ const (
 	PvLimit           = "PV_LIMIT"
 	ExcludedResources = "EXCLUDED_RESOURCES"
 	ISResource        = "imagestreams"
+	PVResource        = "persistentvolumes"
+	PVCResource       = "persistentvolumeclaims"
 )
 
 // Included resource defaults
 var IncludedInitialResources = mapset.NewSetFromSlice([]interface{}{})
 var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
 	"serviceaccount",
-	"persistentvolumes",
-	"persistentvolumeclaims",
+	PVResource,
+	PVCResource,
 	"namespaces",
 	ISResource,
 	"secrets",
@@ -31,9 +33,9 @@ var IncludedStageResources = mapset.NewSetFromSlice([]interface{}{
 
 // Excluded resource defaults
 var ExcludedInitialResources = mapset.NewSetFromSlice([]interface{}{
-	"imagestreams",
-	"persistentvolumes",
-	"persistentvolumeclaims",
+	ISResource,
+	PVResource,
+	PVCResource,
 })
 var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 
