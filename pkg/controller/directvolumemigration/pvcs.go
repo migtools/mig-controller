@@ -40,7 +40,7 @@ func (t *Task) createDestinationPVCs() error {
 		}
 
 		newSpec := srcPVC.Spec
-		srcPVC.Labels["owner"] = "directvolumemigration"
+		srcPVC.Labels = t.buildDVMLabels()
 		newSpec.StorageClassName = &pvc.TargetStorageClass
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
@@ -84,9 +84,7 @@ func (t *Task) getDestinationPVCs() (bool, error) {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
-	selector := labels.SelectorFromSet(map[string]string{
-		"owner": "directvolumemigration",
-	})
+	selector := labels.SelectorFromSet(t.buildDVMLabels())
 	for ns, _ := range pvcMap {
 		pvcList := corev1.PersistentVolumeClaimList{}
 		err = destClient.List(
