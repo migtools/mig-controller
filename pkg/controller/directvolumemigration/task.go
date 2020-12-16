@@ -18,25 +18,17 @@ var NoReQ = time.Duration(0)
 
 // Phases
 const (
-	Created                      = ""
-	Started                      = "Started"
-	Prepare                      = "Prepare"
-	CleanStaleRsyncResources     = "CleanStaleRsyncResources"
-	CreateDestinationNamespaces  = "CreateDestinationNamespaces"
-	DestinationNamespacesCreated = "DestinationNamespacesCreated"
-	CreateDestinationPVCs        = "CreateDestinationPVCs"
-	DestinationPVCsCreated       = "DestinationPVCsCreated"
-	CreateStunnelConfig          = "CreateStunnelConfig"
-	CreateRsyncConfig            = "CreateRsyncConfig"
-	CreateRsyncRoute             = "CreateRsyncRoute"
-	// Do not initiate Rsync process unless we know stunnel is up and running
-	// and in a healthy state
-
-	// Distinguish rsync transfer pod step from rsync client pod
-	// i.e. Create transfer pod, ensure it is healthy, then start client pod
-	CreateStunnelPodOnSource        = "CreateStunnelPodOnSource"
-	EnsureStunnelPodOnSourceHealthy = "EnsureStunnelPodOnSourceHealthy"
-	//Next two phases are on destination
+	Created                              = ""
+	Started                              = "Started"
+	Prepare                              = "Prepare"
+	CleanStaleRsyncResources             = "CleanStaleRsyncResources"
+	CreateDestinationNamespaces          = "CreateDestinationNamespaces"
+	DestinationNamespacesCreated         = "DestinationNamespacesCreated"
+	CreateDestinationPVCs                = "CreateDestinationPVCs"
+	DestinationPVCsCreated               = "DestinationPVCsCreated"
+	CreateStunnelConfig                  = "CreateStunnelConfig"
+	CreateRsyncConfig                    = "CreateRsyncConfig"
+	CreateRsyncRoute                     = "CreateRsyncRoute"
 	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
 	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
 	CreateStunnelClientPods              = "CreateStunnelClientPods"
