@@ -24,7 +24,7 @@ const (
 // Returns the right backup/restore annotations including registry-specific ones
 func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error) {
 	annotations := t.Annotations
-	if t.PlanResources.MigPlan.Spec.IndirectImageMigration {
+	if t.PlanResources.MigPlan.Spec.IndirectImageMigration && !t.PlanResources.MigPlan.IsImageMigrationDisabled() {
 		registryService, err := t.PlanResources.MigPlan.GetRegistryService(client)
 		if err != nil {
 			return nil, err
