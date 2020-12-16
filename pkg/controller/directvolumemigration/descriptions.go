@@ -13,7 +13,7 @@ var phaseDescriptions = map[string]string{
 	CreateRsyncRoute:                     "Creating one route for each namespace for Rsync on the target cluster",
 	CreateRsyncConfig:                    "Creating a config map and secrets on both the source and target clusters for Rsync configuration",
 	CreateStunnelConfig:                  "Creating a config map and secrets for Stunnel to connect to Rsync on the source and target clusters",
-	CreatePVProgressCRs:                  "Creating a Direct Volume Migration Progress CR to get progress percent and transfer rate",
+	CreatePVProgressCRs:                  "Creating a Direct Volume Migration Progress CR to get progress percentage and transfer rate",
 	CreateRsyncTransferPods:              "Creating Rsync daemon pods on the target cluster",
 	WaitForRsyncTransferPodsRunning:      "Waiting for the Rsync daemon pod to run",
 	CreateStunnelClientPods:              "Creating Stunnel client pods on the source cluster",
