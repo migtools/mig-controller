@@ -390,7 +390,11 @@ func (t *Task) Run() error {
 		// After this, registry health is continuously checked in validation.go
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
-			return liberr.Wrap(err)
+			if err.Error() == "ImagePullBackOff" {
+				t.fail(WaitForRegistriesReady, []string{message})
+			} else {
+				return liberr.Wrap(err)
+			}
 		}
 		if nEnsured == 2 && message == "" {
 			setMigRegistryHealthyCondition(t.Owner)
