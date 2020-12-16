@@ -313,6 +313,7 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 	return nEnsured, "", nil
 }
 
+// Checking the health of registry pod, return health status, pod and container status of the pod.
 func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod, string) {
 	unHealthyPod := corev1.Pod{}
 	for _, registryPod := range registryPods.Items {
@@ -320,8 +321,11 @@ func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod, stri
 			if !containerStatus.Ready {
 				if containerStatus.State.Waiting != nil {
 					return true, registryPod, containerStatus.State.Waiting.Reason
+				} else if containerStatus.State.Terminated != nil {
+					return true, registryPod, "Terminating"
+				} else {
+					return true, registryPod, "Running"
 				}
-				return true, registryPod, "Running"
 			}
 		}
 	}

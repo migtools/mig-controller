@@ -391,7 +391,7 @@ func (t *Task) Run() error {
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
 			if err.Error() == "ImagePullBackOff" {
-				t.fail("WaitForRegistriesReady", []string{message})
+				t.fail(WaitForRegistriesReady, []string{message})
 			} else {
 				return liberr.Wrap(err)
 			}
