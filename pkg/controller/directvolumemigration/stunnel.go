@@ -327,6 +327,17 @@ func (t *Task) createStunnelClientPods() error {
 	if err != nil {
 		return err
 	}
+
+	// Get transfer image for source cluster
+	cluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return err
+	}
+	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
+	if err != nil {
+		return err
+	}
+
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
@@ -394,7 +405,7 @@ func (t *Task) createStunnelClientPods() error {
 
 		containers = append(containers, corev1.Container{
 			Name:    "stunnel",
-			Image:   "quay.io/konveyor/rsync-transfer:latest",
+			Image:   transferImage,
 			Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
 			Ports: []corev1.ContainerPort{
 				{
