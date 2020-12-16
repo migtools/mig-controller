@@ -511,7 +511,7 @@ func (t *Task) createRsyncTransferPods() error {
 						},
 					},
 					{
-						Name:    "stunnel",
+						Name:    DirectVolumeMigrationStunnel,
 						Image:   transferImage,
 						Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
 						Ports: []corev1.ContainerPort{
@@ -734,7 +734,7 @@ func (t *Task) createRsyncClientPods() error {
 				},
 			})
 			containers = append(containers, corev1.Container{
-				Name:  "rsync-client",
+				Name:  DirectVolumeMigrationRsyncClient,
 				Image: transferImage,
 				Env: []corev1.EnvVar{
 					{
