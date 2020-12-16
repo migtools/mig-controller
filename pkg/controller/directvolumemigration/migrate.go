@@ -2,6 +2,7 @@ package directvolumemigration
 
 import (
 	"fmt"
+	liberr "github.com/konveyor/controller/pkg/error"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -10,6 +11,12 @@ import (
 )
 
 func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration) (time.Duration, error) {
+
+	migration, planResources, err := r.getDVMMigrationAndPlanResources(direct)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+
 	// Started
 	if direct.Status.StartTimestamp == nil {
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
@@ -22,8 +29,10 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 		Owner:            direct,
 		Phase:            direct.Status.Phase,
 		PhaseDescription: direct.Status.PhaseDescription,
+		PlanResources:    planResources,
+		MigrationUID:     string(migration.UID),
 	}
-	err := task.Run()
+	err = task.Run()
 	if err != nil {
 		if errors.IsConflict(err) {
 			return FastReQ, nil
@@ -67,4 +76,42 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	})
 
 	return task.Requeue, nil
+}
+
+// fetches DVM Migration object and Migplan resources if DVM has an owner reference
+func (r *ReconcileDirectVolumeMigration) getDVMMigrationAndPlanResources(direct *migapi.DirectVolumeMigration) (*migapi.MigMigration, *migapi.PlanResources, error) {
+
+	if len(direct.OwnerReferences) > 0 {
+
+		migration := &migapi.MigMigration{}
+		planResources := &migapi.PlanResources{}
+
+		// Ready
+		migration, err := direct.GetMigrationForDVM(r)
+		if err != nil {
+			return migration, planResources, liberr.Wrap(err)
+		}
+
+		if migration == nil {
+			log.Info("Migration not found for DVM", "name", direct.Name)
+			return migration, planResources, liberr.Wrap(err)
+		}
+
+		plan, err := migration.GetPlan(r)
+		if err != nil {
+			return migration, planResources, liberr.Wrap(err)
+		}
+		if !plan.Status.IsReady() {
+			log.Info("Plan not ready.", "name", migration.Name)
+			return migration, planResources, liberr.Wrap(err)
+		}
+
+		// Resources
+		planResources, err = plan.GetRefResources(r)
+		if err != nil {
+			return migration, planResources, liberr.Wrap(err)
+		}
+		return migration, planResources, nil
+	}
+	return &migapi.MigMigration{}, &migapi.PlanResources{}, nil
 }
