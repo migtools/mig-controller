@@ -74,7 +74,7 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
-	dvmLabels := t.getDVMLabels()
+	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	selector := labels.SelectorFromSet(dvmLabels)
 
@@ -274,7 +274,7 @@ func (t *Task) createRsyncTransferRoute() error {
 		return err
 	}
 	pvcMap := t.getPVCNamespaceMap()
-	dvmLabels := t.getDVMLabels()
+	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 
 	for ns, _ := range pvcMap {
@@ -474,7 +474,7 @@ func (t *Task) createRsyncTransferPods() error {
 			SubPath:   "rsyncd.secrets",
 		})
 
-		dvmLabels := t.getDVMLabels()
+		dvmLabels := t.buildDVMLabels()
 		dvmLabels["purpose"] = DirectVolumeMigrationRsync
 
 		transferPod := corev1.Pod{

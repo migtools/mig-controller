@@ -340,7 +340,7 @@ func (t *Task) createStunnelClientPods() error {
 
 	pvcMap := t.getPVCNamespaceMap()
 
-	dvmLabels := t.getDVMLabels()
+	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationStunnel
 
 	for ns, _ := range pvcMap {
@@ -432,7 +432,7 @@ func (t *Task) createStunnelClientPods() error {
 			},
 		})
 
-		dvmLabels := t.getDVMLabels()
+		dvmLabels := t.buildDVMLabels()
 		dvmLabels["purpose"] = DirectVolumeMigrationStunnel
 
 		clientPod := corev1.Pod{
@@ -474,7 +474,7 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 
 	pvcMap := t.getPVCNamespaceMap()
 
-	dvmLabels := t.getDVMLabels()
+	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationStunnel
 	selector := labels.SelectorFromSet(dvmLabels)
 
