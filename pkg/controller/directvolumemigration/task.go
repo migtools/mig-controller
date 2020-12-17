@@ -241,7 +241,7 @@ func (t *Task) Run() error {
 		}
 	case DestinationPVCsCreated:
 		// Get the PVCs on the destination and confirm they are bound
-		next, err := t.getDestinationPVCs()
+		next, err := t.areDestinationPVCsBound()
 		if err != nil {
 			return liberr.Wrap(err)
 		}

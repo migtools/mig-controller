@@ -2,6 +2,8 @@ package directvolumemigration
 
 import (
 	"context"
+	"fmt"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +77,7 @@ func (t *Task) createDestinationPVCs() error {
 	return nil
 }
 
-func (t *Task) getDestinationPVCs() (bool, error) {
+func (t *Task) areDestinationPVCsBound() (bool, error) {
 	// Ensure PVCs are bound and not in pending state
 	// Get client for destination
 	destClient, err := t.getDestinationClient()
@@ -98,9 +100,15 @@ func (t *Task) getDestinationPVCs() (bool, error) {
 			return false, err
 		}
 		for _, pvc := range pvcList.Items {
-			if pvc.Status.Phase == corev1.ClaimLost {
-				t.Log.Info("The PVC in lost state", pvc.Name, pvc.Status.Phase)
-			} else if pvc.Status.Phase != corev1.ClaimBound {
+			if pvc.Status.Phase != corev1.ClaimBound {
+				t.Owner.Status.SetCondition(migapi.Condition{
+					Type:     Running,
+					Status:   True,
+					Reason:   t.Phase,
+					Category: Advisory,
+					Message:  fmt.Sprintf("PVC %s of %s namespace is in %s state", pvc.Name, pvc.Namespace, pvc.Status.Phase),
+					Durable:  true,
+				})
 				return false, nil
 			}
 		}
