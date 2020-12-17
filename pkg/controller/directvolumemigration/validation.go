@@ -24,6 +24,7 @@ const (
 	StunnelClientPodsPending     = "StunnelClientPodsPending"
 	RsyncTransferPodsPending     = "RsyncTransferPodsPending"
 	Running                      = "Running"
+	PVCUnBound					 = "PVCNotBoundOnDestinationCluster"
 	Failed                       = "Failed"
 	Succeeded                    = "Succeeded"
 )
