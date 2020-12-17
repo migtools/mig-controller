@@ -104,7 +104,7 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 			if pvc.Status.Phase != corev1.ClaimBound {
 				if time.Now().Sub(pvc.CreationTimestamp.Time) > time.Minute*10 {
 					t.Owner.Status.SetCondition(migapi.Condition{
-						Type:     PVCUnBound,
+						Type:     PVCNotBoundOnDestinationCluster,
 						Status:   True,
 						Reason:   t.Phase,
 						Category: Critical,
