@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 func (t *Task) areSourcePVCsUnattached() error {
@@ -102,15 +101,11 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 		}
 		for _, pvc := range pvcList.Items {
 			if pvc.Status.Phase != corev1.ClaimBound {
-				category := Advisory
-				if time.Now().Sub(pvc.CreationTimestamp.Time) > time.Minute*10 {
-					category = Critical
-				}
 				t.Owner.Status.SetCondition(migapi.Condition{
 					Type:     Running,
 					Status:   True,
 					Reason:   t.Phase,
-					Category: category,
+					Category: Critical,
 					Message:  fmt.Sprintf("PVC %s of %s namespace is in %s state", pvc.Name, pvc.Namespace, pvc.Status.Phase),
 					Durable:  true,
 				})
