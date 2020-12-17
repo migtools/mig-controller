@@ -106,7 +106,7 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 					t.Owner.Status.SetCondition(migapi.Condition{
 						Type:     PVCNotBoundOnDestinationCluster,
 						Status:   True,
-						Reason:   t.Phase,
+						Reason:   migapi.NotReady,
 						Category: Critical,
 						Message:  fmt.Sprintf("PVC %s of %s namespace is in %s state", pvc.Name, pvc.Namespace, pvc.Status.Phase),
 						Durable:  true,
