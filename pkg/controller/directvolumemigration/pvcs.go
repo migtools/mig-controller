@@ -118,7 +118,7 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 	}
 	conditions := t.Owner.Status.Conditions.FindConditionByCategory(Critical)
 	if len(conditions) > 0 {
-		t.Owner.Status.DeleteCondition(Critical)
+		t.Owner.Status.DeleteCondition(PVCNotBoundOnDestinationCluster)
 	}
 	return true, nil
 }
