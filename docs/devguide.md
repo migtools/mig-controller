@@ -190,6 +190,8 @@ All `Conditions` methods are idempotent and most support _varargs_.
 4. Any non-durable conditions that are not re-staged during a reconcile will disappear
 5. `DeleteCondition()` should only be used for removing durable conditions, since regular conditions will be removed simply by not re-staging them
 
+![Conditions](./images/conditions.png)
+
 ## User Experience
 
 The impact of new changes in MTC on the overall user experience of migrations _must_ be taken into account. 
