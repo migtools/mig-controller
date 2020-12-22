@@ -19,6 +19,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -363,6 +364,10 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+	limits, requests, err := getPodConfig(t.Client, []string{"TRANSFER_POD_CPU_LIMIT", "TRANSFER_POD_MEMORY_LIMIT", "TRANSFER_POD_CPU_REQUEST", "TRANSFER_POD_MEMORY_REQUEST"})
+	if err != nil {
+		return err
+	}
 	// one transfer pod should be created per namespace and should mount all
 	// PVCs that are being written to in that namespace
 
@@ -379,7 +384,6 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-
 	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
 	mode := int32(0600)
 
@@ -512,6 +516,10 @@ func (t *Task) createRsyncTransferPods() error {
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
 						},
+						Resources: corev1.ResourceRequirements{
+							Limits: limits,
+							Requests: requests,
+						},
 					},
 					{
 						Name:    DirectVolumeMigrationStunnel,
@@ -554,6 +562,37 @@ func (t *Task) createRsyncTransferPods() error {
 
 	}
 	return nil
+}
+
+func getPodConfig(client k8sclient.Client, keys []string) (corev1.ResourceList, corev1.ResourceList, error) {
+	podConfigMap := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
+	if err != nil {
+		return nil, nil, err
+	}
+	limits := corev1.ResourceList{}
+	if _, exists := podConfigMap.Data[keys[0]]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[keys[0]])
+		if _, exists := podConfigMap.Data[keys[1]]; exists {
+			memory := resource.MustParse(podConfigMap.Data[keys[1]])
+			limits = corev1.ResourceList{
+				corev1.ResourceCPU:    cpu,
+				corev1.ResourceMemory: memory,
+			}
+		}
+	}
+	requests := corev1.ResourceList{}
+	if _, exists := podConfigMap.Data[keys[2]]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[keys[2]])
+		if _, exists := podConfigMap.Data[keys[3]]; exists {
+			memory := resource.MustParse(podConfigMap.Data[keys[3]])
+			requests = corev1.ResourceList{
+				corev1.ResourceCPU:    cpu,
+				corev1.ResourceMemory: memory,
+			}
+		}
+	}
+	return limits, requests, nil
 }
 
 func (t *Task) getPVCNamespaceMap() map[string][]string {
@@ -750,6 +789,11 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
+	limits, requests, err := getPodConfig(t.Client, []string{"CLIENT_POD_CPU_LIMIT", "CLIENT_POD_MEMORY_LIMIT", "CLIENT_POD_CPU_REQUEST", "CLIENT_POD_MEMORY_REQUEST"})
+	if err != nil {
+		return err
+	}
+
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -805,6 +849,10 @@ func (t *Task) createRsyncClientPods() error {
 					Privileged:             &trueBool,
 					RunAsUser:              &runAsUser,
 					ReadOnlyRootFilesystem: &trueBool,
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits: limits,
+					Requests: requests,
 				},
 			})
 			clientPod := corev1.Pod{
