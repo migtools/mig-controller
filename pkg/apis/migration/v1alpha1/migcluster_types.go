@@ -158,9 +158,13 @@ func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
 
 // GetRsyncTransferImage gets a MigCluster specific rsync transfer image from ConfigMap
 func (m *MigCluster) GetRsyncTransferImage(c k8sclient.Client) (string, error) {
+	client, err := m.GetClient(c)
+	if err != nil {
+		return "", err
+	}
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
-	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	err = client.Get(context.TODO(), clusterConfigRef, clusterConfig)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
