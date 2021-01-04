@@ -669,7 +669,7 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
-			criticalWarning, err := t.getCriticalWarningForDVM(dvm)
+			criticalWarning, err := t.getWarningForDVM(dvm)
 			if err != nil {
 				return liberr.Wrap(err)
 			}

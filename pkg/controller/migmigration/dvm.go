@@ -117,16 +117,15 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	return completed, failureReasons, progress
 }
 
-func (t *Task) getCriticalWarningForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.Condition, error) {
-	conditions := dvm.Status.Conditions.FindConditionByCategory(dvmc.Critical)
+func (t *Task) getWarningForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.Condition, error) {
+	conditions := dvm.Status.Conditions.FindConditionByCategory(dvmc.Warn)
 	if len(conditions) > 0 {
 		return &migapi.Condition{
 			Type:     DirectVolumeMigrationBlocked,
 			Status:   True,
 			Reason:   migapi.NotReady,
-			Category: Critical,
+			Category: migapi.Warn,
 			Message:  joinConditionMessages(conditions),
-			Durable:  true,
 		}, nil
 	}
 

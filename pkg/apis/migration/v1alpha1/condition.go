@@ -223,7 +223,7 @@ func (r *Conditions) SetCondition(condition Condition) {
 	condition.staged = true
 	found := r.find(condition.Type)
 	if found == nil {
-		condition.LastTransitionTime = metav1.NewTime(time.Now())
+		condition.LastTransitionTime = metav1.NewTime(time.Now().UTC())
 		r.List = append(r.List, condition)
 	} else {
 		found.Update(condition)
