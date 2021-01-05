@@ -258,7 +258,7 @@ func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) e
 				Status:   True,
 				Reason:   RouteTestFailed,
 				Category: Critical,
-				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", err),
+				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", err.Error()),
 				Items:    []string{err.Error()},
 			})
 			return nil
