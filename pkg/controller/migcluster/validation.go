@@ -258,8 +258,19 @@ func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) e
 				Status:   True,
 				Reason:   RouteTestFailed,
 				Category: Critical,
-				Message:  fmt.Sprintf("Exposed registry route is invalid, response received : %#v", res),
+				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", err),
 				Items:    []string{err.Error()},
+			})
+			return nil
+		}
+
+		if res.StatusCode != 200 {
+			cluster.Status.SetCondition(migapi.Condition{
+				Type:     InvalidRegistryRoute,
+				Status:   True,
+				Reason:   RouteTestFailed,
+				Category: Critical,
+				Message:  fmt.Sprintf("Exposed registry route connection test failed, Response code received: %#v", res.StatusCode),
 			})
 			return nil
 		}
