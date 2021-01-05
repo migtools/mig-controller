@@ -149,7 +149,7 @@ func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []str
 func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 	pvcList := []migapi.PVCToMigrate{}
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		if pv.Selection.Action != migapi.PvCopyAction && pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+		if pv.Selection.Action != migapi.PvCopyAction || pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
 			continue
 		}
 		accessModes := pv.PVC.AccessModes
