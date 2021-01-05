@@ -364,7 +364,7 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-	limits, requests, err := getPodConfig(t.Client, []string{"TRANSFER_POD_CPU_LIMIT", "TRANSFER_POD_MEMORY_LIMIT", "TRANSFER_POD_CPU_REQUEST", "TRANSFER_POD_MEMORY_REQUEST"})
+	limits, requests, err := getPodConfig(t.Client, "TRANSFER_POD_CPU_LIMIT", "TRANSFER_POD_MEMORY_LIMIT", "TRANSFER_POD_CPU_REQUEST", "TRANSFER_POD_MEMORY_REQUEST")
 	if err != nil {
 		return err
 	}
@@ -564,28 +564,34 @@ func (t *Task) createRsyncTransferPods() error {
 	return nil
 }
 
-func getPodConfig(client k8sclient.Client, keys []string) (corev1.ResourceList, corev1.ResourceList, error) {
+func getPodConfig(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string, ) (corev1.ResourceList, corev1.ResourceList, error) {
 	podConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
 	if err != nil {
 		return nil, nil, err
 	}
-	limits := corev1.ResourceList{}
-	if _, exists := podConfigMap.Data[keys[0]]; exists {
-		cpu := resource.MustParse(podConfigMap.Data[keys[0]])
-		if _, exists := podConfigMap.Data[keys[1]]; exists {
-			memory := resource.MustParse(podConfigMap.Data[keys[1]])
+	limits := corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("1Gi"),
+		corev1.ResourceCPU: resource.MustParse("1"),
+	}
+	if _, exists := podConfigMap.Data[cpu_limit]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[cpu_limit])
+		if _, exists := podConfigMap.Data[memory_limit]; exists {
+			memory := resource.MustParse(podConfigMap.Data[memory_limit])
 			limits = corev1.ResourceList{
 				corev1.ResourceCPU:    cpu,
 				corev1.ResourceMemory: memory,
 			}
 		}
 	}
-	requests := corev1.ResourceList{}
-	if _, exists := podConfigMap.Data[keys[2]]; exists {
-		cpu := resource.MustParse(podConfigMap.Data[keys[2]])
-		if _, exists := podConfigMap.Data[keys[3]]; exists {
-			memory := resource.MustParse(podConfigMap.Data[keys[3]])
+	requests := corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("1Gi"),
+		corev1.ResourceCPU: resource.MustParse("400m"),
+	}
+	if _, exists := podConfigMap.Data[cpu_request]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[cpu_request])
+		if _, exists := podConfigMap.Data[memory_request]; exists {
+			memory := resource.MustParse(podConfigMap.Data[memory_request])
 			requests = corev1.ResourceList{
 				corev1.ResourceCPU:    cpu,
 				corev1.ResourceMemory: memory,
@@ -789,7 +795,7 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
-	limits, requests, err := getPodConfig(t.Client, []string{"CLIENT_POD_CPU_LIMIT", "CLIENT_POD_MEMORY_LIMIT", "CLIENT_POD_CPU_REQUEST", "CLIENT_POD_MEMORY_REQUEST"})
+	limits, requests, err := getPodConfig(t.Client, "CLIENT_POD_CPU_LIMIT", "CLIENT_POD_MEMORY_LIMIT", "CLIENT_POD_CPU_REQUEST", "CLIENT_POD_MEMORY_REQUEST")
 	if err != nil {
 		return err
 	}
