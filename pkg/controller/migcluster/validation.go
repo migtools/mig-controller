@@ -228,9 +228,6 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 
 // Validate the Exposed registry route
 func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) error {
-	if cluster.Spec.IsHostCluster {
-		return nil
-	}
 
 	if cluster.Status.HasCriticalCondition() {
 		return nil
