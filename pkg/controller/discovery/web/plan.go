@@ -345,6 +345,16 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 			Log.Trace(err)
 			return err
 		}
+		err = t.addDirectVolumes(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		err = t.addDirectImages(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
@@ -432,6 +442,70 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		if err != nil {
 			Log.Trace(err)
 			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add direct volumes
+func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode) error {
+	collection := model.DirectVolume{}
+	cLabel := t.cLabel(migration.DecodeObject())
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Labels == nil {
+			continue
+		}
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: DirectVolumeHandler{}.Link(m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add direct images
+func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode) error {
+	collection := model.DirectImage{}
+	cLabel := t.cLabel(migration.DecodeObject())
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Labels == nil {
+			continue
+		}
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: DirectImageHandler{}.Link(m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
 		}
 		parent.Children = append(parent.Children, node)
 	}
