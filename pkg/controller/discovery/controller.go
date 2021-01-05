@@ -158,6 +158,8 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 		cluster,
 		&container.Backup{},
 		&container.Restore{},
+		&container.DirectVolume{},
+		&container.DirectImage{},
 		&container.PodVolumeBackup{},
 		&container.PodVolumeRestore{},
 		&container.Namespace{},

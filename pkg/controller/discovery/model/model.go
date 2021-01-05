@@ -50,6 +50,8 @@ func Create() (*sql.DB, error) {
 		&Cluster{},
 		&Plan{},
 		&Migration{},
+		&DirectVolume{},
+		&DirectImage{},
 		&Backup{},
 		&Restore{},
 		&PodVolumeBackup{},
