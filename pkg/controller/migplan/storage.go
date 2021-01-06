@@ -8,6 +8,8 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -130,10 +132,28 @@ type PlanStorage struct {
 	storage       *migapi.MigStorage
 }
 
+// Get labels (correlation labels+migrationcontroller label)
+func (r PlanStorage) getLabels() map[string]string {
+	labels := r.plan.GetCorrelationLabels()
+	migrationControllerList := unstructured.UnstructuredList{}
+	gvk := schema.GroupVersionKind{
+		Kind:    "migrationcontroller",
+		Group:   "migration.openshift.io",
+		Version: "v1alpha1",
+	}
+	migrationControllerList.SetGroupVersionKind(gvk)
+	options := k8sclient.InNamespace(migapi.VeleroNamespace)
+	err := r.List(context.TODO(), options, &migrationControllerList)
+	if err == nil && len(migrationControllerList.Items) > 0 {
+		labels["migrationcontroller"] = string(migrationControllerList.Items[0].GetUID())
+	}
+	return labels
+}
+
 // Create the velero BackupStorageLocation has been created.
 func (r PlanStorage) ensureBSL() error {
 	newBSL := r.BuildBSL()
-	newBSL.Labels = r.plan.GetCorrelationLabels()
+	newBSL.Labels = r.getLabels()
 	foundBSL, err := r.plan.GetBSL(r.targetClient)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -160,7 +180,7 @@ func (r PlanStorage) ensureBSL() error {
 // Create the velero VolumeSnapshotLocation has been created.
 func (r PlanStorage) ensureVSL() error {
 	newVSL := r.BuildVSL()
-	newVSL.Labels = r.plan.GetCorrelationLabels()
+	newVSL.Labels = r.getLabels()
 	foundVSL, err := r.plan.GetVSL(r.targetClient)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -190,7 +210,7 @@ func (r PlanStorage) ensureBSLCloudSecret() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	newSecret.Labels = r.plan.GetCorrelationLabels()
+	newSecret.Labels = r.getLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetBackupStorageProvider())
 	if err != nil {
 		return liberr.Wrap(err)
@@ -226,7 +246,7 @@ func (r PlanStorage) ensureVSLCloudSecret() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	newSecret.Labels = r.plan.GetCorrelationLabels()
+	newSecret.Labels = r.getLabels()
 	foundSecret, err := r.plan.GetCloudSecret(r.targetClient, r.storage.GetVolumeSnapshotProvider())
 	if err != nil {
 		return liberr.Wrap(err)
