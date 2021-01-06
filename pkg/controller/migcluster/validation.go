@@ -2,7 +2,9 @@ package migcluster
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -20,6 +22,7 @@ const (
 	InvalidURL           = "InvalidURL"
 	InvalidSaSecretRef   = "InvalidSaSecretRef"
 	InvalidSaToken       = "InvalidSaToken"
+	InvalidRegistryRoute = "InvalidRegistryRoute"
 	TestConnectFailed    = "TestConnectFailed"
 	SaTokenNotPrivileged = "SaTokenNotPrivileged"
 )
@@ -31,12 +34,13 @@ const (
 
 // Reasons
 const (
-	NotSet        = "NotSet"
-	NotFound      = "NotFound"
-	ConnectFailed = "ConnectFailed"
-	Malformed     = "Malformed"
-	InvalidScheme = "InvalidScheme"
-	Unauthorized  = "Unauthorized"
+	NotSet          = "NotSet"
+	NotFound        = "NotFound"
+	ConnectFailed   = "ConnectFailed"
+	Malformed       = "Malformed"
+	RouteTestFailed = "RouteTestFailed"
+	InvalidScheme   = "InvalidScheme"
+	Unauthorized    = "Unauthorized"
 )
 
 // Statuses
@@ -68,6 +72,12 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 
 	// Token privileges
 	err = r.validateSaTokenPrivileges(cluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Exposed registry route
+	err = r.validateRegistryRoute(cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -213,6 +223,58 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 		return nil
 	}
 
+	return nil
+}
+
+// Validate the Exposed registry route
+func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) error {
+
+	if cluster.Status.HasCriticalCondition() {
+		return nil
+	}
+
+	if cluster.Spec.ExposedRegistryPath != "" {
+		url := "https://" + cluster.Spec.ExposedRegistryPath + "/v2/"
+		restConfig, err := cluster.BuildRestConfig(r.Client)
+		token := restConfig.BearerToken
+
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+
+		req, err := http.NewRequest("GET", url, nil)
+
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+
+		req.Header.Set("Authorization", "bearer "+token)
+
+		res, err := client.Do(req)
+		if err != nil {
+			cluster.Status.SetCondition(migapi.Condition{
+				Type:     InvalidRegistryRoute,
+				Status:   True,
+				Reason:   RouteTestFailed,
+				Category: Critical,
+				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", err.Error()),
+				Items:    []string{err.Error()},
+			})
+			return nil
+		}
+
+		if res.StatusCode != 200 {
+			cluster.Status.SetCondition(migapi.Condition{
+				Type:     InvalidRegistryRoute,
+				Status:   True,
+				Reason:   RouteTestFailed,
+				Category: Critical,
+				Message:  fmt.Sprintf("Exposed registry route connection test failed, Response code received: %#v", res.StatusCode),
+			})
+			return nil
+		}
+	}
 	return nil
 }
 

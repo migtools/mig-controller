@@ -154,7 +154,7 @@ func GetMigrationForDVM(client k8sclient.Client, owners []metav1.OwnerReference)
 			return nil, liberr.Wrap(err)
 		}
 	}
-	
+
 	return &migrationObject, nil
 }
 
