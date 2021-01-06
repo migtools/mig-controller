@@ -6,8 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	random "math/rand"
+	"strings"
+	"text/template"
+	"time"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	migsettings "github.com/konveyor/mig-controller/pkg/settings"
 	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
@@ -17,10 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	random "math/rand"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"text/template"
-	"time"
 )
 
 type pvc struct {
@@ -678,6 +681,47 @@ func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 	return nodeNameMap, nil
 }
 
+// generates Rsync commands based on custom options provided by the user in MigrationController CR
+// TODO: validate user provided extra options
+func (t *Task) getRsyncOptions() []string {
+	var rsyncOpts []string
+	defaultInfoOpts := "COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2"
+	defaultExtraOpts := []string{
+		"--human-readable",
+		"--port", "2222",
+		"--log-file", "/dev/stdout",
+	}
+	rsyncOptions := migsettings.Settings.RsyncOpts
+	if rsyncOptions.BwLimit != -1 {
+		rsyncOpts = append(rsyncOpts,
+			fmt.Sprintf("--bwlimit=%d", rsyncOptions.BwLimit))
+	}
+	if rsyncOptions.Archive {
+		rsyncOpts = append(rsyncOpts, "--archive")
+	}
+	if rsyncOptions.Delete {
+		rsyncOpts = append(rsyncOpts, "--delete")
+		// --delete option does not work without --recursive
+		rsyncOpts = append(rsyncOpts, "--recursive")
+	}
+	if rsyncOptions.HardLinks {
+		rsyncOpts = append(rsyncOpts, "--hard-links")
+	}
+	if rsyncOptions.Partial {
+		rsyncOpts = append(rsyncOpts, "--partial")
+	}
+	if rsyncOptions.Info != "" {
+		rsyncOpts = append(rsyncOpts,
+			fmt.Sprintf("--info=%s", rsyncOptions.Info))
+	} else {
+		rsyncOpts = append(rsyncOpts,
+			fmt.Sprintf("--info=%s", defaultInfoOpts))
+	}
+	rsyncOpts = append(rsyncOpts, defaultExtraOpts...)
+	rsyncOpts = append(rsyncOpts, rsyncOptions.Extras...)
+	return rsyncOpts
+}
+
 // Create rsync client pods
 func (t *Task) createRsyncClientPods() error {
 	// Get client for destination
@@ -733,6 +777,11 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 			})
+			rsyncCommand := []string{"rsync"}
+			rsyncCommand = append(rsyncCommand, t.getRsyncOptions()...)
+			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol))
+			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol))
+			t.Log.Info(fmt.Sprintf("Using Rsync command [%s]", strings.Join(rsyncCommand, " ")))
 			containers = append(containers, corev1.Container{
 				Name:  DirectVolumeMigrationRsyncClient,
 				Image: transferImage,
@@ -743,16 +792,7 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-				Command: []string{"rsync",
-					"--archive",
-					"--hard-links",
-					"--human-readable",
-					"--partial",
-					"--delete",
-					"--port", "2222",
-					"--log-file", "/dev/stdout",
-					"--info=COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2",
-					fmt.Sprintf("/mnt/%s/%s/", ns, vol), fmt.Sprintf("rsync://root@%s/%s", ip, vol)},
+				Command:                  rsyncCommand,
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          DirectVolumeMigrationRsyncClient,

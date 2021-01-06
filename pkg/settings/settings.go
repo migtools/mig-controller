@@ -33,6 +33,7 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
+	RsyncOpts
 	Roles     map[string]bool
 	ProxyVars map[string]string
 }
@@ -44,6 +45,10 @@ func (r *_Settings) Load() error {
 		return err
 	}
 	err = r.Discovery.Load()
+	if err != nil {
+		return err
+	}
+	err = r.RsyncOpts.Load()
 	if err != nil {
 		return err
 	}
@@ -62,7 +67,6 @@ func (r *_Settings) Load() error {
 //
 // Load the manager role.
 // The default is ALL roles.
-
 func (r *_Settings) loadProxyVars() error {
 	r.ProxyVars = map[string]string{}
 	if s, found := os.LookupEnv(HttpProxy); found {
