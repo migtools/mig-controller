@@ -107,7 +107,7 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 						Type:     PVCNotBoundOnDestinationCluster,
 						Status:   True,
 						Reason:   migapi.NotReady,
-						Category: Critical,
+						Category: migapi.Warn,
 						Message:  fmt.Sprintf("PVC %s of %s namespace is in %s state", pvc.Name, pvc.Namespace, pvc.Status.Phase),
 						Durable:  true,
 					})
@@ -116,7 +116,7 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 			}
 		}
 	}
-	conditions := t.Owner.Status.Conditions.FindConditionByCategory(Critical)
+	conditions := t.Owner.Status.Conditions.FindConditionByCategory(migapi.Warn)
 	if len(conditions) > 0 {
 		t.Owner.Status.DeleteCondition(PVCNotBoundOnDestinationCluster)
 	}
