@@ -38,6 +38,21 @@ type rsyncConfig struct {
 	PVCList   []pvc
 }
 
+const (
+	TRANSFER_POD_CPU_LIMIT      = "TRANSFER_POD_CPU_LIMIT"
+	TRANSFER_POD_MEMORY_LIMIT   = "TRANSFER_POD_MEMORY_LIMIT"
+	TRANSFER_POD_CPU_REQUEST    = "TRANSFER_POD_CPU_REQUEST"
+	TRANSFER_POD_MEMORY_REQUEST = "TRANSFER_POD_MEMORY_REQUEST"
+	CLIENT_POD_CPU_LIMIT        = "CLIENT_POD_CPU_LIMIT"
+	CLIENT_POD_MEMORY_LIMIT     = "CLIENT_POD_MEMORY_LIMIT"
+	CLIENT_POD_CPU_REQUEST      = "CLIENT_POD_CPU_REQUEST"
+	CLIENT_POD_MEMORY_REQUEST   = "CLIENT_POD_MEMORY_REQUEST"
+	STUNNEL_POD_CPU_LIMIT       = "STUNNEL_POD_CPU_LIMIT"
+	STUNNEL_POD_MEMORY_LIMIT    = "STUNNEL_POD_MEMORY_LIMIT"
+	STUNNEL_POD_CPU_REQUEST     = "STUNNEL_POD_CPU_REQUEST"
+	STUNNEL_POD_MEMORY_REQUEST  = "STUNNEL_POD_MEMORY_REQUEST"
+)
+
 // TODO: Parameterize this more to support custom
 // user/pass/networking configs from directvolumemigration spec
 const rsyncConfigTemplate = `apiVersion: v1
@@ -364,7 +379,7 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-	limits, requests, err := getPodConfig(t.Client, "TRANSFER_POD_CPU_LIMIT", "TRANSFER_POD_MEMORY_LIMIT", "TRANSFER_POD_CPU_REQUEST", "TRANSFER_POD_MEMORY_REQUEST")
+	limits, requests, err := getPodConfig(t.Client, TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
@@ -517,7 +532,7 @@ func (t *Task) createRsyncTransferPods() error {
 							ReadOnlyRootFilesystem: &trueBool,
 						},
 						Resources: corev1.ResourceRequirements{
-							Limits: limits,
+							Limits:   limits,
 							Requests: requests,
 						},
 					},
@@ -572,7 +587,7 @@ func getPodConfig(client k8sclient.Client, cpu_limit string, memory_limit string
 	}
 	limits := corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("1Gi"),
-		corev1.ResourceCPU: resource.MustParse("1"),
+		corev1.ResourceCPU:    resource.MustParse("1"),
 	}
 	if _, exists := podConfigMap.Data[cpu_limit]; exists {
 		cpu := resource.MustParse(podConfigMap.Data[cpu_limit])
@@ -586,7 +601,7 @@ func getPodConfig(client k8sclient.Client, cpu_limit string, memory_limit string
 	}
 	requests := corev1.ResourceList{
 		corev1.ResourceMemory: resource.MustParse("1Gi"),
-		corev1.ResourceCPU: resource.MustParse("400m"),
+		corev1.ResourceCPU:    resource.MustParse("400m"),
 	}
 	if _, exists := podConfigMap.Data[cpu_request]; exists {
 		cpu := resource.MustParse(podConfigMap.Data[cpu_request])
@@ -795,7 +810,7 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
-	limits, requests, err := getPodConfig(t.Client, "CLIENT_POD_CPU_LIMIT", "CLIENT_POD_MEMORY_LIMIT", "CLIENT_POD_CPU_REQUEST", "CLIENT_POD_MEMORY_REQUEST")
+	limits, requests, err := getPodConfig(t.Client, CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
@@ -857,7 +872,7 @@ func (t *Task) createRsyncClientPods() error {
 					ReadOnlyRootFilesystem: &trueBool,
 				},
 				Resources: corev1.ResourceRequirements{
-					Limits: limits,
+					Limits:   limits,
 					Requests: requests,
 				},
 			})

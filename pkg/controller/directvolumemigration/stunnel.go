@@ -338,7 +338,7 @@ func (t *Task) createStunnelClientPods() error {
 		return err
 	}
 
-	limits, requests, err := getPodConfig(t.Client, "STUNNEL_POD_CPU_LIMIT", "STUNNEL_POD_MEMORY_LIMIT", "STUNNEL_POD_CPU_REQUEST", "STUNNEL_POD_MEMORY_REQUEST")
+	limits, requests, err := getPodConfig(t.Client, STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
