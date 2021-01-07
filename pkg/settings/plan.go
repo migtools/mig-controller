@@ -13,6 +13,7 @@ const (
 	PodLimit          = "POD_LIMIT"
 	PvLimit           = "PV_LIMIT"
 	ExcludedResources = "EXCLUDED_RESOURCES"
+	DnsConfigName     = "DNS_CONFIG_NAME"
 	ISResource        = "imagestreams"
 )
 
@@ -47,6 +48,7 @@ type Plan struct {
 	PodLimit          int
 	PvLimit           int
 	ExcludedResources []string
+	DNSConfigName     string
 }
 
 // Load settings.
@@ -68,6 +70,7 @@ func (r *Plan) Load() error {
 	if len(excludedResources) > 0 {
 		r.ExcludedResources = strings.Split(excludedResources, ",")
 	}
+	r.DnsConfigName = os.Getenv(DnsConfigName)
 
 	return nil
 }

@@ -23,6 +23,8 @@ const (
 	HttpProxy  = "HTTP_PROXY"
 	HttpsProxy = "HTTPS_PROXY"
 	NoProxy    = "NO_PROXY"
+	// DNS configuration CR name
+	DnsConfigName = "DNS_CONFIG_NAME"
 )
 
 // Global

@@ -14,6 +14,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	migsettings "github.com/konveyor/mig-controller/pkg/settings"
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
@@ -308,6 +309,21 @@ func (t *Task) createRsyncTransferRoute() error {
 		} else if err != nil {
 			return err
 		}
+
+		// Get default subdomain config value
+		config := configv1.DNS{}
+		key := types.NamespacedName{Name: migsettings.DNSConfigName}
+		err = destClient.Get(context.TODO(), key, &config)
+		subdomain := config.Spec.BaseDomain
+
+		// Ensure that route prefix will not exceed 63 chars
+		// Route gen will add `-` between name + ns so need to ensure below is <62 chars
+		prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, ns)
+		if len(prefix) > 62 {
+			prefix = prefix[0:62]
+		}
+		host := fmt.Sprintf("%s.%s", prefix, subdomain)
+
 		route := routev1.Route{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DirectVolumeMigrationRsyncTransferRoute,
@@ -317,6 +333,7 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 			Spec: routev1.RouteSpec{
+				Host: host,
 				To: routev1.RouteTargetReference{
 					Kind: "Service",
 					Name: DirectVolumeMigrationRsyncTransferSvc,
