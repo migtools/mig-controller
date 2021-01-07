@@ -69,7 +69,7 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 		return nil, err
 	}
 
-	dstResourceList, err := collectResources(r.DstDiscovery)
+	dstResourceList, err := collectNamespacedResources(r.DstDiscovery)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +119,8 @@ func toSet(strSlice []string) mapset.Set {
 	return mapset.NewSetFromSlice(interfaceSlice)
 }
 
-// collectResources collects all namespaced scoped apiResources from the cluster
-func collectResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+// collectNamespacedResources collects all namespace-scoped apiResources from the cluster
+func collectNamespacedResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	resources, err := discovery.ServerResources()
 	if err != nil {
 		return nil, err
@@ -170,8 +170,8 @@ func convertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVer
 	return GVRs, nil
 }
 
-// GetGVRsForCluster collects all namespaced scoped GVRs for the provided cluster compatible client
-func GetGVRsForCluster(cluster *migapi.MigCluster, c client.Client) (dynamic.Interface, []schema.GroupVersionResource, error) {
+// GetNamespacedGVRsForCluster collects all namespace-scoped GVRs for the provided cluster compatible client
+func GetNamespacedGVRsForCluster(cluster *migapi.MigCluster, c client.Client) (dynamic.Interface, []schema.GroupVersionResource, error) {
 	compat, err := cluster.GetClient(c)
 	if err != nil {
 		return nil, nil, err
@@ -180,7 +180,7 @@ func GetGVRsForCluster(cluster *migapi.MigCluster, c client.Client) (dynamic.Int
 	if err != nil {
 		return nil, nil, err
 	}
-	resourceList, err := collectResources(compat)
+	resourceList, err := collectNamespacedResources(compat)
 	if err != nil {
 		return nil, nil, err
 	}

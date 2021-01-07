@@ -12,6 +12,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/gvk"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -581,8 +582,24 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 	return nDeleted, nil
 }
 
+// Delete namespace and cluster-scoped resources on dest cluster
 func (t *Task) deleteMigrated() error {
-	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
+	err := t.deleteMigratedNamespaceScopedResources()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	err = t.deleteMovedNfsPVs()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	return nil
+}
+
+// Delete migrated namespace-scoped resources on dest cluster
+func (t *Task) deleteMigratedNamespaceScopedResources() error {
+	client, GVRs, err := gvk.GetNamespacedGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -615,6 +632,9 @@ func (t *Task) deleteMigrated() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
+				log.Info("Deleted resource from destination cluster",
+					"GVK", gvr.Group+"/"+gvr.Version+"/"+gvr.Resource,
+					"ns/name", ns+"/"+r.GetName())
 			}
 		}
 	}
@@ -622,8 +642,47 @@ func (t *Task) deleteMigrated() error {
 	return nil
 }
 
+// Delete migrated NFS PV resources that were "moved" to the dest cluster
+func (t *Task) deleteMovedNfsPVs() error {
+	dstClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Only delete PVs with matching 'migrated-by-migplan' label.
+	listOptions := k8sclient.MatchingLabels(map[string]string{
+		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
+	})
+	list := corev1.PersistentVolumeList{}
+	err = dstClient.List(context.TODO(), listOptions, &list)
+	if err != nil {
+		return err
+	}
+	for _, pv := range list.Items {
+		// Skip unless PV type = NFS
+		if pv.Spec.NFS == nil {
+			continue
+		}
+		// Skip delete unless ReclaimPolicy=Retain
+		if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
+			continue
+		}
+		err := dstClient.Delete(context.TODO(), &pv)
+		if err != nil {
+			if k8serror.IsMethodNotSupported(err) || k8serror.IsNotFound(err) {
+				continue
+			}
+			log.Error(err, fmt.Sprintf("Failed to request delete on moved PV: %s", pv.Name))
+			return err
+		}
+		log.Info("Deleted moved NFS PV from destination cluster", "resource", pv.Name)
+	}
+
+	return nil
+}
+
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
-	client, GVRs, err := gvk.GetGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
+	client, GVRs, err := gvk.GetNamespacedGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
