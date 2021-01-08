@@ -182,6 +182,16 @@ _staging_ ends.
 
 All `Conditions` methods are idempotent and most support _varargs_.
 
+#### Working with Conditions
+
+1. `SetCondition()` is required to create all conditions. If a condition doesn't exist yet, you can't `StageCondition()` it into existence
+2. `StageCondition()` will look to see if a condition already exists in the conditions array from the previous reconcile, and if it does, will stop it from being removed. This is useful to preserve original timestamps and stop flickering conditions.
+3. Durable `SetCondition()` is the same as `SetCondition()` but does not need to be re-staged on every reconcile
+4. Any non-durable conditions that are not re-staged during a reconcile will disappear
+5. `DeleteCondition()` should only be used for removing durable conditions, since regular conditions will be removed simply by not re-staging them
+
+![Conditions](./images/conditions.png)
+
 ## User Experience
 
 The impact of new changes in MTC on the overall user experience of migrations _must_ be taken into account. 
