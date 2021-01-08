@@ -21,6 +21,8 @@ const (
 	SourceClusterNotReady        = "SourceClusterNotReady"
 	DestinationClusterNotReady   = "DestinationClusterNotReady"
 	PVCsNotFoundOnSourceCluster  = "PodsNotFoundOnSourceCluster"
+	StunnelClientPodsPending     = "StunnelClientPodsPending"
+	RsyncTransferPodsPending     = "RsyncTransferPodsPending"
 	Running                      = "Running"
 	Failed                       = "Failed"
 	Succeeded                    = "Succeeded"
@@ -54,6 +56,7 @@ const (
 const (
 	Critical = migapi.Critical
 	Advisory = migapi.Advisory
+	Warn     = migapi.Warn
 )
 
 // Statuses

@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+	"sort"
+	"strings"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	path "path"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sort"
 )
 
 func (t *Task) createDirectVolumeMigration() error {
@@ -113,6 +115,29 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	// sort the progress report so we dont have flapping for the same progress info
 	sort.Sort(sort.StringSlice(progress))
 	return completed, failureReasons, progress
+}
+
+func (t *Task) getWarningForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.Condition, error) {
+	conditions := dvm.Status.Conditions.FindConditionByCategory(dvmc.Warn)
+	if len(conditions) > 0 {
+		return &migapi.Condition{
+			Type:     DirectVolumeMigrationBlocked,
+			Status:   True,
+			Reason:   migapi.NotReady,
+			Category: migapi.Warn,
+			Message:  joinConditionMessages(conditions),
+		}, nil
+	}
+
+	return nil, nil
+}
+
+func joinConditionMessages(conditions []*migapi.Condition) string {
+	messages := []string{}
+	for _, c := range conditions {
+		messages = append(messages, c.Message)
+	}
+	return strings.Join(messages, ", ")
 }
 
 // Set warning conditions on migmigration if there were any partial failures

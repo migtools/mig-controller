@@ -41,6 +41,7 @@ const (
 	StaleSrcVeleroCRsDeleted           = "StaleSrcVeleroCRsDeleted"
 	StaleDestVeleroCRsDeleted          = "StaleDestVeleroCRsDeleted"
 	StaleResticCRsDeleted              = "StaleResticCRsDeleted"
+	DirectVolumeMigrationBlocked       = "DirectVolumeMigrationBlocked"
 )
 
 // Categories
