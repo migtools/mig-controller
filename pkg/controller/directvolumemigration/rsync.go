@@ -110,6 +110,10 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 		if err != nil {
 			return false, err
 		}
+		_, err := t.verifyNumberOfObjects(len(pods.Items), 1)
+		if err != nil {
+			return false, err
+		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
 				return false, nil

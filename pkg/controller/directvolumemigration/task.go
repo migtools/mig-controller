@@ -528,3 +528,11 @@ func (t *Task) buildDVMLabels() map[string]string {
 
 	return dvmLabels
 }
+
+// Verify desired numbers in the list
+func (t *Task) verifyNumberOfObjects (present int, desired int) (bool, error){
+	if present != desired {
+		return false, nil
+	}
+	return true, nil
+}
