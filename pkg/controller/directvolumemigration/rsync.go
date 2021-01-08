@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	random "math/rand"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -681,8 +682,20 @@ func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 	return nodeNameMap, nil
 }
 
-// generates Rsync commands based on custom options provided by the user in MigrationController CR
-// TODO: validate user provided extra options
+// validates extra Rsync options set by user
+// only returns options identified as valid
+func (t *Task) filterRsyncExtraOptions(options []string) (validatedOptions []string) {
+	for _, opt := range options {
+		if valid, _ := regexp.Match(`^\-{1,2}[\w-]+?\w$`, []byte(opt)); valid {
+			validatedOptions = append(validatedOptions, opt)
+		} else {
+			t.Log.Info(fmt.Sprintf("Invalid Rsync extra option passed: %s", opt))
+		}
+	}
+	return
+}
+
+// generates Rsync options based on custom options provided by the user in MigrationController CR
 func (t *Task) getRsyncOptions() []string {
 	var rsyncOpts []string
 	defaultInfoOpts := "COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2"
@@ -710,7 +723,7 @@ func (t *Task) getRsyncOptions() []string {
 	if rsyncOptions.Partial {
 		rsyncOpts = append(rsyncOpts, "--partial")
 	}
-	if rsyncOptions.Info != "" {
+	if valid, _ := regexp.Match(`^\w[\w,]*?\w$`, []byte(rsyncOptions.Info)); valid {
 		rsyncOpts = append(rsyncOpts,
 			fmt.Sprintf("--info=%s", rsyncOptions.Info))
 	} else {
@@ -718,7 +731,8 @@ func (t *Task) getRsyncOptions() []string {
 			fmt.Sprintf("--info=%s", defaultInfoOpts))
 	}
 	rsyncOpts = append(rsyncOpts, defaultExtraOpts...)
-	rsyncOpts = append(rsyncOpts, rsyncOptions.Extras...)
+	rsyncOpts = append(rsyncOpts,
+		t.filterRsyncExtraOptions(rsyncOptions.Extras)...)
 	return rsyncOpts
 }
 
