@@ -2,6 +2,7 @@ package directvolumemigration
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -291,11 +292,34 @@ func (t *Task) Run() error {
 		}
 		if running {
 			t.Requeue = NoReQ
+			conditions := t.Owner.Status.FindConditionByCategory(Warn)
+			for _, c := range conditions {
+				if c.Reason == RsyncTransferPodsPending {
+					t.Owner.Status.DeleteCondition(RsyncTransferPodsPending)
+				}
+			}
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
 		} else {
 			t.Requeue = PollReQ
+			t.Owner.Status.StageCondition(Running)
+			cond := t.Owner.Status.FindCondition(Running)
+			if cond == nil {
+				return fmt.Errorf("unable to find running condition")
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 10*time.Minute {
+				t.Owner.Status.SetCondition(
+					migapi.Condition{
+						Type:     RsyncTransferPodsPending,
+						Status:   True,
+						Reason:   migapi.NotReady,
+						Category: Warn,
+						Message:  "Some or all transfer pods are pending for more than 10 mins on destination cluster",
+					},
+				)
+			}
 		}
 	case CreateStunnelClientPods:
 		err := t.createStunnelClientPods()
@@ -313,10 +337,36 @@ func (t *Task) Run() error {
 		}
 		if running {
 			t.Requeue = NoReQ
+			conditions := t.Owner.Status.FindConditionByCategory(Warn)
+			for _, c := range conditions {
+				if c.Reason == StunnelClientPodsPending {
+					t.Owner.Status.DeleteCondition("StunnelClientPodsPending")
+				}
+			}
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Owner.Status.StageCondition(Running)
+			cond := t.Owner.Status.FindCondition(Running)
+			if cond == nil {
+				return fmt.Errorf("`Running` condition missing on DVM %s/%s", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.After(cond.LastTransitionTime.Time) {
+				if now.Sub(cond.LastTransitionTime.Time).Round(time.Minute) > 10*time.Minute {
+					t.Owner.Status.SetCondition(
+						migapi.Condition{
+							Type:     StunnelClientPodsPending,
+							Status:   True,
+							Reason:   migapi.NotReady,
+							Category: Warn,
+							Message:  "Some or all stunnel client pods are pending for more than 10 mins on the source cluster",
+							Durable:  true,
+						},
+					)
+				}
+			}
 			t.Requeue = PollReQ
 		}
 	case CreatePVProgressCRs:

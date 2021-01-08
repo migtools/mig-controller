@@ -669,6 +669,15 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
+			criticalWarning, err := t.getWarningForDVM(dvm)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if criticalWarning != nil {
+				t.Owner.Status.SetCondition(*criticalWarning)
+				return nil
+			}
+			t.Owner.Status.DeleteCondition(DirectVolumeMigrationBlocked)
 		}
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
