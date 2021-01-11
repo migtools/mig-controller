@@ -379,7 +379,7 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-	limits, requests, err := getPodresourceLists(t.Client, TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
+	limits, requests, err := getPodResourceLists(t.Client, TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
@@ -579,7 +579,7 @@ func (t *Task) createRsyncTransferPods() error {
 	return nil
 }
 
-func getPodresourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string ) (corev1.ResourceList, corev1.ResourceList, error) {
+func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string ) (corev1.ResourceList, corev1.ResourceList, error) {
 	podConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
 	if err != nil {
@@ -806,7 +806,7 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
-	limits, requests, err := getPodresourceLists(t.Client, CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	limits, requests, err := getPodResourceLists(t.Client, CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
