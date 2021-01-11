@@ -19,6 +19,8 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/compat"
+	"k8s.io/apimachinery/pkg/labels"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -39,6 +41,25 @@ func (t *Task) getDirectImageMigration() (*migapi.DirectImageMigration, error) {
 		return &dimList.Items[0], nil
 	}
 	return nil, nil
+}
+
+func (t *Task) getDirectImageStreamMigrationForDIM(dim *migapi.DirectImageMigration, destClient compat.Client) (*migapi.DirectImageStreamMigration, error) {
+
+	dimLabels := dim.GetCorrelationLabels()
+	dimLabels["directimagemigration"] = string(dim.UID)
+	selector := labels.SelectorFromSet(dimLabels)
+	dismList := migapi.DirectImageStreamMigrationList{}
+	err := destClient.List(context.TODO(),
+		&k8sclient.ListOptions{
+			LabelSelector: selector,
+		},
+		&dismList)
+
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	return &dismList.Items[0], nil
 }
 
 func (t *Task) createDirectImageMigration() error {
@@ -87,4 +108,38 @@ func (t *Task) setDirectImageMigrationWarning(dim *migapi.DirectImageMigration) 
 			Durable:  true,
 		})
 	}
+}
+
+func (t *Task) deleteDirectImageMigrationResources() error {
+	// fetch the destination cluster client
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// fetch the DIM
+	dim, err := t.getDirectImageMigration()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// fetch the corresponding DISM instance
+	dism, err := t.getDirectImageStreamMigrationForDIM(dim, destClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// delete the DISM instance
+	err = destClient.Delete(context.TODO(), dism)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// delete the DIM instance from destination cluster
+	err = destClient.Delete(context.TODO(), dim)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	return nil
 }

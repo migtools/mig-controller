@@ -85,6 +85,8 @@ const (
 	DeleteBackups                          = "DeleteBackups"
 	DeleteRestores                         = "DeleteRestores"
 	DeleteHookJobs                         = "DeleteHookJobs"
+	DeleteDirectVolumeMigrationResources   = "DeleteDirectVolumeMigrationResources"
+	DeleteDirectImageMigrationResources    = "DeleteDirectImageMigrationResources"
 	MigrationFailed                        = "MigrationFailed"
 	Canceling                              = "Canceling"
 	Canceled                               = "Canceled"
@@ -233,6 +235,8 @@ var CancelItinerary = Itinerary{
 		{Name: DeleteRestores, Step: StepCleanupVelero},
 		{Name: DeleteRegistries, Step: StepCleanupHelpers},
 		{Name: DeleteHookJobs, Step: StepCleanupHelpers},
+		{Name: DeleteDirectVolumeMigrationResources, Step: StepCleanupHelpers, all: DirectVolume},
+		{Name: DeleteDirectImageMigrationResources, Step: StepCleanupHelpers, all: DirectImage},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanupHelpers, all: HasStagePods},
 		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, all: HasStageBackup},
 		{Name: Canceled, Step: StepCleanup},
@@ -959,6 +963,22 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		}
+	case DeleteDirectVolumeMigrationResources:
+		// Delete all DVM Resources created on the destination cluster
+		if err := t.deleteDirectVolumeMigrationResources(); err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case DeleteDirectImageMigrationResources:
+		// Delete all DIM Resources created on the destination cluster
+		if err := t.deleteDirectImageMigrationResources(); err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
 		}
 	case Canceled:
 		t.Owner.Status.DeleteCondition(Canceling)

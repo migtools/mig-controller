@@ -8,10 +8,13 @@ import (
 	"sort"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -76,6 +79,25 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	}
 
 	return nil, nil
+}
+
+func (t *Task) getDirectVolumeMigrationProgressForDVM(dvm *migapi.DirectVolumeMigration, destClient compat.Client) (*migapi.DirectVolumeMigrationProgress, error) {
+
+	dvmLabels := dvm.GetCorrelationLabels()
+	dvmLabels["directvolumemigration"] = string(dvm.UID)
+	selector := labels.SelectorFromSet(dvmLabels)
+	dvmpList := migapi.DirectVolumeMigrationProgressList{}
+	err := destClient.List(context.TODO(),
+		&k8sclient.ListOptions{
+			LabelSelector: selector,
+		},
+		&dvmpList)
+
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	return &dvmpList.Items[0], nil
 }
 
 // Check if the DVM has completed.
@@ -195,5 +217,40 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 	if len(pvcList) > 0 {
 		return &pvcList
 	}
+	return nil
+}
+
+func (t *Task) deleteDirectVolumeMigrationResources() error {
+
+	// fetch the destination cluster client
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// fetch the DVM
+	dvm, err := t.getDirectVolumeMigration()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// fetch the corresponding DVMP instance
+	dvmp, err := t.getDirectVolumeMigrationProgressForDVM(dvm, destClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// delete the DVMP instance
+	err = destClient.Delete(context.TODO(), dvmp)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// delete the DVM instance from destination cluster
+	err = destClient.Delete(context.TODO(), dvm)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	return nil
 }
