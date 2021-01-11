@@ -316,7 +316,7 @@ func (t *Task) Run() error {
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  "Some or all transfer pods are pending for more than 10 mins on destination cluster",
+						Message:  "Some or all transfer pods are not running for more than 10 mins on destination cluster",
 					},
 				)
 			}
@@ -361,7 +361,7 @@ func (t *Task) Run() error {
 							Status:   True,
 							Reason:   migapi.NotReady,
 							Category: Warn,
-							Message:  "Some or all stunnel client pods are pending for more than 10 mins on the source cluster",
+							Message:  "Some or all stunnel client pods are not ready for more than 10 mins on the source cluster",
 							Durable:  true,
 						},
 					)
@@ -530,9 +530,9 @@ func (t *Task) buildDVMLabels() map[string]string {
 }
 
 // Verify desired numbers in the list
-func (t *Task) verifyNumberOfObjects (present int, desired int) (bool, error){
+func (t *Task) verifyNumberOfObjects (present int, desired int) (bool){
 	if present != desired {
-		return false, nil
+		return false
 	}
-	return true, nil
+	return true
 }
