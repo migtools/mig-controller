@@ -200,7 +200,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 		if namespace.Labels == nil {
 			namespace.Labels = make(map[string]string)
 		}
-		if _, exist := namespace.GetLabels()[IncludedInStageBackupLabel]; exist {
+		if namespace.GetLabels()[IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
 		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
@@ -309,7 +309,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		if pvResource.Annotations == nil {
 			pvResource.Annotations = make(map[string]string)
 		}
-		if _, exist := pvResource.Labels[IncludedInStageBackupLabel]; exist {
+		if pvResource.Labels[IncludedInStageBackupLabel] == t.UID(){
 			continue
 		}
 		// PV action (move|copy) needed by the velero plugin.
@@ -355,7 +355,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		if pvcResource.Labels == nil {
 			pvcResource.Labels = make(map[string]string)
 		}
-		if _, exist := pvcResource.Labels[IncludedInStageBackupLabel]; exist {
+		if pvcResource.Labels[IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
 		pvcResource.Labels[IncludedInStageBackupLabel] = t.UID()
@@ -411,7 +411,7 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 			if sa.Labels == nil {
 				sa.Labels = make(map[string]string)
 			}
-			if _, exist := sa.Labels[IncludedInStageBackupLabel]; exist {
+			if sa.Labels[IncludedInStageBackupLabel] == t.UID() {
 				continue
 			}
 			sa.Labels[IncludedInStageBackupLabel] = t.UID()
@@ -450,7 +450,7 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 			if is.Labels == nil {
 				is.Labels = map[string]string{}
 			}
-			if _, exist := is.Labels[IncludedInStageBackupLabel]; exist {
+			if is.Labels[IncludedInStageBackupLabel] == t.UID() {
 				continue
 			}
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
