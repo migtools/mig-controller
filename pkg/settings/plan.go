@@ -9,12 +9,12 @@ import (
 
 // Environment variables.
 const (
-	NsLimit           = "NAMESPACE_LIMIT"
-	PodLimit          = "POD_LIMIT"
-	PvLimit           = "PV_LIMIT"
-	ExcludedResources = "EXCLUDED_RESOURCES"
-	DnsConfigName     = "DNS_CONFIG_NAME"
-	ISResource        = "imagestreams"
+	NsLimit               = "NAMESPACE_LIMIT"
+	PodLimit              = "POD_LIMIT"
+	PvLimit               = "PV_LIMIT"
+	ExcludedResources     = "EXCLUDED_RESOURCES"
+	IngressControllerName = "INGRESS_CONTROLLER_NAME"
+	ISResource            = "imagestreams"
 )
 
 // Included resource defaults
@@ -44,11 +44,11 @@ var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 //   PvLimit: Maximum number PVs on a Plan.
 //   ExcludedResources: Resources excluded from a Plan.
 type Plan struct {
-	NsLimit           int
-	PodLimit          int
-	PvLimit           int
-	ExcludedResources []string
-	DNSConfigName     string
+	NsLimit               int
+	PodLimit              int
+	PvLimit               int
+	ExcludedResources     []string
+	IngressControllerName string
 }
 
 // Load settings.
@@ -70,7 +70,11 @@ func (r *Plan) Load() error {
 	if len(excludedResources) > 0 {
 		r.ExcludedResources = strings.Split(excludedResources, ",")
 	}
-	r.DnsConfigName = os.Getenv(DnsConfigName)
+	ingressControllerName := os.Getenv(IngressControllerName)
+	if ingressControllerName == "" {
+		ingressControllerName = "default"
+	}
+	r.IngressControllerName = ingressControllerName
 
 	return nil
 }
