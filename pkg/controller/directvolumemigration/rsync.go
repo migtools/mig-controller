@@ -20,6 +20,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,6 +38,21 @@ type rsyncConfig struct {
 	Password  string
 	PVCList   []pvc
 }
+
+const (
+	TRANSFER_POD_CPU_LIMIT      = "TRANSFER_POD_CPU_LIMIT"
+	TRANSFER_POD_MEMORY_LIMIT   = "TRANSFER_POD_MEMORY_LIMIT"
+	TRANSFER_POD_CPU_REQUEST    = "TRANSFER_POD_CPU_REQUEST"
+	TRANSFER_POD_MEMORY_REQUEST = "TRANSFER_POD_MEMORY_REQUEST"
+	CLIENT_POD_CPU_LIMIT        = "CLIENT_POD_CPU_LIMIT"
+	CLIENT_POD_MEMORY_LIMIT     = "CLIENT_POD_MEMORY_LIMIT"
+	CLIENT_POD_CPU_REQUEST      = "CLIENT_POD_CPU_REQUEST"
+	CLIENT_POD_MEMORY_REQUEST   = "CLIENT_POD_MEMORY_REQUEST"
+	STUNNEL_POD_CPU_LIMIT       = "STUNNEL_POD_CPU_LIMIT"
+	STUNNEL_POD_MEMORY_LIMIT    = "STUNNEL_POD_MEMORY_LIMIT"
+	STUNNEL_POD_CPU_REQUEST     = "STUNNEL_POD_CPU_REQUEST"
+	STUNNEL_POD_MEMORY_REQUEST  = "STUNNEL_POD_MEMORY_REQUEST"
+)
 
 // TODO: Parameterize this more to support custom
 // user/pass/networking configs from directvolumemigration spec
@@ -364,6 +380,10 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+	limits, requests, err := getPodResourceLists(t.Client, TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
+	if err != nil {
+		return err
+	}
 	// one transfer pod should be created per namespace and should mount all
 	// PVCs that are being written to in that namespace
 
@@ -380,7 +400,6 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-
 	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
 	mode := int32(0600)
 
@@ -513,6 +532,10 @@ func (t *Task) createRsyncTransferPods() error {
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
 						},
+						Resources: corev1.ResourceRequirements{
+							Limits:   limits,
+							Requests: requests,
+						},
 					},
 					{
 						Name:    DirectVolumeMigrationStunnel,
@@ -555,6 +578,39 @@ func (t *Task) createRsyncTransferPods() error {
 
 	}
 	return nil
+}
+
+func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string ) (corev1.ResourceList, corev1.ResourceList, error) {
+	podConfigMap := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
+	if err != nil {
+		return nil, nil, err
+	}
+	limits := corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("1Gi"),
+		corev1.ResourceCPU:    resource.MustParse("1"),
+	}
+	if _, exists := podConfigMap.Data[cpu_limit]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[cpu_limit])
+		limits[corev1.ResourceCPU] = cpu
+	}
+	if _, exists := podConfigMap.Data[memory_limit]; exists {
+		memory := resource.MustParse(podConfigMap.Data[memory_limit])
+		limits[corev1.ResourceMemory] = memory
+	}
+	requests := corev1.ResourceList{
+		corev1.ResourceMemory: resource.MustParse("1Gi"),
+		corev1.ResourceCPU:    resource.MustParse("400m"),
+	}
+	if _, exists := podConfigMap.Data[cpu_request]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[cpu_request])
+		requests[corev1.ResourceCPU] = cpu
+	}
+	if _, exists := podConfigMap.Data[memory_request]; exists {
+		memory := resource.MustParse(podConfigMap.Data[memory_request])
+		requests[corev1.ResourceMemory] = memory
+	}
+	return limits, requests, nil
 }
 
 func (t *Task) getPVCNamespaceMap() map[string][]string {
@@ -764,6 +820,11 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
+	limits, requests, err := getPodResourceLists(t.Client, CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	if err != nil {
+		return err
+	}
+
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -819,6 +880,10 @@ func (t *Task) createRsyncClientPods() error {
 					Privileged:             &trueBool,
 					RunAsUser:              &runAsUser,
 					ReadOnlyRootFilesystem: &trueBool,
+				},
+				Resources: corev1.ResourceRequirements{
+					Limits:   limits,
+					Requests: requests,
 				},
 			})
 			clientPod := corev1.Pod{
