@@ -52,7 +52,7 @@ const (
 	DirectVolumeMigrationRsyncConfig        = "directvolumemigration-rsync-config"
 	DirectVolumeMigrationRsyncCreds         = "directvolumemigration-rsync-creds"
 	DirectVolumeMigrationRsyncTransferSvc   = "directvolumemigration-rsync-transfer-svc"
-	DirectVolumeMigrationRsyncTransferRoute = "directvolumemigration-rsync-transfer-route"
+	DirectVolumeMigrationRsyncTransferRoute = "dvm"
 	DirectVolumeMigrationStunnelConfig      = "directvolumemigration-stunnel-config"
 	DirectVolumeMigrationStunnelCerts       = "directvolumemigration-stunnel-certs"
 	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
