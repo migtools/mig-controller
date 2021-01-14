@@ -116,7 +116,6 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 							Reason:   migapi.NotReady,
 							Category: Warn,
 							Message:  fmt.Sprintf("dvm cr : %s/%s expected %v, found %v", t.Owner.Namespace, t.Owner.Name,len(pvcMap[ns]), len(pvcList.Items)),
-							Durable:  true,
 						},
 					)
 				}
