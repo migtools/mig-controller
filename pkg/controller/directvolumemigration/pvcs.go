@@ -100,6 +100,33 @@ func (t *Task) areDestinationPVCsBound() (bool, error) {
 		if err != nil {
 			return false, err
 		}
+		if len(pvcList.Items) !=  len(pvcMap[ns]){
+			t.Log.Info(fmt.Sprintf("dvm cr : %s/%s number of PVCs expected %v, found %v", t.Owner.Namespace, t.Owner.Name,len(pvcMap[ns]), len(pvcList.Items)))
+			cond := t.Owner.Status.FindCondition(Running)
+			if cond == nil {
+				return false, fmt.Errorf("`Running` condition missing on DVM %s/%s", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.After(cond.LastTransitionTime.Time) {
+				if now.Sub(cond.LastTransitionTime.Time).Round(time.Minute) > 10*time.Minute {
+					t.Owner.Status.SetCondition(
+						migapi.Condition{
+							Type:     PVCNotFoundOnDestinationCluster,
+							Status:   True,
+							Reason:   migapi.NotReady,
+							Category: Warn,
+							Message:  fmt.Sprintf("dvm cr : %s/%s expected %v, found %v", t.Owner.Namespace, t.Owner.Name,len(pvcMap[ns]), len(pvcList.Items)),
+							Durable:  true,
+						},
+					)
+				}
+			}
+			return false, nil
+		}
+		conditions := t.Owner.Status.Conditions.FindConditionByCategory(migapi.Warn)
+		if len(conditions) > 0 {
+			t.Owner.Status.DeleteCondition(PVCNotFoundOnDestinationCluster)
+		}
 		for _, pvc := range pvcList.Items {
 			if pvc.Status.Phase != corev1.ClaimBound {
 				if time.Now().Sub(pvc.CreationTimestamp.Time) > time.Minute*10 {
