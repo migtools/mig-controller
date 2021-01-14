@@ -3,6 +3,7 @@ package directvolumemigration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"gopkg.in/yaml.v2"
 	"text/template"
 
@@ -497,6 +498,10 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 			&pods)
 		if err != nil {
 			return false, err
+		}
+		if len(pods.Items) != 1 {
+			t.Log.Info(fmt.Sprintf("dvm cr: %s/%s, number of stunnel pods expected %d, found %d", t.Owner.Namespace, t.Owner.Name, 1, len(pods.Items)))
+			return false, nil
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
