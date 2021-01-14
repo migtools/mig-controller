@@ -19,7 +19,6 @@ package migmigration
 import (
 	"context"
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/compat"
 	"k8s.io/apimachinery/pkg/labels"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -43,13 +42,12 @@ func (t *Task) getDirectImageMigration() (*migapi.DirectImageMigration, error) {
 	return nil, nil
 }
 
-func (t *Task) getDirectImageStreamMigrationForDIM(dim *migapi.DirectImageMigration, destClient compat.Client) (*migapi.DirectImageStreamMigration, error) {
+func (t *Task) getDirectImageStreamMigrationForDIM(dim *migapi.DirectImageMigration) (*migapi.DirectImageStreamMigration, error) {
 
 	dimLabels := dim.GetCorrelationLabels()
-	dimLabels["directimagemigration"] = string(dim.UID)
 	selector := labels.SelectorFromSet(dimLabels)
 	dismList := migapi.DirectImageStreamMigrationList{}
-	err := destClient.List(context.TODO(),
+	err := t.Client.List(context.TODO(),
 		&k8sclient.ListOptions{
 			LabelSelector: selector,
 		},
@@ -111,11 +109,6 @@ func (t *Task) setDirectImageMigrationWarning(dim *migapi.DirectImageMigration) 
 }
 
 func (t *Task) deleteDirectImageMigrationResources() error {
-	// fetch the destination cluster client
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 
 	// fetch the DIM
 	dim, err := t.getDirectImageMigration()
@@ -123,22 +116,24 @@ func (t *Task) deleteDirectImageMigrationResources() error {
 		return liberr.Wrap(err)
 	}
 
-	// fetch the corresponding DISM instance
-	dism, err := t.getDirectImageStreamMigrationForDIM(dim, destClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
+	if dim != nil {
+		// fetch the corresponding DISM instance
+		dism, err := t.getDirectImageStreamMigrationForDIM(dim)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 
-	// delete the DISM instance
-	err = destClient.Delete(context.TODO(), dism)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
+		// delete the DISM instance
+		err = t.Client.Delete(context.TODO(), dism)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 
-	// delete the DIM instance from destination cluster
-	err = destClient.Delete(context.TODO(), dim)
-	if err != nil {
-		return liberr.Wrap(err)
+		// delete the DIM instance from destination cluster
+		err = t.Client.Delete(context.TODO(), dim)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	return nil

@@ -1017,7 +1017,7 @@ func (t *Task) createRsyncClientPods() error {
 // Create rsync PV progress CR on destination cluster
 func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
-	labels := t.Owner.DirectVolumeMigrationLabels()
+	labels := t.Owner.GetCorrelationLabels()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{

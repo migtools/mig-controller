@@ -117,9 +117,3 @@ func (r *DirectVolumeMigration) HasErrors() bool {
 func init() {
 	SchemeBuilder.Register(&DirectVolumeMigration{}, &DirectVolumeMigrationList{})
 }
-
-func (r *DirectVolumeMigration) DirectVolumeMigrationLabels() map[string]string {
-	labels := r.GetCorrelationLabels()
-	labels["directvolumemigration"] = string(r.UID)
-	return labels
-}
