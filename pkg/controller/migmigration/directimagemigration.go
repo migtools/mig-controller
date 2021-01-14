@@ -57,7 +57,11 @@ func (t *Task) getDirectImageStreamMigrationForDIM(dim *migapi.DirectImageMigrat
 		return nil, liberr.Wrap(err)
 	}
 
-	return &dismList.Items[0], nil
+	if len(dismList.Items) > 0 {
+		return &dismList.Items[0], nil
+	}
+
+	return nil, nil
 }
 
 func (t *Task) createDirectImageMigration() error {

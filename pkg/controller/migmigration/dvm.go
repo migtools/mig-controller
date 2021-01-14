@@ -95,7 +95,11 @@ func (t *Task) getDirectVolumeMigrationProgressForDVM(dvm *migapi.DirectVolumeMi
 		return nil, liberr.Wrap(err)
 	}
 
-	return &dvmpList.Items[0], nil
+	if len(dvmpList.Items) > 0 {
+		return &dvmpList.Items[0], nil
+	}
+
+	return nil, nil
 }
 
 // Check if the DVM has completed.
