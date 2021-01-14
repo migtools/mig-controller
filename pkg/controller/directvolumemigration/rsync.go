@@ -830,19 +830,27 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 		if err != nil {
 			return nil, err
 		}
-		for _, claimName := range pvcs {
-			for _, p := range podList.Items {
-				if !isClaimUsedByPod(claimName, &p) {
-					continue
+
+		// for each namespace, have a pvc->SCC map to look up in the pvc loop later
+		// we will use the scc of the last pod in the list mounting the pvc
+		pvcSecurityContextMapForNamespace := map[string]PVCWithSecurityContext{}
+		for _, pod := range podList.Items {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					pvcSecurityContextMapForNamespace[vol.PersistentVolumeClaim.ClaimName] = PVCWithSecurityContext{
+						name:               vol.PersistentVolumeClaim.ClaimName,
+						fsGroup:            pod.Spec.SecurityContext.FSGroup,
+						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
+						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
+					}
 				}
-				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
-					name:               claimName,
-					fsGroup:            p.Spec.SecurityContext.FSGroup,
-					supplementalGroups: p.Spec.SecurityContext.SupplementalGroups,
-					seLinuxOptions:     p.Spec.SecurityContext.SELinuxOptions,
-				})
-				// get the first lucky pod's fsgroup to avoid selection problem.
-				break
+			}
+		}
+
+		for _, claimName := range pvcs {
+			pss, exists := pvcSecurityContextMapForNamespace[claimName]
+			if exists {
+				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
 			}
 			// pvc not used by any pod
 			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
@@ -966,14 +974,6 @@ func (t *Task) createRsyncClientPods() error {
 					Requests: requests,
 				},
 			})
-			//var fsGroup *int64
-			//sgs := []int64{}
-			//if vol.fsGroup != nil {
-			//	fsGroup = vol.fsGroup
-			//}
-			//if vol.supplementalGroups != nil && len(vol.supplementalGroups) != 0 {
-			//	sgs = vol.supplementalGroups
-			//}
 			clientPod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol.name),
