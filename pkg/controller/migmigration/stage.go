@@ -487,6 +487,12 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		for _, c := range pod.Status.InitContainerStatuses {
 			// If the init contianer is waiting, then nothing can happen.
 			if c.State.Waiting != nil {
+				// If the pod has unhealthy claims, we will fail the migration
+				// So the user can fix the plan/pvc.
+				if !hasHealthyClaims(&pod) {
+					report.failed = true
+					return
+				}
 				initReady = false
 				report.progress = append(
 					report.progress,
@@ -546,7 +552,6 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodUnknown {
 			report.failed = true
 			report.progress = append(report.progress, report.reasons...)
-			hasHealthyClaims(&pod)
 		}
 	}
 	return
