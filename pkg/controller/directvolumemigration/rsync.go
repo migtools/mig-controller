@@ -584,7 +584,7 @@ func (t *Task) createRsyncTransferPods() error {
 	return nil
 }
 
-func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string ) (corev1.ResourceList, corev1.ResourceList, error) {
+func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string) (corev1.ResourceList, corev1.ResourceList, error) {
 	podConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
 	if err != nil {
@@ -796,6 +796,87 @@ func (t *Task) getRsyncOptions() []string {
 	return rsyncOpts
 }
 
+type PVCWithSecurityContext struct {
+	name               string
+	fsGroup            *int64
+	supplementalGroups []int64
+	seLinuxOptions     *corev1.SELinuxOptions
+
+	// TODO:
+	// add capabilities for dvm controller to handle case the source
+	// application pods is privileged with the following flags from
+	// PodSecurityContext and Containers' SecurityContext
+	// We need to
+	// 1. go through the pod's volume.
+	// 2. find the container where it is volume mounted.
+	//    i. if the container's fields are non-nil, use that
+	//    ii. if the container's fields are nil, use the pods fields.
+
+	// RunAsUser    *int64
+	// RunAsGroup   *int64
+	// RunAsNonRoot *bool
+}
+
+// Get fsGroup per PVC
+func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext, error) {
+	pvcMap := t.getPVCNamespaceMap()
+	pvcSecurityContextMap := map[string][]PVCWithSecurityContext{}
+	for ns, _ := range pvcMap {
+		pvcSecurityContextMap[ns] = []PVCWithSecurityContext{}
+	}
+	for ns, pvcs := range pvcMap {
+		srcClient, err := t.getSourceClient()
+		if err != nil {
+			return nil, err
+		}
+		podList := &corev1.PodList{}
+		err = srcClient.List(context.TODO(), &k8sclient.ListOptions{Namespace: ns}, podList)
+		if err != nil {
+			return nil, err
+		}
+
+		// for each namespace, have a pvc->SCC map to look up in the pvc loop later
+		// we will use the scc of the last pod in the list mounting the pvc
+		pvcSecurityContextMapForNamespace := map[string]PVCWithSecurityContext{}
+		for _, pod := range podList.Items {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					pvcSecurityContextMapForNamespace[vol.PersistentVolumeClaim.ClaimName] = PVCWithSecurityContext{
+						name:               vol.PersistentVolumeClaim.ClaimName,
+						fsGroup:            pod.Spec.SecurityContext.FSGroup,
+						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
+						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
+					}
+				}
+			}
+		}
+
+		for _, claimName := range pvcs {
+			pss, exists := pvcSecurityContextMapForNamespace[claimName]
+			if exists {
+				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
+			}
+			// pvc not used by any pod
+			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
+				name:               claimName,
+				fsGroup:            nil,
+				supplementalGroups: nil,
+				seLinuxOptions:     nil,
+			})
+		}
+	}
+	return pvcSecurityContextMap, nil
+}
+
+func isClaimUsedByPod(claimName string, p *corev1.Pod) bool {
+	for _, vol := range p.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName == claimName {
+			return true
+		}
+	}
+	return false
+}
+
 // Create rsync client pods
 func (t *Task) createRsyncClientPods() error {
 	// Get client for destination
@@ -814,7 +895,11 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
-	pvcMap := t.getPVCNamespaceMap()
+	pvcMap, err := t.getfsGroupMapForNamespace()
+	if err != nil {
+		return err
+	}
+
 	password, err := t.getRsyncPassword()
 	if err != nil {
 		return err
@@ -833,7 +918,10 @@ func (t *Task) createRsyncClientPods() error {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
 		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferSvc, Namespace: ns}
-		srcClient.Get(context.TODO(), key, &svc)
+		err := srcClient.Get(context.TODO(), key, &svc)
+		if err != nil {
+			return err
+		}
 		ip := svc.Spec.ClusterIP
 
 		trueBool := true
@@ -845,21 +933,21 @@ func (t *Task) createRsyncClientPods() error {
 			volumeMounts := []corev1.VolumeMount{}
 			containers := []corev1.Container{}
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      vol,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol),
+				Name:      vol.name,
+				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol.name),
 			})
 			volumes = append(volumes, corev1.Volume{
-				Name: vol,
+				Name: vol.name,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: vol,
+						ClaimName: vol.name,
 					},
 				},
 			})
 			rsyncCommand := []string{"rsync"}
 			rsyncCommand = append(rsyncCommand, t.getRsyncOptions()...)
-			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol))
-			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol))
+			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol.name))
+			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol.name))
 			t.Log.Info(fmt.Sprintf("Using Rsync command [%s]", strings.Join(rsyncCommand, " ")))
 			containers = append(containers, corev1.Container{
 				Name:  DirectVolumeMigrationRsyncClient,
@@ -892,7 +980,7 @@ func (t *Task) createRsyncClientPods() error {
 			})
 			clientPod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol.name),
 					Namespace: ns,
 					Labels: map[string]string{
 						"app":                   DirectVolumeMigrationRsyncTransfer,
@@ -903,7 +991,12 @@ func (t *Task) createRsyncClientPods() error {
 					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes:       volumes,
 					Containers:    containers,
-					NodeName:      pvcNodeMap[ns+"/"+vol],
+					NodeName:      pvcNodeMap[ns+"/"+vol.name],
+					SecurityContext: &corev1.PodSecurityContext{
+						SupplementalGroups: vol.supplementalGroups,
+						FSGroup:            vol.fsGroup,
+						SELinuxOptions:     vol.seLinuxOptions,
+					},
 				},
 			}
 			err = srcClient.Create(context.TODO(), &clientPod)
