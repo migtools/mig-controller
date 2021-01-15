@@ -112,12 +112,12 @@ var VolumeMigration = Itinerary{
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
+		{phase: DestinationPVCsCreated},
 		{phase: CreateRsyncRoute},
 		{phase: CreateRsyncConfig},
 		{phase: CreateStunnelConfig},
 		{phase: CreatePVProgressCRs},
 		{phase: CreateRsyncTransferPods},
-		{phase: DestinationPVCsCreated},
 		{phase: WaitForRsyncTransferPodsRunning},
 		{phase: CreateStunnelClientPods},
 		{phase: WaitForStunnelClientPodsRunning},
@@ -241,15 +241,13 @@ func (t *Task) Run() error {
 		}
 	case DestinationPVCsCreated:
 		// Get the PVCs on the destination and confirm they are bound
-		next, err := t.areDestinationPVCsBound()
+		err := t.getDestinationPVCs()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if next {
-			t.Requeue = NoReQ
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
 		}
 	case CreateRsyncRoute:
 		err := t.createRsyncTransferRoute()
