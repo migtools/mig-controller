@@ -42,6 +42,7 @@ const (
 	NsNotFoundOnSourceCluster                  = "NamespaceNotFoundOnSourceCluster"
 	NsNotFoundOnDestinationCluster             = "NamespaceNotFoundOnDestinationCluster"
 	NsLimitExceeded                            = "NamespaceLimitExceeded"
+	NsLengthExceeded                           = "NamespaceLengthExceeded"
 	PodLimitExceeded                           = "PodLimitExceeded"
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
@@ -84,15 +85,16 @@ const (
 
 // Reasons
 const (
-	NotSet        = "NotSet"
-	NotFound      = "NotFound"
-	KeyNotFound   = "KeyNotFound"
-	NotDistinct   = "NotDistinct"
-	LimitExceeded = "LimitExceeded"
-	NotDone       = "NotDone"
-	Done          = "Done"
-	Conflict      = "Conflict"
-	NotHealthy    = "NotHealthy"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	KeyNotFound    = "KeyNotFound"
+	NotDistinct    = "NotDistinct"
+	LimitExceeded  = "LimitExceeded"
+	LengthExceeded = "LengthExceeded"
+	NotDone        = "NotDone"
+	Done           = "Done"
+	Conflict       = "Conflict"
+	NotHealthy     = "NotHealthy"
 )
 
 // Statuses
@@ -247,8 +249,39 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 		})
 		return nil
 	}
+	namespaces := r.validateNamespaceLengthForDVM(plan)
+	if len(namespaces) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsLengthExceeded,
+			Status:   True,
+			Reason:   LengthExceeded,
+			Category: Warn,
+			Message:  fmt.Sprintf("Namespaces [] exceed 59 characters and no destination route subdomain was configured. Direct Volume Migration may fail."),
+			Items:    namespaces,
+		})
+		return nil
+	}
 
 	return nil
+}
+
+func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []string {
+	items := []string{}
+	// This is not relevant if the plan is not running DVM
+	// This validation is also not needed if the user has supplied the route
+	// subdomain for the destination cluster
+	if plan.Spec.IndirectVolumeMigration || Settings.Plan.DestinationRouteSubdomain != "" {
+		return items
+	}
+	for _, ns := range plan.Spec.Namespaces {
+		// If length of namespace is 60+ characters, route creation will fail as
+		// the route generator will attempt to create a route with:
+		// dvm-<namespace> and this cannot exceed 63 characters
+		if len(ns) > 59 {
+			items = append(items, ns)
+		}
+	}
+	return items
 }
 
 // Validate the total number of running pods (limit) across namespaces.

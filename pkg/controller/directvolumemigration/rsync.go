@@ -353,6 +353,23 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 		}
+		// This is a backdoor setting to help guarantee DVM can still function if a
+		// user is migrating namespaces that are 60+ characters
+		// NOTE: We do no validation of this subdomain value. User is expected to
+		// set this properly and it's only used for the unlikely case a user needs
+		// to migrate namespaces with very long names.
+		if migsettings.Settings.Plan.DestinationRouteSubdomain != "" {
+			// Ensure that route prefix will not exceed 63 chars
+			// Route gen will add `-` between name + ns so need to ensure below is <62 chars
+			// NOTE: only do this if we actually get a configured subdomain,
+			// otherwise just use the name and hope for the best
+			prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, ns)
+			if len(prefix) > 62 {
+				prefix = prefix[0:62]
+			}
+			host := fmt.Sprintf("%s.%s", prefix, migsettings.Settings.Plan.DestinationRouteSubdomain)
+			route.Spec.Host = host
+		}
 		err = destClient.Create(context.TODO(), &route)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Rsync transfer route already exists on destination", "namespace", ns)
