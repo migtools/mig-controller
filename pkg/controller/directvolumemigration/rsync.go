@@ -3,8 +3,10 @@ package directvolumemigration
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/hex"
 	"fmt"
 	random "math/rand"
 	"regexp"
@@ -1019,7 +1021,7 @@ func (t *Task) createPVProgressCR() error {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Name:      getMD5Hash(t.Owner.Name + vol + ns),
 					Namespace: migapi.OpenshiftMigrationNamespace,
 				},
 				Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -1045,6 +1047,11 @@ func (t *Task) createPVProgressCR() error {
 	return nil
 }
 
+func getMD5Hash(s string) string {
+	hash := md5.Sum([]byte(s))
+	return hex.EncodeToString(hash[:])
+}
+
 func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
@@ -1055,7 +1062,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{}
 			err := t.Client.Get(context.TODO(), types.NamespacedName{
-				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+				Name:      getMD5Hash(t.Owner.Name + vol + ns),
 				Namespace: migapi.OpenshiftMigrationNamespace,
 			}, &dvmp)
 			if err != nil {
@@ -1361,7 +1368,7 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 		for _, vol := range vols {
 			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+					Name:      getMD5Hash(t.Owner.Name + vol + ns),
 					Namespace: ns,
 				},
 			}, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
