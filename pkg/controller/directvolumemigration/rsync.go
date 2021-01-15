@@ -1472,7 +1472,7 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 		for _, vol := range vols {
 			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getMD5Hash(t.Owner.Name + vol + ns),
+					Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
 					Namespace: ns,
 				},
 			}, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
