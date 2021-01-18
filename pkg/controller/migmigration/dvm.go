@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
@@ -195,5 +196,24 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 	if len(pvcList) > 0 {
 		return &pvcList
 	}
+	return nil
+}
+
+func (t *Task) deleteDirectVolumeMigrationResources() error {
+
+	// fetch the DVM
+	dvm, err := t.getDirectVolumeMigration()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	if dvm != nil {
+		// delete the DVM instance
+		err = t.Client.Delete(context.TODO(), dvm)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
 	return nil
 }
