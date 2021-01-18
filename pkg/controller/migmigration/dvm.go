@@ -13,7 +13,6 @@ import (
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -80,27 +79,6 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	return nil, nil
 }
 
-func (t *Task) getDirectVolumeMigrationProgressForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.DirectVolumeMigrationProgress, error) {
-
-	dvmLabels := dvm.GetCorrelationLabels()
-	selector := labels.SelectorFromSet(dvmLabels)
-	dvmpList := migapi.DirectVolumeMigrationProgressList{}
-	err := t.Client.List(context.TODO(),
-		&k8sclient.ListOptions{
-			LabelSelector: selector,
-		},
-		&dvmpList)
-
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	if len(dvmpList.Items) > 0 {
-		return &dvmpList.Items[0], nil
-	}
-
-	return nil, nil
-}
 
 // Check if the DVM has completed.
 // Returns if it has completed, why it failed, and it's progress results

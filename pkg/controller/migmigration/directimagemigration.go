@@ -19,8 +19,6 @@ package migmigration
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
-
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,27 +40,6 @@ func (t *Task) getDirectImageMigration() (*migapi.DirectImageMigration, error) {
 	return nil, nil
 }
 
-func (t *Task) getDirectImageStreamMigrationForDIM(dim *migapi.DirectImageMigration) (*migapi.DirectImageStreamMigration, error) {
-
-	dimLabels := dim.GetCorrelationLabels()
-	selector := labels.SelectorFromSet(dimLabels)
-	dismList := migapi.DirectImageStreamMigrationList{}
-	err := t.Client.List(context.TODO(),
-		&k8sclient.ListOptions{
-			LabelSelector: selector,
-		},
-		&dismList)
-
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	if len(dismList.Items) > 0 {
-		return &dismList.Items[0], nil
-	}
-
-	return nil, nil
-}
 
 func (t *Task) createDirectImageMigration() error {
 	dim, err := t.getDirectImageMigration()
