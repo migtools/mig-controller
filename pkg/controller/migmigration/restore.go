@@ -424,15 +424,10 @@ func (t *Task) deleteCorrelatedRestores() error {
 		return liberr.Wrap(err)
 	}
 
-	migplan, err := t.Owner.GetPlan(client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(migplan.GetCorrelationLabels()),
+		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()),
 		&list)
 	if err != nil {
 		return liberr.Wrap(err)
