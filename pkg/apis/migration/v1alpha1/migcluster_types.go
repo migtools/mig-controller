@@ -57,7 +57,7 @@ const (
 	RegistryImageKey      = "REGISTRY_IMAGE"
 	StagePodImageKey      = "STAGE_IMAGE"
 	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
-	RsyncTransferImageKey = "CLUSTER_SUBDOMAIN"
+	ClusterSubdomainKey   = "CLUSTER_SUBDOMAIN"
 )
 
 // MigClusterSpec defines the desired state of MigCluster

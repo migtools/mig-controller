@@ -270,7 +270,12 @@ func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []
 	// This is not relevant if the plan is not running DVM
 	// This validation is also not needed if the user has supplied the route
 	// subdomain for the destination cluster
-	if plan.Spec.IndirectVolumeMigration || Settings.Plan.DestinationRouteSubdomain != "" {
+	cluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return items
+	}
+	subdomain, _ := cluster.GetClusterSubdomain(r)
+	if plan.Spec.IndirectVolumeMigration || subdomain != "" {
 		return items
 	}
 	for _, ns := range plan.Spec.Namespaces {

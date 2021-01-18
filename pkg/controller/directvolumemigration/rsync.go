@@ -353,12 +353,21 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 		}
+		// Get cluster subdomain if it exists
+		cluster, err := t.Owner.GetDestinationCluster(t.Client)
+		if err != nil {
+			return err
+		}
+		// Ignore error since this is optional config and won't breka
+		// anything if it doesn't exist
+		subdomain, _ := cluster.GetClusterSubdomain(t.Client)
+
 		// This is a backdoor setting to help guarantee DVM can still function if a
 		// user is migrating namespaces that are 60+ characters
 		// NOTE: We do no validation of this subdomain value. User is expected to
 		// set this properly and it's only used for the unlikely case a user needs
 		// to migrate namespaces with very long names.
-		if migsettings.Settings.Plan.DestinationRouteSubdomain != "" {
+		if subdomain != "" {
 			// Ensure that route prefix will not exceed 63 chars
 			// Route gen will add `-` between name + ns so need to ensure below is <62 chars
 			// NOTE: only do this if we actually get a configured subdomain,
@@ -367,7 +376,7 @@ func (t *Task) createRsyncTransferRoute() error {
 			if len(prefix) > 62 {
 				prefix = prefix[0:62]
 			}
-			host := fmt.Sprintf("%s.%s", prefix, migsettings.Settings.Plan.DestinationRouteSubdomain)
+			host := fmt.Sprintf("%s.%s", prefix, subdomain)
 			route.Spec.Host = host
 		}
 		err = destClient.Create(context.TODO(), &route)
