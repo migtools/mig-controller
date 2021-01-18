@@ -19,7 +19,6 @@ package migmigration
 import (
 	"context"
 	"fmt"
-
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,4 +86,23 @@ func (t *Task) setDirectImageMigrationWarning(dim *migapi.DirectImageMigration) 
 			Durable:  true,
 		})
 	}
+}
+
+func (t *Task) deleteDirectImageMigrationResources() error {
+
+	// fetch the DIM
+	dim, err := t.getDirectImageMigration()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	if dim != nil {
+		// delete the DIM instance
+		err = t.Client.Delete(context.TODO(), dim)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	return nil
 }
