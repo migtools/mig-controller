@@ -358,7 +358,7 @@ func (t *Task) createRsyncTransferRoute() error {
 		if err != nil {
 			return err
 		}
-		// Ignore error since this is optional config and won't breka
+		// Ignore error since this is optional config and won't break
 		// anything if it doesn't exist
 		subdomain, _ := cluster.GetClusterSubdomain(t.Client)
 
@@ -372,7 +372,7 @@ func (t *Task) createRsyncTransferRoute() error {
 			// Route gen will add `-` between name + ns so need to ensure below is <62 chars
 			// NOTE: only do this if we actually get a configured subdomain,
 			// otherwise just use the name and hope for the best
-			prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, ns)
+			prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, getMD5Hash(ns))
 			if len(prefix) > 62 {
 				prefix = prefix[0:62]
 			}
@@ -671,6 +671,19 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	err = destClient.Get(context.TODO(), key, &route)
 	if err != nil {
 		return "", err
+	}
+	// Check if we can find the admitted condition for the route
+	admitted := false
+	for _, ingress := range route.Status.Ingress {
+		for _, condition := range ingress.Conditions {
+			if condition == routev1.RouteAdmitted {
+				admitted = true
+				break
+			}
+		}
+	}
+	if !admitted {
+		return "", errors.New("Failed to find Admitted condition on route for DVM. Check if route is valid")
 	}
 	return route.Spec.Host, nil
 }
