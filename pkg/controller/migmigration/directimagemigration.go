@@ -120,24 +120,10 @@ func (t *Task) deleteDirectImageMigrationResources() error {
 		return liberr.Wrap(err)
 	}
 
-	if dim != nil {
-		// fetch the corresponding DISM instance
-		dism, err := t.getDirectImageStreamMigrationForDIM(dim)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-
-		// delete the DISM instance
-		err = t.Client.Delete(context.TODO(), dism)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-
-		// delete the DIM instance from destination cluster
-		err = t.Client.Delete(context.TODO(), dim)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+	// delete the DIM instance
+	err = t.Client.Delete(context.TODO(), dim)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 
 	return nil

@@ -230,24 +230,10 @@ func (t *Task) deleteDirectVolumeMigrationResources() error {
 		return liberr.Wrap(err)
 	}
 
-	if dvm != nil {
-		// fetch the corresponding DVMP instance
-		dvmp, err := t.getDirectVolumeMigrationProgressForDVM(dvm)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-
-		// delete the DVMP instance
-		err = t.Client.Delete(context.TODO(), dvmp)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-
-		// delete the DVM instance from destination cluster
-		err = t.Client.Delete(context.TODO(), dvm)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+	// delete the DVM instance
+	err = t.Client.Delete(context.TODO(), dvm)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
 
 	return nil
