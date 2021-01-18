@@ -676,7 +676,7 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	admitted := false
 	for _, ingress := range route.Status.Ingress {
 		for _, condition := range ingress.Conditions {
-			if condition == routev1.RouteAdmitted {
+			if condition.Type == routev1.RouteAdmitted {
 				admitted = true
 				break
 			}
