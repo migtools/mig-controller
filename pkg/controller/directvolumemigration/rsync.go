@@ -68,7 +68,8 @@ data:
     syslog facility = local7
     read only = no
     list = yes
-    max = 3
+    log file = /dev/stdout
+    max verbosity = 4
     auth users = {{ .SshUser }}
     secrets file = /etc/rsyncd.secrets
     hosts allow = ::1, 127.0.0.1, localhost

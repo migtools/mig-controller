@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"text/template"
+
+	"gopkg.in/yaml.v2"
 
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+
 	//"encoding/asn1"
 	"encoding/pem"
 	"math/big"
@@ -18,6 +20,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
 	//"k8s.io/apimachinery/pkg/types"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,6 +71,7 @@ data:
     socket = l:TCP_NODELAY=1
     socket = r:TCP_NODELAY=1
     sslVersion = TLSv1.2
+    debug = 7
 
     [rsync]
     accept = {{ .StunnelPort }}
@@ -436,7 +440,7 @@ func (t *Task) createStunnelClientPods() error {
 				ReadOnlyRootFilesystem: &trueBool,
 			},
 			Resources: corev1.ResourceRequirements{
-				Limits: limits,
+				Limits:   limits,
 				Requests: requests,
 			},
 		})
