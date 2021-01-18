@@ -79,7 +79,6 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	return nil, nil
 }
 
-
 // Check if the DVM has completed.
 // Returns if it has completed, why it failed, and it's progress results
 func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigration) (completed bool, failureReasons, progress []string) {
@@ -208,10 +207,12 @@ func (t *Task) deleteDirectVolumeMigrationResources() error {
 		return liberr.Wrap(err)
 	}
 
-	// delete the DVM instance
-	err = t.Client.Delete(context.TODO(), dvm)
-	if err != nil {
-		return liberr.Wrap(err)
+	if dvm != nil {
+		// delete the DVM instance
+		err = t.Client.Delete(context.TODO(), dvm)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	return nil

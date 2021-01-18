@@ -40,7 +40,6 @@ func (t *Task) getDirectImageMigration() (*migapi.DirectImageMigration, error) {
 	return nil, nil
 }
 
-
 func (t *Task) createDirectImageMigration() error {
 	dim, err := t.getDirectImageMigration()
 	if err != nil {
@@ -97,10 +96,12 @@ func (t *Task) deleteDirectImageMigrationResources() error {
 		return liberr.Wrap(err)
 	}
 
-	// delete the DIM instance
-	err = t.Client.Delete(context.TODO(), dim)
-	if err != nil {
-		return liberr.Wrap(err)
+	if dim != nil {
+		// delete the DIM instance
+		err = t.Client.Delete(context.TODO(), dim)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	return nil
