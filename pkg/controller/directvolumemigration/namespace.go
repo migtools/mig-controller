@@ -32,12 +32,15 @@ func (t *Task) ensureDestinationNamespaces() error {
 		if err != nil {
 			return err
 		}
+		// Remove openshift node-selector label
+		newAnnotations := srcNS.Annotations
+		delete(newAnnotations, "openshift.io/node-selector")
 
 		// Create namespace on destination with same annotations
 		destNs := corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        ns,
-				Annotations: srcNS.Annotations,
+				Annotations: newAnnotations,
 			},
 		}
 		err = destClient.Create(context.TODO(), &destNs)
