@@ -931,6 +931,7 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 		for _, claim := range pvcs {
 			pss, exists := pvcSecurityContextMapForNamespace[claim.Name]
 			if exists {
+				pss.verify = claim.Verify
 				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
 				continue
 			}
