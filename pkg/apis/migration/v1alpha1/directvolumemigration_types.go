@@ -26,6 +26,7 @@ type PVCToMigrate struct {
 	*kapi.ObjectReference `json:",inline"`
 	TargetStorageClass    string                            `json:"targetStorageClass"`
 	TargetAccessModes     []kapi.PersistentVolumeAccessMode `json:"targetAccessModes,omitEmpty"`
+	Verify                bool                              `json:"verify,omitEmpty"`
 }
 
 // DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
