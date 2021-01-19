@@ -7,7 +7,7 @@ import (
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,7 +38,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	}
 	err = task.Run()
 	if err != nil {
-		if errors.IsConflict(err) {
+		if k8serrors.IsConflict(err) {
 			return FastReQ, nil
 		}
 		log.Trace(err)
