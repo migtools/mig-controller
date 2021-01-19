@@ -675,11 +675,12 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	return route.Spec.Host, nil
 }
 
-func (t *Task) areRsyncRoutesAdmitted() (bool, error) {
+func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
+	messages := []string{}
 	// Get client for destination
 	destClient, err := t.getDestinationClient()
 	if err != nil {
-		return false, err
+		return false, messages, err
 	}
 	nsMap := t.getPVCNamespaceMap()
 	for namespace, _ := range nsMap {
@@ -688,23 +689,28 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, error) {
 		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
 		err = destClient.Get(context.TODO(), key, &route)
 		if err != nil {
-			return false, err
+			return false, messages, err
 		}
-		admitted := false
+		admitted := true
+		message := ""
 		// Check if we can find the admitted condition for the route
 		for _, ingress := range route.Status.Ingress {
 			for _, condition := range ingress.Conditions {
-				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
-					admitted = true
+				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
+					admitted = false
+					message = condition.Message
 					break
 				}
 			}
 		}
 		if !admitted {
-			return false, nil
+			messages = append(messages, message)
 		}
 	}
-	return true, nil
+	if len(messages) > 0 {
+		return false, messages, nil
+	}
+	return true, []string{}, nil
 }
 
 func (t *Task) createRsyncPassword() (string, error) {

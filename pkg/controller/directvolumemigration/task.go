@@ -261,7 +261,7 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 	case EnsureRsyncRouteAdmitted:
-		admitted, err := t.areRsyncRoutesAdmitted()
+		admitted, reasons, err := t.areRsyncRoutesAdmitted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -285,7 +285,7 @@ func (t *Task) Run() error {
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  "Some or all rsync transfer routes have failed to be admitted within 3 mins on destination cluster",
+						Message:  fmt.Sprintf("Some or all rsync transfer routes have failed to be admitted within 3 mins on destination cluster. Errors: %v", reasons),
 					},
 				)
 			}
