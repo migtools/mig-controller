@@ -10,6 +10,7 @@ import (
 	"fmt"
 	random "math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -410,6 +411,10 @@ func (t *Task) createRsyncTransferPods() error {
 	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
 	mode := int32(0600)
 
+	isRsyncPrivileged, err := isRsyncPrivileged(destClient)
+	if err != nil {
+		return err
+	}
 	// Loop through namespaces and create transfer pod
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
@@ -535,7 +540,7 @@ func (t *Task) createRsyncTransferPods() error {
 						},
 						VolumeMounts: volumeMounts,
 						SecurityContext: &corev1.SecurityContext{
-							Privileged:             &trueBool,
+							Privileged:             &isRsyncPrivileged,
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
 						},
@@ -567,7 +572,7 @@ func (t *Task) createRsyncTransferPods() error {
 							},
 						},
 						SecurityContext: &corev1.SecurityContext{
-							Privileged:             &trueBool,
+							Privileged:             &isRsyncPrivileged,
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
 						},
@@ -587,7 +592,7 @@ func (t *Task) createRsyncTransferPods() error {
 	return nil
 }
 
-func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit string, cpu_request string, memory_request string) (corev1.ResourceList, corev1.ResourceList, error) {
+func getPodResourceLists(client k8sclient.Client, cpuLimit string, memoryLimit string, cpu_request string, memoryRequest string) (corev1.ResourceList, corev1.ResourceList, error) {
 	podConfigMap := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
 	if err != nil {
@@ -597,12 +602,12 @@ func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit
 		corev1.ResourceMemory: resource.MustParse("1Gi"),
 		corev1.ResourceCPU:    resource.MustParse("1"),
 	}
-	if _, exists := podConfigMap.Data[cpu_limit]; exists {
-		cpu := resource.MustParse(podConfigMap.Data[cpu_limit])
+	if _, exists := podConfigMap.Data[cpuLimit]; exists {
+		cpu := resource.MustParse(podConfigMap.Data[cpuLimit])
 		limits[corev1.ResourceCPU] = cpu
 	}
-	if _, exists := podConfigMap.Data[memory_limit]; exists {
-		memory := resource.MustParse(podConfigMap.Data[memory_limit])
+	if _, exists := podConfigMap.Data[memoryLimit]; exists {
+		memory := resource.MustParse(podConfigMap.Data[memoryLimit])
 		limits[corev1.ResourceMemory] = memory
 	}
 	requests := corev1.ResourceList{
@@ -613,8 +618,8 @@ func getPodResourceLists(client k8sclient.Client, cpu_limit string, memory_limit
 		cpu := resource.MustParse(podConfigMap.Data[cpu_request])
 		requests[corev1.ResourceCPU] = cpu
 	}
-	if _, exists := podConfigMap.Data[memory_request]; exists {
-		memory := resource.MustParse(podConfigMap.Data[memory_request])
+	if _, exists := podConfigMap.Data[memoryRequest]; exists {
+		memory := resource.MustParse(podConfigMap.Data[memoryRequest])
 		requests[corev1.ResourceMemory] = memory
 	}
 	return limits, requests, nil
@@ -815,9 +820,8 @@ type PVCWithSecurityContext struct {
 	//    i. if the container's fields are non-nil, use that
 	//    ii. if the container's fields are nil, use the pods fields.
 
-	// RunAsUser    *int64
-	// RunAsGroup   *int64
-	// RunAsNonRoot *bool
+	// RunAsUser  *int64
+	// RunAsGroup *int64
 }
 
 // Get fsGroup per PVC
@@ -858,6 +862,7 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 			pss, exists := pvcSecurityContextMapForNamespace[claimName]
 			if exists {
 				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
+				continue
 			}
 			// pvc not used by any pod
 			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
@@ -917,6 +922,8 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
+	isPrivileged, err := isRsyncPrivileged(srcClient)
+
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -972,7 +979,7 @@ func (t *Task) createRsyncClientPods() error {
 				},
 				VolumeMounts: volumeMounts,
 				SecurityContext: &corev1.SecurityContext{
-					Privileged:             &trueBool,
+					Privileged:             &isPrivileged,
 					RunAsUser:              &runAsUser,
 					ReadOnlyRootFilesystem: &trueBool,
 				},
@@ -1013,6 +1020,26 @@ func (t *Task) createRsyncClientPods() error {
 
 	}
 	return nil
+}
+
+func isRsyncPrivileged(client compat.Client) (bool, error) {
+	cm := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}, cm)
+	if err != nil {
+		return false, err
+	}
+	if cm.Data != nil {
+		isRsyncPrivileged, exists := cm.Data["RSYNC_PRIVILEGED"]
+		if !exists {
+			return false, fmt.Errorf("RSYNC_PRIVILEGED boolean does not exists")
+		}
+		parsed, err := strconv.ParseBool(isRsyncPrivileged)
+		if err != nil {
+			return false, err
+		}
+		return parsed, nil
+	}
+	return false, fmt.Errorf("configmap %s of source cluster has empty data", k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}.String())
 }
 
 // Create rsync PV progress CR on destination cluster
