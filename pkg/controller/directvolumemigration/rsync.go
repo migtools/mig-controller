@@ -7,7 +7,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	random "math/rand"
 	"regexp"
@@ -673,20 +672,39 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Check if we can find the admitted condition for the route
-	admitted := false
-	for _, ingress := range route.Status.Ingress {
-		for _, condition := range ingress.Conditions {
-			if condition.Type == routev1.RouteAdmitted {
-				admitted = true
-				break
+	return route.Spec.Host, nil
+}
+
+func (t *Task) areRsyncRoutesAdmitted() (bool, error) {
+	// Get client for destination
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return false, err
+	}
+	nsMap := t.getPVCNamespaceMap()
+	for namespace, _ := range nsMap {
+		route := routev1.Route{}
+
+		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
+		err = destClient.Get(context.TODO(), key, &route)
+		if err != nil {
+			return false, err
+		}
+		admitted := false
+		// Check if we can find the admitted condition for the route
+		for _, ingress := range route.Status.Ingress {
+			for _, condition := range ingress.Conditions {
+				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
+					admitted = true
+					break
+				}
 			}
 		}
+		if !admitted {
+			return false, nil
+		}
 	}
-	if !admitted {
-		return "", errors.New("Failed to find Admitted condition on route for DVM. Check if route is valid")
-	}
-	return route.Spec.Host, nil
+	return true, nil
 }
 
 func (t *Task) createRsyncPassword() (string, error) {
