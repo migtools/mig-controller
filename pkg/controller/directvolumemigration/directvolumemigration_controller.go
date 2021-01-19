@@ -23,7 +23,6 @@ import (
 	migrationv1alpha1 "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -73,25 +72,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
-func GetDVMRefFromDPMP(a handler.MapObject) []reconcile.Request {
-	requests := []reconcile.Request{}
-
-	labels := a.Meta.GetLabels()
-	name, exists := labels["dvm-name"]
-	if name == "" || !exists {
-		return requests
-	}
-
-	requests = append(requests, reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: a.Meta.GetNamespace(),
-			Name:      name,
-		},
-	})
-
-	return requests
-}
-
 var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 
 // ReconcileDirectVolumeMigration reconciles a DirectVolumeMigration object
@@ -109,6 +89,8 @@ type ReconcileDirectVolumeMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	log.Reset()
+
 	// Fetch the DirectVolumeMigration instance
 	direct := &migrationv1alpha1.DirectVolumeMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, direct)
@@ -121,6 +103,9 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+
+	// Set values
+	log.SetValues("direct", request)
 
 	// Check if completed
 	if direct.Status.Phase == Completed {

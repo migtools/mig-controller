@@ -191,6 +191,7 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 			},
 			TargetStorageClass: pv.Selection.StorageClass,
 			TargetAccessModes:  accessModes,
+			Verify:             pv.Selection.Verify,
 		})
 	}
 	if len(pvcList) > 0 {

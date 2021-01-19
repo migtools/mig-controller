@@ -191,7 +191,7 @@ func (t *Task) createRsyncConfig() error {
 	for ns, vols := range pvcMap {
 		pvcList := []pvc{}
 		for _, vol := range vols {
-			pvcList = append(pvcList, pvc{Name: vol})
+			pvcList = append(pvcList, pvc{Name: vol.Name})
 		}
 		// Generate template
 		rsyncConf := rsyncConfig{
@@ -510,14 +510,14 @@ func (t *Task) createRsyncTransferPods() error {
 		// Add PVC volume mounts
 		for _, vol := range vols {
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      vol,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol),
+				Name:      vol.Name,
+				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol.Name),
 			})
 			volumes = append(volumes, corev1.Volume{
-				Name: vol,
+				Name: vol.Name,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: vol,
+						ClaimName: vol.Name,
 					},
 				},
 			})
@@ -651,14 +651,19 @@ func getPodResourceLists(client k8sclient.Client, cpuLimit string, memoryLimit s
 	return limits, requests, nil
 }
 
-func (t *Task) getPVCNamespaceMap() map[string][]string {
-	nsMap := map[string][]string{}
+type pvcMapElement struct {
+	Name   string
+	Verify bool
+}
+
+func (t *Task) getPVCNamespaceMap() map[string][]pvcMapElement {
+	nsMap := map[string][]pvcMapElement{}
 	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
 		if vols, exists := nsMap[pvc.Namespace]; exists {
-			vols = append(vols, pvc.Name)
+			vols = append(vols, pvcMapElement{Name: pvc.Name, Verify: pvc.Verify})
 			nsMap[pvc.Namespace] = vols
 		} else {
-			nsMap[pvc.Namespace] = []string{pvc.Name}
+			nsMap[pvc.Namespace] = []pvcMapElement{pvcMapElement{Name: pvc.Name, Verify: pvc.Verify}}
 		}
 	}
 	return nsMap
@@ -873,6 +878,7 @@ type PVCWithSecurityContext struct {
 	fsGroup            *int64
 	supplementalGroups []int64
 	seLinuxOptions     *corev1.SELinuxOptions
+	verify             bool
 
 	// TODO:
 	// add capabilities for dvm controller to handle case the source
@@ -922,18 +928,20 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 			}
 		}
 
-		for _, claimName := range pvcs {
-			pss, exists := pvcSecurityContextMapForNamespace[claimName]
+		for _, claim := range pvcs {
+			pss, exists := pvcSecurityContextMapForNamespace[claim.Name]
 			if exists {
+				pss.verify = claim.Verify
 				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
 				continue
 			}
 			// pvc not used by any pod
 			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
-				name:               claimName,
+				name:               claim.Name,
 				fsGroup:            nil,
 				supplementalGroups: nil,
 				seLinuxOptions:     nil,
+				verify:             claim.Verify,
 			})
 		}
 	}
@@ -1020,6 +1028,9 @@ func (t *Task) createRsyncClientPods() error {
 			})
 			rsyncCommand := []string{"rsync"}
 			rsyncCommand = append(rsyncCommand, t.getRsyncOptions()...)
+			if vol.verify {
+				rsyncCommand = append(rsyncCommand, "--checksum")
+			}
 			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol.name))
 			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol.name))
 			t.Log.Info(fmt.Sprintf("Using Rsync command [%s]", strings.Join(rsyncCommand, " ")))
@@ -1114,7 +1125,7 @@ func (t *Task) createPVProgressCR() error {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getMD5Hash(t.Owner.Name + vol + ns),
+					Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
 					Labels:    labels,
 					Namespace: migapi.OpenshiftMigrationNamespace,
 				},
@@ -1122,7 +1133,7 @@ func (t *Task) createPVProgressCR() error {
 					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
 					PodRef: &corev1.ObjectReference{
 						Namespace: ns,
-						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+						Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol.Name),
 					},
 				},
 				Status: migapi.DirectVolumeMigrationProgressStatus{},
@@ -1156,7 +1167,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{}
 			err := t.Client.Get(context.TODO(), types.NamespacedName{
-				Name:      getMD5Hash(t.Owner.Name + vol + ns),
+				Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
 				Namespace: migapi.OpenshiftMigrationNamespace,
 			}, &dvmp)
 			if err != nil {
@@ -1165,7 +1176,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 			}
 			objRef := &corev1.ObjectReference{
 				Namespace: ns,
-				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol),
+				Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol.Name),
 			}
 			switch {
 			case dvmp.Status.PodPhase == corev1.PodRunning:
@@ -1462,7 +1473,7 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 		for _, vol := range vols {
 			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getMD5Hash(t.Owner.Name + vol + ns),
+					Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
 					Namespace: ns,
 				},
 			}, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
