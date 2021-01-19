@@ -189,7 +189,7 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(err)
 	}
 	clusterSubdomain, ok := clusterConfig.Data[ClusterSubdomainKey]
-	if !ok {
+	if !ok || clusterSubdomain == "" {
 		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", ClusterSubdomainKey))
 	}
 	return clusterSubdomain, nil

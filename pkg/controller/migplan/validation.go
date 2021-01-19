@@ -256,7 +256,7 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 			Status:   True,
 			Reason:   LengthExceeded,
 			Category: Warn,
-			Message:  fmt.Sprintf("Namespaces [] exceed 59 characters and no destination route subdomain was configured. Direct Volume Migration may fail."),
+			Message:  fmt.Sprintf("Namespaces [] exceed 59 characters and no destination cluster route subdomain was configured. Direct Volume Migration may fail if you do not set `cluster_subdomain` value on the `MigrationController` CR."),
 			Items:    namespaces,
 		})
 		return nil
