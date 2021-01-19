@@ -1,6 +1,7 @@
 package directvolumemigration
 
 import (
+	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"time"
@@ -15,6 +16,9 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	migration, planResources, err := r.getDVMMigrationAndPlanResources(direct)
 	if err != nil {
 		return 0, liberr.Wrap(err)
+	}
+	if migration == nil {
+		return 0, liberr.Wrap(errors.New("did not find expected owning migmigration object for dvm"))
 	}
 
 	// Started
