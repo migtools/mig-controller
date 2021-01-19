@@ -352,6 +352,11 @@ func (t *Task) createStunnelClientPods() error {
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationStunnel
 
+	isRsyncPrivileged, err := isRsyncPrivileged(srcClient)
+	if err != nil {
+		return err
+	}
+
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -435,7 +440,7 @@ func (t *Task) createStunnelClientPods() error {
 				},
 			},
 			SecurityContext: &corev1.SecurityContext{
-				Privileged:             &trueBool,
+				Privileged:             &isRsyncPrivileged,
 				RunAsUser:              &runAsUser,
 				ReadOnlyRootFilesystem: &trueBool,
 			},
