@@ -354,6 +354,32 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 		}
+		// Get cluster subdomain if it exists
+		cluster, err := t.Owner.GetDestinationCluster(t.Client)
+		if err != nil {
+			return err
+		}
+		// Ignore error since this is optional config and won't break
+		// anything if it doesn't exist
+		subdomain, _ := cluster.GetClusterSubdomain(t.Client)
+
+		// This is a backdoor setting to help guarantee DVM can still function if a
+		// user is migrating namespaces that are 60+ characters
+		// NOTE: We do no validation of this subdomain value. User is expected to
+		// set this properly and it's only used for the unlikely case a user needs
+		// to migrate namespaces with very long names.
+		if subdomain != "" {
+			// Ensure that route prefix will not exceed 63 chars
+			// Route gen will add `-` between name + ns so need to ensure below is <62 chars
+			// NOTE: only do this if we actually get a configured subdomain,
+			// otherwise just use the name and hope for the best
+			prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, getMD5Hash(ns))
+			if len(prefix) > 62 {
+				prefix = prefix[0:62]
+			}
+			host := fmt.Sprintf("%s.%s", prefix, subdomain)
+			route.Spec.Host = host
+		}
 		err = destClient.Create(context.TODO(), &route)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Rsync transfer route already exists on destination", "namespace", ns)
@@ -652,6 +678,44 @@ func (t *Task) getRsyncRoute(namespace string) (string, error) {
 		return "", err
 	}
 	return route.Spec.Host, nil
+}
+
+func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
+	messages := []string{}
+	// Get client for destination
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return false, messages, err
+	}
+	nsMap := t.getPVCNamespaceMap()
+	for namespace, _ := range nsMap {
+		route := routev1.Route{}
+
+		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
+		err = destClient.Get(context.TODO(), key, &route)
+		if err != nil {
+			return false, messages, err
+		}
+		admitted := true
+		message := ""
+		// Check if we can find the admitted condition for the route
+		for _, ingress := range route.Status.Ingress {
+			for _, condition := range ingress.Conditions {
+				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
+					admitted = false
+					message = condition.Message
+					break
+				}
+			}
+		}
+		if !admitted {
+			messages = append(messages, message)
+		}
+	}
+	if len(messages) > 0 {
+		return false, messages, nil
+	}
+	return true, []string{}, nil
 }
 
 func (t *Task) createRsyncPassword() (string, error) {

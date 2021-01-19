@@ -30,6 +30,7 @@ const (
 	CreateStunnelConfig                  = "CreateStunnelConfig"
 	CreateRsyncConfig                    = "CreateRsyncConfig"
 	CreateRsyncRoute                     = "CreateRsyncRoute"
+	EnsureRsyncRouteAdmitted             = "EnsureRsyncRouteAdmitted"
 	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
 	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
 	CreateStunnelClientPods              = "CreateStunnelClientPods"
@@ -114,6 +115,7 @@ var VolumeMigration = Itinerary{
 		{phase: CreateDestinationPVCs},
 		{phase: DestinationPVCsCreated},
 		{phase: CreateRsyncRoute},
+		{phase: EnsureRsyncRouteAdmitted},
 		{phase: CreateRsyncConfig},
 		{phase: CreateStunnelConfig},
 		{phase: CreatePVProgressCRs},
@@ -257,6 +259,36 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
+		}
+	case EnsureRsyncRouteAdmitted:
+		admitted, reasons, err := t.areRsyncRoutesAdmitted()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if admitted {
+			t.Requeue = NoReQ
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		} else {
+			t.Requeue = PollReQ
+			t.Owner.Status.StageCondition(Running)
+			cond := t.Owner.Status.FindCondition(Running)
+			if cond == nil {
+				return fmt.Errorf("unable to find running condition")
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 3*time.Minute {
+				t.Owner.Status.SetCondition(
+					migapi.Condition{
+						Type:     RsyncRouteNotAdmitted,
+						Status:   True,
+						Reason:   migapi.NotReady,
+						Category: Warn,
+						Message:  fmt.Sprintf("Some or all rsync transfer routes have failed to be admitted within 3 mins on destination cluster. Errors: %v", reasons),
+					},
+				)
+			}
 		}
 	case CreateRsyncConfig:
 		err := t.createRsyncConfig()

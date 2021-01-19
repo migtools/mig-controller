@@ -23,6 +23,7 @@ const (
 	PVCsNotFoundOnSourceCluster  = "PodsNotFoundOnSourceCluster"
 	StunnelClientPodsPending     = "StunnelClientPodsPending"
 	RsyncTransferPodsPending     = "RsyncTransferPodsPending"
+	RsyncRouteNotAdmitted        = "RsyncRouteNotAdmitted"
 	Running                      = "Running"
 	Failed                       = "Failed"
 	Succeeded                    = "Succeeded"

@@ -57,6 +57,7 @@ const (
 	RegistryImageKey      = "REGISTRY_IMAGE"
 	StagePodImageKey      = "STAGE_IMAGE"
 	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
+	ClusterSubdomainKey   = "CLUSTER_SUBDOMAIN"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -141,11 +142,22 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	return client, nil
 }
 
-// GetRegistryImage gets a MigCluster specific registry image from ConfigMap
-func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
+func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*corev1.ConfigMap, error) {
 	clusterConfig := &corev1.ConfigMap{}
 	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
 	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if clusterConfig.Data == nil {
+		return nil, liberr.Wrap(errors.New("failed to find data in cluster configmap"))
+	}
+	return clusterConfig, nil
+}
+
+// GetRegistryImage gets a MigCluster specific registry image from ConfigMap
+func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
+	clusterConfig, err := m.GetClusterConfigMap(c)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -162,9 +174,7 @@ func (m *MigCluster) GetRsyncTransferImage(c k8sclient.Client) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	clusterConfig := &corev1.ConfigMap{}
-	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
-	err = client.Get(context.TODO(), clusterConfigRef, clusterConfig)
+	clusterConfig, err := m.GetClusterConfigMap(client)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -173,6 +183,23 @@ func (m *MigCluster) GetRsyncTransferImage(c k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", RsyncTransferImageKey))
 	}
 	return rsyncImage, nil
+}
+
+// GetClusterSubdomain gets a MigCluster specific subdomain value to be used for DVM routes
+func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
+	client, err := m.GetClient(c)
+	if err != nil {
+		return "", err
+	}
+	clusterConfig, err := m.GetClusterConfigMap(client)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	clusterSubdomain, ok := clusterConfig.Data[ClusterSubdomainKey]
+	if !ok || clusterSubdomain == "" {
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", ClusterSubdomainKey))
+	}
+	return clusterSubdomain, nil
 }
 
 // Test the connection settings by building a client.
