@@ -7,13 +7,14 @@ import (
 
 // Rsync options
 const (
-	RsyncOptBwLimit   = "RSYNC_OPT_BWLIMIT"
-	RsyncOptPartial   = "RSYNC_OPT_PARTIAL"
-	RsyncOptArchive   = "RSYNC_OPT_ARCHIVE"
-	RsyncOptDelete    = "RSYNC_OPT_DELETE"
-	RsyncOptHardLinks = "RSYNC_OPT_HARDLINKS"
-	RsyncOptInfo      = "RSYNC_OPT_INFO"
-	RsyncOptExtras    = "RSYNC_OPT_EXTRAS"
+	RsyncOptBwLimit           = "RSYNC_OPT_BWLIMIT"
+	RsyncOptPartial           = "RSYNC_OPT_PARTIAL"
+	RsyncOptArchive           = "RSYNC_OPT_ARCHIVE"
+	RsyncOptDelete            = "RSYNC_OPT_DELETE"
+	RsyncOptHardLinks         = "RSYNC_OPT_HARDLINKS"
+	RsyncOptInfo              = "RSYNC_OPT_INFO"
+	RsyncOptExtras            = "RSYNC_OPT_EXTRAS"
+	RsyncTransferRouteTimeout = "RSYNC_TRANSFER_ROUTE_TIMEOUT"
 )
 
 // RsyncOpts Rsync Options
@@ -22,6 +23,7 @@ const (
 //	Partial: whether to set --partial option or not
 //	Delete:  whether to set --delete option or not
 //	HardLinks: whether to set --hard-links option or not
+//	Info: equivalent to --info=<string> option
 //	Extras: arbitrary rsync options provided by the user
 type RsyncOpts struct {
 	BwLimit   int
@@ -31,6 +33,11 @@ type RsyncOpts struct {
 	HardLinks bool
 	Info      string
 	Extras    []string
+}
+
+// DvmOpts DVM global options
+type DvmOpts struct {
+	RsyncTransferRouteTimeout int
 }
 
 // Load load rsync options
@@ -51,6 +58,16 @@ func (r *RsyncOpts) Load() error {
 	rsyncExtraOpts := os.Getenv(RsyncOptExtras)
 	if len(rsyncExtraOpts) > 0 {
 		r.Extras = strings.Fields(rsyncExtraOpts)
+	}
+	return err
+}
+
+// Load load dvm options
+func (d *DvmOpts) Load() error {
+	var err error
+	d.RsyncTransferRouteTimeout, err = getEnvLimit(RsyncTransferRouteTimeout, 30)
+	if err != nil {
+		return err
 	}
 	return err
 }

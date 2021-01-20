@@ -63,7 +63,11 @@ const (
 	DirectVolumeMigrationStunnel            = "stunnel"
 	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"      // (migplan UID)
 	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+)
 
+// annotations
+const (
+	RsyncTransferRouteTimeout = "haproxy.router.openshift.io/timeout"
 )
 
 // Flags

@@ -304,7 +304,9 @@ func (t *Task) createRsyncTransferRoute() error {
 	pvcMap := t.getPVCNamespaceMap()
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
-
+	rsyncRouteAnnotations := make(map[string]string)
+	routeTimeout := fmt.Sprintf("%ss", strconv.Itoa(migsettings.Settings.DvmOpts.RsyncTransferRouteTimeout))
+	rsyncRouteAnnotations[RsyncTransferRouteTimeout] = routeTimeout
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -340,6 +342,7 @@ func (t *Task) createRsyncTransferRoute() error {
 				Labels: map[string]string{
 					"app": DirectVolumeMigrationRsyncTransfer,
 				},
+				Annotations: rsyncRouteAnnotations,
 			},
 			Spec: routev1.RouteSpec{
 				To: routev1.RouteTargetReference{
