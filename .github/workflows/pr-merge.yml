@@ -5,7 +5,7 @@ name: BZ Merge
 # Controls when the action will run. 
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
-  pull_request:
+  pull_request_target:
     branches:
     - "*"
     types:
@@ -18,7 +18,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in pnamearallel
 jobs:
   # This workflow contains a single job called "build"
-  bq-on-pr-merge:
+  bz-on-pr-merge:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
