@@ -18,6 +18,7 @@ package migmigration
 
 import (
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -63,7 +64,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	}
 	err = task.Run()
 	if err != nil {
-		if errors.IsConflict(err) {
+		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
 		log.Trace(err)

@@ -18,6 +18,7 @@ package migstorage
 
 import (
 	"context"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
@@ -121,7 +122,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	defer func() {
 		log.Info("CR", "conditions", storage.Status.Conditions)
 		storage.Status.Conditions.RecordEvents(storage, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		storage.Status.SetReconcileFailed(err)

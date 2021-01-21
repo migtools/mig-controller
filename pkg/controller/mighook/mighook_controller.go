@@ -18,6 +18,7 @@ package mighook
 
 import (
 	"context"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -95,7 +96,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	defer func() {
 		log.Info("CR", "conditions", hook.Status.Conditions)
 		hook.Status.Conditions.RecordEvents(hook, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		hook.Status.SetReconcileFailed(err)
