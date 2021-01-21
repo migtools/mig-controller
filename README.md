@@ -17,6 +17,9 @@ mig-controller is installed by [mig-operator](https://github.com/konveyor/mig-op
 
 Automation will be run to check if the bug is valid and will update the bugzilla.
 To complete the automation for a bugzilla please add `Bug xxxxxx:` to the title of the PR.
+The automation will follow the bug process outlined.
+Once a bug pr is posted the bug will be moved to `POST`. you can create more then 1 PR across all the repos for the bug and they will all be attached.
+Once the last open PR is merged, and it is merged to the branch that the bug is targeting, the bugzilla will be moved to `MODIFIED`
 
 ## Quick-start: CLI based migration
 
