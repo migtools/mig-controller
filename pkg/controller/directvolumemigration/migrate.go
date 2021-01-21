@@ -1,13 +1,14 @@
 package directvolumemigration
 
 import (
+	"errors"
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,6 +17,9 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	migration, planResources, err := r.getDVMMigrationAndPlanResources(direct)
 	if err != nil {
 		return 0, liberr.Wrap(err)
+	}
+	if migration == nil {
+		return 0, liberr.Wrap(errors.New("did not find expected owning migmigration object for dvm"))
 	}
 
 	// Started
@@ -35,7 +39,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	}
 	err = task.Run()
 	if err != nil {
-		if errors.IsConflict(errorutil.Unwrap(err)) {
+		if k8serrors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
 		log.Trace(err)
