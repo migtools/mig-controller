@@ -18,6 +18,7 @@ package migcluster
 
 import (
 	"context"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
@@ -123,7 +124,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	defer func() {
 		log.Info("CR", "conditions", cluster.Status.Conditions)
 		cluster.Status.Conditions.RecordEvents(cluster, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		cluster.Status.SetReconcileFailed(err)

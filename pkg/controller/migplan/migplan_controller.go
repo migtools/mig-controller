@@ -18,6 +18,7 @@ package migplan
 
 import (
 	"context"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
 	"strconv"
 	"time"
@@ -184,7 +185,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	defer func() {
 		log.Info("CR", "conditions", plan.Status.Conditions)
 		plan.Status.Conditions.RecordEvents(plan, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		plan.Status.SetReconcileFailed(err)

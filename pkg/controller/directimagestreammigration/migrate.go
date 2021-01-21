@@ -18,6 +18,7 @@ package directimagestreammigration
 
 import (
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -40,7 +41,7 @@ func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *miga
 	}
 	err := task.Run()
 	if err != nil {
-		if errors.IsConflict(err) {
+		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
 		log.Trace(err)

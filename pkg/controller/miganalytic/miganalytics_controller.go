@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"strconv"
 	"strings"
 	"time"
@@ -129,7 +130,7 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	defer func() {
 		log.Info("CR", "conditions", analytic.Status.Conditions)
 		analytic.Status.Conditions.RecordEvents(analytic, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		analytic.Status.SetReconcileFailed(err)
