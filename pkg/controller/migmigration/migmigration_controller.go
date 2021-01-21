@@ -19,6 +19,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -170,7 +171,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	defer func() {
 		log.Info("CR", "conditions", migration.Status.Conditions)
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		migration.Status.SetReconcileFailed(err)

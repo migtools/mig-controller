@@ -3,6 +3,7 @@ package directvolumemigration
 import (
 	"fmt"
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -34,7 +35,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	}
 	err = task.Run()
 	if err != nil {
-		if errors.IsConflict(err) {
+		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
 		log.Trace(err)

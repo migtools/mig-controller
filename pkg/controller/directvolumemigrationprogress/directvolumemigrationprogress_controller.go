@@ -19,6 +19,7 @@ package directvolumemigrationprogress
 import (
 	"context"
 	"fmt"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"io"
 	"k8s.io/client-go/kubernetes"
 	"path"
@@ -125,7 +126,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 
 	// Report reconcile error.
 	defer func() {
-		if err == nil || errors.IsConflict(err) {
+		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
 		}
 		pvProgress.Status.SetReconcileFailed(err)
