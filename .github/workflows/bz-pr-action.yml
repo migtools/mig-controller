@@ -35,4 +35,5 @@ jobs:
           bz_product: "Migration Toolkit for Containers"
           title: ${{ github.event.pull_request.title }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          bugzilla_token: ${{ secrets.BUGZILLA_TOKEN }}
+          bugzilla_token: "testing that it would pass a value"
+            #            ${{ secrets.BUGZILLA_TOKEN }}
