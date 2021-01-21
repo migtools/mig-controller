@@ -15,6 +15,9 @@ mig-controller is installed by [mig-operator](https://github.com/konveyor/mig-op
  - Conventions
  - Dev practices
 
+Automation will be run to check if the bug is valid and will update the bugzilla.
+To complete the automation for a bugzilla please add `Bug xxxxxx:` to the title of the PR.
+
 ## Quick-start: CLI based migration
 
 __1. Identify a pair of running OpenShift clusters to migrate workloads between__
