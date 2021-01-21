@@ -21,6 +21,7 @@ jobs:
   bq-on-pr-merge:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    environment: BZ-Automation
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
