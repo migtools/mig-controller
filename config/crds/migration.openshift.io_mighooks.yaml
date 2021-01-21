@@ -45,20 +45,27 @@ spec:
           type: string
         metadata:
           type: object
+          preserveUnknownFields: false
         spec:
           description: MigHookSpec defines the desired state of MigHook
           properties:
             activeDeadlineSeconds:
               format: int64
               type: integer
+              description: activeDeadlineSeconds is used to specify the highest amount of time for which the hook will run
             custom:
               type: boolean
+              description: custom implies whether the hook is a custom Ansible playbook or a pre-built image
             image:
               type: string
+              description: image is used to specify the image of the hook to be executed
             playbook:
               type: string
+              description: playbook is used to specify the contents of the custom Ansible playbook in base64 format, it
+                is used in conjunction with the custom boolean flag
             targetCluster:
               type: string
+              description: targetCluster is used to specify the cluster on which the hook is to be executed
           required:
           - custom
           - image

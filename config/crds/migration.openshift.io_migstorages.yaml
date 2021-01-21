@@ -47,6 +47,7 @@ spec:
           type: object
         spec:
           description: MigStorageSpec defines the desired state of MigStorage
+          preserveUnknownFields: false
           properties:
             backupStorageConfig:
               description: BackupStorageConfig defines config for creating and storing
@@ -54,24 +55,40 @@ spec:
               properties:
                 awsBucketName:
                   type: string
+                  description: awsBucketName is the name of the AWS S3 object storage bucket
                 awsKmsKeyId:
                   type: string
+                  description: awsKmsKeyId is ued to enable encryption of the backups stored in S3 object storage
                 awsPublicUrl:
                   type: string
+                  description: awsPublicUrl is used instead of awsS3Url if specified, this field is primarily for
+                    local storage services like MinIO
                 awsRegion:
                   type: string
+                  description: awsRegion is the AWS region where the S3 bucket is located, it is queried from AWS S3
+                    API if not provided
                 awsS3ForcePathStyle:
                   type: boolean
+                  description: awsS3ForcePathStyle is used to indicate whether to use path-style addressing instead of
+                    virtual hosted bucket addressing, set to true if using local storage service loke MinIO
                 awsS3Url:
                   type: string
+                  description: awsS3Url is used to specify the AWS S3 URL for explicitness, this field is primarily used
+                    for local storage services like MinIO
                 awsSignatureVersion:
                   type: string
+                  description: awsSignatureVersion is used to specify the version of the signature algorithm used to
+                    create signed URLs that are used by velero CLI to download backups or fetch logs
                 azureResourceGroup:
                   type: string
+                  description: azureResourceGroup is the name of the resource group containing the storage account for
+                    the backup storage location
                 azureStorageAccount:
                   type: string
+                  description: azureStorageAccount is the name of the storage account for the backup storage location
                 azureStorageContainer:
                   type: string
+                  description: azureStorageContainer is the bucket to be used for the backup storage location
                 credsSecretRef:
                   description: ObjectReference contains enough information to let
                     you inspect or modify the referred object.
@@ -111,25 +128,39 @@ spec:
                   type: object
                 gcpBucket:
                   type: string
+                  description: gcpBucket is the name of the bucket used for the backup storage location
                 insecure:
                   type: boolean
+                  description: insecure is set to true if you do not want the TLS certificate when connecting to the
+                    object store -- like for self-signed certs with MinIO. This is susceptible to man-in-the-middle
+                    attacks and is not recommended for production
                 s3CustomCABundle:
                   format: byte
                   type: string
+                  description: s3CustomCABundle is used to specify the self-signed ca certs
               type: object
             backupStorageProvider:
               type: string
+              description: backupStorageProvider is the provider name whose object storage is used for backup
+                storage location
             refresh:
               type: boolean
+              description: refresh flag is used to trigger a reconcile for the MigStorage CRD
             volumeSnapshotConfig:
               description: VolumeSnapshotConfig defines config for taking Volume Snapshots
               properties:
                 awsRegion:
                   type: string
+                  description: awsRegion is the AWS region where the S3 bucket is located, it is queried from AWS S3
+                    API if not provided
                 azureApiTimeout:
                   type: string
+                  description: azureApiTimeout is ued to specify how long to wait for an Azure API request to
+                    complete before timeout
                 azureResourceGroup:
                   type: string
+                  description: azureResourceGroup is the name of the resource group containing the storage account for
+                    the backup storage location
                 credsSecretRef:
                   description: ObjectReference contains enough information to let
                     you inspect or modify the referred object.
@@ -172,6 +203,8 @@ spec:
               type: object
             volumeSnapshotProvider:
               type: string
+              description: volumeSnapshotProvider is the provider name whose object storage is used for backup
+                storage location
           required:
           - backupStorageConfig
           - backupStorageProvider

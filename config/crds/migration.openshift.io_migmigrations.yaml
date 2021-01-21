@@ -56,11 +56,16 @@ spec:
           type: object
         spec:
           description: MigMigrationSpec defines the desired state of MigMigration
+          preserveUnknownFields: false
           properties:
             canceled:
               type: boolean
+              description: canceled is used to invoke the cancel migration operation, when set to true the migration controller
+                switches to cancel itinerary
             keepAnnotations:
               type: boolean
+              description: keepAnnotations is used to specify whether to retain the annotations set by the migration
+                controller or not
             migPlanRef:
               description: ObjectReference contains enough information to let you
                 inspect or modify the referred object.
@@ -100,12 +105,18 @@ spec:
               type: object
             quiescePods:
               type: boolean
+              description: quiescePods is used to specify whether to quiesce the application pods before migration or not
             rollback:
               type: boolean
+              description: rollback is used to invoke the rollback migration operation, when set to true the migration
+                controller switches to rollback itinerary
             stage:
               type: boolean
+              description: stage is used to invoke the stage operation, when set to true the migration controller
+                switches to stage itinerary
             verify:
               type: boolean
+              description: verify is used to specify whether to verify the health of the migrated pods or not
           required:
           - stage
           type: object
