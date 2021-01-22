@@ -80,8 +80,8 @@ data:
     [{{ $pvc.Name }}]
         comment = archive for {{ $pvc.Name }}
         path = /mnt/{{ $.Namespace }}/{{ $pvc.Name }}
-        uid = root
-        gid = root
+        use chroot = no
+        fake super = yes
         list = yes
         hosts allow = ::1, 127.0.0.1, localhost
         auth users = {{ $.SshUser }}
