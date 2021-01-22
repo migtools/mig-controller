@@ -1031,20 +1031,22 @@ func (t *Task) init() error {
 
 	t.initPipeline()
 
-	hasImageStreams, err := t.hasImageStreams()
-	if err != nil {
-		return err
-	}
+	if t.stage() && !t.Owner.Status.HasCondition(StageNoOp) {
+		hasImageStreams, err := t.hasImageStreams()
+		if err != nil {
+			return err
+		}
 
-	anyPVs, _ := t.hasPVs()
-	if t.stage() && (!anyPVs && !hasImageStreams) {
-		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     StageNoOp,
-			Status:   True,
-			Category: migapi.Warn,
-			Message:  "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated.",
-			Durable:  true,
-		})
+		anyPVs, _ := t.hasPVs()
+		if !anyPVs && !hasImageStreams {
+			t.Owner.Status.SetCondition(migapi.Condition{
+				Type:     StageNoOp,
+				Status:   True,
+				Category: migapi.Warn,
+				Message:  "Stage migration was run without any PVs or ImageStreams in source cluster. No Velero operations were initiated.",
+				Durable:  true,
+			})
+		}
 	}
 	return nil
 
