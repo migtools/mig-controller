@@ -1110,7 +1110,7 @@ func isRsyncPrivileged(client compat.Client) (bool, error) {
 	if cm.Data != nil {
 		isRsyncPrivileged, exists := cm.Data["RSYNC_PRIVILEGED"]
 		if !exists {
-			return false, fmt.Errorf("RSYNC_PRIVILEGED boolean does not exists")
+			return false, fmt.Errorf("RSYNC_PRIVILEGED boolean does not exist. Verify source and destination clusters operators are up to date")
 		}
 		parsed, err := strconv.ParseBool(isRsyncPrivileged)
 		if err != nil {
