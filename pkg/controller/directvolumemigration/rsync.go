@@ -701,14 +701,18 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		if err != nil {
 			return false, messages, err
 		}
-		admitted := true
-		message := ""
+		admitted := false
+		message := "no status condition available for the route"
 		// Check if we can find the admitted condition for the route
 		for _, ingress := range route.Status.Ingress {
 			for _, condition := range ingress.Conditions {
 				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
 					admitted = false
 					message = condition.Message
+					break
+				}
+				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
+					admitted = true
 					break
 				}
 			}
