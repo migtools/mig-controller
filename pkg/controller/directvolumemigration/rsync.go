@@ -81,6 +81,7 @@ data:
         comment = archive for {{ $pvc.Name }}
         path = /mnt/{{ $.Namespace }}/{{ $pvc.Name }}
         use chroot = no
+        munge symlinks = no
         list = yes
         hosts allow = ::1, 127.0.0.1, localhost
         auth users = {{ $.SshUser }}
