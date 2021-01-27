@@ -6,14 +6,7 @@ __1. Install prerequisites__
 
  - golang compiler (tested @ 1.14.4)
  - kubebuilder (tested @ 1.0.7)
- - dep (binary built from https://github.com/golang/dep/pull/1963)
  - mig-operator (tested @ latest) installed on both clusters involved in migration
-
-Note that if there are any dependencies which use go modules, the
-latest dep release will not work. The fix for supporting modules-using
-dependencies is at https://github.com/golang/dep/pull/1963 but as of
-Aug 2020, this PR is not yet merged, so a custom `dep` binary built
-from this PR is required to update dependencies for mig-controller.
 
 __2. Clone mig-controller project to your `$GOPATH`__
 
