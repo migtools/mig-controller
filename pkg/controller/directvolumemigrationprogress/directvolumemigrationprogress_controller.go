@@ -271,10 +271,14 @@ func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgres
 		// pod has a failure, report last failure reason
 		pvProgress.Status.PodPhase = kapi.PodFailed
 		pvProgress.Status.LogMessage = containerStatus.LastTerminationState.Terminated.Message
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
 	case pod.Status.Phase == kapi.PodFailed:
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		pvProgress.Status.PodPhase = kapi.PodFailed
 		pvProgress.Status.LogMessage = containerStatus.State.Terminated.Message
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 0:
 		// succeeded dont ever requeue
 		pvProgress.Status.PodPhase = kapi.PodSucceeded

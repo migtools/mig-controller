@@ -168,6 +168,8 @@ spec:
                 - type
                 type: object
               type: array
+            exitCode:
+              type: integer
             lastObservedProgressPercent:
               type: string
             lastObservedTransferRate:
