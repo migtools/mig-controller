@@ -536,7 +536,9 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		if pod.Status.Phase == corev1.PodPending {
 			// If the pod has unhealthy claims, we will fail the migration
 			// So the user can fix the plan/pvc.
-			if !hasHealthyClaims(&pod) {
+			// pod Spec having the node name, means the pod has been scheduled
+			// becuase the pod has been scheduled we know that the PVC should be bound
+			if pod.Spec.NodeName != "" && !hasHealthyClaims(&pod) {
 				report.failed = true
 				return
 			}
