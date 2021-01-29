@@ -3,6 +3,8 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
@@ -10,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 // Velero Plugin Annotations
@@ -34,6 +35,11 @@ const (
 const (
 	ResticPvBackupAnnotation = "backup.velero.io/backup-volumes" // comma-separated list of volume names
 	ResticPvVerifyAnnotation = "backup.velero.io/verify-volumes" // comma-separated list of volume names
+)
+
+// Disables the internal image copy
+const (
+	DisableImageCopy = "migration.openshift.io/disable-image-copy"
 )
 
 // Labels.

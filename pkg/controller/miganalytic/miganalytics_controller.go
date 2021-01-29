@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/errorutil"
-
 	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/konveyor/mig-controller/pkg/gvk"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/openshift/api/image/docker10"
 	"github.com/openshift/library-go/pkg/image/reference"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -62,6 +62,7 @@ const (
 )
 
 var log = logging.WithName("analytics")
+var Settings = &settings.Settings
 
 // Add creates a new MigAnalytic Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -263,7 +264,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 				return liberr.Wrap(err)
 			}
 		}
-		if analytic.Spec.AnalyzeImageCount && !isExcluded("imagestreams", excludedResources) {
+		if analytic.Spec.AnalyzeImageCount && !isExcluded("imagestreams", excludedResources) && !Settings.DisImgCopy {
 			err := r.analyzeImages(client, &ns, analytic.Spec.ListImages, analytic.Spec.ListImagesLimit)
 			if err != nil {
 				return liberr.Wrap(err)

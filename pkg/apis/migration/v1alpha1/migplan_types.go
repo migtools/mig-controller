@@ -26,6 +26,9 @@ import (
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	kapi "k8s.io/api/core/v1"
@@ -35,10 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"github.com/konveyor/mig-controller/pkg/settings"
 )
 
 var Settings = &settings.Settings
@@ -674,11 +673,12 @@ func (r *MigPlan) IsResourceExcluded(resource string) bool {
 	return false
 }
 
-// IsImageMigrationDisabled returns whether this MigPlan has disabled Image Migration
-// Currently this is only implemented site-wide via the ExcludedResources list. This
+// IsImageMigrationDisabled returns whether this MigPlan has disable_image_copy or disabled_image_migration
+// disable_image_copy is a flag available as a controller boolean env var.
+// disabled_image_migration is currently implemented site-wide via the ExcludedResources list. This
 // This will change to an explicit controller boolean env var at some point.
 func (r *MigPlan) IsImageMigrationDisabled() bool {
-	return r.IsResourceExcluded(settings.ISResource)
+	return r.IsResourceExcluded(settings.ISResource) || Settings.DisImgCopy
 }
 
 // IsVolumeMigrationDisabled returns whether this MigPlan has disabled Volume Migration
