@@ -152,7 +152,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 func (t *Task) getResticVolumes(client k8sclient.Client, pod corev1.Pod) ([]string, []string, error) {
 	volumes := []string{}
 	verifyVolumes := []string{}
-	pvs := t.getPVs()
+	pvs := t.getStagePVs()
 	for _, pv := range pod.Spec.Volumes {
 		claim := pv.VolumeSource.PersistentVolumeClaim
 		if claim == nil {
@@ -293,7 +293,11 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 // The PvCopyMethodAnnotation annotation is added to PV and PVC as needed by the velero plugin.
 func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, error) {
-	pvs := t.getPVs()
+	hasPVs, hasStagePVs := t.hasPVs()
+	if !hasPVs || !hasStagePVs {
+		return 0, nil
+	}
+	pvs := t.getStagePVs()
 	total := len(pvs.List)
 	for i, pv := range pvs.List {
 		pvResource := corev1.PersistentVolume{}
@@ -309,7 +313,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		if pvResource.Annotations == nil {
 			pvResource.Annotations = make(map[string]string)
 		}
-		if pvResource.Labels[IncludedInStageBackupLabel] == t.UID(){
+		if pvResource.Labels[IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
 		// PV action (move|copy) needed by the velero plugin.

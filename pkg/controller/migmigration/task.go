@@ -1336,13 +1336,22 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
-// Get the persistent volumes included in the plan which are not skipped.
-func (t *Task) getPVs() migapi.PersistentVolumes {
+// Get the persistent volumes included in the plan which are included in the
+// stage backup/restore process
+// This function will only return PVs that are being copied via restic or
+// snapshot and any PVs selected for move.
+func (t *Task) getStagePVs() migapi.PersistentVolumes {
+	directVolumesEnabled := !t.PlanResources.MigPlan.Spec.IndirectVolumeMigration
 	volumes := []migapi.PV{}
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		if pv.Selection.Action != migapi.PvSkipAction {
-			volumes = append(volumes, pv)
+		// If the pv is skipped or if its a filesystem copy with DVM enabled then
+		// don't include it in a stage PV
+		if pv.Selection.Action == migapi.PvSkipAction ||
+			(directVolumesEnabled && pv.Selection.Action == migapi.PvCopyAction &&
+				pv.Selection.CopyMethod == migapi.PvFilesystemCopyMethod) {
+			continue
 		}
+		volumes = append(volumes, pv)
 	}
 	pvList := t.PlanResources.MigPlan.Spec.PersistentVolumes.DeepCopy()
 	pvList.List = volumes
@@ -1352,7 +1361,7 @@ func (t *Task) getPVs() migapi.PersistentVolumes {
 // Get the persistentVolumeClaims / action mapping included in the plan which are not skipped.
 func (t *Task) getPVCs() map[k8sclient.ObjectKey]migapi.PV {
 	claims := map[k8sclient.ObjectKey]migapi.PV{}
-	for _, pv := range t.getPVs().List {
+	for _, pv := range t.getStagePVs().List {
 		claimKey := k8sclient.ObjectKey{
 			Name:      pv.PVC.Name,
 			Namespace: pv.PVC.Namespace,
