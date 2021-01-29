@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -18,6 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var Settings = &settings.Settings
 
 // Ensure the initial backup on the source cluster has been created
 // and has the proper settings.
@@ -38,6 +41,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
 	newBackup.Labels[InitialBackupLabel] = t.UID()
 	newBackup.Labels[MigMigrationDebugLabel] = t.Owner.Name
 	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
@@ -46,6 +50,14 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	delete(newBackup.Annotations, QuiesceAnnotation)
+
+	if Settings.DisImgCopy {
+		if newBackup.Annotations == nil {
+			newBackup.Annotations = map[string]string{}
+		}
+		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
+	}
+
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -106,7 +118,8 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	var includedResources mapset.Set
-	if t.indirectImageMigration() {
+
+	if t.indirectImageMigration() || Settings.DisImgCopy {
 		includedResources = settings.IncludedStageResources
 	} else {
 		includedResources = settings.IncludedStageResources.Difference(mapset.NewSetFromSlice([]interface{}{settings.ISResource}))
@@ -114,6 +127,12 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Spec.IncludedResources = toStringSlice(includedResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
+	if Settings.DisImgCopy {
+		if newBackup.Annotations == nil {
+			newBackup.Annotations = map[string]string{}
+		}
+		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
+	}
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		return nil, err

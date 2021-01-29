@@ -20,9 +20,10 @@ const (
 	// Only the discovery should be loaded.
 	DiscoveryRole = "discovery"
 	// Proxy environment variables
-	HttpProxy  = "HTTP_PROXY"
-	HttpsProxy = "HTTPS_PROXY"
-	NoProxy    = "NO_PROXY"
+	HttpProxy        = "HTTP_PROXY"
+	HttpsProxy       = "HTTPS_PROXY"
+	NoProxy          = "NO_PROXY"
+	DisableImageCopy = "DISABLE_IMAGE_COPY"
 )
 
 // Global
@@ -34,8 +35,9 @@ type _Settings struct {
 	Discovery
 	Plan
 	DvmOpts
-	Roles     map[string]bool
-	ProxyVars map[string]string
+	Roles      map[string]bool
+	ProxyVars  map[string]string
+	DisImgCopy bool
 }
 
 // Load settings.
@@ -60,6 +62,8 @@ func (r *_Settings) Load() error {
 	if err != nil {
 		return err
 	}
+
+	r.DisImgCopy = getEnvBool(DisableImageCopy, false)
 
 	return nil
 }
