@@ -1336,8 +1336,10 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
 }
 
-// Get the persistent volumes included in the plan which are not skipped.
-// This function will only return PVs that are being copied via restic or snapshot
+// Get the persistent volumes included in the plan which are included in the
+// stage backup/restore process
+// This function will only return PVs that are being copied via restic or
+// snapshot and any PVs selected for move.
 func (t *Task) getStagePVs() migapi.PersistentVolumes {
 	directVolumesEnabled := !t.PlanResources.MigPlan.Spec.IndirectVolumeMigration
 	volumes := []migapi.PV{}
