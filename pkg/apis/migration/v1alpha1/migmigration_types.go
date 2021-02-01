@@ -30,11 +30,23 @@ const (
 // MigMigrationSpec defines the desired state of MigMigration
 type MigMigrationSpec struct {
 	MigPlanRef      *kapi.ObjectReference `json:"migPlanRef,omitempty"`
+
+	// Invokes the stage operation, when set to true the migration controller switches to stage itinerary. This is a required field.
 	Stage           bool                  `json:"stage"`
+
+	// Specifies whether to quiesce the application pods before migration or not.
 	QuiescePods     bool                  `json:"quiescePods,omitempty"`
+
+	// Specifies whether to retain the annotations set by the migration controller or not.
 	KeepAnnotations bool                  `json:"keepAnnotations,omitempty"`
+
+	// Specifies whether to verify the health of the migrated pods or not.
 	Verify          bool                  `json:"verify,omitempty"`
+
+	// Invokes the cancel migration operation, when set to true the migration controller switches to cancel itinerary.
 	Canceled        bool                  `json:"canceled,omitempty"`
+
+	// Invokes the rollback migration operation, when set to true the migration controller switches to rollback itinerary.
 	Rollback        bool                  `json:"rollback,omitempty"`
 }
 

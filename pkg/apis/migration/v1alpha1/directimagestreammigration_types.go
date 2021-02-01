@@ -30,6 +30,8 @@ type DirectImageStreamMigrationSpec struct {
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 	ImageStreamRef    *kapi.ObjectReference `json:"imageStreamRef,omitempty"`
+
+	//  A string holding the name of the namespace on destination cluster where imagestreams should be migrated.
 	DestNamespace     string                `json:"destNamespace,omitempty"`
 }
 

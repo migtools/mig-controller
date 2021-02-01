@@ -59,7 +59,7 @@ deploy: manifests
 	kustomize build config/default | kubectl apply -f -
 
 # Provide CRDs that work back to k8s 1.11
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
 # Generate manifests e.g. CRD, Webhooks
 manifests:
