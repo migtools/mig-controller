@@ -34,12 +34,13 @@ type DirectVolumeMigrationProgressSpec struct {
 // DirectVolumeMigrationProgressStatus defines the observed state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressStatus struct {
 	Conditions                  `json:",omitempty"`
-	PodPhase                    kapi.PodPhase `json:"phase,omitempty"`
-	ExitCode                    *int32        `json:"exitCode,omitempty"`
-	LogMessage                  string        `json:"logMessage,omitempty"`
-	ObservedDigest              string        `json:"observedDigest,omitempty"`
-	LastObservedProgressPercent string        `json:"lastObservedProgressPercent,omitempty"`
-	LastObservedTransferRate    string        `json:"lastObservedTransferRate,omitempty"`
+	PodPhase                    kapi.PodPhase    `json:"phase,omitempty"`
+	ExitCode                    *int32           `json:"exitCode,omitempty"`
+	ContainerElapsedTime        *metav1.Duration `json:"runtime,omitempty"`
+	LogMessage                  string           `json:"logMessage,omitempty"`
+	ObservedDigest              string           `json:"observedDigest,omitempty"`
+	LastObservedProgressPercent string           `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string           `json:"lastObservedTransferRate,omitempty"`
 }
 
 // +genclient
