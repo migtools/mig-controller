@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.3.0
+    controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
   name: mighooks.migration.openshift.io
 spec:
@@ -27,6 +27,7 @@ spec:
     listKind: MigHookList
     plural: mighooks
     singular: mighook
+  preserveUnknownFields: false
   scope: Namespaced
   subresources: {}
   validation:
@@ -49,15 +50,26 @@ spec:
           description: MigHookSpec defines the desired state of MigHook
           properties:
             activeDeadlineSeconds:
+              description: Specifies the highest amount of time for which the hook
+                will run.
               format: int64
               type: integer
             custom:
+              description: Implies whether the hook is a custom Ansible playbook or
+                a pre-built image. The value of this field is required. This is a
+                required field.
               type: boolean
             image:
+              description: Specifies the image of the hook to be executed. This is
+                a required field.
               type: string
             playbook:
+              description: Specifies the contents of the custom Ansible playbook in
+                base64 format, it is used in conjunction with the custom boolean flag.
               type: string
             targetCluster:
+              description: Specifies the cluster on which the hook is to be executed.
+                This is a required field.
               type: string
           required:
           - custom

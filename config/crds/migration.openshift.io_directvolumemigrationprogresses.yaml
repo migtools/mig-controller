@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.3.0
+    controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
   name: directvolumemigrationprogresses.migration.openshift.io
 spec:
@@ -35,6 +35,7 @@ spec:
     shortNames:
     - dvmp
     singular: directvolumemigrationprogress
+  preserveUnknownFields: false
   scope: Namespaced
   subresources: {}
   validation:

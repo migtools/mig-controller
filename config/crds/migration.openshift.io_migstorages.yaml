@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.3.0
+    controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
   name: migstorages.migration.openshift.io
 spec:
@@ -27,6 +27,7 @@ spec:
     listKind: MigStorageList
     plural: migstorages
     singular: migstorage
+  preserveUnknownFields: false
   scope: Namespaced
   subresources: {}
   validation:
@@ -49,8 +50,8 @@ spec:
           description: MigStorageSpec defines the desired state of MigStorage
           properties:
             backupStorageConfig:
-              description: BackupStorageConfig defines config for creating and storing
-                Backups
+              description: Defines config for creating and storing Backups. This is
+                a required field.
               properties:
                 awsBucketName:
                   type: string
@@ -118,11 +119,15 @@ spec:
                   type: string
               type: object
             backupStorageProvider:
+              description: Holds the provider name whose object storage is used for
+                backup storage location. This is a required field.
               type: string
             refresh:
+              description: A boolean used to trigger a reconcile for the MigStorage
+                CRD.
               type: boolean
             volumeSnapshotConfig:
-              description: VolumeSnapshotConfig defines config for taking Volume Snapshots
+              description: Defines config for taking Volume Snapshots.
               properties:
                 awsRegion:
                   type: string
@@ -171,6 +176,8 @@ spec:
                   type: string
               type: object
             volumeSnapshotProvider:
+              description: Holds the provider name whose object storage is used for
+                backup storage location.
               type: string
           required:
           - backupStorageConfig
