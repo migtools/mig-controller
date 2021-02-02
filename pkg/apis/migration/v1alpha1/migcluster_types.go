@@ -70,13 +70,13 @@ type MigClusterSpec struct {
 
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 
-	// If the migcluster needs SSL verification for connections a user can supply a custom CA bundle.
+	// If the migcluster needs SSL verification for connections a user can supply a custom CA bundle. This field is required only when spec.Insecure is set false
 	CABundle                []byte                `json:"caBundle,omitempty"`
 
 	// For azure clusters -- it's the resource group that in-cluster volumes use.
 	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
 
-	// If set false, user will need to provide CA bundle for TSL connection to the remote cluster.
+	// If set false, user will need to provide CA bundle for TLS connection to the remote cluster.
 	Insecure                bool                  `json:"insecure,omitempty"`
 
 	// An override setting to tell the controller that the source cluster restic needs to be restarted after stage pod creation.

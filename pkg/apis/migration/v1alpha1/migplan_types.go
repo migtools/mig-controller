@@ -52,7 +52,7 @@ const (
 type MigPlanHook struct {
 	Reference          *kapi.ObjectReference `json:"reference"`
 
-	// Indicates the phase when the hooks will be executed.
+	// Indicates the phase when the hooks will be executed. Acceptable values are: PreBackup, PostBackup, PreRestore, and PostRestore.
 	Phase              string                `json:"phase"`
 
 	// Holds the name of the namespace where hooks should be implemented.
@@ -83,7 +83,7 @@ type MigPlanSpec struct {
 	// Holds a reference to a MigHook along with the desired phase to run it in.
 	Hooks                   []MigPlanHook         `json:"hooks,omitempty"`
 
-	// If set True, the controller is forces to check if the migplan is in Ready state or not.
+	// If set True, the controller is forced to check if the migplan is in Ready state or not.
 	Refresh                 bool                  `json:"refresh,omitempty"`
 
 	// If set True, disables direct image migrations.

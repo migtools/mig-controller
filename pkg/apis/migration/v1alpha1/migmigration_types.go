@@ -43,10 +43,10 @@ type MigMigrationSpec struct {
 	// Specifies whether to verify the health of the migrated pods or not.
 	Verify          bool                  `json:"verify,omitempty"`
 
-	// Invokes the cancel migration operation, when set to true the migration controller switches to cancel itinerary.
+	// Invokes the cancel migration operation, when set to true the migration controller switches to cancel itinerary. This field can be used on-demand to cancel the running migration.
 	Canceled        bool                  `json:"canceled,omitempty"`
 
-	// Invokes the rollback migration operation, when set to true the migration controller switches to rollback itinerary.
+	// Invokes the rollback migration operation, when set to true the migration controller switches to rollback itinerary. This field needs to be set prior to creation of a MigMigration.
 	Rollback        bool                  `json:"rollback,omitempty"`
 }
 
