@@ -36,7 +36,7 @@ const (
 
 // MigHookSpec defines the desired state of MigHook
 type MigHookSpec struct {
-	// Specifies whether the hook is a custom Ansible playbook or a pre-built image. The value of this field is required. This is a required field.
+	// Specifies whether the hook is a custom Ansible playbook or a pre-built image. This is a required field.
 	Custom                bool   `json:"custom"`
 
 	// Specifies the image of the hook to be executed. This is a required field.
