@@ -56,8 +56,7 @@ spec:
               type: integer
             custom:
               description: Specifies whether the hook is a custom Ansible playbook
-                or a pre-built image. The value of this field is required. This is
-                a required field.
+                or a pre-built image. This is a required field.
               type: boolean
             image:
               description: Specifies the image of the hook to be executed. This is
