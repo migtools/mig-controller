@@ -76,8 +76,8 @@ spec:
                   type: string
               type: object
             namespaces:
-              description: A list of all namespaces to run DIM to get all the imagestreams
-                in these namespaces.
+              description: Holds names of all namespaces to run DIM to get all the
+                imagestreams in these namespaces.
               items:
                 type: string
               type: array

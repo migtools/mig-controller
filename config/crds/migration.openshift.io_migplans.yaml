@@ -200,8 +200,7 @@ spec:
                   type: string
               type: object
             namespaces:
-              description: ' A list of string of all the namespaces to be included
-                in migration.'
+              description: Holds names of all the namespaces to be included in migration.
               items:
                 type: string
               type: array

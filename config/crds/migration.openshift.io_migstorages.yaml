@@ -123,8 +123,7 @@ spec:
                 backup storage location. This is a required field.
               type: string
             refresh:
-              description: A boolean used to trigger a reconcile for the MigStorage
-                CRD.
+              description: Triggers a reconcile for the MigStorage CRD.
               type: boolean
             volumeSnapshotConfig:
               description: Defines config for taking Volume Snapshots.

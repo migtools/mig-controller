@@ -77,8 +77,8 @@ spec:
                   type: string
               type: object
             destNamespace:
-              description: ' A string holding the name of the namespace on destination
-                cluster where imagestreams should be migrated.'
+              description: ' Holds the name of the namespace on destination cluster
+                where imagestreams should be migrated.'
               type: string
             imageStreamRef:
               description: ObjectReference contains enough information to let you
