@@ -106,7 +106,9 @@ spec:
                       be implemented.
                     type: string
                   phase:
-                    description: Indicates the phase when the hooks will be executed.
+                    description: 'Indicates the phase when the hooks will be executed.
+                      Acceptable values are: PreBackup, PostBackup, PreRestore, and
+                      PostRestore.'
                     type: string
                   reference:
                     description: ObjectReference contains enough information to let
@@ -277,7 +279,7 @@ spec:
                 type: object
               type: array
             refresh:
-              description: If set True, the controller is forces to check if the migplan
+              description: If set True, the controller is forced to check if the migplan
                 is in Ready state or not.
               type: boolean
             srcMigClusterRef:

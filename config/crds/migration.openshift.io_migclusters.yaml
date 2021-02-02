@@ -55,14 +55,15 @@ spec:
               type: string
             caBundle:
               description: If the migcluster needs SSL verification for connections
-                a user can supply a custom CA bundle.
+                a user can supply a custom CA bundle. This field is required only
+                when spec.Insecure is set false
               format: byte
               type: string
             exposedRegistryPath:
               description: Stores the path of registry route when using direct migration.
               type: string
             insecure:
-              description: If set false, user will need to provide CA bundle for TSL
+              description: If set false, user will need to provide CA bundle for TLS
                 connection to the remote cluster.
               type: boolean
             isHostCluster:
