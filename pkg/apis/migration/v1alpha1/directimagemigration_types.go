@@ -32,7 +32,7 @@ type DirectImageMigrationSpec struct {
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
-	// A list of all namespaces to run DIM to get all the imagestreams in these namespaces.
+	// Holds names of all namespaces to run DIM to get all the imagestreams in these namespaces.
 	Namespaces        []string              `json:"namespaces,omitempty"`
 }
 

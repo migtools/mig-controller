@@ -27,19 +27,19 @@ import (
 type MigAnalyticSpec struct {
 	MigPlanRef          *kapi.ObjectReference `json:"migPlanRef"`
 
-	// A boolean flag to enable analysis of persistent volume capacity. This is a required field.
+	// Enables analysis of persistent volume capacity, if set true. This is a required field.
 	AnalyzePVCapacity   bool                  `json:"analyzePVCapacity"`
 
-	// A boolean flag to enable analysis of image count. This is a required field.
+	// Enables analysis of image count, if set true. This is a required field.
 	AnalyzeImageCount   bool                  `json:"analyzeImageCount"`
 
-	// A boolean flag to enable analysis of k8s resources. This is a required field.
+	// Enables analysis of k8s resources, if set true. This is a required field.
 	AnalyzeK8SResources bool                  `json:"analyzeK8SResources"`
 
-	// A boolean flag to enable used in analysis of image count
+	// Enable used in analysis of image count, if set true.
 	ListImages          bool                  `json:"listImages,omitempty"`
 
-	// An integer representing limit on image counts
+	// Represents limit on image counts
 	ListImagesLimit     int                   `json:"listImagesLimit,omitempty"`
 }
 

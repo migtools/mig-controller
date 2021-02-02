@@ -47,7 +47,7 @@ type MigStorageSpec struct {
 	// Defines config for taking Volume Snapshots.
 	VolumeSnapshotConfig   `json:"volumeSnapshotConfig,omitempty"`
 
-	// A boolean used to trigger a reconcile for the MigStorage CRD.
+	// Triggers a reconcile for the MigStorage CRD.
 	Refresh                bool `json:"refresh,omitempty"`
 }
 

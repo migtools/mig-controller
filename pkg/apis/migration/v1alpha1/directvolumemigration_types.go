@@ -34,13 +34,13 @@ type DirectVolumeMigrationSpec struct {
 	SrcMigClusterRef            *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef           *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
-	//  A list of all the PVCs that are to be migrated with direct volume migration
+	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims      []PVCToMigrate        `json:"persistentVolumeClaims,omitempty"`
 
-	// A boolean flag that is set True to create namespaces in destination cluster
+	// Set true to create namespaces in destination cluster
 	CreateDestinationNamespaces bool                  `json:"createDestinationNamespaces,omitempty"`
 
-	// A boolean flag to specify if progress reporting CRs needs to be deleted or not
+	// Specifies if progress reporting CRs needs to be deleted or not
 	DeleteProgressReportingCRs  bool                  `json:"deleteProgressReportingCRs,omitempty"`
 }
 

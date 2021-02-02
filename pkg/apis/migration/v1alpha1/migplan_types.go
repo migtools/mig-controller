@@ -65,10 +65,10 @@ type MigPlanHook struct {
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
 
-	// Holds list of all the persistent volumes found for the namespaces included in migplan. Each entry in the list is a persistent volume with the information. Name - The PV name. Capacity - The PV storage capacity. StorageClass - The PV storage class name. Supported - Lists of what is supported. Selection - Choices made from supported. PVC - Associated PVC. NFS - NFS properties. staged - A PV has been explicitly added/updated.
+	// Holds all the persistent volumes found for the namespaces included in migplan. Each entry is a persistent volume with the information. Name - The PV name. Capacity - The PV storage capacity. StorageClass - The PV storage class name. Supported - Lists of what is supported. Selection - Choices made from supported. PVC - Associated PVC. NFS - NFS properties. staged - A PV has been explicitly added/updated.
 	PersistentVolumes       `json:",inline"`
 
-	//  A list of string of all the namespaces to be included in migration.
+	// Holds names of all the namespaces to be included in migration.
 	Namespaces              []string              `json:"namespaces,omitempty"`
 
 	SrcMigClusterRef        *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
