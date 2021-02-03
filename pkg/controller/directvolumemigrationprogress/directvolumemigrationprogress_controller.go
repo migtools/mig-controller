@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"path"
 	"regexp"
@@ -267,22 +268,35 @@ func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgres
 		if transferRate != "" {
 			pvProgress.Status.LastObservedTransferRate = transferRate
 		}
+		pvProgress.Status.ContainerElapsedTime = nil
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
 		// pod has a failure, report last failure reason
 		pvProgress.Status.PodPhase = kapi.PodFailed
 		pvProgress.Status.LogMessage = containerStatus.LastTerminationState.Terminated.Message
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
+		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
 	case pod.Status.Phase == kapi.PodFailed:
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		pvProgress.Status.PodPhase = kapi.PodFailed
 		pvProgress.Status.LogMessage = containerStatus.State.Terminated.Message
+		exitCode := containerStatus.State.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
+		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
 	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 0:
 		// succeeded dont ever requeue
 		pvProgress.Status.PodPhase = kapi.PodSucceeded
 		pvProgress.Status.LastObservedProgressPercent = "100%"
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
+		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
 	case pod.Status.Phase == kapi.PodSucceeded:
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		pvProgress.Status.PodPhase = kapi.PodSucceeded
 		pvProgress.Status.LastObservedProgressPercent = "100%"
+		exitCode := containerStatus.State.Terminated.ExitCode
+		pvProgress.Status.ExitCode = &exitCode
+		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
 	}
 
 	return nil
