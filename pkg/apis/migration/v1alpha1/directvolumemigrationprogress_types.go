@@ -36,7 +36,7 @@ type DirectVolumeMigrationProgressStatus struct {
 	Conditions                  `json:",omitempty"`
 	PodPhase                    kapi.PodPhase    `json:"phase,omitempty"`
 	ExitCode                    *int32           `json:"exitCode,omitempty"`
-	ContainerElapsedTime        *metav1.Duration `json:"runtime,omitempty"`
+	ContainerElapsedTime        *metav1.Duration `json:"containerElapsedTime,omitempty"`
 	LogMessage                  string           `json:"logMessage,omitempty"`
 	ObservedDigest              string           `json:"observedDigest,omitempty"`
 	LastObservedProgressPercent string           `json:"lastObservedProgressPercent,omitempty"`
