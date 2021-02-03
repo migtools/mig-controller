@@ -13,20 +13,21 @@ import (
 
 // Types
 const (
-	InvalidSourceClusterRef      = "InvalidSourceClusterRef"
-	InvalidDestinationClusterRef = "InvalidDestinationClusterRef"
-	InvalidSourceCluster         = "InvalidSourceCluster"
-	InvalidDestinationCluster    = "InvalidDestinationCluster"
-	InvalidPVCs                  = "InvalidPVCs"
-	SourceClusterNotReady        = "SourceClusterNotReady"
-	DestinationClusterNotReady   = "DestinationClusterNotReady"
-	PVCsNotFoundOnSourceCluster  = "PodsNotFoundOnSourceCluster"
-	StunnelClientPodsPending     = "StunnelClientPodsPending"
-	RsyncTransferPodsPending     = "RsyncTransferPodsPending"
-	RsyncRouteNotAdmitted        = "RsyncRouteNotAdmitted"
-	Running                      = "Running"
-	Failed                       = "Failed"
-	Succeeded                    = "Succeeded"
+	InvalidSourceClusterRef         = "InvalidSourceClusterRef"
+	InvalidDestinationClusterRef    = "InvalidDestinationClusterRef"
+	InvalidSourceCluster            = "InvalidSourceCluster"
+	InvalidDestinationCluster       = "InvalidDestinationCluster"
+	InvalidPVCs                     = "InvalidPVCs"
+	SourceClusterNotReady           = "SourceClusterNotReady"
+	DestinationClusterNotReady      = "DestinationClusterNotReady"
+	PVCsNotFoundOnSourceCluster     = "PodsNotFoundOnSourceCluster"
+	StunnelClientPodsPending        = "StunnelClientPodsPending"
+	RsyncTransferPodsPending        = "RsyncTransferPodsPending"
+	RsyncRouteNotAdmitted           = "RsyncRouteNotAdmitted"
+	Running                         = "Running"
+	Failed                          = "Failed"
+	Succeeded                       = "Succeeded"
+	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
 )
 
 // Reasons
