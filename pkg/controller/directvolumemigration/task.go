@@ -436,11 +436,12 @@ func (t *Task) Run() error {
 					Reason:   SourceToDestinationNetworkError,
 					Category: migapi.Error,
 					Message: "All the rsync client pods on source are timing out at 20 seconds, " +
-						"please check your network configuration (like egressnetwork) that would block traffic from " +
+						"please check your network configuration (like egressnetworkpolicy) that would block traffic from " +
 						"source namespace to destination",
 					Durable: true,
 				})
 				t.fail(MigrationFailed, []string{"all the source rsync pods have timed out, look at error condition for more details"})
+				t.Requeue = NoReQ
 				return nil
 			}
 			if failed {
