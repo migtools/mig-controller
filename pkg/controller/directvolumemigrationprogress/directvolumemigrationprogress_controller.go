@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Red Hat Inc.
+Copyright 2020 Red Hat Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -113,6 +114,7 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigrationProgress{}
 type ReconcileDirectVolumeMigrationProgress struct {
 	client.Client
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigrationProgress object and makes changes based on the state read
@@ -133,6 +135,12 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+
+	// Set up jaeger tracing
+	reconcileSpan, err := r.initTracer(*pvProgress)
+	if reconcileSpan != nil {
+		defer reconcileSpan.Finish()
 	}
 
 	// Report reconcile error.

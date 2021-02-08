@@ -22,6 +22,7 @@ import (
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -98,6 +99,7 @@ type ReconcileDirectImageMigration struct {
 	client.Client
 	record.EventRecorder
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 // Reconcile reads that state of the cluster for a DirectImageMigration object and makes changes based on the state read
@@ -123,6 +125,12 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{}, err
 	}
 
+	// Set up jaeger tracing
+	reconcileSpan := r.initTracer(imageMigration)
+	if reconcileSpan != nil {
+		defer reconcileSpan.Finish()
+	}
+
 	// Completed.
 	if imageMigration.Status.Phase == Completed {
 		return reconcile.Result{}, nil
@@ -139,7 +147,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 	}
 
 	if !imageMigration.Status.HasBlockerCondition() {
-		_, err = r.migrate(imageMigration)
+		_, err = r.migrate(imageMigration, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil

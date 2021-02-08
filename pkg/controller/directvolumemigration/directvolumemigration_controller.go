@@ -20,7 +20,8 @@ import (
 	"context"
 
 	"github.com/konveyor/controller/pkg/logging"
-	migrationv1alpha1 "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,15 +54,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectVolumeMigration
-	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectVolumeMigration{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &migrationv1alpha1.DirectVolumeMigrationProgress{}},
+	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}},
 		&handler.EnqueueRequestForOwner{
 			IsController: true,
-			OwnerType:    &migrationv1alpha1.DirectVolumeMigration{},
+			OwnerType:    &migapi.DirectVolumeMigration{},
 		})
 	if err != nil {
 		return err
@@ -78,6 +79,7 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 type ReconcileDirectVolumeMigration struct {
 	client.Client
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigration object and makes changes based on the state read
@@ -92,7 +94,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	log.Reset()
 
 	// Fetch the DirectVolumeMigration instance
-	direct := &migrationv1alpha1.DirectVolumeMigration{}
+	direct := &migapi.DirectVolumeMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, direct)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -102,6 +104,12 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	// Set up jaeger tracing
+	reconcileSpan := r.initTracer(direct)
+	if reconcileSpan != nil {
+		defer reconcileSpan.Finish()
 	}
 
 	// Set values
@@ -123,7 +131,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	}
 
 	if !direct.Status.HasBlockerCondition() {
-		_, err = r.migrate(direct)
+		_, err = r.migrate(direct, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil

@@ -9,6 +9,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/opentracing/opentracing-go"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -161,6 +162,9 @@ type Task struct {
 	Requeue          time.Duration
 	Itinerary        Itinerary
 	Errors           []string
+
+	Tracer        opentracing.Tracer
+	ReconcileSpan opentracing.Span
 }
 
 type sshKeys struct {
@@ -188,6 +192,15 @@ func (t *Task) Run() error {
 
 	// Log '[RUN] (Step 12/37) <Extended Phase Description>'
 	t.logRunHeader()
+
+	// Set up span for task.Run
+	if t.ReconcileSpan != nil {
+		phaseSpan := t.Tracer.StartSpan(
+			"phase-"+t.Phase,
+			opentracing.ChildOf(t.ReconcileSpan.Context()),
+		)
+		defer phaseSpan.Finish()
+	}
 
 	// Run the current phase.
 	switch t.Phase {

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Red Hat Inc.
+Copyright 2020 Red Hat Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/errorutil"
-
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -140,6 +140,7 @@ type ReconcileMigMigration struct {
 	record.EventRecorder
 
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
@@ -160,6 +161,12 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Info("Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Get jaeger spans for migration and reconcile
+	migrationSpan, reconcileSpan := r.initTracer(migration)
+	if reconcileSpan != nil {
+		defer reconcileSpan.Finish()
 	}
 
 	// Ensure debugging labels are present on migmigration
@@ -231,7 +238,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Migrate
 	if !migration.Status.HasBlockerCondition() {
-		requeueAfter, err = r.migrate(migration)
+		requeueAfter, err = r.migrate(migration, migrationSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
