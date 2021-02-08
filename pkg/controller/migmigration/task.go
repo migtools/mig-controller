@@ -1166,12 +1166,14 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&HasVerify != 0 && !t.hasVerify() {
 		return false, nil
 	}
-	hasImageStream, err := t.hasImageStreams()
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	if phase.all&HasISs != 0 && !hasImageStream {
-		return false, nil
+	if phase.all&HasISs != 0 {
+		hasImageStream, err := t.hasImageStreams()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !hasImageStream {
+			return false, nil
+		}
 	}
 	if phase.all&DirectImage != 0 && !t.directImageMigration() {
 		return false, nil
@@ -1191,8 +1193,14 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&EnableVolume != 0 && t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
 		return false, nil
 	}
-	if phase.all&HasStageBackup != 0 && !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
-		return false, nil
+	if phase.all&HasStageBackup != 0 {
+		hasImageStream, err := t.hasImageStreams()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+			return false, nil
+		}
 	}
 
 	return true, nil
@@ -1213,12 +1221,14 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&HasVerify != 0 && t.hasVerify() {
 		return true, nil
 	}
-	hasImageStream, err := t.hasImageStreams()
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	if phase.any&HasISs != 0 && hasImageStream {
-		return true, nil
+	if phase.any&HasISs != 0 {
+		hasImageStream, err := t.hasImageStreams()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if hasImageStream {
+			return true, nil
+		}
 	}
 	if phase.any&DirectImage != 0 && t.directImageMigration() {
 		return true, nil
@@ -1238,8 +1248,14 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&EnableVolume != 0 && !t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
 		return false, nil
 	}
-	if phase.any&HasStageBackup != 0 && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
-		return true, nil
+	if phase.any&HasStageBackup != 0 {
+		hasImageStream, err := t.hasImageStreams()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+			return true, nil
+		}
 	}
 	return phase.any == uint16(0), nil
 }
