@@ -16,6 +16,7 @@ spec:
     shortNames:
     - dvm
     singular: directvolumemigration
+  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -38,8 +39,11 @@ spec:
           description: DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
           properties:
             createDestinationNamespaces:
+              description: Set true to create namespaces in destination cluster
               type: boolean
             deleteProgressReportingCRs:
+              description: Specifies if progress reporting CRs needs to be deleted
+                or not
               type: boolean
             destMigClusterRef:
               description: ObjectReference contains enough information to let you
@@ -79,6 +83,8 @@ spec:
                   type: string
               type: object
             persistentVolumeClaims:
+              description: ' Holds all the PVCs that are to be migrated with direct
+                volume migration'
               items:
                 properties:
                   apiVersion:
@@ -119,9 +125,12 @@ spec:
                   uid:
                     description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                     type: string
+                  verify:
+                    type: boolean
                 required:
                 - targetAccessModes
                 - targetStorageClass
+                - verify
                 type: object
               type: array
             srcMigClusterRef:

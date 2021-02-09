@@ -16,6 +16,7 @@ spec:
     shortNames:
     - dim
     singular: directimagemigration
+  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -75,6 +76,8 @@ spec:
                   type: string
               type: object
             namespaces:
+              description: Holds names of all namespaces to run DIM to get all the
+                imagestreams in these namespaces.
               items:
                 type: string
               type: array

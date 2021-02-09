@@ -36,10 +36,19 @@ const (
 
 // MigHookSpec defines the desired state of MigHook
 type MigHookSpec struct {
+	// Specifies whether the hook is a custom Ansible playbook or a pre-built image. This is a required field.
 	Custom                bool   `json:"custom"`
+
+	// Specifies the image of the hook to be executed. This is a required field.
 	Image                 string `json:"image"`
+
+	// Specifies the contents of the custom Ansible playbook in base64 format, it is used in conjunction with the custom boolean flag.
 	Playbook              string `json:"playbook,omitempty"`
+
+	// Specifies the cluster on which the hook is to be executed. This is a required field.
 	TargetCluster         string `json:"targetCluster"`
+
+	// Specifies the highest amount of time for which the hook will run.
 	ActiveDeadlineSeconds int64  `json:"activeDeadlineSeconds,omitempty"`
 }
 

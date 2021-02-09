@@ -16,6 +16,7 @@ spec:
     shortNames:
     - dism
     singular: directimagestreammigration
+  preserveUnknownFields: false
   scope: Namespaced
   validation:
     openAPIV3Schema:
@@ -76,6 +77,8 @@ spec:
                   type: string
               type: object
             destNamespace:
+              description: ' Holds the name of the namespace on destination cluster
+                where imagestreams should be migrated.'
               type: string
             imageStreamRef:
               description: ObjectReference contains enough information to let you

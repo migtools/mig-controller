@@ -33,8 +33,14 @@ type PVCToMigrate struct {
 type DirectVolumeMigrationSpec struct {
 	SrcMigClusterRef            *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef           *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+
+	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims      []PVCToMigrate        `json:"persistentVolumeClaims,omitempty"`
+
+	// Set true to create namespaces in destination cluster
 	CreateDestinationNamespaces bool                  `json:"createDestinationNamespaces,omitempty"`
+
+	// Specifies if progress reporting CRs needs to be deleted or not
 	DeleteProgressReportingCRs  bool                  `json:"deleteProgressReportingCRs,omitempty"`
 }
 
