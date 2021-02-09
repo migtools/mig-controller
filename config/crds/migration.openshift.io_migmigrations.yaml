@@ -36,6 +36,7 @@ spec:
     listKind: MigMigrationList
     plural: migmigrations
     singular: migmigration
+  preserveUnknownFields: false
   scope: Namespaced
   subresources: {}
   validation:
@@ -58,8 +59,13 @@ spec:
           description: MigMigrationSpec defines the desired state of MigMigration
           properties:
             canceled:
+              description: Invokes the cancel migration operation, when set to true
+                the migration controller switches to cancel itinerary. This field
+                can be used on-demand to cancel the running migration.
               type: boolean
             keepAnnotations:
+              description: Specifies whether to retain the annotations set by the
+                migration controller or not.
               type: boolean
             migPlanRef:
               description: ObjectReference contains enough information to let you
@@ -99,12 +105,21 @@ spec:
                   type: string
               type: object
             quiescePods:
+              description: Specifies whether to quiesce the application Pods before
+                migrating Persistent Volume data.
               type: boolean
             rollback:
+              description: Invokes the rollback migration operation, when set to true
+                the migration controller switches to rollback itinerary. This field
+                needs to be set prior to creation of a MigMigration.
               type: boolean
             stage:
+              description: Invokes the stage operation, when set to true the migration
+                controller switches to stage itinerary. This is a required field.
               type: boolean
             verify:
+              description: Specifies whether to verify the health of the migrated
+                pods or not.
               type: boolean
           required:
           - stage

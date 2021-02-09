@@ -26,10 +26,20 @@ import (
 // MigAnalyticSpec defines the desired state of MigAnalytic
 type MigAnalyticSpec struct {
 	MigPlanRef          *kapi.ObjectReference `json:"migPlanRef"`
+
+	// Enables analysis of persistent volume capacity, if set true. This is a required field.
 	AnalyzePVCapacity   bool                  `json:"analyzePVCapacity"`
+
+	// Enables analysis of image count, if set true. This is a required field.
 	AnalyzeImageCount   bool                  `json:"analyzeImageCount"`
+
+	// Enables analysis of k8s resources, if set true. This is a required field.
 	AnalyzeK8SResources bool                  `json:"analyzeK8SResources"`
+
+	// Enable used in analysis of image count, if set true.
 	ListImages          bool                  `json:"listImages,omitempty"`
+
+	// Represents limit on image counts
 	ListImagesLimit     int                   `json:"listImagesLimit,omitempty"`
 }
 

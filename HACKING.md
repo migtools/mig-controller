@@ -99,6 +99,8 @@ There are several useful Makefile targets for mig-controller that developers sho
 | `make docker-build` | Build the controller-manager into a container image. Requires support for multi-stage builds. |
 
 ---
+***Note***: controller-runtime version 0.3.0 is desired for development.   
+
 ## Invoking CI on pull requests
 
 You can invoke CI via webhook with an appropriate pull request comment command. CI will run a stateless migration and return results as a comment on the relevant PR where CI was requested.

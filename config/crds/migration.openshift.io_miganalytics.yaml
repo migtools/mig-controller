@@ -42,6 +42,7 @@ spec:
     listKind: MigAnalyticList
     plural: miganalytics
     singular: miganalytic
+  preserveUnknownFields: false
   scope: Namespaced
   subresources: {}
   validation:
@@ -64,14 +65,22 @@ spec:
           description: MigAnalyticSpec defines the desired state of MigAnalytic
           properties:
             analyzeImageCount:
+              description: Enables analysis of image count, if set true. This is a
+                required field.
               type: boolean
             analyzeK8SResources:
+              description: Enables analysis of k8s resources, if set true. This is
+                a required field.
               type: boolean
             analyzePVCapacity:
+              description: Enables analysis of persistent volume capacity, if set
+                true. This is a required field.
               type: boolean
             listImages:
+              description: Enable used in analysis of image count, if set true.
               type: boolean
             listImagesLimit:
+              description: Represents limit on image counts
               type: integer
             migPlanRef:
               description: ObjectReference contains enough information to let you
