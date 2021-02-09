@@ -25,22 +25,28 @@ import (
 
 // MigAnalyticSpec defines the desired state of MigAnalytic
 type MigAnalyticSpec struct {
-	MigPlanRef          *kapi.ObjectReference `json:"migPlanRef"`
+	MigPlanRef *kapi.ObjectReference `json:"migPlanRef"`
 
 	// Enables analysis of persistent volume capacity, if set true. This is a required field.
-	AnalyzePVCapacity   bool                  `json:"analyzePVCapacity"`
+	AnalyzePVCapacity bool `json:"analyzePVCapacity"`
 
 	// Enables analysis of image count, if set true. This is a required field.
-	AnalyzeImageCount   bool                  `json:"analyzeImageCount"`
+	AnalyzeImageCount bool `json:"analyzeImageCount"`
 
 	// Enables analysis of k8s resources, if set true. This is a required field.
-	AnalyzeK8SResources bool                  `json:"analyzeK8SResources"`
+	AnalyzeK8SResources bool `json:"analyzeK8SResources"`
 
 	// Enable used in analysis of image count, if set true.
-	ListImages          bool                  `json:"listImages,omitempty"`
+	ListImages bool `json:"listImages,omitempty"`
 
 	// Represents limit on image counts
-	ListImagesLimit     int                   `json:"listImagesLimit,omitempty"`
+	ListImagesLimit int `json:"listImagesLimit,omitempty"`
+
+	// Enables advanced analysis of volumes required for PV resizing
+	AnalyzeExntendedPVCapacity bool `json:"analyzeExtendedPVCapacity,omitempty"`
+
+	// Enables refreshing existing MigAnalytic
+	Refresh bool `json:"refresh,omitempty"`
 }
 
 // MigAnalyticStatus defines the observed state of MigAnalytic
@@ -66,18 +72,19 @@ type MigAnalyticPlan struct {
 
 // MigAnalyticNamespace defines the observed state of MigAnalyticNamespace
 type MigAnalyticNamespace struct {
-	Namespace                    string                  `json:"namespace"`
-	K8SResourceTotal             int                     `json:"k8sResourceTotal"`
-	ExcludedK8SResourceTotal     int                     `json:"excludedK8SResourceTotal"`
-	IncompatibleK8SResourceTotal int                     `json:"incompatibleK8SResourceTotal"`
-	PVCapacity                   resource.Quantity       `json:"pvCapacity"`
-	PVCount                      int                     `json:"pvCount"`
-	ImageCount                   int                     `json:"imageCount"`
-	ImageSizeTotal               resource.Quantity       `json:"imageSizeTotal"`
-	Images                       []MigAnalyticNSImage    `json:"images,omitempty"`
-	K8SResources                 []MigAnalyticNSResource `json:"k8sResources,omitempty"`
-	ExcludedK8SResources         []MigAnalyticNSResource `json:"excludedK8SResources,omitempty"`
-	IncompatibleK8SResources     []MigAnalyticNSResource `json:"incompatibleK8SResources,omitempty"`
+	Namespace                    string                             `json:"namespace"`
+	K8SResourceTotal             int                                `json:"k8sResourceTotal"`
+	ExcludedK8SResourceTotal     int                                `json:"excludedK8SResourceTotal"`
+	IncompatibleK8SResourceTotal int                                `json:"incompatibleK8SResourceTotal"`
+	PVCapacity                   resource.Quantity                  `json:"pvCapacity"`
+	PVCount                      int                                `json:"pvCount"`
+	ImageCount                   int                                `json:"imageCount"`
+	ImageSizeTotal               resource.Quantity                  `json:"imageSizeTotal"`
+	Images                       []MigAnalyticNSImage               `json:"images,omitempty"`
+	K8SResources                 []MigAnalyticNSResource            `json:"k8sResources,omitempty"`
+	PersistentVolumes            []MigAnalyticPersistentVolumeClaim `json:"persistentVolumes,omitempty"`
+	ExcludedK8SResources         []MigAnalyticNSResource            `json:"excludedK8SResources,omitempty"`
+	IncompatibleK8SResources     []MigAnalyticNSResource            `json:"incompatibleK8SResources,omitempty"`
 }
 
 // MigAnalyticNamespaceResource defines the observed state of MigAnalyticNamespaceResource
@@ -92,6 +99,22 @@ type MigAnalyticNSImage struct {
 	Name      string            `json:"name"`
 	Reference string            `json:"reference"`
 	Size      resource.Quantity `json:"size"`
+}
+
+// MigAnalyticPersistentVolumeClaim represents a Kubernetes Persistent volume claim with discovered analytic properties
+type MigAnalyticPersistentVolumeClaim struct {
+	// Name of the persistent volume claim
+	Name string `json:"name"`
+	// Requested capacity of the claim
+	RequestedCapacity resource.Quantity `json:"requestedCapacity,omitempty"`
+	// Actual provisioned capacity of the volume
+	ActualCapacity resource.Quantity `json:"actualCapacity,omitempty"`
+	// Usage of volume in percentage
+	UsagePercentage int `json:"usagePercentage,omitempty"`
+	// Adjusted capacity of the volume
+	ProposedCapacity resource.Quantity `json:"proposedCapacity,omitempty"`
+	// Human readable reason for proposed adjustment
+	Comment string `json:"comment,omitempty"`
 }
 
 // +genclient

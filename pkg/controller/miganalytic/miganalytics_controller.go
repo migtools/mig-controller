@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -122,7 +123,8 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	// Exit early if the MigAnalytic already has a ready condition
-	if analytic.Status.IsReady() {
+	// and Refresh boolean is unset
+	if analytic.Status.IsReady() && !analytic.Spec.Refresh {
 		return reconcile.Result{}, nil
 	}
 
@@ -173,6 +175,8 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	analytic.Status.SetReady(
 		!analytic.Status.HasBlockerCondition(),
 		"The analytic is ready.")
+
+	analytic.Spec.Refresh = false
 
 	// End staging conditions.
 	analytic.Status.EndStagingConditions()
@@ -257,6 +261,13 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			}
 		}
 
+		if analytic.Spec.AnalyzeExntendedPVCapacity {
+			err := r.analyzeExtendedPVCapacity(client, &ns)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+
 		analytic.Status.Analytics.Namespaces = append(analytic.Status.Analytics.Namespaces, ns)
 		analytic.Status.Analytics.K8SResourceTotal += ns.K8SResourceTotal
 		analytic.Status.Analytics.ExcludedK8SResourceTotal += ns.ExcludedK8SResourceTotal
@@ -272,6 +283,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			return liberr.Wrap(err)
 		}
 	}
+	return nil
+}
+
+func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(client compat.Client, ns *migapi.MigAnalyticNamespace) error {
 	return nil
 }
 
