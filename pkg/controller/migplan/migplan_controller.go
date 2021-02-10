@@ -45,6 +45,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const (
+	MigPlan         = "migplan"
+)
 var log = logging.WithName("plan")
 
 // Application settings.
@@ -219,7 +222,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Check if migAnalytics exists
-	err = r.validateMigAnalytics(plan)
+	err = r.ensureMigAnalytics(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -468,10 +471,9 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 	return nil
 }
 
-func (r ReconcileMigPlan) validateMigAnalytics(plan *migapi.MigPlan) error {
-	log.Info(fmt.Sprintf("Checking if migpanalytics exists or not"))
+func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	migAnalytics := &migapi.MigAnalyticList{}
-	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{"migplan": plan.Name}), migAnalytics)
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
 		if !errors.IsNotFound(err){
 			return err
@@ -479,7 +481,6 @@ func (r ReconcileMigPlan) validateMigAnalytics(plan *migapi.MigPlan) error {
 	}
 	for _, migAnalytic := range migAnalytics.Items {
 		if migAnalytic.Spec.AnalyzeExntendedPVCapacity && plan.Spec.Refresh{
-			log.Info("refreshing miganalytics")
 			migAnalytic.Spec.Refresh = true
 			err := r.Update(context.TODO(), &migAnalytic)
 			if err != nil{
@@ -489,7 +490,6 @@ func (r ReconcileMigPlan) validateMigAnalytics(plan *migapi.MigPlan) error {
 		}
 	}
 
-	log.Info(fmt.Sprintf("Creating new analytics"))
 	pvMigAnalytics := &migapi.MigAnalytic{}
 	pvMigAnalytics.GenerateName = plan.Name + "-"
 	pvMigAnalytics.Namespace = plan.Namespace
@@ -509,9 +509,8 @@ func (r ReconcileMigPlan) validateMigAnalytics(plan *migapi.MigPlan) error {
 }
 
 func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
-	log.Info(fmt.Sprintf("Checking if migpanalytics exists or not"))
 	migAnalytics := &migapi.MigAnalyticList{}
-	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{"migplan": plan.Name}), migAnalytics)
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
 		return nil, err
 	}
