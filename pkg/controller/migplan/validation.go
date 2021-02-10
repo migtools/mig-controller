@@ -34,6 +34,7 @@ const (
 	InvalidStorageRef                          = "InvalidStorageRef"
 	SourceClusterNotReady                      = "SourceClusterNotReady"
 	DestinationClusterNotReady                 = "DestinationClusterNotReady"
+	ClusterVersionMismatch                     = "ClusterVersionMismatch"
 	SourceClusterNoRegistryPath                = "SourceClusterNoRegistryPath"
 	DestinationClusterNoRegistryPath           = "DestinationClusterNoRegistryPath"
 	StorageNotReady                            = "StorageNotReady"
@@ -170,6 +171,12 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// GVK
 	err = r.compareGVK(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Versions
+	err = r.validateMatchingOperatorVersion(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -467,6 +474,40 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Reason:   NotSet,
 			Message: fmt.Sprintf("Direct image migration is selected and the destination cluster %s is missing a configured Registry Path",
 				path.Join(ref.Namespace, ref.Name)),
+		})
+		return nil
+	}
+
+	return nil
+}
+
+func (r ReconcileMigPlan) validateMatchingOperatorVersion(plan *migapi.MigPlan) error {
+	destRef := plan.Spec.DestMigClusterRef
+	srcRef := plan.Spec.SrcMigClusterRef
+
+	srcCluster, err := migapi.GetCluster(r, srcRef)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	destCluster, err := migapi.GetCluster(r, destRef)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	srcClusterOperatorVersion, err := srcCluster.GetOperatorVersion(r)
+	destClusterOperatorVersion, err := destCluster.GetOperatorVersion(r)
+
+	doVersionsMatch := srcClusterOperatorVersion == destClusterOperatorVersion
+
+	if !doVersionsMatch && err != nil {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     ClusterVersionMismatch,
+			Status:   True,
+			Category: Critical,
+			Reason:   Conflict,
+			Message: fmt.Sprintf("Cluster versions do not match. Source and destination clusters must have the same operator version. %s",
+				path.Join(srcClusterOperatorVersion, destClusterOperatorVersion)),
 		})
 		return nil
 	}
