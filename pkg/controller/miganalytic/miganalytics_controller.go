@@ -305,37 +305,25 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 		return nil, liberr.Wrap(err)
 	}
 
-	if len(podList.Items) > 0 {
-		for _, pod := range podList.Items {
-			if pod.Status.Phase == migapi.Running {
-				for _, vol := range pod.Spec.Volumes {
-					if vol.PersistentVolumeClaim != nil {
-						pvcObject := kapi.PersistentVolumeClaim{}
-						err := r.Client.Get(
-							context.TODO(),
-							types.NamespacedName{
-								Name:      vol.PersistentVolumeClaim.ClaimName,
-								Namespace: pod.Namespace,
-							}, &pvcObject)
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == migapi.Running {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					pvcObject := kapi.PersistentVolumeClaim{}
+					err := r.Client.Get(
+						context.TODO(),
+						types.NamespacedName{
+							Name:      vol.PersistentVolumeClaim.ClaimName,
+							Namespace: pod.Namespace,
+						}, &pvcObject)
 
-						if err != nil {
-							return nil, liberr.Wrap(err)
-						}
+					if err != nil {
+						return nodeToPVDetails, liberr.Wrap(err)
+					}
 
-						if volDetailList, exists := nodeToPVDetails[pod.Spec.NodeName]; exists {
-							volDetailList = append(volDetailList,
-								persistentVolumeDetails{
-									Name:                vol.PersistentVolumeClaim.ClaimName,
-									Namespace:           pvcObject.Namespace,
-									RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
-									PodUID:              pod.UID,
-									ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
-									StorageClass:        pvcObject.Spec.StorageClassName,
-									VolumeName:          pvcObject.Spec.VolumeName,
-								})
-							nodeToPVDetails[pod.Spec.NodeName] = volDetailList
-						} else {
-							nodeToPVDetails[pod.Spec.NodeName] = []persistentVolumeDetails{{
+					if volDetailList, exists := nodeToPVDetails[pod.Spec.NodeName]; exists {
+						volDetailList = append(volDetailList,
+							persistentVolumeDetails{
 								Name:                vol.PersistentVolumeClaim.ClaimName,
 								Namespace:           pvcObject.Namespace,
 								RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
@@ -343,17 +331,25 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 								ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
 								StorageClass:        pvcObject.Spec.StorageClassName,
 								VolumeName:          pvcObject.Spec.VolumeName,
-							}}
-						}
-
+							})
+						nodeToPVDetails[pod.Spec.NodeName] = volDetailList
+					} else {
+						nodeToPVDetails[pod.Spec.NodeName] = []persistentVolumeDetails{{
+							Name:                vol.PersistentVolumeClaim.ClaimName,
+							Namespace:           pvcObject.Namespace,
+							RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
+							PodUID:              pod.UID,
+							ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
+							StorageClass:        pvcObject.Spec.StorageClassName,
+							VolumeName:          pvcObject.Spec.VolumeName,
+						}}
 					}
+
 				}
 			}
 		}
-		return nodeToPVDetails, nil
 	}
-
-	return nil, nil
+	return nodeToPVDetails, nil
 }
 
 func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
