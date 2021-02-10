@@ -18,10 +18,12 @@ package migplan
 
 import (
 	"context"
+	"fmt"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
 	"strconv"
 	"time"
+	e"errors"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -245,6 +247,26 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Check if migAnalytics exists
+	err = r.validateMigAnalytics(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Wait for the migAnalytics to be ready
+	migAnalytic, err := r.waitForMigAnalyticsReady(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Loading PV statistics
+	pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
+	for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
+			pvcMap[mapvc.Namespace] =  mapvc.PersistentVolumes
+	}
+
 	// Validate PV actions.
 	err = r.validatePvSelections(plan)
 	if err != nil {
@@ -444,4 +466,63 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 		}
 	}
 	return nil
+}
+
+func (r ReconcileMigPlan) validateMigAnalytics(plan *migapi.MigPlan) error {
+	log.Info(fmt.Sprintf("Checking if migpanalytics exists or not"))
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{"migplan": plan.Name}), migAnalytics)
+	if err != nil {
+		if !errors.IsNotFound(err){
+			return err
+		}
+	}
+	for _, migAnalytic := range migAnalytics.Items {
+		if migAnalytic.Spec.AnalyzeExntendedPVCapacity && plan.Spec.Refresh{
+			log.Info("refreshing miganalytics")
+			migAnalytic.Spec.Refresh = true
+			err := r.Update(context.TODO(), &migAnalytic)
+			if err != nil{
+				return err
+			}
+			return nil
+		}
+	}
+
+	log.Info(fmt.Sprintf("Creating new analytics"))
+	pvMigAnalytics := &migapi.MigAnalytic{}
+	pvMigAnalytics.GenerateName = plan.Name + "-"
+	pvMigAnalytics.Namespace = plan.Namespace
+	pvMigAnalytics.Spec.AnalyzeExntendedPVCapacity = true
+	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
+		APIVersion: plan.APIVersion,
+		Kind:       plan.Kind,
+		Name:       plan.Name,
+		UID:        plan.UID,
+	})
+	pvMigAnalytics.Spec.MigPlanRef = &kapi.ObjectReference{Namespace: plan.Namespace, Name: plan.Name}
+	err = r.Create(context.TODO(), pvMigAnalytics)
+	if err != nil{
+		return err
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+	log.Info(fmt.Sprintf("Checking if migpanalytics exists or not"))
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{"migplan": plan.Name}), migAnalytics)
+	if err != nil {
+		return nil, err
+	}
+	for _, migAnalytic := range migAnalytics.Items {
+		if migAnalytic.Spec.AnalyzeExntendedPVCapacity == true {
+			for _, condition := range migAnalytic.Status.Conditions.List {
+				if condition.Type == migapi.Ready && condition.Status == "True" {
+					return &migAnalytic, nil
+				}
+			}
+		}
+	}
+	return nil, e.New("Mig-Analytics is not ready")
 }
