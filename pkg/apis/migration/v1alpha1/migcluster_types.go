@@ -58,6 +58,7 @@ const (
 	StagePodImageKey      = "STAGE_IMAGE"
 	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
 	ClusterSubdomainKey   = "CLUSTER_SUBDOMAIN"
+	OperatorVersionKey    = "OPERATOR_VERSION"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -94,6 +95,7 @@ type MigClusterStatus struct {
 	Conditions     `json:","`
 	ObservedDigest string `json:"observedDigest,omitempty"`
 	RegistryPath   string `json:"registryPath,omitempty"`
+	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
 
 // +genclient
@@ -216,6 +218,19 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", ClusterSubdomainKey))
 	}
 	return clusterSubdomain, nil
+}
+
+// GetRegistryImage gets a MigCluster specific registry image from ConfigMap
+func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
+	clusterConfig, err := m.GetClusterConfigMap(c)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
+	if !ok {
+		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", OperatorVersionKey))
+	}
+	return operatorVersion, nil
 }
 
 // Test the connection settings by building a client.
@@ -651,6 +666,15 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 		return "", nil
 	}
 	return m.GetInternalRegistryPath(c)
+}
+
+func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
+	newOperatorVersion, err := m.GetOperatorVersion(c)
+	if err != nil {
+		return err
+	}
+	m.Status.OperatorVersion = newOperatorVersion
+	return nil
 }
 
 type routingConfig struct {
