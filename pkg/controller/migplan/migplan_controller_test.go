@@ -17,6 +17,14 @@ limitations under the License.
 package migplan
 
 import (
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 	"time"
 
@@ -77,4 +85,282 @@ func TestReconcile(t *testing.T) {
 	// // Manually delete Deployment since GC isn't enabled in the test control plane
 	// g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
 
+}
+
+var migPlan = &migapi.MigPlan{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "test-plan",
+		Namespace: "test-ns",
+	},
+}
+var migAnalytic = &migapi.MigAnalytic{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "test-analtics",
+		Namespace: "test-ns",
+		Labels:    map[string]string{MigPlan: "test-plan"},
+	},
+	Spec: migapi.MigAnalyticSpec{
+		MigPlanRef: &corev1.ObjectReference{
+			Namespace: "test-plan",
+			Name:      "test-ns",
+		},
+	},
+}
+var migPlan3 = &migapi.MigPlan{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "migplan-00",
+		Namespace: "openshift-migration",
+	},
+	Spec: migapi.MigPlanSpec{
+		DestMigClusterRef: &corev1.ObjectReference{
+			Name:      "migcluster-host",
+			Namespace: "openshift-migration",
+		},
+		SrcMigClusterRef: &corev1.ObjectReference{
+			Name:      "migcluster-source",
+			Namespace: "openshift-migration",
+		},
+		Namespaces: []string{"test-ns"},
+		MigStorageRef: &corev1.ObjectReference{
+			Name:      "migstorage",
+			Namespace: "openshift-migration",
+		},
+	},
+	Status: migapi.MigPlanStatus{
+		Conditions: migapi.Conditions{
+			List: []migapi.Condition{
+				{
+					Category: "Required",
+					Status:   "True",
+					Type:     "Ready",
+				},
+			},
+		},
+	},
+}
+
+var migAnalytic3 = &migapi.MigAnalytic{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "miganalytic-00",
+		Namespace: "openshift-migration",
+		Labels:    map[string]string{MigPlan: "migplan-00"},
+	},
+	Spec: migapi.MigAnalyticSpec{
+		MigPlanRef: &corev1.ObjectReference{
+			Namespace:  "openshift-migration",
+			Name:       "migplan-00",
+			Kind:       "MigPlan",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
+		AnalyzeExntendedPVCapacity: true,
+		Refresh:                    false,
+	},
+}
+var migPlan4 = &migapi.MigPlan{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "migplan-01",
+		Namespace: "openshift-migration",
+	},
+	Spec: migapi.MigPlanSpec{
+		DestMigClusterRef: &corev1.ObjectReference{
+			Name:      "migcluster-host",
+			Namespace: "openshift-migration",
+		},
+		SrcMigClusterRef: &corev1.ObjectReference{
+			Name:      "migcluster-source",
+			Namespace: "openshift-migration",
+		},
+		Namespaces: []string{"test-ns"},
+		MigStorageRef: &corev1.ObjectReference{
+			Name:      "migstorage",
+			Namespace: "openshift-migration",
+		},
+		Refresh: true,
+	},
+	Status: migapi.MigPlanStatus{
+		Conditions: migapi.Conditions{
+			List: []migapi.Condition{
+				{
+					Category: "Required",
+					Status:   "True",
+					Type:     "Ready",
+				},
+			},
+		},
+	},
+}
+
+var migAnalytic4 = &migapi.MigAnalytic{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "miganalytic-01",
+		Namespace: "openshift-migration",
+		Labels:    map[string]string{MigPlan: "migplan-01"},
+	},
+	Spec: migapi.MigAnalyticSpec{
+		MigPlanRef: &corev1.ObjectReference{
+			Namespace:  "openshift-migration",
+			Name:       "migplan-01",
+			Kind:       "MigPlan",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
+		AnalyzeExntendedPVCapacity: true,
+		Refresh:                    false,
+	},
+	Status: migapi.MigAnalyticStatus{
+		Conditions: migapi.Conditions{
+			List: []migapi.Condition{
+				{
+					Type:     "Ready",
+					Status:   "True",
+					Category: "Required",
+					Message:  "The MigAnalytic is Ready",
+				},
+			},
+		},
+		Analytics: migapi.MigAnalyticPlan{
+			PVCapacity:     resource.MustParse("1Gi"),
+			ImageSizeTotal: resource.MustParse("1Gi"),
+		},
+	},
+}
+
+func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
+	type fields struct {
+		Client        client.Client
+		EventRecorder record.EventRecorder
+		scheme        *runtime.Scheme
+	}
+	type args struct {
+		plan *migapi.MigPlan
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "If not migAnalytics exists, make sure the controller creates one",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan),
+			},
+			args: args{
+				plan: migPlan,
+			},
+			wantErr: false,
+		},
+		{
+			name: "If migAnalytics exists without AnalyzeExntendedPVCapacity field, create a new migAnalytics",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan, migAnalytic),
+			},
+			args: args{
+				plan: migPlan,
+			},
+			wantErr: false,
+		},
+		{
+			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is not set or set to false, do nothing",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan3, migAnalytic3),
+			},
+			args: args{
+				plan: migPlan3,
+			},
+			wantErr: false,
+		},
+		{
+			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is set to true, refresh migAnalytics",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan4, migAnalytic4),
+			},
+			args: args{
+				plan: migPlan4,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := ReconcileMigPlan{
+				Client:        tt.fields.Client,
+				EventRecorder: tt.fields.EventRecorder,
+				scheme:        tt.fields.scheme,
+			}
+			if err := r.ensureMigAnalytics(tt.args.plan); (err != nil) != tt.wantErr {
+				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
+	type fields struct {
+		Client        client.Client
+		EventRecorder record.EventRecorder
+		scheme        *runtime.Scheme
+	}
+	type args struct {
+		plan *migapi.MigPlan
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *migapi.MigAnalytic
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "No migAnalytics with AnalyzeExntendedPVCapacity field true exists for a migPlan",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan, migAnalytic),
+			},
+			args: args{
+				plan: migPlan,
+			},
+			wantErr: true,
+			want:    nil,
+		},
+		{
+			name: "migAnalytics with AnalyzeExntendedPVCapacity field true exists, but is not in ready state",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan3, migAnalytic3),
+			},
+			args: args{
+				plan: migPlan3,
+			},
+			wantErr: true,
+			want:    nil,
+		},
+		{
+			name: "migAnalytics with AnalyzeExntendedPVCapacity field true exists and is in ready state",
+			fields: fields{
+				Client: fake.NewFakeClient(migPlan4, migAnalytic4),
+			},
+			args: args{
+				plan: migPlan4,
+			},
+			wantErr: false,
+			want:    migAnalytic4,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := ReconcileMigPlan{
+				Client:        tt.fields.Client,
+				EventRecorder: tt.fields.EventRecorder,
+				scheme:        tt.fields.scheme,
+			}
+			got, err := r.waitForMigAnalyticsReady(tt.args.plan)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("waitForMigAnalyticsReady() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

@@ -18,12 +18,11 @@ package migplan
 
 import (
 	"context"
-	"fmt"
+	e "errors"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
 	"strconv"
 	"time"
-	e"errors"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -46,8 +45,9 @@ import (
 )
 
 const (
-	MigPlan         = "migplan"
+	MigPlan = "migplan"
 )
+
 var log = logging.WithName("plan")
 
 // Application settings.
@@ -281,7 +281,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Loading PV statistics
 	pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
 	for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-		pvcMap[mapvc.Namespace] =  mapvc.PersistentVolumes
+		pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
 	}
 
 	// Ready
@@ -475,16 +475,18 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
-		if !errors.IsNotFound(err){
+		if !errors.IsNotFound(err) {
 			return err
 		}
 	}
 	for _, migAnalytic := range migAnalytics.Items {
-		if migAnalytic.Spec.AnalyzeExntendedPVCapacity && plan.Spec.Refresh{
-			migAnalytic.Spec.Refresh = true
-			err := r.Update(context.TODO(), &migAnalytic)
-			if err != nil{
-				return err
+		if migAnalytic.Spec.AnalyzeExntendedPVCapacity {
+			if plan.Spec.Refresh {
+				migAnalytic.Spec.Refresh = true
+				err := r.Update(context.TODO(), &migAnalytic)
+				if err != nil {
+					return err
+				}
 			}
 			return nil
 		}
@@ -494,6 +496,8 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	pvMigAnalytics.GenerateName = plan.Name + "-"
 	pvMigAnalytics.Namespace = plan.Namespace
 	pvMigAnalytics.Spec.AnalyzeExntendedPVCapacity = true
+	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name}
+	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name}
 	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
 		APIVersion: plan.APIVersion,
 		Kind:       plan.Kind,
@@ -502,7 +506,7 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	})
 	pvMigAnalytics.Spec.MigPlanRef = &kapi.ObjectReference{Namespace: plan.Namespace, Name: plan.Name}
 	err = r.Create(context.TODO(), pvMigAnalytics)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	return nil
