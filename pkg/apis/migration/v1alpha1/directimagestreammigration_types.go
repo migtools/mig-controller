@@ -32,7 +32,7 @@ type DirectImageStreamMigrationSpec struct {
 	ImageStreamRef    *kapi.ObjectReference `json:"imageStreamRef,omitempty"`
 
 	//  Holds the name of the namespace on destination cluster where imagestreams should be migrated.
-	DestNamespace     string                `json:"destNamespace,omitempty"`
+	DestNamespace string `json:"destNamespace,omitempty"`
 }
 
 // DirectImageStreamMigrationStatus defines the observed state of DirectImageStreamMigration

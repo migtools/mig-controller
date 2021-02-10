@@ -50,47 +50,47 @@ const (
 
 // MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
-	Reference          *kapi.ObjectReference `json:"reference"`
+	Reference *kapi.ObjectReference `json:"reference"`
 
 	// Indicates the phase when the hooks will be executed. Acceptable values are: PreBackup, PostBackup, PreRestore, and PostRestore.
-	Phase              string                `json:"phase"`
+	Phase string `json:"phase"`
 
 	// Holds the name of the namespace where hooks should be implemented.
-	ExecutionNamespace string                `json:"executionNamespace"`
+	ExecutionNamespace string `json:"executionNamespace"`
 
 	// Holds the name of the service account to be used for running hooks.
-	ServiceAccount     string                `json:"serviceAccount"`
+	ServiceAccount string `json:"serviceAccount"`
 }
 
 // MigPlanSpec defines the desired state of MigPlan
 type MigPlanSpec struct {
 
 	// Holds all the persistent volumes found for the namespaces included in migplan. Each entry is a persistent volume with the information. Name - The PV name. Capacity - The PV storage capacity. StorageClass - The PV storage class name. Supported - Lists of what is supported. Selection - Choices made from supported. PVC - Associated PVC. NFS - NFS properties. staged - A PV has been explicitly added/updated.
-	PersistentVolumes       `json:",inline"`
+	PersistentVolumes `json:",inline"`
 
 	// Holds names of all the namespaces to be included in migration.
-	Namespaces              []string              `json:"namespaces,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty"`
 
-	SrcMigClusterRef        *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	SrcMigClusterRef *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 
-	DestMigClusterRef       *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
-	MigStorageRef           *kapi.ObjectReference `json:"migStorageRef,omitempty"`
+	MigStorageRef *kapi.ObjectReference `json:"migStorageRef,omitempty"`
 
 	// If the migration was successful for a migplan, this value can be set True indicating that after one successful migration no new migrations can be carried out for this migplan.
-	Closed                  bool                  `json:"closed,omitempty"`
+	Closed bool `json:"closed,omitempty"`
 
 	// Holds a reference to a MigHook along with the desired phase to run it in.
-	Hooks                   []MigPlanHook         `json:"hooks,omitempty"`
+	Hooks []MigPlanHook `json:"hooks,omitempty"`
 
 	// If set True, the controller is forced to check if the migplan is in Ready state or not.
-	Refresh                 bool                  `json:"refresh,omitempty"`
+	Refresh bool `json:"refresh,omitempty"`
 
 	// If set True, disables direct image migrations.
-	IndirectImageMigration  bool                  `json:"indirectImageMigration,omitempty"`
+	IndirectImageMigration bool `json:"indirectImageMigration,omitempty"`
 
 	// If set True, disables direct volume migrations.
-	IndirectVolumeMigration bool                  `json:"indirectVolumeMigration,omitempty"`
+	IndirectVolumeMigration bool `json:"indirectVolumeMigration,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
