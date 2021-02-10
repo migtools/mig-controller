@@ -218,6 +218,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Check if migAnalytics exists
+	err = r.validateMigAnalytics(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
@@ -247,8 +254,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Check if migAnalytics exists
-	err = r.validateMigAnalytics(plan)
+	// Validate PV actions.
+	err = r.validatePvSelections(plan)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Storage
+	err = r.ensureStorage(plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -264,21 +278,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Loading PV statistics
 	pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
 	for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-			pvcMap[mapvc.Namespace] =  mapvc.PersistentVolumes
-	}
-
-	// Validate PV actions.
-	err = r.validatePvSelections(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	// Storage
-	err = r.ensureStorage(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+		pvcMap[mapvc.Namespace] =  mapvc.PersistentVolumes
 	}
 
 	// Ready
