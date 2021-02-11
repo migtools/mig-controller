@@ -106,6 +106,17 @@ type ReconcileMigAnalytic struct {
 	scheme *runtime.Scheme
 }
 
+// MigAnalyticPersistentVolumeDetails defines extended properties of a volume discovered by MigAnalytic
+type MigAnalyticPersistentVolumeDetails struct {
+	Name                string
+	RequestedCapacity   *resource.Quantity
+	PodUID              types.UID
+	ProvisionedCapacity *resource.Quantity
+	StorageClass        *string
+	Namespace           string
+	VolumeName          string
+}
+
 func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
@@ -291,12 +302,12 @@ func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(client compat.Client, n
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespace) (map[string][]persistentVolumeDetails, error) {
+func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespace, client compat.Client) (map[string][]MigAnalyticPersistentVolumeDetails, error) {
 
 	podList := corev1.PodList{}
-	nodeToPVDetails := map[string][]persistentVolumeDetails{}
+	nodeToPVDetails := map[string][]MigAnalyticPersistentVolumeDetails{}
 
-	err := r.Client.List(
+	err := client.List(
 		context.TODO(),
 		k8sclient.InNamespace(ns.Namespace),
 		&podList)
@@ -310,7 +321,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 			for _, vol := range pod.Spec.Volumes {
 				if vol.PersistentVolumeClaim != nil {
 					pvcObject := kapi.PersistentVolumeClaim{}
-					err := r.Client.Get(
+					err := client.Get(
 						context.TODO(),
 						types.NamespacedName{
 							Name:      vol.PersistentVolumeClaim.ClaimName,
@@ -323,7 +334,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 
 					if volDetailList, exists := nodeToPVDetails[pod.Spec.NodeName]; exists {
 						volDetailList = append(volDetailList,
-							persistentVolumeDetails{
+							MigAnalyticPersistentVolumeDetails{
 								Name:                vol.PersistentVolumeClaim.ClaimName,
 								Namespace:           pvcObject.Namespace,
 								RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
@@ -334,7 +345,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 							})
 						nodeToPVDetails[pod.Spec.NodeName] = volDetailList
 					} else {
-						nodeToPVDetails[pod.Spec.NodeName] = []persistentVolumeDetails{{
+						nodeToPVDetails[pod.Spec.NodeName] = []MigAnalyticPersistentVolumeDetails{{
 							Name:                vol.PersistentVolumeClaim.ClaimName,
 							Namespace:           pvcObject.Namespace,
 							RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
@@ -690,14 +701,4 @@ type routingConfig struct {
 
 type imagePolicyConfig struct {
 	InternalRegistryHostname string `json:"internalRegistryHostname"`
-}
-
-type persistentVolumeDetails struct {
-	Name                string
-	RequestedCapacity   *resource.Quantity
-	PodUID              types.UID
-	ProvisionedCapacity *resource.Quantity
-	StorageClass        *string
-	Namespace           string
-	VolumeName          string
 }
