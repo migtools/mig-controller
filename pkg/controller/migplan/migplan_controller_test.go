@@ -17,6 +17,8 @@ limitations under the License.
 package migplan
 
 import (
+	"context"
+	"fmt"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -155,6 +157,12 @@ var migAnalytic3 = &migapi.MigAnalytic{
 		AnalyzeExntendedPVCapacity: true,
 		Refresh:                    false,
 	},
+	Status: migapi.MigAnalyticStatus{
+		Analytics: migapi.MigAnalyticPlan{
+			PVCapacity:     resource.MustParse("1Gi"),
+			ImageSizeTotal: resource.MustParse("1Gi"),
+		},
+	},
 }
 var migPlan4 = &migapi.MigPlan{
 	ObjectMeta: metav1.ObjectMeta{
@@ -205,6 +213,70 @@ var migAnalytic4 = &migapi.MigAnalytic{
 		},
 		AnalyzeExntendedPVCapacity: true,
 		Refresh:                    false,
+	},
+	Status: migapi.MigAnalyticStatus{
+		Conditions: migapi.Conditions{
+			List: []migapi.Condition{
+				{
+					Type:     "Ready",
+					Status:   "True",
+					Category: "Required",
+					Message:  "The MigAnalytic is Ready",
+				},
+			},
+		},
+		Analytics: migapi.MigAnalyticPlan{
+			PVCapacity:     resource.MustParse("1Gi"),
+			ImageSizeTotal: resource.MustParse("1Gi"),
+		},
+	},
+}
+
+var expected1 = migapi.MigAnalytic{
+	ObjectMeta: metav1.ObjectMeta{
+		GenerateName: "test-plan-",
+		Namespace:    "test-ns",
+		Labels:       map[string]string{MigPlan: "test-plan"},
+		Annotations:  map[string]string{MigPlan: "test-plan"},
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "",
+				Kind:       "",
+				Name:       "test-plan",
+				UID:        "",
+			},
+		},
+	},
+	Spec: migapi.MigAnalyticSpec{
+		MigPlanRef: &corev1.ObjectReference{
+			Namespace: "test-ns",
+			Name:      "test-plan",
+		},
+		AnalyzeExntendedPVCapacity: true,
+	},
+	Status: migapi.MigAnalyticStatus{
+		Analytics: migapi.MigAnalyticPlan{
+			PVCapacity:     resource.MustParse("0"),
+			ImageSizeTotal: resource.MustParse("0"),
+		},
+	},
+}
+
+var expected2 = migapi.MigAnalytic{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "miganalytic-01",
+		Namespace: "openshift-migration",
+		Labels:    map[string]string{MigPlan: "migplan-01"},
+	},
+	Spec: migapi.MigAnalyticSpec{
+		MigPlanRef: &corev1.ObjectReference{
+			Namespace:  "openshift-migration",
+			Name:       "migplan-01",
+			Kind:       "MigPlan",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
+		AnalyzeExntendedPVCapacity: true,
+		Refresh:                    true,
 	},
 	Status: migapi.MigAnalyticStatus{
 		Conditions: migapi.Conditions{
@@ -290,6 +362,45 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			}
 			if err := r.ensureMigAnalytics(tt.args.plan); (err != nil) != tt.wantErr {
 				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			switch name := tt.args.plan.Name; name {
+			case "test-plan":
+				gotList := &migapi.MigAnalyticList{}
+				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
+				if err != nil {
+					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				for _, got := range gotList.Items {
+					if got.GenerateName != "" {
+						if !reflect.DeepEqual(got, expected1) {
+							t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, expected1)
+						}
+					}
+				}
+			case "migplan-00":
+				gotList := &migapi.MigAnalyticList{}
+				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
+				if err != nil {
+					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				for _, got := range gotList.Items {
+					if !reflect.DeepEqual(got, *migAnalytic3) {
+						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, *migAnalytic3)
+					}
+				}
+			case "migplan-01":
+				gotList := &migapi.MigAnalyticList{}
+				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
+				if err != nil {
+					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				for _, got := range gotList.Items {
+					if !reflect.DeepEqual(got, expected2) {
+						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, expected2)
+					}
+				}
+			default:
+				t.Log(fmt.Sprintf("%s.\n", name))
 			}
 		})
 	}
