@@ -222,7 +222,11 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 
 // GetRegistryImage gets a MigCluster specific registry image from ConfigMap
 func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
-	clusterConfig, err := m.GetClusterConfigMap(c)
+	client, err := m.GetClient(c)
+	if err != nil {
+		return "", err
+	}
+	clusterConfig, err := m.GetClusterConfigMap(client)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
@@ -669,6 +673,9 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 }
 
 func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
+	fmt.Printf("m is: %+v\n", m)
+	fmt.Printf("c is: %+v\n", c)
+
 	newOperatorVersion, err := m.GetOperatorVersion(c)
 	if err != nil {
 		return err
