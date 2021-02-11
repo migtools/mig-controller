@@ -55,6 +55,11 @@ const (
 	STUNNEL_POD_MEMORY_LIMIT    = "STUNNEL_POD_MEMORY_LIMIT"
 	STUNNEL_POD_CPU_REQUEST     = "STUNNEL_POD_CPU_REQUEST"
 	STUNNEL_POD_MEMORY_REQUEST  = "STUNNEL_POD_MEMORY_REQUEST"
+
+	// DefaultStunnelTimout is when stunnel timesout on establishing connection from source to destination.
+	//  When this timeout is reached, the rsync client will still see "connection reset by peer". It is a red-herring
+	// it does not conclusively mean the destination rsyncd is unhealthy but stunnel is dropping this in between
+	DefaultStunnelTimeout = 20
 )
 
 // TODO: Parameterize this more to support custom
@@ -1209,6 +1214,27 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 
 	return isCompleted, hasAnyFailed, nil
+}
+
+func hasAllRsyncClientPodsTimedOut(pvcMap map[string][]pvcMapElement, client k8sclient.Client, dvmName string) (bool, error) {
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			dvmp := migapi.DirectVolumeMigrationProgress{}
+			err := client.Get(context.TODO(), types.NamespacedName{
+				Name:      getMD5Hash(dvmName + vol.Name + ns),
+				Namespace: migapi.OpenshiftMigrationNamespace,
+			}, &dvmp)
+			if err != nil {
+				return false, err
+			}
+			if dvmp.Status.PodPhase != corev1.PodFailed ||
+				(dvmp.Status.ContainerElapsedTime != nil &&
+					dvmp.Status.ContainerElapsedTime.Duration.Round(time.Second).Seconds() != float64(DefaultStunnelTimeout)) {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
 }
 
 // Delete rsync resources

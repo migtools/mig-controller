@@ -98,8 +98,8 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 
 	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed", totalVolumes, successfulPods, runningPods, failedPods)
 	switch {
-	case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
-		// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
+	//case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
+	//	// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
 	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration" && dvm.Status.HasCondition(dvmc.Succeeded):
 		// completed successfully
 		completed = true
