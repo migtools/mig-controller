@@ -108,9 +108,9 @@ type ReconcileMigAnalytic struct {
 // MigAnalyticPersistentVolumeDetails defines extended properties of a volume discovered by MigAnalytic
 type MigAnalyticPersistentVolumeDetails struct {
 	Name                string
-	RequestedCapacity   *resource.Quantity
+	RequestedCapacity   resource.Quantity
 	PodUID              types.UID
-	ProvisionedCapacity *resource.Quantity
+	ProvisionedCapacity resource.Quantity
 	StorageClass        *string
 	Namespace           string
 	VolumeName          string
@@ -212,7 +212,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		return liberr.Wrap(err)
 	}
 
-	if analytic.Status.Analytics.PercentComplete == 100 {
+	if analytic.Status.Analytics.PercentComplete == 100 && !analytic.Spec.Refresh {
 		return nil
 	}
 
@@ -236,8 +236,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		return liberr.Wrap(err)
 	}
 
-	analytic.Status.Analytics.Plan = plan.Name
+	nodeToPVMap := make(map[string][]MigAnalyticPersistentVolumeDetails)
 
+	analytic.Status.Analytics.Plan = plan.Name
+	analytic.Status.Analytics.Namespaces = make([]migapi.MigAnalyticNamespace, 0)
 	for i, namespace := range plan.Spec.Namespaces {
 		for _, ns := range analytic.Status.Analytics.Namespaces {
 			if ns.Namespace == namespace {
@@ -263,6 +265,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 				return liberr.Wrap(err)
 			}
 		}
+
 		if analytic.Spec.AnalyzePVCapacity && !(isExcluded("persistentvolumes", excludedResources) &&
 			isExcluded("persistentvolumeclaims", excludedResources)) {
 
@@ -273,7 +276,13 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		}
 
 		if analytic.Spec.AnalyzeExntendedPVCapacity {
-			err := r.analyzeExtendedPVCapacity(client, &ns)
+			namespacedNodeToPVMap, err := r.getNodeToPVCMapForNS(&ns, client)
+			for node, pvcs := range namespacedNodeToPVMap {
+				if _, exists := nodeToPVMap[node]; !exists {
+					nodeToPVMap[node] = make([]MigAnalyticPersistentVolumeDetails, 0)
+				}
+				nodeToPVMap[node] = append(nodeToPVMap[node], pvcs...)
+			}
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -294,27 +303,49 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			return liberr.Wrap(err)
 		}
 	}
+
+	if analytic.Spec.AnalyzeExntendedPVCapacity {
+		err := r.analyzeExtendedPVCapacity(client, analytic, nodeToPVMap)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = r.Update(context.TODO(), analytic)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(client compat.Client, ns *migapi.MigAnalyticNamespace) error {
+// analyzeExtendedPVCapacity given a source client, owner cr and map of nodeNames -> pvs, run volume adjustment
+func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(sourceClient compat.Client, analytic *migapi.MigAnalytic, nodeToPVMap map[string][]MigAnalyticPersistentVolumeDetails) error {
+	volumeAdjuster := PersistentVolumeAdjuster{
+		Owner:  analytic,
+		Client: r.Client,
+		DFExecutor: &ResticDFCommandExecutor{
+			Namespace: migapi.VeleroNamespace,
+			Client:    sourceClient,
+		},
+	}
+	err := volumeAdjuster.Run(nodeToPVMap)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespace, client compat.Client) (map[string][]MigAnalyticPersistentVolumeDetails, error) {
-
+// getNodeToPVCMapForNS given a ns and client, returns map of nodeName -> PV Info present on that node
+func (r *ReconcileMigAnalytic) getNodeToPVCMapForNS(ns *migapi.MigAnalyticNamespace, client compat.Client) (map[string][]MigAnalyticPersistentVolumeDetails, error) {
 	podList := corev1.PodList{}
 	nodeToPVDetails := map[string][]MigAnalyticPersistentVolumeDetails{}
-
 	err := client.List(
 		context.TODO(),
 		k8sclient.InNamespace(ns.Namespace),
 		&podList)
-
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-
 	for _, pod := range podList.Items {
 		if pod.Status.Phase == migapi.Running {
 			for _, vol := range pod.Spec.Volumes {
@@ -339,9 +370,9 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 						MigAnalyticPersistentVolumeDetails{
 							Name:                vol.PersistentVolumeClaim.ClaimName,
 							Namespace:           pvcObject.Namespace,
-							RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
+							RequestedCapacity:   pvcObject.Spec.Resources.Requests[corev1.ResourceStorage],
 							PodUID:              pod.UID,
-							ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
+							ProvisionedCapacity: pvcObject.Status.Capacity[corev1.ResourceStorage],
 							StorageClass:        pvcObject.Spec.StorageClassName,
 							VolumeName:          pvcObject.Spec.VolumeName,
 						})
