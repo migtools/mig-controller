@@ -105,6 +105,17 @@ type ReconcileMigAnalytic struct {
 	scheme *runtime.Scheme
 }
 
+// MigAnalyticPersistentVolumeDetails defines extended properties of a volume discovered by MigAnalytic
+type MigAnalyticPersistentVolumeDetails struct {
+	Name                string
+	RequestedCapacity   *resource.Quantity
+	PodUID              types.UID
+	ProvisionedCapacity *resource.Quantity
+	StorageClass        *string
+	Namespace           string
+	VolumeName          string
+}
+
 func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
@@ -288,6 +299,57 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 
 func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(client compat.Client, ns *migapi.MigAnalyticNamespace) error {
 	return nil
+}
+
+func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespace, client compat.Client) (map[string][]MigAnalyticPersistentVolumeDetails, error) {
+
+	podList := corev1.PodList{}
+	nodeToPVDetails := map[string][]MigAnalyticPersistentVolumeDetails{}
+
+	err := client.List(
+		context.TODO(),
+		k8sclient.InNamespace(ns.Namespace),
+		&podList)
+
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == migapi.Running {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					pvcObject := corev1.PersistentVolumeClaim{}
+					err := client.Get(
+						context.TODO(),
+						types.NamespacedName{
+							Name:      vol.PersistentVolumeClaim.ClaimName,
+							Namespace: pod.Namespace,
+						}, &pvcObject)
+
+					if err != nil {
+						return nodeToPVDetails, liberr.Wrap(err)
+					}
+
+					if _, exists := nodeToPVDetails[pod.Spec.NodeName]; !exists {
+						nodeToPVDetails[pod.Spec.NodeName] = make([]MigAnalyticPersistentVolumeDetails, 0)
+					}
+
+					nodeToPVDetails[pod.Spec.NodeName] = append(nodeToPVDetails[pod.Spec.NodeName],
+						MigAnalyticPersistentVolumeDetails{
+							Name:                vol.PersistentVolumeClaim.ClaimName,
+							Namespace:           pvcObject.Namespace,
+							RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
+							PodUID:              pod.UID,
+							ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
+							StorageClass:        pvcObject.Spec.StorageClassName,
+							VolumeName:          pvcObject.Spec.VolumeName,
+						})
+				}
+			}
+		}
+	}
+	return nodeToPVDetails, nil
 }
 
 func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
