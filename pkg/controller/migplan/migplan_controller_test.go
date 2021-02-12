@@ -309,6 +309,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 		fields  fields
 		args    args
 		wantErr bool
+		want    migapi.MigAnalytic
 	}{
 		// TODO: Add test cases.
 		{
@@ -320,6 +321,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				plan: migPlan,
 			},
 			wantErr: false,
+			want:    expected1,
 		},
 		{
 			name: "If migAnalytics exists without AnalyzeExntendedPVCapacity field, create a new migAnalytics",
@@ -330,6 +332,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				plan: migPlan,
 			},
 			wantErr: false,
+			want:    expected1,
 		},
 		{
 			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is not set or set to false, do nothing",
@@ -340,6 +343,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				plan: migPlan3,
 			},
 			wantErr: false,
+			want:    *migAnalytic3,
 		},
 		{
 			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is set to true, refresh migAnalytics",
@@ -350,6 +354,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				plan: migPlan4,
 			},
 			wantErr: false,
+			want:    expected2,
 		},
 	}
 	for _, tt := range tests {
@@ -362,40 +367,15 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			if err := r.ensureMigAnalytics(tt.args.plan); (err != nil) != tt.wantErr {
 				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			switch name := tt.args.plan.Name; name {
-			case "test-plan":
-				gotList := &migapi.MigAnalyticList{}
-				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
-				if err != nil {
-					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
-				}
-				for _, got := range gotList.Items {
-					if got.GenerateName != "" {
-						if !reflect.DeepEqual(got, expected1) {
-							t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, expected1)
-						}
-					}
-				}
-			case "migplan-00":
-				gotList := &migapi.MigAnalyticList{}
-				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
-				if err != nil {
-					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
-				}
-				for _, got := range gotList.Items {
-					if !reflect.DeepEqual(got, *migAnalytic3) {
-						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, *migAnalytic3)
-					}
-				}
-			case "migplan-01":
-				gotList := &migapi.MigAnalyticList{}
-				err := r.List(context.TODO(), &client.ListOptions{}, gotList)
-				if err != nil {
-					t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
-				}
-				for _, got := range gotList.Items {
-					if !reflect.DeepEqual(got, expected2) {
-						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, expected2)
+			gotList := &migapi.MigAnalyticList{}
+			err := r.List(context.TODO(), &client.ListOptions{}, gotList)
+			if err != nil {
+				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			for _, got := range gotList.Items {
+				if got.Name == "miganalytic-00" || got.Name == "miganalytic-01" || got.GenerateName == "test-plan-" {
+					if !reflect.DeepEqual(got, tt.want) {
+						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, tt.want)
 					}
 				}
 			}

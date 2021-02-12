@@ -221,11 +221,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Check if migAnalytics exists
-	err = r.ensureMigAnalytics(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
+	// If interlligent pv resizing is enabled, Check if migAnalytics exists
+	if  Settings.EnableIntelligentPVResize {
+		err = r.ensureMigAnalytics(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
 	}
 
 	// Set excluded resources on Status.
@@ -271,17 +273,19 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Wait for the migAnalytics to be ready
-	migAnalytic, err := r.waitForMigAnalyticsReady(plan)
-	if err != nil {
-		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
+	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
+	if  Settings.EnableIntelligentPVResize {
+		migAnalytic, err := r.waitForMigAnalyticsReady(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
 
-	// Loading PV statistics
-	pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
-	for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-		pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
+		// Loading PV statistics
+		pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
+		for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
+			pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
+		}
 	}
 
 	// Ready
