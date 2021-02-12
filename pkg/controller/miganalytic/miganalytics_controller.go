@@ -50,7 +50,6 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
-	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -320,7 +319,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 		if pod.Status.Phase == migapi.Running {
 			for _, vol := range pod.Spec.Volumes {
 				if vol.PersistentVolumeClaim != nil {
-					pvcObject := kapi.PersistentVolumeClaim{}
+					pvcObject := corev1.PersistentVolumeClaim{}
 					err := client.Get(
 						context.TODO(),
 						types.NamespacedName{
