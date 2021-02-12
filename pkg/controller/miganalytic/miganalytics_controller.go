@@ -332,20 +332,12 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 						return nodeToPVDetails, liberr.Wrap(err)
 					}
 
-					if volDetailList, exists := nodeToPVDetails[pod.Spec.NodeName]; exists {
-						volDetailList = append(volDetailList,
-							MigAnalyticPersistentVolumeDetails{
-								Name:                vol.PersistentVolumeClaim.ClaimName,
-								Namespace:           pvcObject.Namespace,
-								RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
-								PodUID:              pod.UID,
-								ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
-								StorageClass:        pvcObject.Spec.StorageClassName,
-								VolumeName:          pvcObject.Spec.VolumeName,
-							})
-						nodeToPVDetails[pod.Spec.NodeName] = volDetailList
-					} else {
-						nodeToPVDetails[pod.Spec.NodeName] = []MigAnalyticPersistentVolumeDetails{{
+					if _, exists := nodeToPVDetails[pod.Spec.NodeName]; !exists {
+						nodeToPVDetails[pod.Spec.NodeName] = make([]MigAnalyticPersistentVolumeDetails, 0)
+					}
+
+					nodeToPVDetails[pod.Spec.NodeName] = append(nodeToPVDetails[pod.Spec.NodeName],
+						MigAnalyticPersistentVolumeDetails{
 							Name:                vol.PersistentVolumeClaim.ClaimName,
 							Namespace:           pvcObject.Namespace,
 							RequestedCapacity:   pvcObject.Spec.Resources.Requests.StorageEphemeral(),
@@ -353,9 +345,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVMapForNS(ns *migapi.MigAnalyticNamespa
 							ProvisionedCapacity: pvcObject.Status.Capacity.StorageEphemeral(),
 							StorageClass:        pvcObject.Spec.StorageClassName,
 							VolumeName:          pvcObject.Spec.VolumeName,
-						}}
-					}
-
+						})
 				}
 			}
 		}
