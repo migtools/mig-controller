@@ -18,7 +18,6 @@ package migplan
 
 import (
 	"context"
-	"fmt"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -399,8 +398,6 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, expected2)
 					}
 				}
-			default:
-				t.Log(fmt.Sprintf("%s.\n", name))
 			}
 		})
 	}
