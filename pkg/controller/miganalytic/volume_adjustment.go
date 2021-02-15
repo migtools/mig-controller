@@ -216,10 +216,6 @@ func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migap
 	return nil
 }
 
-func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
-	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
-	return
-}
 
 // Run runs executor, uses df output to calculate adjusted volume sizes, updates owner.status with results
 func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
@@ -256,4 +252,42 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 	}
 	pva.generateWarningForErroredPVs(erroredPVs)
 	return nil
+}
+
+func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
+	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
+
+	volumeSizeWithThreshold := actualCapacity
+	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage+3)/100))
+	//volumeSizeWithThreshold.String()
+
+	if volumeSizeWithThreshold.Cmp(actualCapacity) == 1 {
+		if volumeSizeWithThreshold.Cmp(requestedCapacity) == 1 {
+			proposedSize = volumeSizeWithThreshold
+		} else {
+			proposedSize = requestedCapacity
+		}
+	} else {
+		if actualCapacity.Cmp(requestedCapacity) == 1 {
+			proposedSize = actualCapacity
+		} else {
+			proposedSize = requestedCapacity
+		}
+	}
+
+	reason = ""
+
+	switch {
+	case proposedSize == requestedCapacity:
+		// TODO: update reason string
+
+	case proposedSize == actualCapacity:
+		// TODO: update reason string
+
+	case proposedSize == volumeSizeWithThreshold:
+		// TODO: update reason string
+
+	}
+
+	return proposedSize, reason
 }
