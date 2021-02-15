@@ -73,6 +73,7 @@ const (
 	InvalidHookSAName                          = "InvalidHookSAName"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
+	UnConfirmedPV                              = "UnConfirmedPV"
 )
 
 // Categories

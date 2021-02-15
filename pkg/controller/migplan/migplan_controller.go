@@ -18,10 +18,12 @@ package migplan
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"fmt"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -285,11 +287,10 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 
 		if migAnalytic != nil {
-			// Loading PV statistics
-			pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
-			for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-				pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
-			}
+			// Process PV Capacity
+			r.processExtendedPVCapacity(plan, migAnalytic)
+			// raise condition for unconfirmed PV sizes
+			r.validatePVSizeConfirmation(plan)
 		}
 
 		if migAnalytic == nil && !plan.Status.HasCondition(IntelligentPVResizingDisabled) {
@@ -548,4 +549,51 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 
 	}
 	return nil, nil
+}
+
+func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+	for _, planVol := range plan.Spec.PersistentVolumes.List {
+		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
+			if planVol.PVC.Namespace == analyticNS.Namespace {
+				for _, analyticNSVol := range analyticNS.PersistentVolumes {
+					if planVol.PVC.Name == analyticNSVol.Name {
+
+						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) <= 0 {
+							planVol.Confirmed = false
+							planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						}
+
+						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) != 0 && planVol.Confirmed == true {
+							planVol.Confirmed = false
+							planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan) {
+	unconfirmedVols := []string{}
+	for _, planVol := range plan.Spec.PersistentVolumes.List {
+		if planVol.Confirmed == false {
+			unconfirmedVols = append(unconfirmedVols, planVol.Name)
+		}
+	}
+
+	if len(unconfirmedVols) > 0 {
+		plan.Status.DeleteCondition(UnConfirmedPV)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     UnConfirmedPV,
+			Status:   True,
+			Category: Critical,
+			Reason:   UnConfirmedPV,
+			Message:  fmt.Sprintf("The Migration plan is associated with Unconfirmed PVs : %#v", unconfirmedVols),
+			Durable:  true,
+		})
+	} else {
+		plan.Status.DeleteCondition(UnConfirmedPV)
+	}
+
 }
