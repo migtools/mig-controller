@@ -28,6 +28,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -290,7 +291,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			// Process PV Capacity
 			r.processExtendedPVCapacity(plan, migAnalytic)
 			// raise condition for unconfirmed PV sizes
-			r.validatePVSizeConfirmation(plan)
+			r.validatePVSizeConfirmation(plan, migAnalytic)
 		}
 
 		if migAnalytic == nil && !plan.Status.HasCondition(IntelligentPVResizingDisabled) {
@@ -574,12 +575,22 @@ func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analyt
 	}
 }
 
-func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan) {
+func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
 	unconfirmedVols := []string{}
 	for _, planVol := range plan.Spec.PersistentVolumes.List {
 		if planVol.Confirmed == false {
 			unconfirmedVols = append(unconfirmedVols, planVol.Name)
 		}
+	}
+
+	if migAnalytic.Status.HasCondition(miganalytic.ExtendedPVAnalysisFailed) {
+		plan.Status.SetCondition(migapi.Condition{
+			Category: migapi.Warn,
+			Status:   True,
+			Type:     miganalytic.ExtendedPVAnalysisFailed,
+			Reason:   miganalytic.FailedRunningDf,
+			Message:  fmt.Sprintf("Failed gathering extended PV usage information for some or all PVs, please see MigAnalytic %s/%s for details", migAnalytic.Namespace, migAnalytic.Name),
+		})
 	}
 
 	if len(unconfirmedVols) > 0 {
