@@ -109,10 +109,10 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 	}
 	// dfOutputs for n nodes
 	dfOutputs := make(map[string]DFCommand, len(pvcNodeMap))
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(len(pvcNodeMap))
-	// run a buffered reader to accept DF outputs on channels
-	bufferedOutputChannel, finishSignalChannel := r.runBufferedOutputReader(dfOutputs)
+	waitGroup := sync.WaitGroup{}
+	mutex := sync.Mutex{}
+	// allows setting a limit on number of concurrent df threads running
+	bufferedExecutionChannel := make(chan struct{}, 10)
 	// run df concurrently for 'n' nodes
 	for node := range pvcNodeMap {
 		resticPodRef := r.getResticPodForNode(node)
@@ -126,21 +126,23 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 				}
 				gatheredData = append(gatheredData, dfOutput)
 			}
-			waitGroup.Done()
 			continue
 		}
+		waitGroup.Add(1)
 		go func(n string, podRef *corev1.Pod) {
+			// block until channel empty
+			bufferedExecutionChannel <- struct{}{}
 			defer waitGroup.Done()
-			bufferedOutputChannel <- bufferedOutput{
-				CmdOutput: r.DF(podRef, pvcNodeMap[n]),
-				Node:      n,
-			}
+			output := r.DF(podRef, pvcNodeMap[n])
+			mutex.Lock()
+			defer mutex.Unlock()
+			dfOutputs[n] = output
+			// free up channel indicating execution finished
+			<-bufferedExecutionChannel
 		}(node, resticPodRef)
 	}
 	// wait for all command instances to return
 	waitGroup.Wait()
-	// exit buffered reader
-	finishSignalChannel <- struct{}{}
 	for node, cmdOutput := range dfOutputs {
 		for _, pvc := range pvcNodeMap[node] {
 			pvcDFInfo := cmdOutput.GetDFOutputForPV(pvc.VolumeName, pvc.PodUID)
@@ -151,33 +153,4 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 		}
 	}
 	return gatheredData, nil
-}
-
-// bufferedOutput is used to buffer outputs coming from concurrent DF commands
-// to avoid overwhelming the apiserver in case there are too many nodes running
-type bufferedOutput struct {
-	CmdOutput DFCommand
-	Node      string
-}
-
-// runBufferedOutputReader runs a thread to receive updates from df command instances
-func (r *ResticDFCommandExecutor) runBufferedOutputReader(dfOutputs map[string]DFCommand) (chan bufferedOutput, chan struct{}) {
-	// at most 10 instances of sender can run at the same time
-	bufferedOutputs := make(chan bufferedOutput, 10)
-	finishSignal := make(chan struct{})
-	mutex := sync.Mutex{}
-	go func() {
-		for {
-			select {
-			case output := <-bufferedOutputs:
-				mutex.Lock()
-				dfOutputs[output.Node] = output.CmdOutput
-				mutex.Unlock()
-				break
-			case <-finishSignal:
-				return
-			}
-		}
-	}()
-	return bufferedOutputs, finishSignal
 }

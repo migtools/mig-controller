@@ -181,21 +181,21 @@ func (pva *PersistentVolumeAdjuster) findOriginalPVDataMatchingDFOutput(pvc DFOu
 // generateWarningForErroredPVs given a list of dfoutputs, generates warnings for associated pvcs
 func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*DFOutput) {
 	warningString := "Failed gathering extended PV usage information for PVs [%s]"
-	pvNames := "%s "
+	pvNames := []string{}
 	for _, dfOutput := range erroredPVs {
 		if dfOutput.IsError {
-			pvNames = fmt.Sprintf(
-				pvNames,
-				dfOutput.Name)
+			pvNames = append(pvNames, dfOutput.Name)
 		}
 	}
-	pva.Owner.Status.Conditions.SetCondition(migapi.Condition{
-		Category: migapi.Warn,
-		Status:   True,
-		Type:     ExtendedPVAnalysisFailed,
-		Reason:   FailedRunningDf,
-		Message:  fmt.Sprintf(warningString, pvNames),
-	})
+	if len(pvNames) > 0 {
+		pva.Owner.Status.Conditions.SetCondition(migapi.Condition{
+			Category: migapi.Warn,
+			Status:   True,
+			Type:     ExtendedPVAnalysisFailed,
+			Reason:   FailedRunningDf,
+			Message:  fmt.Sprintf(warningString, strings.Join(pvNames, " ")),
+		})
+	}
 }
 
 // getRefToAnalyticNs given a ns, returns the reference to correspoding ns present within MigAnalytic.Status.Analytics, stores found ones in cache
@@ -235,17 +235,22 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 			continue
 		}
 		migAnalyticNSRef := pva.getRefToAnalyticNs(originalData.Namespace)
-		statusFieldUpdate := migapi.MigAnalyticPersistentVolumeClaim{}
+		statusFieldUpdate := migapi.MigAnalyticPersistentVolumeClaim{
+			Name:              originalData.Name,
+			RequestedCapacity: originalData.RequestedCapacity,
+		}
 		if pvDfOutput.IsError {
 			erroredPVs = append(erroredPVs, &pvDfOutputs[i])
 		} else {
-			proposedCapacity, _ := pva.calculateProposedVolumeSize(pvDfOutput.UsagePercentage, pvDfOutput.TotalSize, originalData.RequestedCapacity)
+			statusFieldUpdate.ActualCapacity = pvDfOutput.TotalSize
+			proposedCapacity, reason := pva.calculateProposedVolumeSize(pvDfOutput.UsagePercentage, pvDfOutput.TotalSize, originalData.RequestedCapacity)
 			// make sure we never set a value smaller than original provisioned capacity
 			if originalData.ProvisionedCapacity.Cmp(proposedCapacity) >= 1 {
 				statusFieldUpdate.ProposedCapacity = originalData.ProvisionedCapacity
 			} else {
 				statusFieldUpdate.ProposedCapacity = proposedCapacity
 			}
+			statusFieldUpdate.Comment = reason
 		}
 		migAnalyticNSRef.PersistentVolumes = append(migAnalyticNSRef.PersistentVolumes, statusFieldUpdate)
 	}

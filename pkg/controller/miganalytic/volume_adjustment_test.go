@@ -20,13 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func getTestPersistentVolume(name string, ns string, podUID string, volName string, requested string, provisioned string) MigAnalyticPersistentVolumeDetails {
@@ -109,6 +104,22 @@ func TestDFCommand_GetPVUsage(t *testing.T) {
 				IsError: true,
 			},
 		},
+		{
+			name: "given a volume that we know doesn't exist anywhere, correct pv usage info should be returned",
+			fields: fields{
+				BlockSize:    BinarySIMega,
+				BaseLocation: "/host_pods",
+				StdOut:       testDFStdout,
+				StdErr:       testDFStderr,
+			},
+			args: args{
+				volName: "tmp-vo",
+				podUID:  types.UID("280f7572-6590-11eb-b436-0a916cc7c396"),
+			},
+			wantPv: DFOutput{
+				IsError: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,6 +145,14 @@ var testQuantities = []testQuantity{
 	{
 		dfQuantity:  "1090MB",
 		k8sQuantity: "1090M",
+	},
+	{
+		dfQuantity:  "1000GB",
+		k8sQuantity: "1T",
+	},
+	{
+		dfQuantity:  "1048576G",
+		k8sQuantity: "1Pi",
 	},
 }
 
@@ -167,6 +186,28 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "given a valid decimal SI quantity, should return valid k8s resource.Quantity",
+			fields: fields{
+				BlockSize: DecimalSIGiga,
+			},
+			args: args{
+				quantity: testQuantities[1].dfQuantity,
+			},
+			want:    testQuantities[1].k8sQuantity,
+			wantErr: false,
+		},
+		{
+			name: "given a valid binary SI quantity, should return valid k8s resource.Quantity",
+			fields: fields{
+				BlockSize: BinarySIGiga,
+			},
+			args: args{
+				quantity: testQuantities[2].dfQuantity,
+			},
+			want:    testQuantities[2].k8sQuantity,
+			wantErr: false,
+		},
+		{
 			name: "given an invalid pair of SI quantity and block size unit, should return error",
 			fields: fields{
 				BlockSize: DecimalSIGiga,
@@ -193,80 +234,6 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got.String(), tt.want) {
 				t.Errorf("DFCommand.convertDFQuantityToKubernetesResource() = %v, want %v", got.String(), tt.want)
-			}
-		})
-	}
-}
-
-var testMigAnalytic = &migapi.MigAnalytic{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "miganalytic-00",
-		Namespace: "openshift-migration",
-	},
-	Spec: migapi.MigAnalyticSpec{
-		MigPlanRef: &corev1.ObjectReference{
-			Namespace:  "openshift-migration",
-			Name:       "migplan-00",
-			Kind:       "MigPlan",
-			APIVersion: "migration.openshift.io/v1alpha1",
-		},
-		Refresh: false,
-	},
-	Status: migapi.MigAnalyticStatus{
-		Conditions: migapi.Conditions{
-			List: []migapi.Condition{
-				{
-					Type:     "Ready",
-					Status:   "True",
-					Category: "Required",
-					Message:  "The MigAnalytic is Ready",
-				},
-			},
-		},
-	},
-}
-
-func TestPersistentVolumeAdjuster_Run(t *testing.T) {
-	type fields struct {
-		Owner      *migapi.MigAnalytic
-		Client     client.Client
-		DFExecutor DFCommandExecutor
-	}
-	type args struct {
-		pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "given 6 pvcs, sum of errored pvcs and non-errored should match total",
-			fields: fields{
-				Owner:      testMigAnalytic,
-				Client:     fake.NewFakeClient(testMigAnalytic),
-				DFExecutor: &FakeDFExecutor{},
-			},
-			args: args{
-				pvNodeMap: map[string][]MigAnalyticPersistentVolumeDetails{
-					"node1.migration.internal": {pvd1, pvd2},
-					"node2.migration.internal": {pvd3, pvd4},
-					"node3.migration.internal": {pvd4, pvd5},
-				},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pva := &PersistentVolumeAdjuster{
-				Owner:      tt.fields.Owner,
-				Client:     tt.fields.Client,
-				DFExecutor: tt.fields.DFExecutor,
-			}
-			if err := pva.Run(tt.args.pvNodeMap); (err != nil) != tt.wantErr {
-				t.Errorf("PersistentVolumeAdjuster.Run() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
