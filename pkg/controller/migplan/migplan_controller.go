@@ -45,7 +45,8 @@ import (
 )
 
 const (
-	MigPlan = "migplan"
+	MigPlan   = "migplan"
+	CreatedBy = "CreatedBy"
 )
 
 var log = logging.WithName("plan")
@@ -222,7 +223,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// If interlligent pv resizing is enabled, Check if migAnalytics exists
-	if  Settings.EnableIntelligentPVResize {
+	if Settings.EnableIntelligentPVResize {
 		err = r.ensureMigAnalytics(plan)
 		if err != nil {
 			log.Trace(err)
@@ -274,7 +275,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
-	if  Settings.EnableIntelligentPVResize {
+	if Settings.EnableIntelligentPVResize {
 		migAnalytic, err := r.waitForMigAnalyticsReady(plan)
 		if err != nil {
 			log.Trace(err)
@@ -500,8 +501,8 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	pvMigAnalytics.GenerateName = plan.Name + "-"
 	pvMigAnalytics.Namespace = plan.Namespace
 	pvMigAnalytics.Spec.AnalyzeExntendedPVCapacity = true
-	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name}
-	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name}
+	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
+	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name, CreatedBy:plan.Name}
 	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
 		APIVersion: plan.APIVersion,
 		Kind:       plan.Kind,

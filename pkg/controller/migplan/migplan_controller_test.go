@@ -235,8 +235,8 @@ var expected1 = migapi.MigAnalytic{
 	ObjectMeta: metav1.ObjectMeta{
 		GenerateName: "test-plan-",
 		Namespace:    "test-ns",
-		Labels:       map[string]string{MigPlan: "test-plan"},
-		Annotations:  map[string]string{MigPlan: "test-plan"},
+		Labels:       map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
+		Annotations:  map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
 		OwnerReferences: []metav1.OwnerReference{
 			{
 				APIVersion: "",
