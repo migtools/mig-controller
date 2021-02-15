@@ -63,7 +63,14 @@ const (
 	BinarySIGiga  = DFBaseUnit("G")
 )
 
-// DFCommand represents a df command
+// Proposed volume size computation reasons
+const (
+	VolumeAdjustmentNoOp             = "PV sizes not altered. Using original size"
+	VolumeAdjustmentUsageExceeded    = "PV size was adjusted by adding extra headroom of 3%"
+	VolumeAdjustmentCapacityMismatch = "Provisioned size not equal to the requested size, using provisioned size"
+)
+
+// DFCommand represent a df command
 type DFCommand struct {
 	// stdout from df
 	StdOut string
@@ -257,36 +264,22 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
 	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
 
-	volumeSizeWithThreshold := actualCapacity
-	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage+3)/100))
-	//volumeSizeWithThreshold.String()
+	defer proposedSize.String()
 
-	if volumeSizeWithThreshold.Cmp(actualCapacity) == 1 {
-		if volumeSizeWithThreshold.Cmp(requestedCapacity) == 1 {
+	volumeSizeWithThreshold := actualCapacity
+	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage + 3) / 100))
+
+	if volumeSizeWithThreshold.Cmp(requestedCapacity) > 0 {
+		if volumeSizeWithThreshold.Cmp(actualCapacity) > 0 {
 			proposedSize = volumeSizeWithThreshold
+			reason = VolumeAdjustmentUsageExceeded
 		} else {
-			proposedSize = requestedCapacity
+			proposedSize = actualCapacity
+			reason = VolumeAdjustmentCapacityMismatch
 		}
 	} else {
-		if actualCapacity.Cmp(requestedCapacity) == 1 {
-			proposedSize = actualCapacity
-		} else {
-			proposedSize = requestedCapacity
-		}
-	}
-
-	reason = ""
-
-	switch {
-	case proposedSize == requestedCapacity:
-		// TODO: update reason string
-
-	case proposedSize == actualCapacity:
-		// TODO: update reason string
-
-	case proposedSize == volumeSizeWithThreshold:
-		// TODO: update reason string
-
+		proposedSize = requestedCapacity
+		reason = VolumeAdjustmentNoOp
 	}
 
 	return proposedSize, reason

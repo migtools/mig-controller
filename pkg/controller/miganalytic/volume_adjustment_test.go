@@ -242,7 +242,6 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 	}
 }
 
-
 func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 	type fields struct {
 		Owner      *migapi.MigAnalytic
@@ -267,12 +266,12 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage: 50,
-				actualCapacity: resource.MustParse("200"),
+				usagePercentage:   50,
+				actualCapacity:    resource.MustParse("200"),
 				requestedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("200"),
-			wantReason: string(""),
+			wantReason:       VolumeAdjustmentCapacityMismatch,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = volume with threshold size",
@@ -280,12 +279,12 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage: 100,
-				actualCapacity: resource.MustParse("200"),
+				usagePercentage:   100,
+				actualCapacity:    resource.MustParse("200"),
 				requestedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("206"),
-			wantReason: string(""),
+			wantReason:       VolumeAdjustmentUsageExceeded,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = requested capacity",
@@ -293,12 +292,12 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage: 100,
-				actualCapacity: resource.MustParse("200"),
+				usagePercentage:   100,
+				actualCapacity:    resource.MustParse("200"),
 				requestedCapacity: resource.MustParse("250"),
 			},
 			wantProposedSize: resource.MustParse("250"),
-			wantReason: string(""),
+			wantReason:       VolumeAdjustmentNoOp,
 		},
 	}
 	for _, tt := range tests {
@@ -309,7 +308,6 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				DFExecutor: tt.fields.DFExecutor,
 			}
 			gotProposedSize, gotReason := pva.calculateProposedVolumeSize(tt.args.usagePercentage, tt.args.actualCapacity, tt.args.requestedCapacity)
-			gotProposedSize.String()
 			if !reflect.DeepEqual(gotProposedSize, tt.wantProposedSize) {
 				t.Errorf("calculateProposedVolumeSize() gotProposedSize = %v, want %v", gotProposedSize, tt.wantProposedSize)
 			}
