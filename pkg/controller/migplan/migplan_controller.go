@@ -18,7 +18,6 @@ package migplan
 
 import (
 	"context"
-	e "errors"
 	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
@@ -283,10 +282,16 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			return reconcile.Result{Requeue: true}, nil
 		}
 
-		// Loading PV statistics
-		pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
-		for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-			pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
+		if migAnalytic != nil {
+			// Loading PV statistics
+			pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
+			for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
+				pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
+			}
+		}
+
+		if migAnalytic == nil && !plan.Status.HasCondition(miganalytic.NotReady) {
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -540,5 +545,5 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 		}
 
 	}
-	return nil, e.New("Mig-Analytics is not ready")
+	return nil, nil
 }
