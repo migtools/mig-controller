@@ -275,7 +275,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			}
 		}
 
-		if analytic.Spec.AnalyzeExntendedPVCapacity {
+		if analytic.Spec.AnalyzeExtendedPVCapacity {
 			namespacedNodeToPVMap, err := r.getNodeToPVCMapForNS(&ns, client)
 			for node, pvcs := range namespacedNodeToPVMap {
 				if _, exists := nodeToPVMap[node]; !exists {
@@ -304,7 +304,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		}
 	}
 
-	if analytic.Spec.AnalyzeExntendedPVCapacity {
+	if analytic.Spec.AnalyzeExtendedPVCapacity {
 		err := r.analyzeExtendedPVCapacity(client, analytic, nodeToPVMap)
 		if err != nil {
 			return liberr.Wrap(err)

@@ -19,6 +19,7 @@ package migplan
 import (
 	"context"
 	e "errors"
+	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
 	"strconv"
@@ -222,7 +223,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// If interlligent pv resizing is enabled, Check if migAnalytics exists
+	// If intelligent pv resizing is enabled, Check if migAnalytics exists
 	if Settings.EnableIntelligentPVResize {
 		err = r.ensureMigAnalytics(plan)
 		if err != nil {
@@ -485,7 +486,7 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 		}
 	}
 	for _, migAnalytic := range migAnalytics.Items {
-		if migAnalytic.Spec.AnalyzeExntendedPVCapacity {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
 			if plan.Spec.Refresh {
 				migAnalytic.Spec.Refresh = true
 				err := r.Update(context.TODO(), &migAnalytic)
@@ -500,9 +501,9 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	pvMigAnalytics := &migapi.MigAnalytic{}
 	pvMigAnalytics.GenerateName = plan.Name + "-"
 	pvMigAnalytics.Namespace = plan.Namespace
-	pvMigAnalytics.Spec.AnalyzeExntendedPVCapacity = true
+	pvMigAnalytics.Spec.AnalyzeExtendedPVCapacity = true
 	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
-	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name, CreatedBy:plan.Name}
+	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
 	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
 		APIVersion: plan.APIVersion,
 		Kind:       plan.Kind,
@@ -524,13 +525,20 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 		return nil, err
 	}
 	for _, migAnalytic := range migAnalytics.Items {
-		if migAnalytic.Spec.AnalyzeExntendedPVCapacity == true {
-			for _, condition := range migAnalytic.Status.Conditions.List {
-				if condition.Type == migapi.Ready && condition.Status == "True" {
-					return &migAnalytic, nil
-				}
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity == true {
+			if migAnalytic.Status.IsReady() {
+				return &migAnalytic, nil
+			}
+			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > 3 * time.Minute {
+				plan.Status.SetCondition(migapi.Condition{
+					Type:               miganalytic.NotReady,
+					Status:             True,
+					Category:           Warn,
+					Message:            "MigAnalytics is still not ready after 3 minutes of its creation",
+				})
 			}
 		}
+
 	}
 	return nil, e.New("Mig-Analytics is not ready")
 }

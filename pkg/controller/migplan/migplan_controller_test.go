@@ -153,8 +153,8 @@ var migAnalytic3 = &migapi.MigAnalytic{
 			Kind:       "MigPlan",
 			APIVersion: "migration.openshift.io/v1alpha1",
 		},
-		AnalyzeExntendedPVCapacity: true,
-		Refresh:                    false,
+		AnalyzeExtendedPVCapacity: true,
+		Refresh:                   false,
 	},
 	Status: migapi.MigAnalyticStatus{
 		Analytics: migapi.MigAnalyticPlan{
@@ -210,8 +210,8 @@ var migAnalytic4 = &migapi.MigAnalytic{
 			Kind:       "MigPlan",
 			APIVersion: "migration.openshift.io/v1alpha1",
 		},
-		AnalyzeExntendedPVCapacity: true,
-		Refresh:                    false,
+		AnalyzeExtendedPVCapacity: true,
+		Refresh:                   false,
 	},
 	Status: migapi.MigAnalyticStatus{
 		Conditions: migapi.Conditions{
@@ -251,7 +251,7 @@ var expected1 = migapi.MigAnalytic{
 			Namespace: "test-ns",
 			Name:      "test-plan",
 		},
-		AnalyzeExntendedPVCapacity: true,
+		AnalyzeExtendedPVCapacity: true,
 	},
 	Status: migapi.MigAnalyticStatus{
 		Analytics: migapi.MigAnalyticPlan{
@@ -274,8 +274,8 @@ var expected2 = migapi.MigAnalytic{
 			Kind:       "MigPlan",
 			APIVersion: "migration.openshift.io/v1alpha1",
 		},
-		AnalyzeExntendedPVCapacity: true,
-		Refresh:                    true,
+		AnalyzeExtendedPVCapacity: true,
+		Refresh:                   true,
 	},
 	Status: migapi.MigAnalyticStatus{
 		Conditions: migapi.Conditions{
@@ -324,7 +324,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			want:    expected1,
 		},
 		{
-			name: "If migAnalytics exists without AnalyzeExntendedPVCapacity field, create a new migAnalytics",
+			name: "If migAnalytics exists without AnalyzeExtendedPVCapacity field, create a new migAnalytics",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan, migAnalytic),
 			},
@@ -335,7 +335,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			want:    expected1,
 		},
 		{
-			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is not set or set to false, do nothing",
+			name: "If migAnalytics exists with AnalyzeExtendedPVCapacity field, and migplan.refresh is not set or set to false, do nothing",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan3, migAnalytic3),
 			},
@@ -346,7 +346,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			want:    *migAnalytic3,
 		},
 		{
-			name: "If migAnalytics exists with AnalyzeExntendedPVCapacity field, and migplan.refresh is set to true, refresh migAnalytics",
+			name: "If migAnalytics exists with AnalyzeExtendedPVCapacity field, and migplan.refresh is set to true, refresh migAnalytics",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan4, migAnalytic4),
 			},
@@ -401,7 +401,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{
-			name: "No migAnalytics with AnalyzeExntendedPVCapacity field true exists for a migPlan",
+			name: "No migAnalytics with AnalyzeExtendedPVCapacity field true exists for a migPlan",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan, migAnalytic),
 			},
@@ -412,7 +412,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 			want:    nil,
 		},
 		{
-			name: "migAnalytics with AnalyzeExntendedPVCapacity field true exists, but is not in ready state",
+			name: "migAnalytics with AnalyzeExtendedPVCapacity field true exists, but is not in ready state",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan3, migAnalytic3),
 			},
@@ -423,7 +423,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 			want:    nil,
 		},
 		{
-			name: "migAnalytics with AnalyzeExntendedPVCapacity field true exists and is in ready state",
+			name: "migAnalytics with AnalyzeExtendedPVCapacity field true exists and is in ready state",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan4, migAnalytic4),
 			},

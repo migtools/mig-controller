@@ -43,7 +43,7 @@ type MigAnalyticSpec struct {
 	ListImagesLimit int `json:"listImagesLimit,omitempty"`
 
 	// Enables advanced analysis of volumes required for PV resizing
-	AnalyzeExntendedPVCapacity bool `json:"analyzeExtendedPVCapacity,omitempty"`
+	AnalyzeExtendedPVCapacity bool `json:"analyzeExtendedPVCapacity,omitempty"`
 
 	// Enables refreshing existing MigAnalytic
 	Refresh bool `json:"refresh,omitempty"`
