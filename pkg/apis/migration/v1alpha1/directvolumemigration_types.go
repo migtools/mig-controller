@@ -31,17 +31,17 @@ type PVCToMigrate struct {
 
 // DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration
 type DirectVolumeMigrationSpec struct {
-	SrcMigClusterRef            *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
-	DestMigClusterRef           *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
+	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
+	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
 	//  Holds all the PVCs that are to be migrated with direct volume migration
-	PersistentVolumeClaims      []PVCToMigrate        `json:"persistentVolumeClaims,omitempty"`
+	PersistentVolumeClaims []PVCToMigrate `json:"persistentVolumeClaims,omitempty"`
 
 	// Set true to create namespaces in destination cluster
-	CreateDestinationNamespaces bool                  `json:"createDestinationNamespaces,omitempty"`
+	CreateDestinationNamespaces bool `json:"createDestinationNamespaces,omitempty"`
 
 	// Specifies if progress reporting CRs needs to be deleted or not
-	DeleteProgressReportingCRs  bool                  `json:"deleteProgressReportingCRs,omitempty"`
+	DeleteProgressReportingCRs bool `json:"deleteProgressReportingCRs,omitempty"`
 }
 
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
@@ -56,6 +56,7 @@ type DirectVolumeMigrationStatus struct {
 	SuccessfulPods   []*PodProgress `json:"successfulPods,omitempty"`
 	FailedPods       []*PodProgress `json:"failedPods,omitempty"`
 	RunningPods      []*PodProgress `json:"runningPods,omitempty"`
+	PendingPods      []*PodProgress `json:"pendingPods,omitempty"`
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to

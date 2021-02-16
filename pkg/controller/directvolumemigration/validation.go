@@ -26,6 +26,7 @@ const (
 	RsyncRouteNotAdmitted           = "RsyncRouteNotAdmitted"
 	Running                         = "Running"
 	Failed                          = "Failed"
+	RsyncClientPodsPending          = "RsyncClientPodsPending"
 	Succeeded                       = "Succeeded"
 	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
 )
