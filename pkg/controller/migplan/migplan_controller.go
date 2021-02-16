@@ -18,7 +18,6 @@ package migplan
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"sort"
 	"strconv"
@@ -48,6 +47,9 @@ const (
 	MigPlan   = "migplan"
 	CreatedBy = "CreatedBy"
 )
+
+// define maximum waiting time for mig analytic to be ready
+var timeLimit = 3 * time.Minute
 
 var log = logging.WithName("plan")
 
@@ -290,7 +292,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			}
 		}
 
-		if migAnalytic == nil && !plan.Status.HasCondition(miganalytic.NotReady) {
+		if migAnalytic == nil && !plan.Status.HasCondition(IntelligentPVResizingDisabled) {
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -534,12 +536,12 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 			if migAnalytic.Status.IsReady() {
 				return &migAnalytic, nil
 			}
-			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > 3 * time.Minute {
+			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > timeLimit {
 				plan.Status.SetCondition(migapi.Condition{
-					Type:               miganalytic.NotReady,
-					Status:             True,
-					Category:           Warn,
-					Message:            "MigAnalytics is still not ready after 3 minutes of its creation",
+					Type:     IntelligentPVResizingDisabled,
+					Status:   True,
+					Category: Warn,
+					Message:  "MigAnalytics did not complete on time, going ahead with the migration without offering pvc resize function",
 				})
 			}
 		}

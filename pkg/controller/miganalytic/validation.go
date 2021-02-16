@@ -30,7 +30,6 @@ const (
 	NotFound     = "NotFound"
 	KeyError     = "KeyError"
 	TestFailed   = "TestFailed"
-	NotReady     = "NotReady"
 )
 
 // Statuses
