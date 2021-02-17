@@ -49,14 +49,14 @@ func (t *Task) createDestinationPVCs() error {
 
 		// Adjusting destination PVC storage size request
 		if matchingPV != nil {
-			if srcPVCRequest.Cmp(matchingPV.Capacity) > 0 {
-				if srcPVCRequest.Cmp(matchingPV.ProposedCapacity) > 0 {
-					newSpec.Resources.Requests[corev1.ResourceStorage] = srcPVCRequest
-				} else {
-					newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.ProposedCapacity
-				}
-			} else {
+			// update src PVC capacity if matching PV's capacity is the maximum
+			if matchingPV.Capacity.Cmp(srcPVCRequest) > 0 && matchingPV.Capacity.Cmp(matchingPV.ProposedCapacity) > 0 {
 				newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.Capacity
+			}
+
+			// update src PVC capacity if matching PV's proposed capacity is the maximum
+			if matchingPV.ProposedCapacity.Cmp(srcPVCRequest) > 0 && matchingPV.ProposedCapacity.Cmp(matchingPV.Capacity) > 0 {
+				newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.ProposedCapacity
 			}
 		}
 
