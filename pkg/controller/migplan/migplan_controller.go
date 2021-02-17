@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
@@ -553,32 +554,38 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 }
 
 func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
-	for _, planVol := range plan.Spec.PersistentVolumes.List {
+	plan.Spec.PersistentVolumes.BeginPvStaging()
+	for i := range plan.Spec.PersistentVolumes.List {
+		planVol := &plan.Spec.PersistentVolumes.List[i]
 		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
 			if planVol.PVC.Namespace == analyticNS.Namespace {
 				for _, analyticNSVol := range analyticNS.PersistentVolumes {
 					if planVol.PVC.Name == analyticNSVol.Name {
 
-						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) <= 0 {
+						// If old proposed capacity is smaller than new one, set confirmed to False
+						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) < 0 {
 							planVol.Confirmed = false
-							planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
 						}
 
-						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) != 0 && planVol.Confirmed == true {
+						// If new proposed capacity is greater than original capacity, set confirmed to False
+						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
 							planVol.Confirmed = false
-							planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
 						}
+						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						log.Info(fmt.Sprintf("Setting proposed capacity of %s/%s to %s",
+							planVol.PVC.Namespace, planVol.PVC.Name, planVol.ProposedCapacity.String()))
 					}
 				}
 			}
 		}
 	}
+	plan.Spec.PersistentVolumes.EndPvStaging()
 }
 
 func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
 	unconfirmedVols := []string{}
 	for _, planVol := range plan.Spec.PersistentVolumes.List {
-		if planVol.Confirmed == false {
+		if planVol.Confirmed == false && planVol.ProposedCapacity.Cmp(planVol.Capacity) > 1 {
 			unconfirmedVols = append(unconfirmedVols, planVol.Name)
 		}
 	}
@@ -600,7 +607,7 @@ func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAn
 			Status:   True,
 			Category: Critical,
 			Reason:   UnConfirmedPV,
-			Message:  fmt.Sprintf("The Migration plan is associated with Unconfirmed PVs : %#v", unconfirmedVols),
+			Message:  fmt.Sprintf("Adjusted capacity is not confirmed for PVs [%s]", strings.Join(unconfirmedVols, ",")),
 			Durable:  true,
 		})
 	} else {

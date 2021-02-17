@@ -724,8 +724,8 @@ type PV struct {
 	PVC              PVC                   `json:"pvc,omitempty"`
 	NFS              *kapi.NFSVolumeSource `json:"-"`
 	staged           bool                  `json:"-"`
-	Confirmed        bool                  `json:"_"`
-	ProposedCapacity resource.Quantity     `json:"capacity,omitempty"`
+	Confirmed        bool                  `json:"capacityConfirmed"`
+	ProposedCapacity resource.Quantity     `json:"proposedCapacity,omitempty"`
 }
 
 // PVC
