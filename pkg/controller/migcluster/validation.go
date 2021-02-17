@@ -238,10 +238,21 @@ func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) e
 		restConfig, err := cluster.BuildRestConfig(r.Client)
 		token := restConfig.BearerToken
 
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// Construct transport using default values from http lib
+		defaultTransport := http.DefaultTransport.(*http.Transport)
+		transport := &http.Transport{
+			Proxy:                 defaultTransport.Proxy,
+			DialContext:           defaultTransport.DialContext,
+			MaxIdleConns:          defaultTransport.MaxIdleConns,
+			IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+			TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+			ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
 		}
-		client := &http.Client{Transport: tr}
+
+		client := &http.Client{Transport: transport}
 
 		req, err := http.NewRequest("GET", url, nil)
 
