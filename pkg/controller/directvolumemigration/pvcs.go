@@ -2,6 +2,7 @@ package directvolumemigration
 
 import (
 	"context"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,10 +38,27 @@ func (t *Task) createDestinationPVCs() error {
 			return err
 		}
 
+		plan := t.PlanResources.MigPlan
+		matchingPV := t.findMatchingPV(plan, pvc.Name, pvc.Namespace)
+		srcPVCRequest := srcPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+
 		newSpec := srcPVC.Spec
 		newSpec.StorageClassName = &pvc.TargetStorageClass
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
+
+		// Adjusting destination PVC storage size request
+		if matchingPV != nil {
+			if srcPVCRequest.Cmp(matchingPV.Capacity) > 0 {
+				if srcPVCRequest.Cmp(matchingPV.ProposedCapacity) > 0 {
+					newSpec.Resources.Requests[corev1.ResourceStorage] = srcPVCRequest
+				} else {
+					newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.ProposedCapacity
+				}
+			} else {
+				newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.Capacity
+			}
+		}
 
 		//Add src labels and rollback labels
 		pvcLabels := srcPVC.Labels
@@ -74,5 +92,14 @@ func (t *Task) createDestinationPVCs() error {
 
 func (t *Task) getDestinationPVCs() error {
 	// Ensure PVCs are bound and not in pending state
+	return nil
+}
+
+func (t *Task) findMatchingPV(plan *migapi.MigPlan, pvcName string, pvcNamespace string) *migapi.PV {
+	for _, planVol := range plan.Spec.PersistentVolumes.List {
+		if planVol.PVC.Name == pvcName && planVol.PVC.Namespace == pvcNamespace {
+			return &planVol
+		}
+	}
 	return nil
 }
