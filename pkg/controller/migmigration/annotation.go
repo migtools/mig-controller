@@ -293,10 +293,6 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 // The PvAccessModeAnnotation annotation is added to PVC as needed by the velero plugin.
 // The PvCopyMethodAnnotation annotation is added to PV and PVC as needed by the velero plugin.
 func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, error) {
-	hasPVs, hasStagePVs := t.hasPVs()
-	if !hasPVs || !hasStagePVs {
-		return 0, nil
-	}
 	pvs := t.getStagePVs()
 	total := len(pvs.List)
 	for i, pv := range pvs.List {
