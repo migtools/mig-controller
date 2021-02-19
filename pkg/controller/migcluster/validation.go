@@ -19,12 +19,14 @@ import (
 
 // Types
 const (
-	InvalidURL           = "InvalidURL"
-	InvalidSaSecretRef   = "InvalidSaSecretRef"
-	InvalidSaToken       = "InvalidSaToken"
-	InvalidRegistryRoute = "InvalidRegistryRoute"
-	TestConnectFailed    = "TestConnectFailed"
-	SaTokenNotPrivileged = "SaTokenNotPrivileged"
+	InvalidURL                     = "InvalidURL"
+	InvalidSaSecretRef             = "InvalidSaSecretRef"
+	InvalidSaToken                 = "InvalidSaToken"
+	InvalidRegistryRoute           = "InvalidRegistryRoute"
+	TestConnectFailed              = "TestConnectFailed"
+	SaTokenNotPrivileged           = "SaTokenNotPrivileged"
+	OperatorVersionMismatch        = "OperatorVersionMismatch"
+	ClusterOperatorVersionNotFound = "ClusterOperatorVersionNotFound"
 )
 
 // Categories
@@ -34,13 +36,15 @@ const (
 
 // Reasons
 const (
-	NotSet          = "NotSet"
-	NotFound        = "NotFound"
-	ConnectFailed   = "ConnectFailed"
-	Malformed       = "Malformed"
-	RouteTestFailed = "RouteTestFailed"
-	InvalidScheme   = "InvalidScheme"
-	Unauthorized    = "Unauthorized"
+	NotSet             = "NotSet"
+	NotFound           = "NotFound"
+	ConnectFailed      = "ConnectFailed"
+	Malformed          = "Malformed"
+	RouteTestFailed    = "RouteTestFailed"
+	InvalidScheme      = "InvalidScheme"
+	Unauthorized       = "Unauthorized"
+	VersionCheckFailed = "VersionCheckFailed"
+	VersionNotFound    = "VersionNotFound"
 )
 
 // Statuses
@@ -78,6 +82,12 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 
 	// Exposed registry route
 	err = r.validateRegistryRoute(cluster)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// cluster version
+	err = r.validateOperatorVersionMatchesHost(cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -344,5 +354,48 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 			Message:  fmt.Sprintf("The `saToken` has insufficient privileges."),
 		})
 	}
+	return nil
+}
+
+// validate operator version.
+func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.MigCluster) error {
+	if cluster.Spec.IsHostCluster {
+		return nil
+	}
+	if cluster.Status.HasCriticalCondition() {
+		return nil
+	}
+
+	clusterClient, err := cluster.GetClient(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	clusterOperatorVersion, err := cluster.GetOperatorVersion(clusterClient)
+
+	if err != nil {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     ClusterOperatorVersionNotFound,
+			Status:   True,
+			Reason:   VersionNotFound,
+			Category: Critical,
+			Message:  fmt.Sprintf("The configmap key could not be found. See logs for details."),
+		})
+
+		return liberr.Wrap(err)
+	}
+
+	hostOperatorVersion, err := cluster.GetOperatorVersion(r)
+	operatorVersionMatchesHost := clusterOperatorVersion == hostOperatorVersion
+
+	if !operatorVersionMatchesHost {
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     OperatorVersionMismatch,
+			Status:   True,
+			Reason:   VersionCheckFailed,
+			Category: Critical,
+			Message:  fmt.Sprintf("This cluster is running a different version of the Migration Toolkit for Containers operator than the host cluster. Migrating to or from this cluster might result in a failed migration and data loss. Make sure all clusters are running the same version of the operator before attempting a migration."),
+		})
+	}
+
 	return nil
 }

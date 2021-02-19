@@ -220,19 +220,15 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 	return clusterSubdomain, nil
 }
 
-// GetRegistryImage gets a MigCluster specific registry image from ConfigMap
+// GetOperatorVersion retrieves the operator version from the respective controllers ConfigMap
 func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
-	client, err := m.GetClient(c)
-	if err != nil {
-		return "", err
-	}
-	clusterConfig, err := m.GetClusterConfigMap(client)
+	clusterConfig, err := m.GetClusterConfigMap(c)
 	if err != nil {
 		return "", liberr.Wrap(err)
 	}
 	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
 	if !ok {
-		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", OperatorVersionKey))
+		return "", liberr.Wrap(err)
 	}
 	return operatorVersion, nil
 }

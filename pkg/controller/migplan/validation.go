@@ -10,6 +10,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -176,7 +177,7 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 	}
 
 	// Versions
-	err = r.validateMatchingOperatorVersion(plan)
+	err = r.validateOperatorVersions(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -481,7 +482,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 	return nil
 }
 
-func (r ReconcileMigPlan) validateMatchingOperatorVersion(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
 	destRef := plan.Spec.DestMigClusterRef
 	srcRef := plan.Spec.SrcMigClusterRef
 
@@ -494,20 +495,15 @@ func (r ReconcileMigPlan) validateMatchingOperatorVersion(plan *migapi.MigPlan) 
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	srcClusterOperatorVersion, err := srcCluster.GetOperatorVersion(r)
-	destClusterOperatorVersion, err := destCluster.GetOperatorVersion(r)
-
-	doVersionsMatch := srcClusterOperatorVersion == destClusterOperatorVersion
-
-	if !doVersionsMatch && err != nil {
+	srcHasMismatch := srcCluster.Status.HasCondition(migcluster.OperatorVersionMismatch)
+	destHasMismatch := destCluster.Status.HasCondition(migcluster.OperatorVersionMismatch)
+	if srcHasMismatch || destHasMismatch {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     ClusterVersionMismatch,
 			Status:   True,
 			Category: Critical,
 			Reason:   Conflict,
-			Message: fmt.Sprintf("Cluster versions do not match. Source and destination clusters must have the same operator version. %s",
-				path.Join(srcClusterOperatorVersion, destClusterOperatorVersion)),
+			Message:  fmt.Sprintf("Cluster operator versions do not match. Source and destination clusters must have the same operator version."),
 		})
 		return nil
 	}
