@@ -63,7 +63,14 @@ const (
 	BinarySIGiga  = DFBaseUnit("G")
 )
 
-// DFCommand represents a df command
+// Proposed volume size computation reasons
+const (
+	VolumeAdjustmentNoOp             = "No change in original PV capacity is needed."
+	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%, an extra headroom is added to avoid disk capacity issue in the target cluster."
+	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values is used to avoid disk capacity issue in the target cluster."
+)
+
+// DFCommand represent a df command
 type DFCommand struct {
 	// stdout from df
 	StdOut string
@@ -216,11 +223,6 @@ func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migap
 	return nil
 }
 
-func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
-	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
-	return
-}
-
 // Run runs executor, uses df output to calculate adjusted volume sizes, updates owner.status with results
 func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
 	pvDfOutputs, err := pva.DFExecutor.Execute(pvNodeMap)
@@ -256,4 +258,30 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 	}
 	pva.generateWarningForErroredPVs(erroredPVs)
 	return nil
+}
+
+func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
+	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
+
+	defer proposedSize.String()
+
+	volumeSizeWithThreshold := actualCapacity
+	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage + 3) / 100))
+
+	maxSize := requestedCapacity
+	reason = VolumeAdjustmentNoOp
+
+	if actualCapacity.Cmp(maxSize) == 1 {
+		maxSize = actualCapacity
+		reason = VolumeAdjustmentCapacityMismatch
+	}
+
+	if volumeSizeWithThreshold.Cmp(maxSize) == 1 {
+		maxSize = volumeSizeWithThreshold
+		reason = VolumeAdjustmentUsageExceeded
+	}
+
+	proposedSize = maxSize
+
+	return proposedSize, reason
 }
