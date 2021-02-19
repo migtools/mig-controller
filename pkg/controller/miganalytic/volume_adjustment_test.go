@@ -299,6 +299,20 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 			wantProposedSize: resource.MustParse("250"),
 			wantReason:       VolumeAdjustmentNoOp,
 		},
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
+				"is greater than requested capacity and actual capacity is greater than requested capacity",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:   1,
+				actualCapacity:    resource.MustParse("200"),
+				requestedCapacity: resource.MustParse("150"),
+			},
+			wantProposedSize: resource.MustParse("200"),
+			wantReason:       VolumeAdjustmentCapacityMismatch,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

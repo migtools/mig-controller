@@ -268,18 +268,20 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 	volumeSizeWithThreshold := actualCapacity
 	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage + 3) / 100))
 
-	if volumeSizeWithThreshold.Cmp(requestedCapacity) > 0 {
-		if volumeSizeWithThreshold.Cmp(actualCapacity) > 0 {
-			proposedSize = volumeSizeWithThreshold
-			reason = VolumeAdjustmentUsageExceeded
-		} else {
-			proposedSize = actualCapacity
-			reason = VolumeAdjustmentCapacityMismatch
-		}
-	} else {
-		proposedSize = requestedCapacity
-		reason = VolumeAdjustmentNoOp
+	maxSize := requestedCapacity
+	reason = VolumeAdjustmentNoOp
+
+	if actualCapacity.Cmp(maxSize) == 1 {
+		maxSize = actualCapacity
+		reason = VolumeAdjustmentCapacityMismatch
 	}
+
+	if volumeSizeWithThreshold.Cmp(maxSize) == 1 {
+		maxSize = volumeSizeWithThreshold
+		reason = VolumeAdjustmentUsageExceeded
+	}
+
+	proposedSize = maxSize
 
 	return proposedSize, reason
 }
