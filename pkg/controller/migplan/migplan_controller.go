@@ -18,14 +18,18 @@ package migplan
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -285,11 +289,10 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 
 		if migAnalytic != nil {
-			// Loading PV statistics
-			pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
-			for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
-				pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
-			}
+			// Process PV Capacity
+			r.processExtendedPVCapacity(plan, migAnalytic)
+			// raise condition for unconfirmed PV sizes
+			r.validatePVSizeConfirmation(plan, migAnalytic)
 		}
 
 		if migAnalytic == nil && !plan.Status.HasCondition(IntelligentPVResizingDisabled) {
@@ -548,4 +551,68 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 
 	}
 	return nil, nil
+}
+
+func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+	plan.Spec.PersistentVolumes.BeginPvStaging()
+	for i := range plan.Spec.PersistentVolumes.List {
+		planVol := &plan.Spec.PersistentVolumes.List[i]
+		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
+			if planVol.PVC.Namespace == analyticNS.Namespace {
+				for _, analyticNSVol := range analyticNS.PersistentVolumes {
+					if planVol.PVC.Name == analyticNSVol.Name {
+
+						// If plan volume capacity is less than analytic volume's proposed capacity, set confirmed to False
+						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) < 0 {
+							planVol.CapacityConfirmed = false
+						}
+
+						// If new proposed capacity is greater than original capacity, set confirmed to False
+						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
+							planVol.CapacityConfirmed = false
+						}
+						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						plan.Spec.AddPv(*planVol)
+						log.Info(fmt.Sprintf("Setting proposed capacity of %s/%s to %s",
+							planVol.PVC.Namespace, planVol.PVC.Name, planVol.ProposedCapacity.String()))
+					}
+				}
+			}
+		}
+	}
+	plan.Spec.PersistentVolumes.EndPvStaging()
+}
+
+func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
+	unconfirmedVols := []string{}
+	for _, planVol := range plan.Spec.PersistentVolumes.List {
+		if planVol.CapacityConfirmed == false && planVol.ProposedCapacity.Cmp(planVol.Capacity) > 1 {
+			unconfirmedVols = append(unconfirmedVols, planVol.Name)
+		}
+	}
+
+	if migAnalytic.Status.HasCondition(miganalytic.ExtendedPVAnalysisFailed) {
+		plan.Status.SetCondition(migapi.Condition{
+			Category: migapi.Warn,
+			Status:   True,
+			Type:     miganalytic.ExtendedPVAnalysisFailed,
+			Reason:   miganalytic.FailedRunningDf,
+			Message:  fmt.Sprintf("Failed gathering extended PV usage information for some or all PVs, please see MigAnalytic %s/%s for details", migAnalytic.Namespace, migAnalytic.Name),
+		})
+	}
+
+	if len(unconfirmedVols) > 0 {
+		plan.Status.DeleteCondition(UnConfirmedPV)
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     UnConfirmedPV,
+			Status:   True,
+			Category: migapi.Warn,
+			Reason:   UnConfirmedPV,
+			Message:  fmt.Sprintf("Migrating data of following volumes may result in a failure either due to mismatch in their apparent and actual capacities or disk usage being close to 100%% :  [%s]", strings.Join(unconfirmedVols, ",")),
+			Durable:  true,
+		})
+	} else {
+		plan.Status.DeleteCondition(UnConfirmedPV)
+	}
+
 }
