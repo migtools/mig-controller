@@ -32,6 +32,7 @@ const (
 // Categories
 const (
 	Critical = migapi.Critical
+	Warn     = migapi.Warn
 )
 
 // Reasons
@@ -370,21 +371,40 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	clusterOperatorVersion, err := cluster.GetOperatorVersion(clusterClient)
-
+	clusterOperatorVersion, clusterConfigMapNamespace, clusterConfigMapName, err := cluster.GetOperatorVersion(clusterClient)
 	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if clusterOperatorVersion == "" {
+
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     ClusterOperatorVersionNotFound,
 			Status:   True,
 			Reason:   VersionNotFound,
-			Category: Critical,
-			Message:  fmt.Sprintf("The configmap key could not be found. See logs for details."),
+			Category: Warn,
+			Message:  fmt.Sprintf(`MTC operator version lookup failed. Key %s  not found in configmap %s/%s. Ensure that all clusters are running the same MTC Operator version.`, migapi.OperatorVersionKey, clusterConfigMapNamespace, clusterConfigMapName),
 		})
 
 		return liberr.Wrap(err)
 	}
 
-	hostOperatorVersion, err := cluster.GetOperatorVersion(r)
+	hostOperatorVersion, hostConfigMapNamespace, hostConfigMapName, err := cluster.GetOperatorVersion(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if hostOperatorVersion == "" {
+
+		cluster.Status.SetCondition(migapi.Condition{
+			Type:     ClusterOperatorVersionNotFound,
+			Status:   True,
+			Reason:   VersionNotFound,
+			Category: Warn,
+			Message:  fmt.Sprintf(`MTC operator version lookup failed. Key %s  not found in configmap %s/%s. Ensure that all clusters are running the same MTC Operator version.`, migapi.OperatorVersionKey, hostConfigMapNamespace, hostConfigMapName),
+		})
+
+		return liberr.Wrap(err)
+	}
+
 	operatorVersionMatchesHost := clusterOperatorVersion == hostOperatorVersion
 
 	if !operatorVersionMatchesHost {
@@ -392,7 +412,7 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 			Type:     OperatorVersionMismatch,
 			Status:   True,
 			Reason:   VersionCheckFailed,
-			Category: Critical,
+			Category: Warn,
 			Message:  fmt.Sprintf("This cluster is running a different version of the Migration Toolkit for Containers operator than the host cluster. Migrating to or from this cluster might result in a failed migration and data loss. Make sure all clusters are running the same version of the operator before attempting a migration."),
 		})
 	}

@@ -221,16 +221,20 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 }
 
 // GetOperatorVersion retrieves the operator version from the respective controllers ConfigMap
-func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
+func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, string, string, error) {
 	clusterConfig, err := m.GetClusterConfigMap(c)
 	if err != nil {
-		return "", liberr.Wrap(err)
+		return "", "", "", liberr.Wrap(err)
 	}
+	configMapNamespace := clusterConfig.Namespace
+	configMapName := clusterConfig.Name
+
 	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
 	if !ok {
-		return "", liberr.Wrap(err)
+		return "", configMapNamespace, configMapName, liberr.Wrap(err)
 	}
-	return operatorVersion, nil
+
+	return operatorVersion, configMapNamespace, configMapName, nil
 }
 
 // Test the connection settings by building a client.
@@ -669,14 +673,19 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 }
 
 func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
-	fmt.Printf("m is: %+v\n", m)
-	fmt.Printf("c is: %+v\n", c)
-
-	newOperatorVersion, err := m.GetOperatorVersion(c)
+	clusterClient, err := m.GetClient(c)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	newOperatorVersion, _, _, err := m.GetOperatorVersion(clusterClient)
 	if err != nil {
 		return err
 	}
-	m.Status.OperatorVersion = newOperatorVersion
+
+	if newOperatorVersion != "" {
+		m.Status.OperatorVersion = newOperatorVersion
+	}
+
 	return nil
 }
 
