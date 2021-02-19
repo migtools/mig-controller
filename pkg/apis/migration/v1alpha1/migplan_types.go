@@ -716,16 +716,16 @@ const (
 // NFS - NFS properties.
 // staged - A PV has been explicitly added/updated.
 type PV struct {
-	Name             string                `json:"name,omitempty"`
-	Capacity         resource.Quantity     `json:"capacity,omitempty"`
-	StorageClass     string                `json:"storageClass,omitempty"`
-	Supported        Supported             `json:"supported"`
-	Selection        Selection             `json:"selection"`
-	PVC              PVC                   `json:"pvc,omitempty"`
-	NFS              *kapi.NFSVolumeSource `json:"-"`
-	staged           bool                  `json:"-"`
-	Confirmed        bool                  `json:"capacityConfirmed"`
-	ProposedCapacity resource.Quantity     `json:"proposedCapacity,omitempty"`
+	Name              string                `json:"name,omitempty"`
+	Capacity          resource.Quantity     `json:"capacity,omitempty"`
+	StorageClass      string                `json:"storageClass,omitempty"`
+	Supported         Supported             `json:"supported"`
+	Selection         Selection             `json:"selection"`
+	PVC               PVC                   `json:"pvc,omitempty"`
+	NFS               *kapi.NFSVolumeSource `json:"-"`
+	staged            bool                  `json:"-"`
+	CapacityConfirmed bool                  `json:"capacityConfirmed"`
+	ProposedCapacity  resource.Quantity     `json:"proposedCapacity,omitempty"`
 }
 
 // PVC

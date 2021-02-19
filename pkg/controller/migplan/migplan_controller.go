@@ -564,12 +564,12 @@ func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analyt
 
 						// If plan volume capacity is less than analytic volume's proposed capacity, set confirmed to False
 						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) < 0 {
-							planVol.Confirmed = false
+							planVol.CapacityConfirmed = false
 						}
 
 						// If new proposed capacity is greater than original capacity, set confirmed to False
 						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
-							planVol.Confirmed = false
+							planVol.CapacityConfirmed = false
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
 						plan.Spec.AddPv(*planVol)
@@ -586,7 +586,7 @@ func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analyt
 func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
 	unconfirmedVols := []string{}
 	for _, planVol := range plan.Spec.PersistentVolumes.List {
-		if planVol.Confirmed == false && planVol.ProposedCapacity.Cmp(planVol.Capacity) > 1 {
+		if planVol.CapacityConfirmed == false && planVol.ProposedCapacity.Cmp(planVol.Capacity) > 1 {
 			unconfirmedVols = append(unconfirmedVols, planVol.Name)
 		}
 	}
