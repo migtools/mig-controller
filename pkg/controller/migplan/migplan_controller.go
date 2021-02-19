@@ -572,6 +572,7 @@ func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analyt
 							planVol.Confirmed = false
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						plan.Spec.AddPv(*planVol)
 						log.Info(fmt.Sprintf("Setting proposed capacity of %s/%s to %s",
 							planVol.PVC.Namespace, planVol.PVC.Name, planVol.ProposedCapacity.String()))
 					}
