@@ -17,7 +17,10 @@ limitations under the License.
 package miganalytic
 
 import (
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -234,6 +237,96 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got.String(), tt.want) {
 				t.Errorf("DFCommand.convertDFQuantityToKubernetesResource() = %v, want %v", got.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
+	type fields struct {
+		Owner      *migapi.MigAnalytic
+		Client     client.Client
+		DFExecutor DFCommandExecutor
+	}
+	type args struct {
+		usagePercentage   int64
+		actualCapacity    resource.Quantity
+		requestedCapacity resource.Quantity
+	}
+	tests := []struct {
+		name             string
+		fields           fields
+		args             args
+		wantProposedSize resource.Quantity
+		wantReason       string
+	}{
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here proposed size = actual capacity",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:   50,
+				actualCapacity:    resource.MustParse("200"),
+				requestedCapacity: resource.MustParse("20"),
+			},
+			wantProposedSize: resource.MustParse("200"),
+			wantReason:       VolumeAdjustmentCapacityMismatch,
+		},
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = volume with threshold size",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:   100,
+				actualCapacity:    resource.MustParse("200"),
+				requestedCapacity: resource.MustParse("20"),
+			},
+			wantProposedSize: resource.MustParse("206"),
+			wantReason:       VolumeAdjustmentUsageExceeded,
+		},
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = requested capacity",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:   100,
+				actualCapacity:    resource.MustParse("200"),
+				requestedCapacity: resource.MustParse("250"),
+			},
+			wantProposedSize: resource.MustParse("250"),
+			wantReason:       VolumeAdjustmentNoOp,
+		},
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
+				"is greater than requested capacity and actual capacity is greater than requested capacity",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:   1,
+				actualCapacity:    resource.MustParse("200"),
+				requestedCapacity: resource.MustParse("150"),
+			},
+			wantProposedSize: resource.MustParse("200"),
+			wantReason:       VolumeAdjustmentCapacityMismatch,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pva := &PersistentVolumeAdjuster{
+				Owner:      tt.fields.Owner,
+				Client:     tt.fields.Client,
+				DFExecutor: tt.fields.DFExecutor,
+			}
+			gotProposedSize, gotReason := pva.calculateProposedVolumeSize(tt.args.usagePercentage, tt.args.actualCapacity, tt.args.requestedCapacity)
+			if !reflect.DeepEqual(gotProposedSize, tt.wantProposedSize) {
+				t.Errorf("calculateProposedVolumeSize() gotProposedSize = %v, want %v", gotProposedSize, tt.wantProposedSize)
+			}
+			if gotReason != tt.wantReason {
+				t.Errorf("calculateProposedVolumeSize() gotReason = %v, want %v", gotReason, tt.wantReason)
 			}
 		})
 	}
