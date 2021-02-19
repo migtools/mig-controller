@@ -608,7 +608,7 @@ func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAn
 			Status:   True,
 			Category: migapi.Warn,
 			Reason:   UnConfirmedPV,
-			Message:  fmt.Sprintf("Migrating data of following volumes may result in failure either due to mismatch in their apparent and actual capacities or disk usage being close to 100 %% :  [%s]", strings.Join(unconfirmedVols, ",")),
+			Message:  fmt.Sprintf("Migrating data of following volumes may result in a failure either due to mismatch in their apparent and actual capacities or disk usage being close to 100%% :  [%s]", strings.Join(unconfirmedVols, ",")),
 			Durable:  true,
 		})
 	} else {
