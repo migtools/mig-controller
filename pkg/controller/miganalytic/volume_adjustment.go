@@ -65,9 +65,9 @@ const (
 
 // Proposed volume size computation reasons
 const (
-	VolumeAdjustmentNoOp             = "PV sizes not altered. Using original size"
-	VolumeAdjustmentUsageExceeded    = "PV size was adjusted by adding extra headroom of 3%"
-	VolumeAdjustmentCapacityMismatch = "Provisioned size not equal to the requested size, using provisioned size"
+	VolumeAdjustmentNoOp             = "No change in original PV capacity is needed."
+	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%, an extra headroom is added to avoid disk capacity issue in the target cluster."
+	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values is used to avoid disk capacity issue in the target cluster."
 )
 
 // DFCommand represent a df command
@@ -222,7 +222,6 @@ func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migap
 	}
 	return nil
 }
-
 
 // Run runs executor, uses df output to calculate adjusted volume sizes, updates owner.status with results
 func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
