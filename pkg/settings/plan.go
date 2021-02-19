@@ -9,13 +9,14 @@ import (
 
 // Environment variables.
 const (
-	NsLimit           = "NAMESPACE_LIMIT"
-	PodLimit          = "POD_LIMIT"
-	PvLimit           = "PV_LIMIT"
-	ExcludedResources = "EXCLUDED_RESOURCES"
-	ISResource        = "imagestreams"
-	PVResource        = "persistentvolumes"
-	PVCResource       = "persistentvolumeclaims"
+	NsLimit                   = "NAMESPACE_LIMIT"
+	PodLimit                  = "POD_LIMIT"
+	PvLimit                   = "PV_LIMIT"
+	ExcludedResources         = "EXCLUDED_RESOURCES"
+	ISResource                = "imagestreams"
+	PVResource                = "persistentvolumes"
+	PVCResource               = "persistentvolumeclaims"
+	EnableIntelligentPVResize = "ENABLE_INTELLIGENT_PV_RESIZE"
 )
 
 // Included resource defaults
@@ -45,10 +46,11 @@ var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 //   PvLimit: Maximum number PVs on a Plan.
 //   ExcludedResources: Resources excluded from a Plan.
 type Plan struct {
-	NsLimit           int
-	PodLimit          int
-	PvLimit           int
-	ExcludedResources []string
+	NsLimit                   int
+	PodLimit                  int
+	PvLimit                   int
+	EnableIntelligentPVResize bool
+	ExcludedResources         []string
 }
 
 // Load settings.
@@ -66,6 +68,7 @@ func (r *Plan) Load() error {
 	if err != nil {
 		return err
 	}
+	r.EnableIntelligentPVResize = getEnvBool(EnableIntelligentPVResize, false)
 	excludedResources := os.Getenv(ExcludedResources)
 	if len(excludedResources) > 0 {
 		r.ExcludedResources = strings.Split(excludedResources, ",")

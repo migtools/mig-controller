@@ -85,16 +85,17 @@ const (
 
 // Reasons
 const (
-	NotSet         = "NotSet"
-	NotFound       = "NotFound"
-	KeyNotFound    = "KeyNotFound"
-	NotDistinct    = "NotDistinct"
-	LimitExceeded  = "LimitExceeded"
-	LengthExceeded = "LengthExceeded"
-	NotDone        = "NotDone"
-	Done           = "Done"
-	Conflict       = "Conflict"
-	NotHealthy     = "NotHealthy"
+	NotSet                        = "NotSet"
+	NotFound                      = "NotFound"
+	KeyNotFound                   = "KeyNotFound"
+	NotDistinct                   = "NotDistinct"
+	LimitExceeded                 = "LimitExceeded"
+	LengthExceeded                = "LengthExceeded"
+	NotDone                       = "NotDone"
+	Done                          = "Done"
+	Conflict                      = "Conflict"
+	NotHealthy                    = "NotHealthy"
+	IntelligentPVResizingDisabled = "IntelligentPVResizingDisabled"
 )
 
 // Statuses

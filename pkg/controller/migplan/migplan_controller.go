@@ -43,6 +43,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+const (
+	MigPlan   = "migplan"
+	CreatedBy = "CreatedBy"
+)
+
+// define maximum waiting time for mig analytic to be ready
+var migAnalyticsTimeout = 3 * time.Minute
+
 var log = logging.WithName("plan")
 
 // Application settings.
@@ -216,6 +224,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// If intelligent pv resizing is enabled, Check if migAnalytics exists
+	if Settings.EnableIntelligentPVResize {
+		err = r.ensureMigAnalytics(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+	}
+
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
@@ -257,6 +274,27 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
+	if Settings.EnableIntelligentPVResize {
+		migAnalytic, err := r.waitForMigAnalyticsReady(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+
+		if migAnalytic != nil {
+			// Loading PV statistics
+			pvcMap := make(map[string][]migapi.MigAnalyticPersistentVolumeClaim)
+			for _, mapvc := range migAnalytic.Status.Analytics.Namespaces {
+				pvcMap[mapvc.Namespace] = mapvc.PersistentVolumes
+			}
+		}
+
+		if migAnalytic == nil && !plan.Status.HasCondition(IntelligentPVResizingDisabled) {
+			return reconcile.Result{Requeue: true}, nil
+		}
 	}
 
 	// Ready
@@ -444,4 +482,70 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 		}
 	}
 	return nil
+}
+
+func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	for _, migAnalytic := range migAnalytics.Items {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
+			if plan.Spec.Refresh {
+				migAnalytic.Spec.Refresh = true
+				err := r.Update(context.TODO(), &migAnalytic)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+
+	pvMigAnalytics := &migapi.MigAnalytic{}
+	pvMigAnalytics.GenerateName = plan.Name + "-"
+	pvMigAnalytics.Namespace = plan.Namespace
+	pvMigAnalytics.Spec.AnalyzeExtendedPVCapacity = true
+	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
+	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
+	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
+		APIVersion: plan.APIVersion,
+		Kind:       plan.Kind,
+		Name:       plan.Name,
+		UID:        plan.UID,
+	})
+	pvMigAnalytics.Spec.MigPlanRef = &kapi.ObjectReference{Namespace: plan.Namespace, Name: plan.Name}
+	err = r.Create(context.TODO(), pvMigAnalytics)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	if err != nil {
+		return nil, err
+	}
+	for _, migAnalytic := range migAnalytics.Items {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity == true {
+			if migAnalytic.Status.IsReady() {
+				return &migAnalytic, nil
+			}
+			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > migAnalyticsTimeout {
+				plan.Status.SetCondition(migapi.Condition{
+					Type:     IntelligentPVResizingDisabled,
+					Status:   True,
+					Category: Warn,
+					Message:  "MigAnalytics did not complete on time, going ahead with the migration without offering pvc resize function",
+				})
+			}
+		}
+
+	}
+	return nil, nil
 }
