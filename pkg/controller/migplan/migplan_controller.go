@@ -49,7 +49,7 @@ const (
 )
 
 // define maximum waiting time for mig analytic to be ready
-var timeLimit = 3 * time.Minute
+var migAnalyticsTimeout = 3 * time.Minute
 
 var log = logging.WithName("plan")
 
@@ -536,7 +536,7 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 			if migAnalytic.Status.IsReady() {
 				return &migAnalytic, nil
 			}
-			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > timeLimit {
+			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > migAnalyticsTimeout {
 				plan.Status.SetCondition(migapi.Condition{
 					Type:     IntelligentPVResizingDisabled,
 					Status:   True,
