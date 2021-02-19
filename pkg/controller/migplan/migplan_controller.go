@@ -562,7 +562,7 @@ func (r ReconcileMigPlan) processExtendedPVCapacity(plan *migapi.MigPlan, analyt
 				for _, analyticNSVol := range analyticNS.PersistentVolumes {
 					if planVol.PVC.Name == analyticNSVol.Name {
 
-						// If old proposed capacity is smaller than new one, set confirmed to False
+						// If plan volume capacity is less than analytic volume's proposed capacity, set confirmed to False
 						if planVol.Capacity.Cmp(analyticNSVol.ProposedCapacity) < 0 {
 							planVol.Confirmed = false
 						}
@@ -606,9 +606,9 @@ func (r ReconcileMigPlan) validatePVSizeConfirmation(plan *migapi.MigPlan, migAn
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     UnConfirmedPV,
 			Status:   True,
-			Category: Critical,
+			Category: migapi.Warn,
 			Reason:   UnConfirmedPV,
-			Message:  fmt.Sprintf("Adjusted capacity is not confirmed for PVs [%s]", strings.Join(unconfirmedVols, ",")),
+			Message:  fmt.Sprintf("Migrating data of following volumes may result in failure either due to mismatch in their apparent and actual capacities or disk usage being close to 100 %% :  [%s]", strings.Join(unconfirmedVols, ",")),
 			Durable:  true,
 		})
 	} else {
