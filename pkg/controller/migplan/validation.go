@@ -501,9 +501,9 @@ func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     ClusterVersionMismatch,
 			Status:   True,
-			Category: Critical,
+			Category: Warn,
 			Reason:   Conflict,
-			Message:  fmt.Sprintf("Cluster operator versions do not match. Source and destination clusters must have the same operator version."),
+			Message:  fmt.Sprintf("Cluster operator versions do not match. Source and destination clusters must have the same MTC operator version."),
 		})
 		return nil
 	}
