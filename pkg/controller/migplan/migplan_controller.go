@@ -53,7 +53,7 @@ const (
 )
 
 // define maximum waiting time for mig analytic to be ready
-var migAnalyticsTimeout = 3 * time.Minute
+var migAnalyticsTimeout = 2 * time.Minute
 
 var log = logging.WithName("plan")
 
@@ -287,13 +287,11 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
-
 		if migAnalytic != nil {
 			// Process PV Capacity and generate conditions
 			r.processProposedPVCapacities(plan, migAnalytic)
 		}
-
-		if migAnalytic == nil && !plan.Status.HasCondition(PVResizingDisabled) {
+		if migAnalytic == nil && !plan.Status.HasCondition(PvUsageAnalysisFailed) {
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -485,7 +483,7 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 	return nil
 }
 
-func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
@@ -525,7 +523,7 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+func (r *ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
@@ -537,24 +535,26 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
 				return migAnalytic, nil
 			}
-			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > migAnalyticsTimeout {
-				plan.Status.SetCondition(migapi.Condition{
-					Type:     PVResizingDisabled,
-					Status:   True,
-					Category: Warn,
-					Reason:   NotDone,
-					Message:  "Failed to gather reliable PV usage data from the source cluster, PV resizing will be disabled.",
-				})
-				plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(miganalytic.ExtendedPVAnalysisStarted)
+			if pvAnalysisStartedCondition != nil {
+				if time.Now().Sub(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
+					plan.Status.SetCondition(migapi.Condition{
+						Type:     PvUsageAnalysisFailed,
+						Status:   True,
+						Category: Warn,
+						Reason:   NotDone,
+						Message:  "Failed to gather reliable PV usage data from the source cluster, PV resizing will be disabled.",
+					})
+					plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+				}
 			}
 		}
-
 	}
 	return nil, nil
 }
 
 // processProposedPVCapacities reads miganalytic status to find proposed capacities of volumes
-func (r ReconcileMigPlan) processProposedPVCapacities(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+func (r *ReconcileMigPlan) processProposedPVCapacities(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
 	pvResizingRequiredVolumes := []string{}
 	plan.Spec.PersistentVolumes.BeginPvStaging()
 	for i := range plan.Spec.PersistentVolumes.List {
@@ -594,10 +594,8 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 				migAnalytic.Namespace, migAnalytic.Name),
 		})
 	}
-
-	// remove pv disabled conditions as we are here processing pvs
-	plan.Status.DeleteCondition(PVResizingDisabled)
-
+	// remove pv analysis related conditions as we are here processing pvs
+	plan.Status.DeleteCondition(PvUsageAnalysisFailed)
 	if len(pvResizingRequiredVolumes) > 0 {
 		if !Settings.DvmOpts.EnablePVResizing || plan.Spec.IndirectVolumeMigration {
 			plan.Status.SetCondition(migapi.Condition{

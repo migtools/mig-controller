@@ -276,6 +276,13 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		}
 
 		if analytic.Spec.AnalyzeExtendedPVCapacity {
+			analytic.Status.SetCondition(migapi.Condition{
+				Type:     ExtendedPVAnalysisStarted,
+				Category: migapi.Advisory,
+				Status:   True,
+				Message:  "Started collecting detailed PV information",
+				Durable:  true,
+			})
 			namespacedNodeToPVMap, err := r.getNodeToPVCMapForNS(&ns, client)
 			for node, pvcs := range namespacedNodeToPVMap {
 				if _, exists := nodeToPVMap[node]; !exists {
@@ -309,6 +316,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		analytic.Status.DeleteCondition(ExtendedPVAnalysisStarted)
 		err = r.Update(context.TODO(), analytic)
 		if err != nil {
 			return liberr.Wrap(err)

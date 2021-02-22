@@ -56,7 +56,7 @@ const (
 	PvWarnAccessModeUnavailable                = "PvWarnAccessModeUnavailable"
 	PvInvalidCopyMethod                        = "PvInvalidCopyMethod"
 	PvCapacityAdjustmentRequired               = "PvCapacityAdjustmentRequired"
-	PVResizingDisabled                         = "PVResizingDisabled"
+	PvUsageAnalysisFailed                      = "PvUsageAnalysisFailed"
 	PvNoCopyMethodSelection                    = "PvNoCopyMethodSelection"
 	PvWarnCopyMethodSnapshot                   = "PvWarnCopyMethodSnapshot"
 	NfsNotAccessible                           = "NfsNotAccessible"

@@ -45,7 +45,8 @@ type PersistentVolumeAdjuster struct {
 
 // VolumeAdjuster conditions
 const (
-	ExtendedPVAnalysisFailed = "ExtendedPVAnalysisFailed"
+	ExtendedPVAnalysisFailed  = "ExtendedPVAnalysisFailed"
+	ExtendedPVAnalysisStarted = "ExtendedPVAnalysisStarted"
 )
 
 // VolumeAdjuster reasons
