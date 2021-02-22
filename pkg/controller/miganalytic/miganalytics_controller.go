@@ -330,7 +330,7 @@ func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(sourceClient compat.Cli
 	}
 	err := volumeAdjuster.Run(nodeToPVMap)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	return nil
 }
