@@ -675,7 +675,7 @@ func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	newOperatorVersion, _, _, err := m.GetOperatorVersion(clusterClient)
+	newOperatorVersion, err := m.GetOperatorVersion(clusterClient)
 	if err != nil {
 		return err
 	}
