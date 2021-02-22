@@ -2,7 +2,9 @@ package directvolumemigration
 
 import (
 	"context"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +51,7 @@ func (t *Task) createDestinationPVCs() error {
 
 		// Adjusting destination PVC storage size request
 		// max(requested capacity on source, capacity reported in migplan, proposed capacity in migplan)
-		if matchingMigPlanPV != nil {
+		if matchingMigPlanPV != nil && settings.Settings.DvmOpts.EnablePVResizing {
 			maxCapacity := pvcRequestedCapacity
 			// update maxCapacity if matching PV's capacity is greater than current maxCapacity
 			if matchingMigPlanPV.Capacity.Cmp(maxCapacity) > 0 {

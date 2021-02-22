@@ -495,7 +495,7 @@ func (r ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	}
 	for _, migAnalytic := range migAnalytics.Items {
 		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
-			if plan.Spec.Refresh || !plan.HasReconciled() {
+			if !migAnalytic.Spec.Refresh && (plan.Spec.Refresh || !plan.HasReconciled()) {
 				migAnalytic.Spec.Refresh = true
 				err := r.Update(context.TODO(), &migAnalytic)
 				if err != nil {
@@ -531,10 +531,11 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	for _, migAnalytic := range migAnalytics.Items {
+	for i := range migAnalytics.Items {
+		migAnalytic := &migAnalytics.Items[i]
 		if migAnalytic.Spec.AnalyzeExtendedPVCapacity == true {
-			if migAnalytic.Status.IsReady() {
-				return &migAnalytic, nil
+			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
+				return migAnalytic, nil
 			}
 			if time.Now().Sub(migAnalytic.CreationTimestamp.Time) > migAnalyticsTimeout {
 				plan.Status.SetCondition(migapi.Condition{
@@ -544,6 +545,7 @@ func (r ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migap
 					Reason:   NotDone,
 					Message:  "Failed to gather reliable PV usage data from the source cluster, PV resizing will be disabled.",
 				})
+				plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
 			}
 		}
 
@@ -569,11 +571,11 @@ func (r ReconcileMigPlan) processProposedPVCapacities(plan *migapi.MigPlan, anal
 							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.Name)
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
-						plan.Spec.AddPv(*planVol)
 					}
 				}
 			}
 		}
+		plan.Spec.AddPv(*planVol)
 	}
 	plan.Spec.PersistentVolumes.EndPvStaging()
 	r.generatePVResizeConditions(pvResizingRequiredVolumes, plan, analytic)
@@ -592,6 +594,9 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 				migAnalytic.Namespace, migAnalytic.Name),
 		})
 	}
+
+	// remove pv disabled conditions as we are here processing pvs
+	plan.Status.DeleteCondition(PVResizingDisabled)
 
 	if len(pvResizingRequiredVolumes) > 0 {
 		if !Settings.DvmOpts.EnablePVResizing || plan.Spec.IndirectVolumeMigration {
