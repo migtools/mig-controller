@@ -18,16 +18,17 @@ package migplan
 
 import (
 	"context"
+	"reflect"
+	"testing"
+	"time"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -296,6 +297,7 @@ var expected2 = migapi.MigAnalytic{
 }
 
 func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
+	migPlan3.MarkReconciled()
 	type fields struct {
 		Client        client.Client
 		EventRecorder record.EventRecorder
@@ -335,7 +337,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 			want:    expected1,
 		},
 		{
-			name: "If migAnalytics exists with AnalyzeExtendedPVCapacity field, and migplan.refresh is not set or set to false, do nothing",
+			name: "If migAnalytics exists with AnalyzeExtendedPVCapacity field, and migplan.refresh is not set and migplan is reconciled, do nothing",
 			fields: fields{
 				Client: fake.NewFakeClient(migPlan3, migAnalytic3),
 			},
@@ -408,7 +410,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 			args: args{
 				plan: migPlan,
 			},
-			wantErr: true,
+			wantErr: false,
 			want:    nil,
 		},
 		{
@@ -419,7 +421,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 			args: args{
 				plan: migPlan3,
 			},
-			wantErr: true,
+			wantErr: false,
 			want:    nil,
 		},
 		{
