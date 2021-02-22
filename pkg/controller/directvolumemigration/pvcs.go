@@ -39,8 +39,8 @@ func (t *Task) createDestinationPVCs() error {
 		}
 
 		plan := t.PlanResources.MigPlan
-		matchingPV := t.findMatchingPV(plan, pvc.Name, pvc.Namespace)
-		srcPVCRequest := srcPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+		matchingMigPlanPV := t.findMatchingPV(plan, pvc.Name, pvc.Namespace)
+		pvcRequestedCapacity := srcPVC.Spec.Resources.Requests[corev1.ResourceStorage]
 
 		newSpec := srcPVC.Spec
 		newSpec.StorageClassName = &pvc.TargetStorageClass
@@ -48,16 +48,19 @@ func (t *Task) createDestinationPVCs() error {
 		newSpec.VolumeName = ""
 
 		// Adjusting destination PVC storage size request
-		if matchingPV != nil {
-			// update src PVC capacity if matching PV's capacity is the maximum
-			if matchingPV.Capacity.Cmp(srcPVCRequest) > 0 && matchingPV.Capacity.Cmp(matchingPV.ProposedCapacity) > 0 {
-				newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.Capacity
+		// max(requested capacity on source, capacity reported in migplan, proposed capacity in migplan)
+		if matchingMigPlanPV != nil {
+			maxCapacity := pvcRequestedCapacity
+			// update maxCapacity if matching PV's capacity is greater than current maxCapacity
+			if matchingMigPlanPV.Capacity.Cmp(maxCapacity) > 0 {
+				maxCapacity = matchingMigPlanPV.Capacity
 			}
 
-			// update src PVC capacity if matching PV's proposed capacity is the maximum
-			if matchingPV.ProposedCapacity.Cmp(srcPVCRequest) > 0 && matchingPV.ProposedCapacity.Cmp(matchingPV.Capacity) > 0 {
-				newSpec.Resources.Requests[corev1.ResourceStorage] = matchingPV.ProposedCapacity
+			// update maxcapacity if matching PV's proposed capacity is greater than current maxCapacity
+			if matchingMigPlanPV.ProposedCapacity.Cmp(maxCapacity) > 0 {
+				maxCapacity = matchingMigPlanPV.ProposedCapacity
 			}
+			newSpec.Resources.Requests[corev1.ResourceStorage] = maxCapacity
 		}
 
 		//Add src labels and rollback labels
