@@ -221,20 +221,18 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 }
 
 // GetOperatorVersion retrieves the operator version from the respective controllers ConfigMap
-func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, string, string, error) {
+func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
 	clusterConfig, err := m.GetClusterConfigMap(c)
 	if err != nil {
-		return "", "", "", liberr.Wrap(err)
+		return "", liberr.Wrap(err)
 	}
-	configMapNamespace := clusterConfig.Namespace
-	configMapName := clusterConfig.Name
 
 	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
 	if !ok {
-		return "", configMapNamespace, configMapName, liberr.Wrap(err)
+		return "", liberr.Wrap(err)
 	}
 
-	return operatorVersion, configMapNamespace, configMapName, nil
+	return operatorVersion, nil
 }
 
 // Test the connection settings by building a client.
