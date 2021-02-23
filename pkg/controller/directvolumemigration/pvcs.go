@@ -2,6 +2,9 @@ package directvolumemigration
 
 import (
 	"context"
+
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,10 +40,30 @@ func (t *Task) createDestinationPVCs() error {
 			return err
 		}
 
+		plan := t.PlanResources.MigPlan
+		matchingMigPlanPV := t.findMatchingPV(plan, pvc.Name, pvc.Namespace)
+		pvcRequestedCapacity := srcPVC.Spec.Resources.Requests[corev1.ResourceStorage]
+
 		newSpec := srcPVC.Spec
 		newSpec.StorageClassName = &pvc.TargetStorageClass
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
+
+		// Adjusting destination PVC storage size request
+		// max(requested capacity on source, capacity reported in migplan, proposed capacity in migplan)
+		if matchingMigPlanPV != nil && settings.Settings.DvmOpts.EnablePVResizing {
+			maxCapacity := pvcRequestedCapacity
+			// update maxCapacity if matching PV's capacity is greater than current maxCapacity
+			if matchingMigPlanPV.Capacity.Cmp(maxCapacity) > 0 {
+				maxCapacity = matchingMigPlanPV.Capacity
+			}
+
+			// update maxcapacity if matching PV's proposed capacity is greater than current maxCapacity
+			if matchingMigPlanPV.ProposedCapacity.Cmp(maxCapacity) > 0 {
+				maxCapacity = matchingMigPlanPV.ProposedCapacity
+			}
+			newSpec.Resources.Requests[corev1.ResourceStorage] = maxCapacity
+		}
 
 		//Add src labels and rollback labels
 		pvcLabels := srcPVC.Labels
@@ -74,5 +97,15 @@ func (t *Task) createDestinationPVCs() error {
 
 func (t *Task) getDestinationPVCs() error {
 	// Ensure PVCs are bound and not in pending state
+	return nil
+}
+
+func (t *Task) findMatchingPV(plan *migapi.MigPlan, pvcName string, pvcNamespace string) *migapi.PV {
+	for i := range plan.Spec.PersistentVolumes.List {
+		planVol := &plan.Spec.PersistentVolumes.List[i]
+		if planVol.PVC.Name == pvcName && planVol.PVC.Namespace == pvcNamespace {
+			return planVol
+		}
+	}
 	return nil
 }

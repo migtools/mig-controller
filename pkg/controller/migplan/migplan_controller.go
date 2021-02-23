@@ -18,14 +18,18 @@ package migplan
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	miganalytic "github.com/konveyor/mig-controller/pkg/controller/miganalytic"
 	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -42,6 +46,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+const (
+	MigPlan   = "migplan"
+	CreatedBy = "CreatedBy"
+)
+
+// define maximum waiting time for mig analytic to be ready
+var migAnalyticsTimeout = 2 * time.Minute
 
 var log = logging.WithName("plan")
 
@@ -216,6 +228,15 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// If intelligent pv resizing is enabled, Check if migAnalytics exists
+	if Settings.EnableIntelligentPVResize {
+		err = r.ensureMigAnalytics(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+	}
+
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
@@ -257,6 +278,22 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
+	if Settings.EnableIntelligentPVResize {
+		migAnalytic, err := r.checkIfMigAnalyticsReady(plan)
+		if err != nil {
+			log.Trace(err)
+			return reconcile.Result{Requeue: true}, nil
+		}
+		if migAnalytic != nil {
+			// Process PV Capacity and generate conditions
+			r.processProposedPVCapacities(plan, migAnalytic)
+		}
+		if migAnalytic == nil && !plan.Status.HasCondition(PvUsageAnalysisFailed) {
+			return reconcile.Result{Requeue: true}, nil
+		}
 	}
 
 	// Ready
@@ -444,4 +481,146 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 		}
 	}
 	return nil
+}
+
+func (r *ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+	}
+	for _, migAnalytic := range migAnalytics.Items {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
+			if !migAnalytic.Spec.Refresh && (plan.Spec.Refresh || !plan.HasReconciled()) {
+				migAnalytic.Spec.Refresh = true
+				err := r.Update(context.TODO(), &migAnalytic)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+			return nil
+		}
+	}
+	pvMigAnalytics := &migapi.MigAnalytic{}
+	pvMigAnalytics.GenerateName = plan.Name + "-"
+	pvMigAnalytics.Namespace = plan.Namespace
+	pvMigAnalytics.Spec.AnalyzeExtendedPVCapacity = true
+	pvMigAnalytics.Annotations = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
+	pvMigAnalytics.Labels = map[string]string{MigPlan: plan.Name, CreatedBy: plan.Name}
+	pvMigAnalytics.OwnerReferences = append(pvMigAnalytics.OwnerReferences, metav1.OwnerReference{
+		APIVersion: plan.APIVersion,
+		Kind:       plan.Kind,
+		Name:       plan.Name,
+		UID:        plan.UID,
+	})
+	pvMigAnalytics.Spec.MigPlanRef = &kapi.ObjectReference{Namespace: plan.Namespace, Name: plan.Name}
+	err = r.Create(context.TODO(), pvMigAnalytics)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+	migAnalytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	for i := range migAnalytics.Items {
+		migAnalytic := &migAnalytics.Items[i]
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity == true {
+			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
+				return migAnalytic, nil
+			}
+			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(miganalytic.ExtendedPVAnalysisStarted)
+			if pvAnalysisStartedCondition != nil {
+				if time.Now().Sub(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
+					plan.Status.SetCondition(migapi.Condition{
+						Type:     PvUsageAnalysisFailed,
+						Status:   True,
+						Category: Warn,
+						Reason:   NotDone,
+						Message:  "Failed to gather reliable PV usage data from the source cluster, PV resizing will be disabled.",
+					})
+					plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+// processProposedPVCapacities reads miganalytic status to find proposed capacities of volumes
+func (r *ReconcileMigPlan) processProposedPVCapacities(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+	pvResizingRequiredVolumes := []string{}
+	plan.Spec.PersistentVolumes.BeginPvStaging()
+	for i := range plan.Spec.PersistentVolumes.List {
+		planVol := &plan.Spec.PersistentVolumes.List[i]
+		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
+			if planVol.PVC.Namespace == analyticNS.Namespace {
+				for _, analyticNSVol := range analyticNS.PersistentVolumes {
+					if planVol.PVC.Name == analyticNSVol.Name {
+						// If new proposed capacity is greater than previous proposed capacity, set confirmed to False
+						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
+							planVol.CapacityConfirmed = false
+						}
+						if analyticNSVol.Comment != miganalytic.VolumeAdjustmentNoOp {
+							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.Name)
+						}
+						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+					}
+				}
+			}
+		}
+		plan.Spec.AddPv(*planVol)
+	}
+	plan.Spec.PersistentVolumes.EndPvStaging()
+	r.generatePVResizeConditions(pvResizingRequiredVolumes, plan, analytic)
+}
+
+// generatePVResizeConditions generates conditions for PV resizing
+func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes []string, plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
+	if migAnalytic.Status.HasCondition(miganalytic.ExtendedPVAnalysisFailed) {
+		plan.Status.SetCondition(migapi.Condition{
+			Category: Warn,
+			Status:   True,
+			Type:     miganalytic.ExtendedPVAnalysisFailed,
+			Reason:   miganalytic.FailedRunningDf,
+			Message: fmt.Sprintf(
+				"Failed gathering extended PV usage information for some or all PVs, please see MigAnalytic %s/%s for details",
+				migAnalytic.Namespace, migAnalytic.Name),
+		})
+	}
+	// remove pv analysis related conditions as we are here processing pvs
+	plan.Status.DeleteCondition(PvUsageAnalysisFailed)
+	if len(pvResizingRequiredVolumes) > 0 {
+		if !Settings.DvmOpts.EnablePVResizing || plan.Spec.IndirectVolumeMigration {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     PvCapacityAdjustmentRequired,
+				Status:   True,
+				Category: Warn,
+				Reason:   NotDone,
+				Message: fmt.Sprintf(
+					"Migrating data of following volumes may result in a failure either due to mismatch in their requested and actual capacities or disk usage being close to 100%% :  [%s]",
+					strings.Join(pvResizingRequiredVolumes, ",")),
+				Durable: true,
+			})
+		} else {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     PvCapacityAdjustmentRequired,
+				Status:   False,
+				Category: Warn,
+				Reason:   Done,
+				Message: fmt.Sprintf(
+					"Capacity of the following volumes will be automatically adjusted to avoid disk capacity issues in the target cluster  :  [%s]",
+					strings.Join(pvResizingRequiredVolumes, ",")),
+				Durable: true,
+			})
+		}
+	} else {
+		plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+	}
 }

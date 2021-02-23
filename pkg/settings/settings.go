@@ -33,7 +33,7 @@ var Settings = _Settings{}
 type _Settings struct {
 	Discovery
 	Plan
-	RsyncOpts
+	DvmOpts
 	Roles     map[string]bool
 	ProxyVars map[string]string
 }
@@ -48,7 +48,7 @@ func (r *_Settings) Load() error {
 	if err != nil {
 		return err
 	}
-	err = r.RsyncOpts.Load()
+	err = r.DvmOpts.Load()
 	if err != nil {
 		return err
 	}

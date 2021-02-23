@@ -55,6 +55,8 @@ const (
 	PvWarnNoCephAvailable                      = "PvWarnNoCephAvailable"
 	PvWarnAccessModeUnavailable                = "PvWarnAccessModeUnavailable"
 	PvInvalidCopyMethod                        = "PvInvalidCopyMethod"
+	PvCapacityAdjustmentRequired               = "PvCapacityAdjustmentRequired"
+	PvUsageAnalysisFailed                      = "PvUsageAnalysisFailed"
 	PvNoCopyMethodSelection                    = "PvNoCopyMethodSelection"
 	PvWarnCopyMethodSnapshot                   = "PvWarnCopyMethodSnapshot"
 	NfsNotAccessible                           = "NfsNotAccessible"

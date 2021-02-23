@@ -24,7 +24,6 @@ import (
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/compat"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,32 +86,6 @@ func TestReconcile(t *testing.T) {
 	// // Manually delete Deployment since GC isn't enabled in the test control plane
 	// g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
 
-}
-
-func TestReconcileMigAnalytic_analyzeExtendedPVCapacity(t *testing.T) {
-	type fields struct {
-		Client client.Client
-	}
-	type args struct {
-		client compat.Client
-		ns     *migapi.MigAnalyticNamespace
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
-	}{}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &ReconcileMigAnalytic{
-				Client: tt.fields.Client,
-			}
-			if err := r.analyzeExtendedPVCapacity(tt.args.client, tt.args.ns); (err != nil) != tt.wantErr {
-				t.Errorf("ReconcileMigAnalytic.analyzeExtendedPVCapacity() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
 }
 
 var testSourceNamespace = corev1.Namespace{

@@ -72,7 +72,7 @@ func (r ReconcileMigAnalytic) validatePlan(analytic *migapi.MigAnalytic) error {
 	}
 
 	//NotReady
-	if !plan.Status.IsReady() {
+	if !plan.Status.IsReady() && !analytic.Spec.AnalyzeExtendedPVCapacity {
 		analytic.Status.SetCondition(migapi.Condition{
 			Type:     Postponed,
 			Status:   True,
