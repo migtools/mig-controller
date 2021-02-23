@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Rsync options
+// DVM options
 const (
 	RsyncOptBwLimit   = "RSYNC_OPT_BWLIMIT"
 	RsyncOptPartial   = "RSYNC_OPT_PARTIAL"
@@ -14,6 +14,7 @@ const (
 	RsyncOptHardLinks = "RSYNC_OPT_HARDLINKS"
 	RsyncOptInfo      = "RSYNC_OPT_INFO"
 	RsyncOptExtras    = "RSYNC_OPT_EXTRAS"
+	EnablePVResizing  = "ENABLE_DVM_PV_RESIZING"
 )
 
 // RsyncOpts Rsync Options
@@ -31,6 +32,12 @@ type RsyncOpts struct {
 	HardLinks bool
 	Info      string
 	Extras    []string
+}
+
+// DvmOpts DVM settings
+type DvmOpts struct {
+	RsyncOpts
+	EnablePVResizing bool
 }
 
 // Load load rsync options
@@ -53,4 +60,15 @@ func (r *RsyncOpts) Load() error {
 		r.Extras = strings.Fields(rsyncExtraOpts)
 	}
 	return err
+}
+
+// Load loads DVM options
+func (r *DvmOpts) Load() error {
+	var err error
+	r.EnablePVResizing = getEnvBool(EnablePVResizing, false)
+	err = r.RsyncOpts.Load()
+	if err != nil {
+		return err
+	}
+	return nil
 }

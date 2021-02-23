@@ -55,6 +55,8 @@ const (
 	PvWarnNoCephAvailable                      = "PvWarnNoCephAvailable"
 	PvWarnAccessModeUnavailable                = "PvWarnAccessModeUnavailable"
 	PvInvalidCopyMethod                        = "PvInvalidCopyMethod"
+	PvCapacityAdjustmentRequired               = "PvCapacityAdjustmentRequired"
+	PvUsageAnalysisFailed                      = "PvUsageAnalysisFailed"
 	PvNoCopyMethodSelection                    = "PvNoCopyMethodSelection"
 	PvWarnCopyMethodSnapshot                   = "PvWarnCopyMethodSnapshot"
 	NfsNotAccessible                           = "NfsNotAccessible"
@@ -73,7 +75,6 @@ const (
 	InvalidHookSAName                          = "InvalidHookSAName"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
-	UnConfirmedPV                              = "UnConfirmedPV"
 )
 
 // Categories
@@ -86,17 +87,16 @@ const (
 
 // Reasons
 const (
-	NotSet                        = "NotSet"
-	NotFound                      = "NotFound"
-	KeyNotFound                   = "KeyNotFound"
-	NotDistinct                   = "NotDistinct"
-	LimitExceeded                 = "LimitExceeded"
-	LengthExceeded                = "LengthExceeded"
-	NotDone                       = "NotDone"
-	Done                          = "Done"
-	Conflict                      = "Conflict"
-	NotHealthy                    = "NotHealthy"
-	IntelligentPVResizingDisabled = "IntelligentPVResizingDisabled"
+	NotSet         = "NotSet"
+	NotFound       = "NotFound"
+	KeyNotFound    = "KeyNotFound"
+	NotDistinct    = "NotDistinct"
+	LimitExceeded  = "LimitExceeded"
+	LengthExceeded = "LengthExceeded"
+	NotDone        = "NotDone"
+	Done           = "Done"
+	Conflict       = "Conflict"
+	NotHealthy     = "NotHealthy"
 )
 
 // Statuses
