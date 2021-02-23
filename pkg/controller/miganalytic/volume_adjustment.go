@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,7 +45,8 @@ type PersistentVolumeAdjuster struct {
 
 // VolumeAdjuster conditions
 const (
-	ExtendedPVAnalysisFailed = "ExtendedPVAnalysisFailed"
+	ExtendedPVAnalysisFailed  = "ExtendedPVAnalysisFailed"
+	ExtendedPVAnalysisStarted = "ExtendedPVAnalysisStarted"
 )
 
 // VolumeAdjuster reasons
@@ -151,6 +153,8 @@ func (cmd *DFCommand) GetDFOutputForPV(volName string, podUID types.UID) (pv DFO
 			return
 		}
 	}
+	// didn't find the PV in stdout or stderr
+	pv.IsError = true
 	return
 }
 
@@ -227,7 +231,7 @@ func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migap
 func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
 	pvDfOutputs, err := pva.DFExecutor.Execute(pvNodeMap)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	erroredPVs := []*DFOutput{}
 	for i, pvDfOutput := range pvDfOutputs {

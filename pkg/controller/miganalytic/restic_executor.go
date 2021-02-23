@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/pods"
 	corev1 "k8s.io/api/core/v1"
@@ -63,8 +64,8 @@ func (r *ResticDFCommandExecutor) DF(podRef *corev1.Pod, persistentVolumes []Mig
 	}
 	err := podCommand.Run()
 	if err != nil {
-		log.Info(
-			fmt.Sprintf("df command inside pod %s returned non-zero error code", podRef.Name))
+		log.Error(err,
+			fmt.Sprintf("Failed running df command inside pod %s", podRef.Name))
 	}
 	dfCmd.StdErr = podCommand.Err.String()
 	dfCmd.StdOut = podCommand.Out.String()
@@ -90,7 +91,7 @@ func (r *ResticDFCommandExecutor) loadResticPodReferences() error {
 			ResticPodLabelKey: ResticPodLabelValue})
 	err := r.Client.List(context.TODO(), labelSelector, &resticPodList)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	for i := range resticPodList.Items {
 		if resticPodList.Items[i].Spec.NodeName != "" {
@@ -105,7 +106,7 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 	gatheredData := []DFOutput{}
 	err := r.loadResticPodReferences()
 	if err != nil {
-		return gatheredData, err
+		return gatheredData, liberr.Wrap(err)
 	}
 	// dfOutputs for n nodes
 	dfOutputs := make(map[string]DFCommand, len(pvcNodeMap))

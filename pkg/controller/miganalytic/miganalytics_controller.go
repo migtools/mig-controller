@@ -55,9 +55,10 @@ import (
 )
 
 const (
-	MiBSuffix       = "Mi"
-	MiB             = 1048576
-	RequeueInterval = 10
+	MiBSuffix               = "Mi"
+	MiB                     = 1048576
+	RequeueInterval         = 10
+	maxConcurrentReconciles = 2
 )
 
 var log = logging.WithName("analytics")
@@ -76,7 +77,10 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("miganalytic-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("miganalytic-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: maxConcurrentReconciles,
+	})
 	if err != nil {
 		log.Trace(err)
 		return err
@@ -276,6 +280,13 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		}
 
 		if analytic.Spec.AnalyzeExtendedPVCapacity {
+			analytic.Status.SetCondition(migapi.Condition{
+				Type:     ExtendedPVAnalysisStarted,
+				Category: migapi.Advisory,
+				Status:   True,
+				Message:  "Started collecting detailed PV information",
+				Durable:  true,
+			})
 			namespacedNodeToPVMap, err := r.getNodeToPVCMapForNS(&ns, client)
 			for node, pvcs := range namespacedNodeToPVMap {
 				if _, exists := nodeToPVMap[node]; !exists {
@@ -309,6 +320,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		analytic.Status.DeleteCondition(ExtendedPVAnalysisStarted)
 		err = r.Update(context.TODO(), analytic)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -330,7 +342,7 @@ func (r *ReconcileMigAnalytic) analyzeExtendedPVCapacity(sourceClient compat.Cli
 	}
 	err := volumeAdjuster.Run(nodeToPVMap)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 	return nil
 }

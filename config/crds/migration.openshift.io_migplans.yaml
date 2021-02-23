@@ -219,8 +219,16 @@ spec:
                     - type: string
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
+                  capacityConfirmed:
+                    type: boolean
                   name:
                     type: string
+                  proposedCapacity:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   pvc:
                     description: PVC
                     properties:
@@ -274,6 +282,7 @@ spec:
                     - copyMethods
                     type: object
                 required:
+                - capacityConfirmed
                 - selection
                 - supported
                 type: object
