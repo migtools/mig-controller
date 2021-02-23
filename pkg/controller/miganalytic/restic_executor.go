@@ -64,7 +64,7 @@ func (r *ResticDFCommandExecutor) DF(podRef *corev1.Pod, persistentVolumes []Mig
 	}
 	err := podCommand.Run()
 	if err != nil {
-		log.Info(
+		log.Error(err,
 			fmt.Sprintf("Failed running df command inside pod %s", podRef.Name))
 	}
 	dfCmd.StdErr = podCommand.Err.String()
