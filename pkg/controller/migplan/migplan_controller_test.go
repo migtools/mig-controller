@@ -443,13 +443,13 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 				EventRecorder: tt.fields.EventRecorder,
 				scheme:        tt.fields.scheme,
 			}
-			got, err := r.waitForMigAnalyticsReady(tt.args.plan)
+			got, err := r.checkIfMigAnalyticsReady(tt.args.plan)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("waitForMigAnalyticsReady() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("checkIfMigAnalyticsReady() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, tt.want)
+				t.Errorf("checkIfMigAnalyticsReady() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

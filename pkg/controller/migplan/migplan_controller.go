@@ -282,7 +282,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
 	if Settings.EnableIntelligentPVResize {
-		migAnalytic, err := r.waitForMigAnalyticsReady(plan)
+		migAnalytic, err := r.checkIfMigAnalyticsReady(plan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
@@ -523,7 +523,7 @@ func (r *ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r *ReconcileMigPlan) waitForMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
