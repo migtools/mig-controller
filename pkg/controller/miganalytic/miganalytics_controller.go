@@ -55,9 +55,10 @@ import (
 )
 
 const (
-	MiBSuffix       = "Mi"
-	MiB             = 1048576
-	RequeueInterval = 10
+	MiBSuffix               = "Mi"
+	MiB                     = 1048576
+	RequeueInterval         = 10
+	maxConcurrentReconciles = 2
 )
 
 var log = logging.WithName("analytics")
@@ -76,7 +77,10 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("miganalytic-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("miganalytic-controller", mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: maxConcurrentReconciles,
+	})
 	if err != nil {
 		log.Trace(err)
 		return err
