@@ -244,6 +244,7 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 		statusFieldUpdate := migapi.MigAnalyticPersistentVolumeClaim{
 			Name:              originalData.Name,
 			RequestedCapacity: originalData.RequestedCapacity,
+			Comment:           VolumeAdjustmentNoOp,
 		}
 		if pvDfOutput.IsError {
 			erroredPVs = append(erroredPVs, &pvDfOutputs[i])

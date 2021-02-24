@@ -597,7 +597,7 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 	// remove pv analysis related conditions as we are here processing pvs
 	plan.Status.DeleteCondition(PvUsageAnalysisFailed)
 	if len(pvResizingRequiredVolumes) > 0 {
-		if !Settings.DvmOpts.EnablePVResizing || plan.Spec.IndirectVolumeMigration {
+		if !Settings.DvmOpts.EnablePVResizing {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     PvCapacityAdjustmentRequired,
 				Status:   True,
