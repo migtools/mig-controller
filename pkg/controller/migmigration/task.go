@@ -1029,7 +1029,10 @@ func (t *Task) init() error {
 
 	t.Step = t.Itinerary.GetStepForPhase(t.Phase)
 
-	t.initPipeline()
+	err := t.initPipeline(t.Owner.Status.Itinerary)
+	if err != nil {
+		return err
+	}
 
 	if t.stage() && !t.Owner.Status.HasCondition(StageNoOp) {
 		hasImageStreams, err := t.hasImageStreams()
@@ -1052,12 +1055,32 @@ func (t *Task) init() error {
 
 }
 
-func (t *Task) initPipeline() {
-	for _, phase := range t.Itinerary.Phases {
-		t.Owner.Status.AddStep(&migapi.Step{
-			Name:    phase.Step,
-			Message: "Not started",
-		})
+func (t *Task) initPipeline(prevItinerary string) error {
+	if t.Itinerary.Name != prevItinerary {
+		for _, phase := range t.Itinerary.Phases {
+			currentStep := t.Owner.Status.FindStep(phase.Step)
+			if currentStep != nil {
+				continue
+			}
+			allFlags, err := t.allFlags(phase)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if !allFlags {
+				continue
+			}
+			anyFlags, err := t.anyFlags(phase)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if !anyFlags {
+				continue
+			}
+			t.Owner.Status.AddStep(&migapi.Step{
+				Name:    phase.Step,
+				Message: "Not started",
+			})
+		}
 	}
 	currentStep := t.Owner.Status.FindStep(t.Step)
 	if currentStep != nil {
@@ -1069,6 +1092,7 @@ func (t *Task) initPipeline() {
 			currentStep.Message = ""
 		}
 	}
+	return nil
 }
 
 func (t *Task) updatePipeline() {
