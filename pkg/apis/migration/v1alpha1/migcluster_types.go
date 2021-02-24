@@ -282,6 +282,19 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	return restConfig, nil
 }
 
+// Test whether OPERATOR_VERSION in configmap on MigCluster matches status.OperatorVersion
+func (m *MigCluster) OperatorVersionMatchesConfigmap(c k8sclient.Client) (bool, error) {
+	clusterClient, err := m.GetClient(c)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	operatorVersion, err := m.GetOperatorVersion(clusterClient)
+	if operatorVersion == m.Status.OperatorVersion {
+		return true, nil
+	}
+	return false, nil
+}
+
 // Delete resources on the cluster by label.
 func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]string) error {
 	client, err := m.GetClient(client)
@@ -671,13 +684,41 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 }
 
 func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
+	oldOperatorVersion := m.Status.OperatorVersion
 	clusterClient, err := m.GetClient(c)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	newOperatorVersion, err := m.GetOperatorVersion(clusterClient)
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
+	}
+
+	// When operator version changes, all other MigClusters will be updated
+	// NOTE: cleaner way to do this (that would support concurrent reconciles)
+	//       would be to write a watch with a predicate that would enqueue
+	//       reconciles when other MigClusters change versions. This is simpler
+	//       for now, but will break if MaxConcurrentReconciles is turned up,
+	//       since other clusters would start reconciling before our change
+	//       is written.
+	if oldOperatorVersion != newOperatorVersion {
+		clusterList, err := ListClusters(c)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		// Update all other MigClusters to propagate version checks
+		for _, cluster := range clusterList {
+			if cluster.UID == m.UID {
+				continue
+			}
+			if !cluster.Spec.Refresh {
+				cluster.Spec.Refresh = true
+				err := c.Update(context.Background(), &cluster)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+		}
 	}
 
 	if newOperatorVersion != "" {
