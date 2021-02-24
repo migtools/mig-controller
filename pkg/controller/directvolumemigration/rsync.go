@@ -1170,7 +1170,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
-
+	var pendingPods []string
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
@@ -1206,13 +1206,30 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
+			case dvmp.Status.PodPhase == corev1.PodPending:
+				t.Owner.Status.PendingPods = append(t.Owner.Status.PendingPods, &migapi.PodProgress{
+					ObjectReference:             objRef,
+					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
+					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+				})
+				pendingPods = append(pendingPods, fmt.Sprintf("%s/%s", objRef.Name, objRef.Namespace))
 			}
 		}
 	}
 
 	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
-
+	isAnyPending := len(t.Owner.Status.PendingPods) > 0
+	if isAnyPending {
+		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins",strings.Join(pendingPods[:], ", "))
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     RsyncClientPodsPending,
+			Status:   migapi.True,
+			Reason:   "PodStuckInContainerCreating",
+			Category: migapi.Warn,
+			Message:  pendingMessage,
+		})
+	}
 	return isCompleted, hasAnyFailed, nil
 }
 
