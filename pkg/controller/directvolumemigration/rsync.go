@@ -1254,6 +1254,28 @@ func hasAllRsyncClientPodsTimedOut(pvcMap map[string][]pvcMapElement, client k8s
 	return true, nil
 }
 
+func isAllRsyncClientPodsNoRouteToHost(pvcMap map[string][]pvcMapElement, client k8sclient.Client, dvmName string) (bool, error) {
+	for ns, vols := range pvcMap {
+		for _, vol := range vols {
+			dvmp := migapi.DirectVolumeMigrationProgress{}
+			err := client.Get(context.TODO(), types.NamespacedName{
+				Name:      getMD5Hash(dvmName + vol.Name + ns),
+				Namespace: migapi.OpenshiftMigrationNamespace,
+			}, &dvmp)
+			if err != nil {
+				return false, err
+			}
+
+			if dvmp.Status.PodPhase != corev1.PodFailed ||
+				(dvmp.Status.ContainerElapsedTime != nil &&
+					dvmp.Status.ContainerElapsedTime.Duration.Seconds() > float64(5)) || *dvmp.Status.ExitCode != int32(10) || !strings.Contains(dvmp.Status.LogMessage, "No route to host") {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
+}
+
 // Delete rsync resources
 func (t *Task) deleteRsyncResources() error {
 	// Get client for source + destination
