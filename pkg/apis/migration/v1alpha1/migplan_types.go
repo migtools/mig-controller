@@ -336,7 +336,7 @@ func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi
 
 // Get registry proxy secret for registry DC
 // Returns nil if secret isn't found or no configuration exists
-func (r *MigPlan) GetRegistryProxySecret(client k8sclient.Client) (*kapi.Secret, error) {
+func (r *MigPlan) GetProxySecret(client k8sclient.Client) (*kapi.Secret, error) {
 	list := kapi.SecretList{}
 	selector := k8sLabels.SelectorFromSet(map[string]string{
 		"migration-proxy-config": "true",

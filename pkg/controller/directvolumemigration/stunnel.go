@@ -16,6 +16,7 @@ import (
 	//"encoding/asn1"
 	"encoding/pem"
 	"math/big"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,11 +30,14 @@ import (
 )
 
 type stunnelConfig struct {
-	Name        string
-	Namespace   string
-	StunnelPort int32
-	RsyncRoute  string
-	RsyncPort   int32
+	Name          string
+	Namespace     string
+	StunnelPort   int32
+	RsyncRoute    string
+	RsyncPort     int32
+	ProxyHost     string
+	ProxyUsername string
+	ProxyPassword string
 }
 
 // TODO: Parameterize this more to support custom
@@ -54,9 +58,18 @@ data:
     accept = {{ .StunnelPort}}
     CAFile = /etc/stunnel/certs/ca.crt
     cert = /etc/stunnel/certs/tls.crt
+{{ if not (eq .ProxyHost "") }}
+    protocol = connect
+    connect = {{ .ProxyHost }}
+    protocolHost = {{ .RsyncRoute }}:443
+    protocolUsername = {{ .ProxyUsername }}
+    protocolPassword = {{ .ProxyPassword }}
+{{ else }}
     connect = {{ .RsyncRoute }}:443
+{{ end }}
     verify = 2
     key = /etc/stunnel/certs/tls.key
+    debug = 7
 `
 
 const stunnelDestinationConfigTemplate = `apiVersion: v1
@@ -70,11 +83,12 @@ data:
     pid =
     socket = l:TCP_NODELAY=1
     socket = r:TCP_NODELAY=1
-    sslVersion = TLSv1.2
     debug = 7
+    sslVersion = TLSv1.2
 
     [rsync]
     accept = {{ .StunnelPort }}
+    protocol = connect
     connect = {{ .RsyncPort }}
     key = /etc/stunnel/certs/tls.key
     cert = /etc/stunnel/certs/tls.crt
@@ -99,6 +113,56 @@ func (t *Task) createStunnelConfig() error {
 	if err != nil {
 		return err
 	}
+
+	// define proxy vars
+	srcProxyHost := ""
+	srcProxyUsername := ""
+	srcProxyPassword := ""
+	destProxyHost := ""
+	destProxyUsername := ""
+	destProxyPassword := ""
+	// Only read proxy info if running from migmigration
+	if t.PlanResources != nil {
+		// Get HTTPS proxy configuration setting for each cluster
+		plan := t.PlanResources.MigPlan
+		srcRegistrySecret, err := plan.GetProxySecret(srcClient)
+		if err != nil {
+			return err
+		}
+		destRegistrySecret, err := plan.GetProxySecret(destClient)
+		if err != nil {
+			return err
+		}
+		if srcRegistrySecret != nil {
+			srcHttpsProxy := string(srcRegistrySecret.Data["HTTPS_PROXY"])
+			proxyHostSplit := strings.Split(srcHttpsProxy, "@")
+			srcProxyPrefix := proxyHostSplit[0]
+			srcProxyHost = proxyHostSplit[1]
+			if strings.HasPrefix(srcProxyPrefix, "http://") {
+				srcProxyPrefix = srcProxyPrefix[7:]
+			} else if strings.HasPrefix(srcProxyPrefix, "https://") {
+				srcProxyPrefix = srcProxyPrefix[8:]
+			}
+			srcBasicAuth := strings.Split(srcProxyPrefix, ":")
+			srcProxyUsername = srcBasicAuth[0]
+			srcProxyPassword = srcBasicAuth[1]
+		}
+		if destRegistrySecret != nil {
+			destHttpsProxy := string(destRegistrySecret.Data["HTTPS_PROXY"])
+			proxyHostSplit := strings.Split(destHttpsProxy, "@")
+			destProxyPrefix := proxyHostSplit[0]
+			destProxyHost = proxyHostSplit[1]
+			if strings.HasPrefix(destProxyPrefix, "http://") {
+				destProxyPrefix = destProxyPrefix[7:]
+			} else if strings.HasPrefix(destProxyPrefix, "https://") {
+				destProxyPrefix = destProxyPrefix[8:]
+			}
+			destBasicAuth := strings.Split(destProxyPrefix, ":")
+			destProxyUsername = destBasicAuth[0]
+			destProxyPassword = destBasicAuth[1]
+		}
+	}
+
 	// openssl library? to generate new certs
 
 	// Create same stunnel configmap with certs on both source+destination
@@ -134,11 +198,25 @@ func (t *Task) createStunnelConfig() error {
 		if err != nil {
 			return err
 		}
-		stunnelConf := stunnelConfig{
-			Namespace:   ns,
-			StunnelPort: 2222,
-			RsyncPort:   22,
-			RsyncRoute:  rsyncRoute,
+		t.Log.Info("proxy info", "source host", srcProxyHost, "dest host", destProxyHost, "src user", srcProxyUsername, "src pw", srcProxyPassword)
+		srcStunnelConf := stunnelConfig{
+			Namespace:     ns,
+			StunnelPort:   2222,
+			RsyncPort:     22,
+			RsyncRoute:    rsyncRoute,
+			ProxyHost:     srcProxyHost,
+			ProxyUsername: srcProxyUsername,
+			ProxyPassword: srcProxyPassword,
+		}
+
+		destStunnelConf := stunnelConfig{
+			Namespace:     ns,
+			StunnelPort:   2222,
+			RsyncPort:     22,
+			RsyncRoute:    rsyncRoute,
+			ProxyHost:     destProxyHost,
+			ProxyUsername: destProxyUsername,
+			ProxyPassword: destProxyPassword,
 		}
 
 		// Generate templates
@@ -154,11 +232,11 @@ func (t *Task) createStunnelConfig() error {
 		}
 
 		// Execute templates
-		err = clientTemp.Execute(&clientTpl, stunnelConf)
+		err = clientTemp.Execute(&clientTpl, srcStunnelConf)
 		if err != nil {
 			return err
 		}
-		err = destTemp.Execute(&destTpl, stunnelConf)
+		err = destTemp.Execute(&destTpl, destStunnelConf)
 		if err != nil {
 			return err
 		}
