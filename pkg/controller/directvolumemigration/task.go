@@ -425,11 +425,11 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if completed {
-			isEgressNetworkSetup, err := hasAllRsyncClientPodsTimedOut(t.getPVCNamespaceMap(), t.Client, t.Owner.Name)
+			isStunnelTimeout, err := hasAllRsyncClientPodsTimedOut(t.getPVCNamespaceMap(), t.Client, t.Owner.Name)
 			if err != nil {
 				return err
 			}
-			if isEgressNetworkSetup {
+			if isStunnelTimeout {
 				t.Owner.Status.SetCondition(migapi.Condition{
 					Type:     migapi.ReconcileFailed,
 					Status:   True,
@@ -438,6 +438,24 @@ func (t *Task) Run() error {
 					Message: "All the rsync client pods on source are timing out at 20 seconds, " +
 						"please check your network configuration (like egressnetworkpolicy) that would block traffic from " +
 						"source namespace to destination",
+					Durable: true,
+				})
+				t.fail(MigrationFailed, []string{"all the source rsync pods have timed out, look at error condition for more details"})
+				t.Requeue = NoReQ
+				return nil
+			}
+			isNoRouteToHost, err := isAllRsyncClientPodsNoRouteToHost(t.getPVCNamespaceMap(), t.Client, t.Owner.Name)
+			if err != nil {
+				return err
+			}
+			if isNoRouteToHost {
+				t.Owner.Status.SetCondition(migapi.Condition{
+					Type:     migapi.ReconcileFailed,
+					Status:   True,
+					Reason:   SourceToDestinationNetworkError,
+					Category: migapi.Error,
+					Message: "All the rsync client pods on source failing because of \"no route to host\" error," +
+						"please check your network configuration",
 					Durable: true,
 				})
 				t.fail(MigrationFailed, []string{"all the source rsync pods have timed out, look at error condition for more details"})
