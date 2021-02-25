@@ -261,21 +261,29 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 
 // Determine the supported PV actions.
 func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim migapi.PVC) []string {
-	suportedActions := []string{}
+	supportedActions := []string{}
 	if !claim.HasReference {
-		suportedActions = append(suportedActions, migapi.PvSkipAction)
+		supportedActions = append(supportedActions, migapi.PvSkipAction)
 	}
 	if pv.Spec.HostPath != nil {
-		return suportedActions
+		return supportedActions
 	}
+	// TODO: Consider adding Cinder to this default list
 	if pv.Spec.NFS != nil ||
 		pv.Spec.Glusterfs != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
-		return append(suportedActions,
+		return append(supportedActions,
 			migapi.PvCopyAction,
 			migapi.PvMoveAction)
 	}
-	return append(suportedActions, migapi.PvCopyAction)
+	for _, sc := range Settings.Plan.MoveStorageClasses {
+		if pv.Spec.StorageClassName == sc {
+			return append(supportedActions,
+				migapi.PvCopyAction,
+				migapi.PvMoveAction)
+		}
+	}
+	return append(supportedActions, migapi.PvCopyAction)
 }
 
 // Determine the supported PV copy methods.

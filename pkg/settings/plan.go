@@ -17,6 +17,7 @@ const (
 	PVResource                = "persistentvolumes"
 	PVCResource               = "persistentvolumeclaims"
 	EnableIntelligentPVResize = "ENABLE_INTELLIGENT_PV_RESIZE"
+	PvMoveStorageClasses      = "PV_MOVE_STORAGECLASSES"
 )
 
 // Included resource defaults
@@ -40,6 +41,8 @@ var ExcludedInitialResources = mapset.NewSetFromSlice([]interface{}{
 })
 var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 
+var MoveStorageClasses = mapset.NewSetFromSlice([]interface{}{})
+
 // Plan settings.
 //   NsLimit: Maximum number of namespaces on a Plan.
 //   PodLimit: Maximum number of Pods across namespaces.
@@ -51,6 +54,7 @@ type Plan struct {
 	PvLimit                   int
 	EnableIntelligentPVResize bool
 	ExcludedResources         []string
+	MoveStorageClasses        []string
 }
 
 // Load settings.
@@ -72,6 +76,10 @@ func (r *Plan) Load() error {
 	excludedResources := os.Getenv(ExcludedResources)
 	if len(excludedResources) > 0 {
 		r.ExcludedResources = strings.Split(excludedResources, ",")
+	}
+	moveStorageClasses := os.Getenv(PvMoveStorageClasses)
+	if len(moveStorageClasses) > 0 {
+		r.MoveStorageClasses = strings.Split(moveStorageClasses, ",")
 	}
 
 	return nil
