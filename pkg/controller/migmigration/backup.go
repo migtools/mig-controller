@@ -493,7 +493,7 @@ func (t *Task) deleteStaleVeleroCRs() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	nRestoresDeleted, nInProgressRestoresDeleted, err := t.deleteStaleBackupsOnCluster(srcCluster)
+	nRestoresDeleted, nInProgressRestoresDeleted, err := t.deleteStaleRestoresOnCluster(srcCluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
