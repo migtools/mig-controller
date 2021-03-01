@@ -63,30 +63,30 @@ const (
 // MigClusterSpec defines the desired state of MigCluster
 type MigClusterSpec struct {
 	// Specifies if the cluster is host (where the controller is installed) or not. This is a required field.
-	IsHostCluster           bool                  `json:"isHostCluster"`
+	IsHostCluster bool `json:"isHostCluster"`
 
 	// Stores the url of the remote cluster. The field is only required for the source cluster object.
-	URL                     string                `json:"url,omitempty"`
+	URL string `json:"url,omitempty"`
 
 	ServiceAccountSecretRef *kapi.ObjectReference `json:"serviceAccountSecretRef,omitempty"`
 
 	// If the migcluster needs SSL verification for connections a user can supply a custom CA bundle. This field is required only when spec.Insecure is set false
-	CABundle                []byte                `json:"caBundle,omitempty"`
+	CABundle []byte `json:"caBundle,omitempty"`
 
 	// For azure clusters -- it's the resource group that in-cluster volumes use.
-	AzureResourceGroup      string                `json:"azureResourceGroup,omitempty"`
+	AzureResourceGroup string `json:"azureResourceGroup,omitempty"`
 
 	// If set false, user will need to provide CA bundle for TLS connection to the remote cluster.
-	Insecure                bool                  `json:"insecure,omitempty"`
+	Insecure bool `json:"insecure,omitempty"`
 
 	// An override setting to tell the controller that the source cluster restic needs to be restarted after stage pod creation.
-	RestartRestic           *bool                 `json:"restartRestic,omitempty"`
+	RestartRestic *bool `json:"restartRestic,omitempty"`
 
 	// If set True, forces the controller to run a full suite of validations on migcluster.
-	Refresh                 bool                  `json:"refresh,omitempty"`
+	Refresh bool `json:"refresh,omitempty"`
 
 	// Stores the path of registry route when using direct migration.
-	ExposedRegistryPath     string                `json:"exposedRegistryPath,omitempty"`
+	ExposedRegistryPath string `json:"exposedRegistryPath,omitempty"`
 }
 
 // MigClusterStatus defines the observed state of MigCluster

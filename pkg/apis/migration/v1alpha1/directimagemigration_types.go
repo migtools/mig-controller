@@ -33,7 +33,7 @@ type DirectImageMigrationSpec struct {
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
 	// Holds names of all namespaces to run DIM to get all the imagestreams in these namespaces.
-	Namespaces        []string              `json:"namespaces,omitempty"`
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // DirectImageMigrationStatus defines the observed state of DirectImageMigration

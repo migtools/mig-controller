@@ -36,19 +36,19 @@ const (
 // MigStorageSpec defines the desired state of MigStorage
 type MigStorageSpec struct {
 	// Holds the provider name whose object storage is used for backup storage location. This is a required field.
-	BackupStorageProvider  string `json:"backupStorageProvider"`
+	BackupStorageProvider string `json:"backupStorageProvider"`
 
 	// Defines config for creating and storing Backups. This is a required field.
-	BackupStorageConfig    `json:"backupStorageConfig"`
+	BackupStorageConfig `json:"backupStorageConfig"`
 
 	// Holds the provider name whose object storage is used for backup storage location.
 	VolumeSnapshotProvider string `json:"volumeSnapshotProvider,omitempty"`
 
 	// Defines config for taking Volume Snapshots.
-	VolumeSnapshotConfig   `json:"volumeSnapshotConfig,omitempty"`
+	VolumeSnapshotConfig `json:"volumeSnapshotConfig,omitempty"`
 
 	// Triggers a reconcile for the MigStorage CRD.
-	Refresh                bool `json:"refresh,omitempty"`
+	Refresh bool `json:"refresh,omitempty"`
 }
 
 // MigStorageStatus defines the observed state of MigStorage
