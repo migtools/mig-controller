@@ -43,6 +43,7 @@ const (
 	NsNotFoundOnDestinationCluster             = "NamespaceNotFoundOnDestinationCluster"
 	NsLimitExceeded                            = "NamespaceLimitExceeded"
 	NsLengthExceeded                           = "NamespaceLengthExceeded"
+	NsHaveNodeSelectors                        = "NamespacesHaveNodeSelectors"
 	PodLimitExceeded                           = "PodLimitExceeded"
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
@@ -87,16 +88,17 @@ const (
 
 // Reasons
 const (
-	NotSet         = "NotSet"
-	NotFound       = "NotFound"
-	KeyNotFound    = "KeyNotFound"
-	NotDistinct    = "NotDistinct"
-	LimitExceeded  = "LimitExceeded"
-	LengthExceeded = "LengthExceeded"
-	NotDone        = "NotDone"
-	Done           = "Done"
-	Conflict       = "Conflict"
-	NotHealthy     = "NotHealthy"
+	NotSet                = "NotSet"
+	NotFound              = "NotFound"
+	KeyNotFound           = "KeyNotFound"
+	NotDistinct           = "NotDistinct"
+	LimitExceeded         = "LimitExceeded"
+	LengthExceeded        = "LengthExceeded"
+	NotDone               = "NotDone"
+	Done                  = "Done"
+	Conflict              = "Conflict"
+	NotHealthy            = "NotHealthy"
+	NodeSelectorsDetected = "NodeSelectorsDetected"
 )
 
 // Statuses
@@ -134,8 +136,9 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 		return liberr.Wrap(err)
 	}
 
-	// Pod limit within each namespace.
-	err = r.validatePodLimit(plan)
+	// Validates pod properties (e.g. limit of number of active pods, presence of node-selectors)
+	// within each namespace.
+	err = r.validatePodProperties(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -158,8 +161,8 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 		return liberr.Wrap(err)
 	}
 
-	// Pods
-	err = r.validatePods(plan)
+	// Validate health of Pods
+	err = r.validatePodHealth(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -291,8 +294,11 @@ func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []
 	return items
 }
 
-// Validate the total number of running pods (limit) across namespaces.
-func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
+// Validates the following properties of pods across namespaces:
+// 1. Validate the total number of running pods (limit) across namespaces.
+// 2. Whether any pods have node-selectors or node names associated with it. If so, a warning is raised to indicate the
+// list of namespaces associated with that pod.
+func (r ReconcileMigPlan) validatePodProperties(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(Suspended, NsLimitExceeded) {
 		plan.Status.StageCondition(PodLimitExceeded)
 		return nil
@@ -310,6 +316,8 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 	}
 	count := 0
 	limit := Settings.Plan.PodLimit
+
+	nsWithNodeSelectors := make([]string, 0)
 	for _, name := range plan.GetSourceNamespaces() {
 		list := kapi.PodList{}
 		options := k8sclient.ListOptions{
@@ -324,6 +332,9 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 			return liberr.Wrap(err)
 		}
 		count += len(list.Items)
+		if r.hasNodeSelectors(list.Items) {
+			nsWithNodeSelectors = append(nsWithNodeSelectors, name)
+		}
 	}
 	if count > limit {
 		plan.Status.SetCondition(migapi.Condition{
@@ -335,7 +346,30 @@ func (r ReconcileMigPlan) validatePodLimit(plan *migapi.MigPlan) error {
 		})
 	}
 
+	if len(nsWithNodeSelectors) > 0 {
+		msgFormat := "Found Pods with `Spec.NodeSelector` or `Spec.NodeName` set in namespaces: [%s]. " +
+			"These fields will be cleared on Pods restored into the target cluster."
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsHaveNodeSelectors,
+			Status:   True,
+			Reason:   NodeSelectorsDetected,
+			Category: Warn,
+			Message: fmt.Sprintf(msgFormat,
+				strings.Join(nsWithNodeSelectors, ", ")),
+		})
+	}
+
 	return nil
+}
+
+func (r ReconcileMigPlan) hasNodeSelectors(podList []kapi.Pod) bool {
+	for _, pod := range podList {
+		if len(pod.Spec.NodeSelector) > 0 || len(pod.Spec.NodeName) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Validate the referenced source cluster.
@@ -942,8 +976,8 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 	return nil
 }
 
-// Validate the pods, all should be healthy befor migration
-func (r ReconcileMigPlan) validatePods(plan *migapi.MigPlan) error {
+// Validate the pods to verify if they are healthy before migration
+func (r ReconcileMigPlan) validatePodHealth(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(Suspended) {
 		plan.Status.StageCondition(SourcePodsNotHealthy)
 		return nil
