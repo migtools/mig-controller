@@ -691,7 +691,13 @@ func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 		return liberr.Wrap(err)
 	}
 	newOperatorVersion, err := m.GetOperatorVersion(clusterClient)
-
+	// Ignore error here. Missing configmap/key is already raised to user in validation,
+	// we don't want reconcile to exit w/ error on MTC < 1.4.2. We also don't want to
+	// accidentally trigger the expensive propagation below if there's an error
+	// getting operator version.
+	if err != nil {
+		return nil
+	}
 	// When operator version changes, all other MigClusters will be updated
 	// NOTE: cleaner way to do this (that would support concurrent reconciles)
 	//       would be to write a watch with a predicate that would enqueue

@@ -379,7 +379,9 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 			Status:   True,
 			Reason:   VersionNotFound,
 			Category: Warn,
-			Message:  fmt.Sprintf(`MTC operator version lookup failed on cluster %s. Key %s not found in configmap %s/%s. Ensure that all clusters are running the same MTC Operator version.`, cluster.ObjectMeta.Name, migapi.OperatorVersionKey, migapi.VeleroNamespace, migapi.ClusterConfigMapName),
+			Message: fmt.Sprintf(`MTC operator version lookup failed on cluster %s. Key %s not found in configmap %s/%s.`+
+				`Ensure that all clusters are running the same MTC Operator version.`,
+				cluster.ObjectMeta.Name, migapi.OperatorVersionKey, migapi.VeleroNamespace, migapi.ClusterConfigMapName),
 		})
 
 		return nil
@@ -393,7 +395,9 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 			Status:   True,
 			Reason:   VersionNotFound,
 			Category: Warn,
-			Message:  fmt.Sprintf(`MTC operator version lookup failed on host cluster. Key %s not found in configmap %s/%s. Ensure that all clusters are running the same MTC Operator version.`, migapi.OperatorVersionKey, migapi.VeleroNamespace, migapi.ClusterConfigMapName),
+			Message: fmt.Sprintf(`MTC operator version lookup failed on host cluster. Key %s not found in configmap %s/%s.`+
+				`Ensure that all clusters are running the same MTC Operator version.`,
+				migapi.OperatorVersionKey, migapi.VeleroNamespace, migapi.ClusterConfigMapName),
 		})
 
 		return nil
