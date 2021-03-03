@@ -229,7 +229,8 @@ func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
 
 	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
 	if !ok {
-		return "", liberr.Wrap(err)
+		return "", liberr.Wrap(errors.Errorf("configmap key %v not found in configmap %v/%v for migcluster %v/%v",
+			OperatorVersionKey, clusterConfig.Namespace, clusterConfig.Name, m.Namespace, m.Name))
 	}
 
 	return operatorVersion, nil
@@ -690,9 +691,6 @@ func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 		return liberr.Wrap(err)
 	}
 	newOperatorVersion, err := m.GetOperatorVersion(clusterClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 
 	// When operator version changes, all other MigClusters will be updated
 	// NOTE: cleaner way to do this (that would support concurrent reconciles)

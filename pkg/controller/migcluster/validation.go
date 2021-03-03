@@ -372,9 +372,6 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 		return liberr.Wrap(err)
 	}
 	clusterOperatorVersion, err := cluster.GetOperatorVersion(clusterClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 	if clusterOperatorVersion == "" {
 
 		cluster.Status.SetCondition(migapi.Condition{
@@ -389,9 +386,6 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 	}
 
 	hostOperatorVersion, err := cluster.GetOperatorVersion(r)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
 	if hostOperatorVersion == "" {
 
 		cluster.Status.SetCondition(migapi.Condition{
@@ -402,7 +396,7 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.
 			Message:  fmt.Sprintf(`MTC operator version lookup failed on host cluster. Key %s not found in configmap %s/%s. Ensure that all clusters are running the same MTC Operator version.`, migapi.OperatorVersionKey, migapi.VeleroNamespace, migapi.ClusterConfigMapName),
 		})
 
-		return nil 
+		return nil
 	}
 
 	operatorVersionMatchesHost := clusterOperatorVersion == hostOperatorVersion
