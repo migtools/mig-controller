@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"text/template"
 
+	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"gopkg.in/yaml.v2"
 
 	"crypto/rand"
@@ -16,7 +19,6 @@ import (
 	//"encoding/asn1"
 	"encoding/pem"
 	"math/big"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +37,12 @@ type stunnelConfig struct {
 	StunnelPort   int32
 	RsyncRoute    string
 	RsyncPort     int32
+	VerifyCA      bool
+	VerifyCALevel string
+	stunnelProxyConfig
+}
+
+type stunnelProxyConfig struct {
 	ProxyHost     string
 	ProxyUsername string
 	ProxyPassword string
@@ -55,19 +63,25 @@ data:
     client = yes
     syslog = no
     [rsync]
-    accept = {{ .StunnelPort}}
+    accept = {{ .StunnelPort }}
     CAFile = /etc/stunnel/certs/ca.crt
     cert = /etc/stunnel/certs/tls.crt
 {{ if not (eq .ProxyHost "") }}
     protocol = connect
     connect = {{ .ProxyHost }}
     protocolHost = {{ .RsyncRoute }}:443
+{{ if not (eq .ProxyUsername "") }}
     protocolUsername = {{ .ProxyUsername }}
+{{ end }}
+{{ if not (eq .ProxyPassword "") }}
     protocolPassword = {{ .ProxyPassword }}
+{{ end }}
 {{ else }}
     connect = {{ .RsyncRoute }}:443
 {{ end }}
-    verify = 2
+{{ if .VerifyCA }}
+    verify = {{ .VerifyCALevel }}
+{{ end }}
     key = /etc/stunnel/certs/tls.key
     debug = 7
 `
@@ -88,12 +102,32 @@ data:
 
     [rsync]
     accept = {{ .StunnelPort }}
-    protocol = connect
     connect = {{ .RsyncPort }}
     key = /etc/stunnel/certs/tls.key
     cert = /etc/stunnel/certs/tls.crt
     TIMEOUTclose = 0
 `
+
+// generateStunnelProxyConfig loads stunnel proxy configuration from app settings
+func (t *Task) generateStunnelProxyConfig() (stunnelProxyConfig, error) {
+	var proxyConfig stunnelProxyConfig
+	tcpProxyString := settings.Settings.DvmOpts.StunnelTCPProxy
+	if tcpProxyString != "" {
+		url, err := url.Parse(tcpProxyString)
+		if err != nil {
+			t.Log.Error(err, fmt.Sprintf("failed to parse %s setting", settings.TCPProxyKey))
+			return proxyConfig, liberr.Wrap(err)
+		}
+		proxyConfig.ProxyHost = url.Host
+		if url.User != nil {
+			proxyConfig.ProxyUsername = url.User.Username()
+			if pass, set := url.User.Password(); set {
+				proxyConfig.ProxyPassword = pass
+			}
+		}
+	}
+	return proxyConfig, nil
+}
 
 func (t *Task) createStunnelConfig() error {
 	// Get client for destination
@@ -114,53 +148,9 @@ func (t *Task) createStunnelConfig() error {
 		return err
 	}
 
-	// define proxy vars
-	srcProxyHost := ""
-	srcProxyUsername := ""
-	srcProxyPassword := ""
-	destProxyHost := ""
-	destProxyUsername := ""
-	destProxyPassword := ""
-	// Only read proxy info if running from migmigration
-	if t.PlanResources != nil {
-		// Get HTTPS proxy configuration setting for each cluster
-		plan := t.PlanResources.MigPlan
-		srcRegistrySecret, err := plan.GetProxySecret(srcClient)
-		if err != nil {
-			return err
-		}
-		destRegistrySecret, err := plan.GetProxySecret(destClient)
-		if err != nil {
-			return err
-		}
-		if srcRegistrySecret != nil {
-			srcHttpsProxy := string(srcRegistrySecret.Data["HTTPS_PROXY"])
-			proxyHostSplit := strings.Split(srcHttpsProxy, "@")
-			srcProxyPrefix := proxyHostSplit[0]
-			srcProxyHost = proxyHostSplit[1]
-			if strings.HasPrefix(srcProxyPrefix, "http://") {
-				srcProxyPrefix = srcProxyPrefix[7:]
-			} else if strings.HasPrefix(srcProxyPrefix, "https://") {
-				srcProxyPrefix = srcProxyPrefix[8:]
-			}
-			srcBasicAuth := strings.Split(srcProxyPrefix, ":")
-			srcProxyUsername = srcBasicAuth[0]
-			srcProxyPassword = srcBasicAuth[1]
-		}
-		if destRegistrySecret != nil {
-			destHttpsProxy := string(destRegistrySecret.Data["HTTPS_PROXY"])
-			proxyHostSplit := strings.Split(destHttpsProxy, "@")
-			destProxyPrefix := proxyHostSplit[0]
-			destProxyHost = proxyHostSplit[1]
-			if strings.HasPrefix(destProxyPrefix, "http://") {
-				destProxyPrefix = destProxyPrefix[7:]
-			} else if strings.HasPrefix(destProxyPrefix, "https://") {
-				destProxyPrefix = destProxyPrefix[8:]
-			}
-			destBasicAuth := strings.Split(destProxyPrefix, ":")
-			destProxyUsername = destBasicAuth[0]
-			destProxyPassword = destBasicAuth[1]
-		}
+	srcStunnelProxyConfig, err := t.generateStunnelProxyConfig()
+	if err != nil {
+		return err
 	}
 
 	// openssl library? to generate new certs
@@ -198,25 +188,21 @@ func (t *Task) createStunnelConfig() error {
 		if err != nil {
 			return err
 		}
-		t.Log.Info("proxy info", "source host", srcProxyHost, "dest host", destProxyHost, "src user", srcProxyUsername, "src pw", srcProxyPassword)
 		srcStunnelConf := stunnelConfig{
-			Namespace:     ns,
-			StunnelPort:   2222,
-			RsyncPort:     22,
-			RsyncRoute:    rsyncRoute,
-			ProxyHost:     srcProxyHost,
-			ProxyUsername: srcProxyUsername,
-			ProxyPassword: srcProxyPassword,
+			Namespace:          ns,
+			StunnelPort:        2222,
+			RsyncPort:          22,
+			RsyncRoute:         rsyncRoute,
+			stunnelProxyConfig: srcStunnelProxyConfig,
+			VerifyCA:           settings.Settings.StunnelVerifyCA,
+			VerifyCALevel:      settings.Settings.StunnelVerifyCALevel,
 		}
 
 		destStunnelConf := stunnelConfig{
-			Namespace:     ns,
-			StunnelPort:   2222,
-			RsyncPort:     22,
-			RsyncRoute:    rsyncRoute,
-			ProxyHost:     destProxyHost,
-			ProxyUsername: destProxyUsername,
-			ProxyPassword: destProxyPassword,
+			Namespace:   ns,
+			StunnelPort: 2222,
+			RsyncPort:   22,
+			RsyncRoute:  rsyncRoute,
 		}
 
 		// Generate templates
