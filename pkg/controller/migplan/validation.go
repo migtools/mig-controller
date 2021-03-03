@@ -495,8 +495,12 @@ func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	srcHasMismatch := srcCluster.Status.HasCondition(migcluster.OperatorVersionMismatch)
-	destHasMismatch := destCluster.Status.HasCondition(migcluster.OperatorVersionMismatch)
+	srcHasMismatch := srcCluster.Status.HasAnyCondition(
+		migcluster.OperatorVersionMismatch,
+		migcluster.ClusterOperatorVersionNotFound)
+	destHasMismatch := destCluster.Status.HasCondition(
+		migcluster.OperatorVersionMismatch,
+		migcluster.ClusterOperatorVersionNotFound)
 	if srcHasMismatch || destHasMismatch {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     ClusterVersionMismatch,

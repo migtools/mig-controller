@@ -690,11 +690,10 @@ func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	newOperatorVersion, err := m.GetOperatorVersion(clusterClient)
+	newOperatorVersion, _ := m.GetOperatorVersion(clusterClient)
 	// Ignore error here. Missing configmap/key is already raised to user in validation,
-	// we don't want reconcile to exit w/ error on MTC < 1.4.2. We also don't want to
-	// accidentally trigger the expensive propagation below if there's an error
-	// getting operator version.
+	// we don't want reconcile to exit w/ error on MTC < 1.4.2. GetOperatorVersion will
+	// return "" on error which is usable below.
 	if err != nil {
 		return nil
 	}
@@ -725,9 +724,7 @@ func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 		}
 	}
 
-	if newOperatorVersion != "" {
-		m.Status.OperatorVersion = newOperatorVersion
-	}
+	m.Status.OperatorVersion = newOperatorVersion
 
 	return nil
 }
