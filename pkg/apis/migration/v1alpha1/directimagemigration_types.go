@@ -202,8 +202,13 @@ func (r *DirectImageMigration) HasCompleted() (bool, []string, []string) {
 func (r *DirectImageMigration) getDISMProgress(items []*ImageStreamListItem, state string) []string {
 	progress := []string{}
 	for _, item := range items {
-		is := fmt.Sprintf("ImageStream %s (dism %s): %s ", path.Join(item.Namespace, item.Name), path.Join(item.DirectMigration.Namespace, item.DirectMigration.Name), state)
-		progress = append(progress, is)
+		var isMsg string
+		if item.DirectMigration == nil {
+			isMsg = fmt.Sprintf("ImageStream %s: %s ", path.Join(item.Namespace, item.Name), state)
+		} else {
+			isMsg = fmt.Sprintf("ImageStream %s (dism %s): %s ", path.Join(item.Namespace, item.Name), path.Join(item.DirectMigration.Namespace, item.DirectMigration.Name), state)
+		}
+		progress = append(progress, isMsg)
 	}
 	return progress
 }
