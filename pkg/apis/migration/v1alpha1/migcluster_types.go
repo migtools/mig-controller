@@ -684,22 +684,22 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 	return m.GetInternalRegistryPath(c)
 }
 
+// Pulls the operatorVersion from the migration-cluster-config configmap and
+// loads it into MigCluster.Status.OperatorVersion
 func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
 	oldOperatorVersion := m.Status.OperatorVersion
 	clusterClient, err := m.GetClient(c)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	newOperatorVersion, _ := m.GetOperatorVersion(clusterClient)
 	// Ignore error here. Missing configmap/key is already raised to user in validation,
 	// we don't want reconcile to exit w/ error on MTC < 1.4.2. GetOperatorVersion will
 	// return "" on error which is usable below.
-	if err != nil {
-		return nil
-	}
+	newOperatorVersion, _ := m.GetOperatorVersion(clusterClient)
+
 	// When operator version changes, all other MigClusters will be updated
-	// NOTE: cleaner way to do this (that would support concurrent reconciles)
-	//       would be to write a watch with a predicate that would enqueue
+	// NOTE: In future if we need to support concurrent reconciles for MigCluster,
+	//       we should remove this and write a watch with a predicate that would enqueue
 	//       reconciles when other MigClusters change versions. This is simpler
 	//       for now, but will break if MaxConcurrentReconciles is turned up,
 	//       since other clusters would start reconciling before our change
