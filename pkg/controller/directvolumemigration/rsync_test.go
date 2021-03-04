@@ -173,6 +173,36 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+		{
+			name: "both rsync client pods failed with nil elapsad time",
+			args: args{
+				pvcMap: map[string][]pvcMapElement{"foo": {{
+					Name:   "pvc-0",
+					Verify: false,
+				}, {
+					Name:   "pvc-1",
+					Verify: false,
+				}}},
+				client: fake.NewFakeClient(&migapi.DirectVolumeMigrationProgress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getMD5Hash("test" + "pvc-0" + "foo"),
+						Namespace: migapi.OpenshiftMigrationNamespace,
+					},
+					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
+					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+				}, &migapi.DirectVolumeMigrationProgress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
+						Namespace: migapi.OpenshiftMigrationNamespace,
+					},
+					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
+					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+				}),
+				dvmName: "test",
+			},
+			want:    false,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -340,6 +370,36 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
 							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
 					},
+				}),
+				dvmName: "test",
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "both rsync client pods failed with nil elapsad time",
+			args: args{
+				pvcMap: map[string][]pvcMapElement{"foo": {{
+					Name:   "pvc-0",
+					Verify: false,
+				}, {
+					Name:   "pvc-1",
+					Verify: false,
+				}}},
+				client: fake.NewFakeClient(&migapi.DirectVolumeMigrationProgress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getMD5Hash("test" + "pvc-0" + "foo"),
+						Namespace: migapi.OpenshiftMigrationNamespace,
+					},
+					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
+					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+				}, &migapi.DirectVolumeMigrationProgress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
+						Namespace: migapi.OpenshiftMigrationNamespace,
+					},
+					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
+					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
 				}),
 				dvmName: "test",
 			},
