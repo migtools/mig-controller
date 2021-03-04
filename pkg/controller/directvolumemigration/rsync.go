@@ -1170,6 +1170,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
+	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
 	var pendingPods []string
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
@@ -1245,6 +1246,7 @@ func hasAllRsyncClientPodsTimedOut(pvcMap map[string][]pvcMapElement, client k8s
 				return false, err
 			}
 			if dvmp.Status.PodPhase != corev1.PodFailed ||
+				dvmp.Status.ContainerElapsedTime == nil ||
 				(dvmp.Status.ContainerElapsedTime != nil &&
 					dvmp.Status.ContainerElapsedTime.Duration.Round(time.Second).Seconds() != float64(DefaultStunnelTimeout)) {
 				return false, nil
@@ -1267,6 +1269,7 @@ func isAllRsyncClientPodsNoRouteToHost(pvcMap map[string][]pvcMapElement, client
 			}
 
 			if dvmp.Status.PodPhase != corev1.PodFailed ||
+				dvmp.Status.ContainerElapsedTime == nil ||
 				(dvmp.Status.ContainerElapsedTime != nil &&
 					dvmp.Status.ContainerElapsedTime.Duration.Seconds() > float64(5)) || *dvmp.Status.ExitCode != int32(10) || !strings.Contains(dvmp.Status.LogMessage, "No route to host") {
 				return false, nil
