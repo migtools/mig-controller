@@ -37,7 +37,7 @@ func (r *RemoteClusterSource) Start(
 	return nil
 }
 
-// Run the scheduled connection tests.
+// Run the scheduled connection and version match tests.
 func (r *RemoteClusterSource) run() {
 	for {
 		time.Sleep(r.Interval)
@@ -64,6 +64,18 @@ func (r *RemoteClusterSource) run() {
 				r.enqueue(cluster)
 				continue
 			}
+
+			// Enqueue if MigCluster configmap OPERATOR_VERSION disagrees with
+			// MigCluster.Status.OperatorVersion
+			versionsMatched, err := cluster.OperatorVersionMatchesConfigmap(r.Client)
+			if err != nil {
+				continue
+			}
+			if !versionsMatched {
+				r.enqueue(cluster)
+				continue
+			}
+
 		}
 	}
 }
