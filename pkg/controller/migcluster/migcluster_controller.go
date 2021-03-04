@@ -152,6 +152,13 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Set Status.OperatorVersion
+	err = cluster.SetOperatorVersion(r)
+	if err != nil {
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Ready
 	cluster.Status.SetReady(
 		!cluster.Status.HasBlockerCondition(),

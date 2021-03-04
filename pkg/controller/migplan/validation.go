@@ -10,6 +10,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -34,6 +35,7 @@ const (
 	InvalidStorageRef                          = "InvalidStorageRef"
 	SourceClusterNotReady                      = "SourceClusterNotReady"
 	DestinationClusterNotReady                 = "DestinationClusterNotReady"
+	ClusterVersionMismatch                     = "ClusterVersionMismatch"
 	SourceClusterNoRegistryPath                = "SourceClusterNoRegistryPath"
 	DestinationClusterNoRegistryPath           = "DestinationClusterNoRegistryPath"
 	StorageNotReady                            = "StorageNotReady"
@@ -172,6 +174,12 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 
 	// GVK
 	err = r.compareGVK(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// Versions
+	err = r.validateOperatorVersions(plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -469,6 +477,39 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 			Reason:   NotSet,
 			Message: fmt.Sprintf("Direct image migration is selected and the destination cluster %s is missing a configured Registry Path",
 				path.Join(ref.Namespace, ref.Name)),
+		})
+		return nil
+	}
+
+	return nil
+}
+
+func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
+	destRef := plan.Spec.DestMigClusterRef
+	srcRef := plan.Spec.SrcMigClusterRef
+
+	srcCluster, err := migapi.GetCluster(r, srcRef)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	destCluster, err := migapi.GetCluster(r, destRef)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	srcHasMismatch := srcCluster.Status.HasAnyCondition(
+		migcluster.OperatorVersionMismatch,
+		migcluster.ClusterOperatorVersionNotFound)
+	destHasMismatch := destCluster.Status.HasCondition(
+		migcluster.OperatorVersionMismatch,
+		migcluster.ClusterOperatorVersionNotFound)
+	if srcHasMismatch || destHasMismatch {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     ClusterVersionMismatch,
+			Status:   True,
+			Category: Warn,
+			Reason:   Conflict,
+			Message:  fmt.Sprintf("Cluster operator versions do not match. Source, destination, and host clusters must all have the same MTC operator version."),
 		})
 		return nil
 	}
