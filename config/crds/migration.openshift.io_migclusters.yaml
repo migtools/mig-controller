@@ -158,6 +158,8 @@ spec:
               type: array
             observedDigest:
               type: string
+            operatorVersion:
+              type: string
             registryPath:
               type: string
           type: object

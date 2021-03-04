@@ -58,6 +58,7 @@ const (
 	StagePodImageKey      = "STAGE_IMAGE"
 	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
 	ClusterSubdomainKey   = "CLUSTER_SUBDOMAIN"
+	OperatorVersionKey    = "OPERATOR_VERSION"
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -91,9 +92,10 @@ type MigClusterSpec struct {
 
 // MigClusterStatus defines the observed state of MigCluster
 type MigClusterStatus struct {
-	Conditions     `json:","`
-	ObservedDigest string `json:"observedDigest,omitempty"`
-	RegistryPath   string `json:"registryPath,omitempty"`
+	Conditions      `json:","`
+	ObservedDigest  string `json:"observedDigest,omitempty"`
+	RegistryPath    string `json:"registryPath,omitempty"`
+	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
 
 // +genclient
@@ -218,6 +220,22 @@ func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
 	return clusterSubdomain, nil
 }
 
+// GetOperatorVersion retrieves the operator version from the respective controllers ConfigMap
+func (m *MigCluster) GetOperatorVersion(c k8sclient.Client) (string, error) {
+	clusterConfig, err := m.GetClusterConfigMap(c)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+
+	operatorVersion, ok := clusterConfig.Data[OperatorVersionKey]
+	if !ok {
+		return "", liberr.Wrap(errors.Errorf("configmap key %v not found in configmap %v/%v for migcluster %v/%v",
+			OperatorVersionKey, clusterConfig.Namespace, clusterConfig.Name, m.Namespace, m.Name))
+	}
+
+	return operatorVersion, nil
+}
+
 // Test the connection settings by building a client.
 func (m *MigCluster) TestConnection(c k8sclient.Client, timeout time.Duration) error {
 	if m.Spec.IsHostCluster {
@@ -263,6 +281,19 @@ func (m *MigCluster) BuildRestConfig(c k8sclient.Client) (*rest.Config, error) {
 	}
 
 	return restConfig, nil
+}
+
+// Test whether OPERATOR_VERSION in configmap on MigCluster matches status.OperatorVersion
+func (m *MigCluster) OperatorVersionMatchesConfigmap(c k8sclient.Client) (bool, error) {
+	clusterClient, err := m.GetClient(c)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	operatorVersion, err := m.GetOperatorVersion(clusterClient)
+	if operatorVersion == m.Status.OperatorVersion {
+		return true, nil
+	}
+	return false, nil
 }
 
 // Delete resources on the cluster by label.
@@ -651,6 +682,51 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 		return "", nil
 	}
 	return m.GetInternalRegistryPath(c)
+}
+
+// Pulls the operatorVersion from the migration-cluster-config configmap and
+// loads it into MigCluster.Status.OperatorVersion
+func (m *MigCluster) SetOperatorVersion(c k8sclient.Client) error {
+	oldOperatorVersion := m.Status.OperatorVersion
+	clusterClient, err := m.GetClient(c)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// Ignore error here. Missing configmap/key is already raised to user in validation,
+	// we don't want reconcile to exit w/ error on MTC < 1.4.2. GetOperatorVersion will
+	// return "" on error which is usable below.
+	newOperatorVersion, _ := m.GetOperatorVersion(clusterClient)
+
+	// When operator version changes, all other MigClusters will be updated
+	// NOTE: In future if we need to support concurrent reconciles for MigCluster,
+	//       we should remove this and write a watch with a predicate that would enqueue
+	//       reconciles when other MigClusters change versions. This is simpler
+	//       for now, but will break if MaxConcurrentReconciles is turned up,
+	//       since other clusters would start reconciling before our change
+	//       is written.
+	if oldOperatorVersion != newOperatorVersion {
+		clusterList, err := ListClusters(c)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		// Update all other MigClusters to propagate version checks
+		for _, cluster := range clusterList {
+			if cluster.UID == m.UID {
+				continue
+			}
+			if !cluster.Spec.Refresh {
+				cluster.Spec.Refresh = true
+				err := c.Update(context.Background(), &cluster)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+		}
+	}
+
+	m.Status.OperatorVersion = newOperatorVersion
+
+	return nil
 }
 
 type routingConfig struct {
