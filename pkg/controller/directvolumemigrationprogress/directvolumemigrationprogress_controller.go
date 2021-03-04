@@ -46,7 +46,7 @@ import (
 
 var log = logging.WithName("pvmigrationprogress")
 
-var TimeLimit = 10*time.Minute
+var TimeLimit = 10 * time.Minute
 
 const (
 	NotFound    = "NotFound"
@@ -247,14 +247,20 @@ func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgres
 	}
 
 	if containerStatus == nil {
-		pvProgress.Status.SetCondition(migapi.Condition{
-			Type:     InvalidPod,
-			Status:   migapi.True,
-			Reason:   NotFound,
-			Category: migapi.Critical,
-			Message: fmt.Sprintf("The spec.podRef %s must reference a `Pod` with container name %s",
-				path.Join(podRef.Namespace, podRef.Name), containerName),
-		})
+		if pod.Status.Phase == kapi.PodFailed {
+			pvProgress.Status.PodPhase = kapi.PodFailed
+			pvProgress.Status.LogMessage = pod.Status.Message
+			pvProgress.Status.ContainerElapsedTime = nil
+		} else {
+			pvProgress.Status.SetCondition(migapi.Condition{
+				Type:     InvalidPod,
+				Status:   migapi.True,
+				Reason:   NotFound,
+				Category: migapi.Critical,
+				Message: fmt.Sprintf("The spec.podRef %s must reference a `Pod` with container name %s",
+					path.Join(podRef.Namespace, podRef.Name), containerName),
+			})
+		}
 		return nil
 	}
 
