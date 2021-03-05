@@ -109,20 +109,30 @@ func recordMetrics(client client.Client) {
 			}
 
 			// Stage
-			migrationGauge.With(
-				prometheus.Labels{"type": stage, "status": idle}).Set(stageIdle)
-			migrationGauge.With(
-				prometheus.Labels{"type": stage, "status": running}).Set(stageRunning)
+			if stageIdle > 0 {
+				migrationGauge.With(
+					prometheus.Labels{"type": stage, "status": idle}).Set(stageIdle)
+			}
+			if stageRunning > 0 {
+
+				migrationGauge.With(
+					prometheus.Labels{"type": stage, "status": running}).Set(stageRunning)
+			}
+			// We probably care if someone has Mig installed but no failed or completed migrations
 			migrationGauge.With(
 				prometheus.Labels{"type": stage, "status": completed}).Set(stageCompleted)
 			migrationGauge.With(
 				prometheus.Labels{"type": stage, "status": failed}).Set(stageFailed)
 
 			// Final
-			migrationGauge.With(
-				prometheus.Labels{"type": final, "status": idle}).Set(finalIdle)
-			migrationGauge.With(
-				prometheus.Labels{"type": final, "status": running}).Set(finalRunning)
+			if finalIdle > 0 {
+				migrationGauge.With(
+					prometheus.Labels{"type": final, "status": idle}).Set(finalIdle)
+			}
+			if finalRunning > 0 {
+				migrationGauge.With(
+					prometheus.Labels{"type": final, "status": running}).Set(finalRunning)
+			}
 			migrationGauge.With(
 				prometheus.Labels{"type": final, "status": completed}).Set(finalCompleted)
 			migrationGauge.With(
