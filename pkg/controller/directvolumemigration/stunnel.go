@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"text/template"
 
+	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"gopkg.in/yaml.v2"
 
 	"crypto/rand"
@@ -29,11 +32,20 @@ import (
 )
 
 type stunnelConfig struct {
-	Name        string
-	Namespace   string
-	StunnelPort int32
-	RsyncRoute  string
-	RsyncPort   int32
+	Name          string
+	Namespace     string
+	StunnelPort   int32
+	RsyncRoute    string
+	RsyncPort     int32
+	VerifyCA      bool
+	VerifyCALevel string
+	stunnelProxyConfig
+}
+
+type stunnelProxyConfig struct {
+	ProxyHost     string
+	ProxyUsername string
+	ProxyPassword string
 }
 
 // TODO: Parameterize this more to support custom
@@ -51,12 +63,27 @@ data:
     client = yes
     syslog = no
     [rsync]
-    accept = {{ .StunnelPort}}
+    accept = {{ .StunnelPort }}
     CAFile = /etc/stunnel/certs/ca.crt
     cert = /etc/stunnel/certs/tls.crt
+{{ if not (eq .ProxyHost "") }}
+    protocol = connect
+    connect = {{ .ProxyHost }}
+    protocolHost = {{ .RsyncRoute }}:443
+{{ if not (eq .ProxyUsername "") }}
+    protocolUsername = {{ .ProxyUsername }}
+{{ end }}
+{{ if not (eq .ProxyPassword "") }}
+    protocolPassword = {{ .ProxyPassword }}
+{{ end }}
+{{ else }}
     connect = {{ .RsyncRoute }}:443
-    verify = 2
+{{ end }}
+{{ if .VerifyCA }}
+    verify = {{ .VerifyCALevel }}
+{{ end }}
     key = /etc/stunnel/certs/tls.key
+    debug = 7
 `
 
 const stunnelDestinationConfigTemplate = `apiVersion: v1
@@ -70,8 +97,8 @@ data:
     pid =
     socket = l:TCP_NODELAY=1
     socket = r:TCP_NODELAY=1
-    sslVersion = TLSv1.2
     debug = 7
+    sslVersion = TLSv1.2
 
     [rsync]
     accept = {{ .StunnelPort }}
@@ -80,6 +107,27 @@ data:
     cert = /etc/stunnel/certs/tls.crt
     TIMEOUTclose = 0
 `
+
+// generateStunnelProxyConfig loads stunnel proxy configuration from app settings
+func (t *Task) generateStunnelProxyConfig() (stunnelProxyConfig, error) {
+	var proxyConfig stunnelProxyConfig
+	tcpProxyString := settings.Settings.DvmOpts.StunnelTCPProxy
+	if tcpProxyString != "" {
+		url, err := url.Parse(tcpProxyString)
+		if err != nil {
+			t.Log.Error(err, fmt.Sprintf("failed to parse %s setting", settings.TCPProxyKey))
+			return proxyConfig, liberr.Wrap(err)
+		}
+		proxyConfig.ProxyHost = url.Host
+		if url.User != nil {
+			proxyConfig.ProxyUsername = url.User.Username()
+			if pass, set := url.User.Password(); set {
+				proxyConfig.ProxyPassword = pass
+			}
+		}
+	}
+	return proxyConfig, nil
+}
 
 func (t *Task) createStunnelConfig() error {
 	// Get client for destination
@@ -99,6 +147,12 @@ func (t *Task) createStunnelConfig() error {
 	if err != nil {
 		return err
 	}
+
+	srcStunnelProxyConfig, err := t.generateStunnelProxyConfig()
+	if err != nil {
+		return err
+	}
+
 	// openssl library? to generate new certs
 
 	// Create same stunnel configmap with certs on both source+destination
@@ -134,7 +188,17 @@ func (t *Task) createStunnelConfig() error {
 		if err != nil {
 			return err
 		}
-		stunnelConf := stunnelConfig{
+		srcStunnelConf := stunnelConfig{
+			Namespace:          ns,
+			StunnelPort:        2222,
+			RsyncPort:          22,
+			RsyncRoute:         rsyncRoute,
+			stunnelProxyConfig: srcStunnelProxyConfig,
+			VerifyCA:           settings.Settings.StunnelVerifyCA,
+			VerifyCALevel:      settings.Settings.StunnelVerifyCALevel,
+		}
+
+		destStunnelConf := stunnelConfig{
 			Namespace:   ns,
 			StunnelPort: 2222,
 			RsyncPort:   22,
@@ -154,11 +218,11 @@ func (t *Task) createStunnelConfig() error {
 		}
 
 		// Execute templates
-		err = clientTemp.Execute(&clientTpl, stunnelConf)
+		err = clientTemp.Execute(&clientTpl, srcStunnelConf)
 		if err != nil {
 			return err
 		}
-		err = destTemp.Execute(&destTpl, stunnelConf)
+		err = destTemp.Execute(&destTpl, destStunnelConf)
 		if err != nil {
 			return err
 		}

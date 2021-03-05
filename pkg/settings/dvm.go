@@ -7,14 +7,17 @@ import (
 
 // DVM options
 const (
-	RsyncOptBwLimit   = "RSYNC_OPT_BWLIMIT"
-	RsyncOptPartial   = "RSYNC_OPT_PARTIAL"
-	RsyncOptArchive   = "RSYNC_OPT_ARCHIVE"
-	RsyncOptDelete    = "RSYNC_OPT_DELETE"
-	RsyncOptHardLinks = "RSYNC_OPT_HARDLINKS"
-	RsyncOptInfo      = "RSYNC_OPT_INFO"
-	RsyncOptExtras    = "RSYNC_OPT_EXTRAS"
-	EnablePVResizing  = "ENABLE_DVM_PV_RESIZING"
+	RsyncOptBwLimit         = "RSYNC_OPT_BWLIMIT"
+	RsyncOptPartial         = "RSYNC_OPT_PARTIAL"
+	RsyncOptArchive         = "RSYNC_OPT_ARCHIVE"
+	RsyncOptDelete          = "RSYNC_OPT_DELETE"
+	RsyncOptHardLinks       = "RSYNC_OPT_HARDLINKS"
+	RsyncOptInfo            = "RSYNC_OPT_INFO"
+	RsyncOptExtras          = "RSYNC_OPT_EXTRAS"
+	EnablePVResizing        = "ENABLE_DVM_PV_RESIZING"
+	TCPProxyKey             = "STUNNEL_TCP_PROXY"
+	StunnelVerifyCAKey      = "STUNNEL_VERIFY_CA"
+	StunnelVerifyCALevelKey = "STUNNEL_VERIFY_CA_LEVEL"
 )
 
 // RsyncOpts Rsync Options
@@ -37,7 +40,10 @@ type RsyncOpts struct {
 // DvmOpts DVM settings
 type DvmOpts struct {
 	RsyncOpts
-	EnablePVResizing bool
+	EnablePVResizing     bool
+	StunnelTCPProxy      string
+	StunnelVerifyCA      bool
+	StunnelVerifyCALevel string
 }
 
 // Load load rsync options
@@ -66,6 +72,12 @@ func (r *RsyncOpts) Load() error {
 func (r *DvmOpts) Load() error {
 	var err error
 	r.EnablePVResizing = getEnvBool(EnablePVResizing, false)
+	r.StunnelTCPProxy = os.Getenv(TCPProxyKey)
+	r.StunnelVerifyCA = getEnvBool(StunnelVerifyCAKey, true)
+	r.StunnelVerifyCALevel = os.Getenv(StunnelVerifyCALevelKey)
+	if r.StunnelVerifyCALevel == "" {
+		r.StunnelVerifyCALevel = "2"
+	}
 	err = r.RsyncOpts.Load()
 	if err != nil {
 		return err
