@@ -233,7 +233,7 @@ func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Se
 	dirName := storage.GetName() + "-registry-" + string(storage.UID)
 
 	// Get Proxy Env Vars for DC
-	proxySecret, err := plan.GetRegistryProxySecret(client)
+	proxySecret, err := plan.GetProxySecret(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
