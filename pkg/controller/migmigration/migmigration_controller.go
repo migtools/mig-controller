@@ -19,8 +19,9 @@ package migmigration
 import (
 	"context"
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -145,6 +146,9 @@ type ReconcileMigMigration struct {
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	// Set values.
+	log.SetValues("migration", request)
+	log.V(4).Info("Starting reconcile")
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}
@@ -153,6 +157,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if errors.IsNotFound(err) {
 			err = r.deleted()
 		}
+		log.V(2).Error(err, "Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -160,23 +165,23 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Ensure debugging labels are present on migmigration
 	err = r.ensureDebugLabels(migration)
 	if err != nil {
+		log.V(2).Error(err, "Error setting debug labels, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
-
-	// Set values.
-	log.SetValues("migration", request)
 
 	// Report reconcile error.
 	defer func() {
 		log.Info("CR", "conditions", migration.Status.Conditions)
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
+			log.V(2).Error(err, "Error recording conditions as events.")
 			return
 		}
 		migration.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), migration)
 		if err != nil {
+			log.V(2).Error(err, "Exited reconcile with error.")
 			log.Trace(err)
 			return
 		}
@@ -190,6 +195,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Owner Reference
 	err = r.setOwnerReference(migration)
 	if err != nil {
+		log.V(2).Error(err, "Failed to set owner references, requeuing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
@@ -203,6 +209,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Validate
 	err = r.validate(migration)
 	if err != nil {
+		log.V(2).Error(err, "Validation failed, requeueing")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -213,6 +220,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
+			log.V(2).Error(err, "Failed to check if postpone required.")
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, err
 		}
@@ -222,6 +230,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(migration)
 		if err != nil {
+			log.V(2).Error(err, "Error executing phase logic.", "phase", migration.Status.Phase)
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
@@ -240,6 +249,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.MarkReconciled()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
+		log.V(2).Error(err, "Error updating migmigration at end of reconcile.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
