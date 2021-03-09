@@ -195,7 +195,9 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", plan.Status.Conditions)
+		// This should only be turned on in debug mode IMO,
+		// in normal mode we should only show condition deltas.
+		// log.Info("CR", "conditions", plan.Status.Conditions)
 		plan.Status.Conditions.RecordEvents(plan, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return

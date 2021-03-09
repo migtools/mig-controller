@@ -334,12 +334,7 @@ type Task struct {
 //   4. Return.
 func (t *Task) Run() error {
 	// Set stage, phase, phase description, migplan name
-	t.Log = t.Log.WithValues(
-		"Phase", t.Phase,
-		"Step", t.Step,
-		"MigPlan", t.PlanResources.MigPlan.Name,
-		"SourceCluster", t.PlanResources.SrcMigCluster.Name,
-		"TargetCluster", t.PlanResources.DestMigCluster.Name)
+	t.Log = t.Log.WithValues("Phase", t.Phase)
 	t.Requeue = FastReQ
 	t.Log.Info("[RUN]")
 

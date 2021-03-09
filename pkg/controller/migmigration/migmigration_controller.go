@@ -147,8 +147,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	var err error
 	log.Reset()
 	// Set values.
-	log.SetValues("migration", request)
-	log.V(4).Info("Starting reconcile")
+	log.SetValues("MigMigration", request.Name)
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}
@@ -172,7 +171,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", migration.Status.Conditions)
+		// This should only be turned on in debug mode IMO,
+		// in normal mode we should only show condition deltas.
+		// log.Info("CR", "conditions", migration.Status.Conditions)
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			// log.V(4).Error(err, "Error recording conditions as events.")
