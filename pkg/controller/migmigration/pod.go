@@ -294,7 +294,9 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 		return false, liberr.Wrap(err)
 	}
 	if len(list) == 0 {
-		log.Info("No velero pods found.")
+		t.Log.Info(fmt.Sprintf("No velero pods found on MigCluster [%v/%v] "+
+			"while checking for Velero cloud secret propagation.",
+			cluster.Namespace, cluster.Name))
 		return false, nil
 	}
 	restCfg, err := cluster.BuildRestConfig(t.Client)
@@ -315,12 +317,16 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 				RestCfg: restCfg,
 				Pod:     &pod,
 			}
+			t.Log.V(2).Info(fmt.Sprintf("Execing into Velero Pod [%v/%v]"+
+				"on MigCluster [%v/%v] with command [%v] to check for Cloud Credentials",
+				pod.Namespace, pod.Name, cluster.Namespace, cluster.Name,
+				"cat "+provider.GetCloudCredentialsPath()))
 			err = cmd.Run()
 			if err != nil {
 				exErr, cast := err.(exec.CodeExitError)
 				if cast && exErr.Code == 126 {
-					log.Info(
-						"Pod command failed:",
+					t.Log.Info(
+						"Exec into Velero Pod command failed:",
 						"solution",
 						"https://access.redhat.com/solutions/3734981",
 						"cmd",
@@ -349,6 +355,7 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 			}
 		}
 	}
-
+	t.Log.Info(fmt.Sprintf("Found propagated cloud secret in Velero Pod "+
+		"on MigCluster [%v/%v]", cluster.Name, cluster.Namespace))
 	return true, nil
 }
