@@ -335,10 +335,11 @@ type Task struct {
 func (t *Task) Run() error {
 	// Set stage, phase, phase description, migplan name
 	t.Log = t.Log.WithValues(
-		"stage", t.stage(),
-		"phase", t.Phase,
-		"step", t.Step,
-		"migplan", t.PlanResources.MigPlan.Name)
+		"Phase", t.Phase,
+		"Step", t.Step,
+		"MigPlan", t.PlanResources.MigPlan.Name,
+		"SourceCluster", t.PlanResources.SrcMigCluster.Name,
+		"TargetCluster", t.PlanResources.DestMigCluster.Name)
 	t.Requeue = FastReQ
 	t.Log.Info("[RUN]")
 
@@ -647,6 +648,7 @@ func (t *Task) Run() error {
 	case WaitForVeleroReady:
 		started, err := t.haveVeleroPodsStarted()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking if Velero Pods are ready.")
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -654,12 +656,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Velero is unready on at least one cluster, waiting.")
+			t.Log.V(2).Info("Velero Pod(s) are unready on at least one cluster, waiting.")
 			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
 		err := t.quiesceApplications()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error quiescing applications on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -668,6 +671,7 @@ func (t *Task) Run() error {
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking for quiescing app termination on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if quiesced {

@@ -175,7 +175,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Info("CR", "conditions", migration.Status.Conditions)
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
-			log.V(2).Error(err, "Error recording conditions as events.")
+			// log.V(4).Error(err, "Error recording conditions as events.")
 			return
 		}
 		migration.Status.SetReconcileFailed(err)

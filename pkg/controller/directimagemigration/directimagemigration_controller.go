@@ -110,7 +110,7 @@ type ReconcileDirectImageMigration struct {
 func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the DirectImageMigration instance
 	log.Reset()
-	log.SetValues("directImageMigration", request)
+	log.SetValues("DIM", request.Name)
 	imageMigration := &migapi.DirectImageMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageMigration)
 	if err != nil {
