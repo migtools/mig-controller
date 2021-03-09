@@ -612,6 +612,8 @@ func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
 // Delete stale Velero Backups in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int, error) {
+	t.Log.V(2).Info(fmt.Sprintf("Checking for stale Velero Backups on MigCluster %v/%v",
+		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
 
@@ -687,6 +689,8 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 // Delete stale Velero PodVolumeBackups in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error) {
+	t.Log.V(2).Info(fmt.Sprintf("Checking for stale PodVolumeBackups on MigCluster %v/%v",
+		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
 	if err != nil {

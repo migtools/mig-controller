@@ -18,8 +18,9 @@ package migmigration
 
 import (
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -37,7 +38,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return 0, liberr.Wrap(err)
 	}
 	if !plan.Status.IsReady() {
-		log.Info("Plan not ready.", "name", migration.Name)
+		log.Info("Plan not ready. Migration can't run unless Plan is ready.", "name", migration.Name)
 		return 0, liberr.Wrap(err)
 	}
 
@@ -49,6 +50,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Started
 	if migration.Status.StartTimestamp == nil {
+		log.V(2).Info("Marking migration as started.")
 		migration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
@@ -65,6 +67,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 	err = task.Run()
 	if err != nil {
 		if errors.IsConflict(errorutil.Unwrap(err)) {
+			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
 		log.Trace(err)

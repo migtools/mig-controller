@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -645,6 +646,9 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			}
 			for _, ref := range pod.OwnerReferences {
 				if _, found := kinds[ref.Kind]; found {
+					t.Log.V(2).Info(fmt.Sprintf("Found quiesced Pod [%v/%v] on source cluster"+
+						" that has not yet terminated. Waiting.",
+						pod.Namespace, pod.Name))
 					return false, nil
 				}
 			}

@@ -69,6 +69,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 
 // Ensure the migration registries on both source and dest clusters have been created
 func (t *Task) ensureMigRegistries() (int, error) {
+	t.Log.V(2).Info("Creating Migration registries")
 	nEnsured := 0
 
 	plan := t.PlanResources.MigPlan
@@ -92,24 +93,32 @@ func (t *Task) ensureMigRegistries() (int, error) {
 		}
 
 		// Migration Registry Secret
+		t.Log.V(2).Info(fmt.Sprintf("Creating migration registry secret on MigCluster %v/%v",
+			cluster.Namespace, cluster.Name))
 		secret, err := t.ensureRegistrySecret(client)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Get cluster specific registry image
+		t.Log.V(2).Info(fmt.Sprintf("Retreiving migration registry image name for MigCluster %v/%v",
+			cluster.Namespace, cluster.Name))
 		registryImage, err := cluster.GetRegistryImage(client)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Migration Registry DeploymentConfig
+		t.Log.V(2).Info(fmt.Sprintf("Creating migration registry deployment for MigCluster %v/%v",
+			cluster.Namespace, cluster.Name))
 		err = t.ensureRegistryDeployment(client, secret, registryImage)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Migration Registry Service
+		t.Log.V(2).Info(fmt.Sprintf("Creating migration registry service on MigCluster %v/%v",
+			cluster.Namespace, cluster.Name))
 		err = t.ensureRegistryService(client, secret)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
@@ -301,6 +310,7 @@ func (t *Task) ensureRegistryService(client k8sclient.Client, secret *kapi.Secre
 }
 
 func (t *Task) deleteImageRegistryResources() error {
+	t.Log.V(2).Info(fmt.Sprintf("Deleting image registries created for migration."))
 	t.Owner.Status.Conditions.DeleteCondition(RegistriesHealthy)
 	t.Owner.Status.Conditions.DeleteCondition(RegistriesUnhealthy)
 

@@ -19,6 +19,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +50,8 @@ func (t *Task) createDirectImageMigration() error {
 		return nil
 	}
 	dim = t.buildDirectImageMigration()
+	t.Log.V(2).Info(fmt.Sprintf("Creating directimagemigration resource %v/%v.",
+		dim.Namespace, dim.Name))
 	err = t.Client.Create(context.TODO(), dim)
 	if err != nil {
 		return liberr.Wrap(err)

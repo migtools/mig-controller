@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -332,8 +333,16 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
+	// Set stage and phase, log phase description
+	t.Log = t.Log.WithValues("stage", t.stage(), "phase", t.Phase, "step", t.Step)
 	t.Requeue = FastReQ
-	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
+	t.Log.Info("[RUN]")
+
+	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
+		t.Log.Info(phaseDescription)
+	} else {
+		t.Log.V(4).Info("Missing phase description for phase.")
+	}
 
 	err := t.init()
 	if err != nil {
@@ -392,6 +401,8 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Created %v/2 registries, retrying.", nEnsured))
 		}
 	case WaitForRegistriesReady:
 		// First registry health check happens here
@@ -399,6 +410,7 @@ func (t *Task) Run() error {
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
 			if err.Error() == "ImagePullBackOff" {
+				t.Log.V(2).Error(err, "Migration failed due to registry pod ImagePullBackoff")
 				t.fail(WaitForRegistriesReady, []string{message})
 			} else {
 				return liberr.Wrap(err)
@@ -410,6 +422,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Found %v/2 registries in healthy state, retrying.", nEnsured))
 			t.Requeue = PollReQ
 		}
 	case DeleteRegistries:
@@ -446,12 +459,16 @@ func (t *Task) Run() error {
 		if completed {
 			if len(reasons) > 0 {
 				t.setDirectImageMigrationWarning(dim)
+				t.Log.V(2).Info(fmt.Sprintf("directimagemigration %v/%v completed with warnings.",
+					dim.Namespace, dim.Name))
 				// Once supported, add reasons to Status.Warnings for the Step
 			}
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Waiting for directimagemigration %v/%v to complete.",
+				dim.Namespace, dim.Name))
 			t.Requeue = PollReQ
 		}
 	case EnsureCloudSecretPropagated:
@@ -472,6 +489,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Cloud secret has propagated on %v/2 clusters, waiting.", count))
 			t.Requeue = PollReQ
 		}
 	case PreBackupHooks:
@@ -485,6 +503,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("PreBackupHooks are still running, waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureInitialBackup:
@@ -514,21 +533,28 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup %v/%v is still running, waiting.",
+				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
 		finished, err := t.annotateStageResources()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while annotating source cluster resources to be migrated")
 			return liberr.Wrap(err)
 		}
 		if finished {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Annotated/labeled %v source cluster resources, requeuing.",
+				AnnotationsPerReconcile))
 		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while creating stage pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -537,6 +563,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while creating stage pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -545,6 +572,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromOrphanedPVCs:
 		err := t.ensureStagePodsFromOrphanedPVCs()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while creating stage pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -553,9 +581,11 @@ func (t *Task) Run() error {
 	case StagePodsCreated:
 		report, err := t.ensureSourceStagePodsStarted()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while creating stage pods")
 			return liberr.Wrap(err)
 		}
 		if report.failed {
+			t.Log.V(2).Info("Migration failed due to source cluster stage pods")
 			t.fail(SourceStagePodsFailed, report.reasons)
 			break
 		}
@@ -564,12 +594,15 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Waiting for Stage Pods to be ready",
+				"StagePodProgress", report.progress)
 			t.Requeue = PollReQ
 		}
 		t.setProgress(report.progress)
 	case RestartRestic:
 		err := t.restartResticPods()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while restarting Restic Pods on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -578,6 +611,7 @@ func (t *Task) Run() error {
 	case RestartVelero:
 		err := t.restartVeleroPods()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error while restarting Velero Pod on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -593,6 +627,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Restic is unready on at least one cluster, waiting.")
 			t.Requeue = PollReQ
 		}
 	case WaitForVeleroReady:
@@ -605,6 +640,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Velero is unready on at least one cluster, waiting.")
 			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
@@ -625,6 +661,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Quiescing is incomplete. Pods are not yet terminated, waiting.")
 			t.Requeue = PollReQ
 		}
 	case UnQuiesceSrcApplications:
@@ -1013,6 +1050,7 @@ func (t *Task) Run() error {
 
 // Initialize.
 func (t *Task) init() error {
+	t.Log.V(4).Info("Running task init")
 	t.Requeue = FastReQ
 	if t.failed() {
 		t.Itinerary = FailedItinerary
@@ -1098,6 +1136,7 @@ func (t *Task) initPipeline(prevItinerary string) error {
 }
 
 func (t *Task) updatePipeline() {
+	t.Log.V(4).Info("Updating pipeline view of progress")
 	currentStep := t.Owner.Status.FindStep(t.Step)
 	for _, step := range t.Owner.Status.Pipeline {
 		if currentStep != step && step.MarkedStarted() {
@@ -1288,6 +1327,7 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 
 // Phase fail.
 func (t *Task) fail(nextPhase string, reasons []string) {
+	log.V(2).Info("Marking migration as failed.")
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{

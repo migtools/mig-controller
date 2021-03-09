@@ -103,6 +103,7 @@ type ServiceAccounts map[string]map[string]bool
 // The IncludedInStageBackupLabel label is added to Namespaces to prevent the
 // velero.Backup from being empty which causes the Restore to fail.
 func (t *Task) annotateStageResources() (bool, error) {
+	t.Log.V(4).Info("Starting annotation of PVs, PVCs, Pods Namespaces")
 	sourceClient, err := t.getSourceClient()
 	if err != nil {
 		return false, liberr.Wrap(err)
@@ -139,6 +140,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	}
 
 	if itemsUpdated > AnnotationsPerReconcile {
+		t.Log.V(2).Info("Completed %v annotations/label operations this reconcile, requeueing.")
 		return false, nil
 	}
 
@@ -210,14 +212,14 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 			continue
 		}
 		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
+		log.Info(
+			"Adding migration annotations/labels to source cluster namespace.",
+			"namespace",
+			namespace.Name)
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
 		}
-		log.Info(
-			"NS annotations/labels added.",
-			"name",
-			namespace.Name)
 		itemsUpdated++
 		if itemsUpdated > AnnotationsPerReconcile {
 			t.setProgress([]string{fmt.Sprintf("%v/%v Namespaces labeled", i, total)})
@@ -263,17 +265,15 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 
 		pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
 		pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
+
 		// Update
+		log.Info(
+			"Adding annotations/labels to source cluster Pod.",
+			"ns", pod.Namespace, "Pod", pod.Name)
 		err = client.Update(context.TODO(), &pod)
 		if err != nil {
 			return itemsUpdated, nil, liberr.Wrap(err)
 		}
-		log.Info(
-			"Pod annotations/labels added.",
-			"ns",
-			pod.Namespace,
-			"name",
-			pod.Name)
 		itemsUpdated++
 		sa := pod.Spec.ServiceAccountName
 		names, found := serviceAccounts[pod.Namespace]
@@ -331,15 +331,14 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			pvResource.Labels = make(map[string]string)
 		}
 		pvResource.Labels[IncludedInStageBackupLabel] = t.UID()
+
 		// Update
+		log.Info("Adding annotations/labels to source cluster PersistentVolume.",
+			"PersistentVolume", pv.Name)
 		err = client.Update(context.TODO(), &pvResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
 		}
-		log.Info(
-			"PV annotations/labels added.",
-			"name",
-			pv.Name)
 
 		pvcResource := corev1.PersistentVolumeClaim{}
 		err = client.Get(
@@ -376,16 +375,14 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			}
 		}
 		// Update
+		log.Info(
+			"Adding annotations/labels to source cluster PersistentVolumeClaim.",
+			"ns", pv.PVC.Namespace, "PersistentVolumeClaim", pv.PVC.Name)
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
 		}
-		log.Info(
-			"PVC annotations/labels added.",
-			"ns",
-			pv.PVC.Namespace,
-			"name",
-			pv.PVC.Name)
+
 		itemsUpdated++
 		if itemsUpdated > AnnotationsPerReconcile {
 			t.setProgress([]string{fmt.Sprintf("%v/%v PV annotations/labels added.", i, total), fmt.Sprintf("%v/%v PVC annotations/labels added.", i, total)})
@@ -426,10 +423,10 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 				return itemsUpdated, liberr.Wrap(err)
 			}
 			log.Info(
-				"SA annotations/labels added.",
+				"Added annotations/labels to source cluster Service Account.",
 				"ns",
 				sa.Namespace,
-				"name",
+				"serviceaccount",
 				sa.Name)
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
@@ -460,16 +457,14 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 				continue
 			}
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
+
+			log.Info("Adding labels to source cluster ImageStream.",
+				"ns", is.Namespace,
+				"ImageStream", is.Name)
 			err = client.Update(context.Background(), &is)
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)
 			}
-			log.Info(
-				"ImageStream labels added.",
-				"ns",
-				is.Namespace,
-				"name",
-				is.Name)
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
 				t.setProgress([]string{fmt.Sprintf("%v/%v ImageStream labels added. in the namespace: %s", i, total, is.Namespace)})

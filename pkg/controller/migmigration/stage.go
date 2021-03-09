@@ -135,8 +135,12 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 	for _, stagePod := range stagePods {
 		if existingPods.contains(stagePod) {
+			t.Log.V(2).Info(fmt.Sprintf("Found existing stage pod [%v/%v], skipping",
+				stagePod.Namespace, stagePod.Name))
 			continue
 		}
+		t.Log.V(2).Info(fmt.Sprintf("Creating stage pod [%v/%v]",
+			stagePod.Namespace, stagePod.Name))
 		err := client.Create(context.TODO(), &stagePod.Pod)
 		if err != nil && !k8serr.IsAlreadyExists(err) {
 			return 0, liberr.Wrap(err)
@@ -186,6 +190,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return liberr.Wrap(err)
 	}
 
+	t.Log.V(2).Info("Getting list of existing Stage Pods")
 	existingStagePods, err := t.listStagePods(client)
 	if err != nil {
 		log.Trace(err)
@@ -207,12 +212,15 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return false
 	}
 
+	t.Log.V(2).Info("Getting list of PVCs")
 	pvcMapping := t.getPVCs()
 
+	t.Log.V(2).Info("Building resource limit mapping for Stage Pods from Orphaned PVCs")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	t.Log.V(2).Info("Getting Stage Pod image")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -247,6 +255,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		}
 	}
 
+	t.Log.V(2).Info("Creating Stage Pods on source cluster from Orphaned PVCs")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -274,21 +283,32 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return liberr.Wrap(err)
 	}
 
+	t.Log.V(2).Info("Getting list of Stage Pods to create for DeploymentConfigs, Deployments, " +
+		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	podTemplates, err := migpods.ListTemplatePods(client, t.sourceNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
+	t.Log.V(2).Info("Building Stage Pod resource mappings for DeploymentConfigs, Deployments, " +
+		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	t.Log.V(2).Info("Getting Stage Pod image for source cluster")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
+	t.Log.V(2).Info("Building Stage Pod definitions for DeploymentConfigs, Deployments, " +
+		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, stagePodImage, resourceLimitMapping)
 
+	t.Log.V(2).Info("Creating Stage Pods for DeploymentConfigs, Deployments, " +
+		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -368,15 +388,18 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		return liberr.Wrap(err)
 	}
 	stagePods := StagePodList{}
+	t.Log.V(2).Info("Building resource limit mapping for stage pods")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	t.Log.V(2).Info("Retrieving stage pod image")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	for _, ns := range t.sourceNamespaces() {
+		t.Log.V(2).Info("Building list of stage pods for src cluster namespace", "namespace", ns)
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &podList)
 		if err != nil {
@@ -385,6 +408,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping)...)
 	}
 
+	t.Log.V(2).Info("Creating stage pods on source cluster")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		return liberr.Wrap(err)

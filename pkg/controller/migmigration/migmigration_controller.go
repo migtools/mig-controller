@@ -181,7 +181,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		migration.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), migration)
 		if err != nil {
-			log.V(2).Error(err, "Exited reconcile with error.")
+			log.V(2).Error(err, "Error updating resource on reconcile exit.")
 			log.Trace(err)
 			return
 		}

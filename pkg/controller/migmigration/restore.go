@@ -445,6 +445,8 @@ func (t *Task) deleteCorrelatedRestores() error {
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, int, error) {
+	t.Log.V(2).Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster %v/%v",
+		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
 
@@ -504,6 +506,8 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error) {
+	t.Log.V(2).Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster %v/%v",
+		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
 	if err != nil {
