@@ -681,6 +681,7 @@ func (t *Task) Run() error {
 	case UnQuiesceSrcApplications:
 		err := t.unQuiesceSrcApplications()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error unquiescing apps on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -689,6 +690,7 @@ func (t *Task) Run() error {
 	case UnQuiesceDestApplications:
 		err := t.unQuiesceDestApplications()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error unquiescing apps on destination cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -697,6 +699,7 @@ func (t *Task) Run() error {
 	case CreateDirectVolumeMigration:
 		err := t.createDirectVolumeMigration()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error creating DirectVolumeMigration resource.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -705,10 +708,12 @@ func (t *Task) Run() error {
 	case WaitForDirectVolumeMigrationToComplete:
 		dvm, err := t.getDirectVolumeMigration()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking DirectVolumeMigration completion.")
 			return liberr.Wrap(err)
 		}
 		// if no dvm, continue to next task
 		if dvm == nil {
+			t.Log.V(2).Info("No DVM resource found, continuing to next phase.")
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
@@ -741,6 +746,7 @@ func (t *Task) Run() error {
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error creating Stage Velero Backup on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -749,6 +755,8 @@ func (t *Task) Run() error {
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking Stage Velero Backup "+
+				"completion on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -770,6 +778,8 @@ func (t *Task) Run() error {
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking for Stage Velero Backup "+
+				"repliction on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -789,6 +799,7 @@ func (t *Task) Run() error {
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
+			t.Log.V(2).Error(err, "Error running PostBackupHooks.")
 			t.fail(PostBackupHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -802,6 +813,7 @@ func (t *Task) Run() error {
 	case PreRestoreHooks:
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
+			t.Log.V(2).Error(err, "Error running PreRestoreHooks.")
 			t.fail(PreRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -815,6 +827,7 @@ func (t *Task) Run() error {
 	case EnsureStageRestore:
 		_, err := t.ensureStageRestore()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error creating Stage Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -823,6 +836,8 @@ func (t *Task) Run() error {
 	case StageRestoreCreated:
 		restore, err := t.getStageRestore()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking completion of Stage "+
+				"Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
@@ -845,6 +860,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error cleaning up Stage Pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -853,6 +869,8 @@ func (t *Task) Run() error {
 	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking completion of Stage "+
+				"Pod Cleanup.")
 			return liberr.Wrap(err)
 		}
 		if terminated {
@@ -866,6 +884,7 @@ func (t *Task) Run() error {
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {
+				t.Log.V(2).Error(err, "Error cleaning up annotations on migrated resources")
 				return liberr.Wrap(err)
 			}
 		}
@@ -875,6 +894,7 @@ func (t *Task) Run() error {
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -882,6 +902,8 @@ func (t *Task) Run() error {
 		}
 		replicated, err := t.isBackupReplicated(backup)
 		if err != nil {
+			t.Log.V(2).Error(err, "Error checking initial Velero Backup "+
+				"replication to target cluster.")
 			return liberr.Wrap(err)
 		}
 		if replicated {
@@ -894,6 +916,7 @@ func (t *Task) Run() error {
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -901,6 +924,7 @@ func (t *Task) Run() error {
 		}
 		_, err = t.ensureFinalRestore()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error creating final Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		t.Requeue = PollReQ
@@ -910,6 +934,7 @@ func (t *Task) Run() error {
 	case FinalRestoreCreated:
 		restore, err := t.getFinalRestore()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error getting final Velero Restore from target cluster.")
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
