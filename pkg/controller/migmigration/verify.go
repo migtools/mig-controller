@@ -57,6 +57,8 @@ func (t *Task) updateResourcesHealth(client k8sclient.Client) error {
 func (t *Task) getAppState(client k8sclient.Client) error {
 	// Scan namespaces
 	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
+		t.Log.Info(fmt.Sprintf("Checking migrated app health in destination"+
+			"cluster namespace [%v]", namespace))
 		options := k8sclient.InNamespace(namespace)
 
 		unhealthyPods, err := health.PodsUnhealthy(client, options)
@@ -64,6 +66,11 @@ func (t *Task) getAppState(client k8sclient.Client) error {
 			return err
 		}
 
+		unhealthyPodCount := len(*unhealthyPods)
+		if unhealthyPodCount > 0 {
+			t.Log.Info(fmt.Sprintf("Found [%v] unhealthy Pods in destination "+
+				"cluster namespace [%v]", unhealthyPodCount, namespace))
+		}
 		destinationNamespaces := &t.Owner.Status.UnhealthyResources.Namespaces
 		t.Owner.Status.UnhealthyResources.AddResources(
 			client,

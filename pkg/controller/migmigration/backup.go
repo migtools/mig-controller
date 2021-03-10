@@ -505,6 +505,8 @@ func (t *Task) deleteCorrelatedBackups() error {
 				BackupName: backup.Name,
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Deleting Velero Backup [%v/%v] on source cluster "+
+			"due to correlation with MigPlan", backup.Namespace, backup.Name))
 		if err := client.Create(context.TODO(), request); err != nil {
 			return liberr.Wrap(err)
 		}

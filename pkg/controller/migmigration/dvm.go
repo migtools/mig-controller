@@ -213,6 +213,8 @@ func (t *Task) deleteDirectVolumeMigrationResources() error {
 
 	if dvm != nil {
 		// delete the DVM instance
+		t.Log.Info(fmt.Sprintf("Deleting DirectVolumeMigration [%v/%v] on host cluster "+
+			"due to correlation with MigPlan", dvm.Namespace, dvm.Name))
 		err = t.Client.Delete(context.TODO(), dvm)
 		if err != nil {
 			return liberr.Wrap(err)

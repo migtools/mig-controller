@@ -101,6 +101,8 @@ func (t *Task) deleteDirectImageMigrationResources() error {
 
 	if dim != nil {
 		// delete the DIM instance
+		t.Log.Info(fmt.Sprintf("Deleting DirectImageMigration [%v/%v] on host cluster "+
+			"due to correlation with MigPlan", dim.Namespace, dim.Name))
 		err = t.Client.Delete(context.TODO(), dim)
 		if err != nil {
 			return liberr.Wrap(err)

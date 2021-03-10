@@ -435,6 +435,8 @@ func (t *Task) deleteCorrelatedRestores() error {
 		return liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
+		t.Log.Info(fmt.Sprintf("Deleting Velero Restore [%v/%v] on target cluster "+
+			"due to correlation with MigPlan", restore.Namespace, restore.Name))
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
@@ -637,9 +639,8 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info("DELETED resource from destination cluster",
-					"GVK", gvkCombined,
-					"ns/name", ns+"/"+r.GetName())
+				log.Info(fmt.Sprintf("DELETED resource [%v/%v] GVK=[%v]from destination cluster",
+					ns, r.GetName(), gvkCombined))
 			}
 		}
 	}
