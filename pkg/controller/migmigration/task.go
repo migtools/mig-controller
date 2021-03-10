@@ -81,7 +81,6 @@ const (
 	EnsureAnnotationsDeleted               = "EnsureAnnotationsDeleted"
 	EnsureMigratedDeleted                  = "EnsureMigratedDeleted"
 	DeleteRegistries                       = "DeleteRegistries"
-	DeleteMigrated                         = "DeleteMigrated"
 	DeleteBackups                          = "DeleteBackups"
 	DeleteRestores                         = "DeleteRestores"
 	DeleteHookJobs                         = "DeleteHookJobs"
@@ -265,7 +264,6 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteRegistries, Step: StepCleanupHelpers},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanupHelpers},
 		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, any: HasPVs | HasISs},
-		{Name: DeleteMigrated, Step: StepCleanupMigrated},
 		{Name: EnsureMigratedDeleted, Step: StepCleanupMigrated},
 		{Name: UnQuiesceSrcApplications, Step: StepCleanupUnquiesce},
 		{Name: Completed, Step: StepCleanup},
@@ -921,15 +919,11 @@ func (t *Task) Run() error {
 	case MigrationFailed:
 		t.Phase = Completed
 		t.Step = StepCleanup
-	case DeleteMigrated:
+	case EnsureMigratedDeleted:
 		err := t.deleteMigrated()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case EnsureMigratedDeleted:
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
