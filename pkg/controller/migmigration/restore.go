@@ -312,6 +312,9 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		completed = true
 	}
 
+	t.Log.Info(fmt.Sprintf("Velero Restore [%s/%s] progress: [%v]",
+		restore.Name, restore.Namespace, progress))
+
 	t.setProgress(progress)
 	return completed, reasons
 }
