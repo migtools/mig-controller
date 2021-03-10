@@ -54,7 +54,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
 	t.Log.Info(fmt.Sprintf("Creating Velero Final Restore [%v/%v] on target cluster.",
-		restore.Namespace, restore.Name))
+		newRestore.Namespace, newRestore.Name))
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -602,6 +602,8 @@ func (t *Task) deleteMigrated() error {
 
 // Delete migrated namespace-scoped resources on dest cluster
 func (t *Task) deleteMigratedNamespaceScopedResources() error {
+	t.Log.Info("Scanning all GVKs in all migrated namespaces for " +
+		"MigPlan associated resources to delete.")
 	client, GVRs, err := gvk.GetNamespacedGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -639,8 +641,8 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info(fmt.Sprintf("DELETED resource [%v/%v] GVK=[%v]from destination cluster",
-					ns, r.GetName(), gvkCombined))
+				log.Info(fmt.Sprintf("DELETED resource GVK=[%v] [%v/%v] from destination cluster",
+					gvkCombined, ns, r.GetName()))
 			}
 		}
 	}
@@ -688,6 +690,8 @@ func (t *Task) deleteMovedNfsPVs() error {
 }
 
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
+	t.Log.Info("Scanning all GVKs in all migrated namespaces to ensure " +
+		"resources have finished deleting.")
 	client, GVRs, err := gvk.GetNamespacedGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
 		return false, liberr.Wrap(err)
@@ -699,6 +703,8 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
+			log.Info(fmt.Sprintf("Checking for leftover resources with GVK=[%v] "+
+				"in namespace=[%v] in destination cluster", gvkCombinedName, ns))
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
 				return false, liberr.Wrap(err)

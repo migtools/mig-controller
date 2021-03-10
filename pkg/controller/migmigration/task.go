@@ -799,7 +799,7 @@ func (t *Task) Run() error {
 					backup.Status.Progress.ItemsBackedUp,
 					backup.Status.Progress.TotalItems)
 			}
-			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is"+
+			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is "+
 				"incomplete. Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
 				"Backup.Warnings=[%v], Backup.Errors=[%v]",
 				backup.Namespace, backup.Name, backup.Status.Phase,

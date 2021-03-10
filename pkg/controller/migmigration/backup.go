@@ -128,17 +128,15 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Spec.IncludedResources = toStringSlice(includedResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
-<<<<<<< HEAD
 	if Settings.DisImgCopy {
 		if newBackup.Annotations == nil {
 			newBackup.Annotations = map[string]string{}
 		}
 		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
 	}
-=======
 	t.Log.Info(fmt.Sprintf("Creating Stage Velero Backup [%v/%v] on source cluster.",
 		backup.Namespace, backup.Name))
->>>>>>> 810e646b... Add more context, log during hook creation
+		newBackup.Namespace, newBackup.Name))
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		return nil, err
@@ -175,7 +173,6 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 
 // Get an existing Backup on the source cluster.
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
-	t.Log.Info(fmt.Sprintf("Getting Velero Backup from source cluster with labels [%v]", labels))
 	client, err := t.getSourceClient()
 	if err != nil {
 		return nil, err
