@@ -267,7 +267,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 				deployment.Spec.Replicas = &restoredReplicas
 			}
 			t.Log.Info(fmt.Sprintf("Unquiescing Deployment [%v/%v] "+
-				"Changing spec.Replicas from [%v->%v]. "+
+				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
 				deployment.Namespace, deployment.Name,
 				currentReplicas, restoredReplicas,
@@ -297,7 +297,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 		}
 		for _, set := range list.Items {
 			t.Log.Info(fmt.Sprintf("Quiescing StatefulSet [%v/%v] "+
-				"Changing spec.Replicas from [%v->%v]. "+
+				"Changing Spec.Replicas from [%v->%v]. "+
 				"Annotating with [%v: %v]",
 				set.Namespace, set.Name,
 				set.Spec.Replicas, zero,
@@ -347,7 +347,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			restoredReplicas := int32(number)
 
 			t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet [%v/%v]. "+
-				"Changing spec.Replicas from [%v->%v]. "+
+				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v].",
 				set.Namespace, set.Name,
 				set.Spec.Replicas, replicas,
@@ -393,7 +393,7 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 			}
 			set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
 			t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet [%v/%v]. "+
-				"Changing spec.Replicas from [%v->%v]. "+
+				"Changing Spec.Replicas from [%v->%v]. "+
 				"Setting Annotation [%v: %v]",
 				set.Namespace, set.Name,
 				set.Spec.Replicas, zero,
@@ -422,7 +422,8 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 		}
 		for _, set := range list.Items {
 			if len(set.OwnerReferences) > 0 {
-				t.Log.Info("Unquiesce skipping ReplicaSet, has OwnerReferences", "name", set.Name)
+				t.Log.Info(fmt.Sprintf("Unquiesce skipping ReplicaSet [%v/%v], has OwnerReferences",
+					set.Namespace, set.Name))
 				continue
 			}
 			if set.Annotations == nil {
@@ -443,7 +444,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 				set.Spec.Replicas = &restoredReplicas
 			}
 			t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet [%v/%v]. "+
-				"Changing spec.Replicas from [%v->%v]. "+
+				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
 				set.Namespace, set.Name, 0, restoredReplicas, ReplicasAnnotation))
 			err = client.Update(context.TODO(), &set)
@@ -724,8 +725,8 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			for _, ref := range pod.OwnerReferences {
 				if _, found := kinds[ref.Kind]; found {
 					t.Log.Info(fmt.Sprintf("Found quiesced Pod [%v/%v] on source cluster"+
-						" that has not yet terminated. Waiting.",
-						pod.Namespace, pod.Name))
+						" with Phase=[%v] that has not yet terminated. Waiting.",
+						pod.Namespace, pod.Name, pod.Status.Phase))
 					return false, nil
 				}
 			}

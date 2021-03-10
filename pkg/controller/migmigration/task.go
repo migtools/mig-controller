@@ -547,8 +547,17 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. Waiting. Backup.Status=[%v]",
-				backup.Namespace, backup.Name, backup.Status))
+			backupProgress := ""
+			if backup.Status.Progress != nil {
+				backupProgress = fmt.Sprintf("%v/%v",
+					backup.Status.Progress.ItemsBackedUp,
+					backup.Status.Progress.TotalItems)
+			}
+			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. "+
+				"Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
+				"Backup.Warnings=[%v], Backup.Errors=[%v]",
+				backup.Namespace, backup.Name, backup.Status.Phase, backupProgress,
+				backup.Status.Warnings, backup.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
@@ -780,9 +789,17 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			backupProgress := ""
+			if backup.Status.Progress != nil {
+				backupProgress = fmt.Sprintf("%v/%v",
+					backup.Status.Progress.ItemsBackedUp,
+					backup.Status.Progress.TotalItems)
+			}
 			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is"+
-				"incomplete. Waiting. Backup.Status=[%v]",
-				backup.Namespace, backup.Name, backup.Status))
+				"incomplete. Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
+				"Backup.Warnings=[%v], Backup.Errors=[%v]",
+				backup.Namespace, backup.Name, backup.Status.Phase,
+				backupProgress, backup.Status.Warnings, backup.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
@@ -871,8 +888,10 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Log.Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
-				"is incomplete. Waiting. Restore.Status=[%v]",
-				restore.Namespace, restore.Name, restore.Status))
+				"is incomplete. Waiting. Restore.Phase=[%v], "+
+				"Restore.Warnings=[%v], Restore.Errors=[%v]",
+				restore.Namespace, restore.Name, restore.Status.Phase,
+				restore.Status.Warnings, restore.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
@@ -973,8 +992,10 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Log.Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
-				"cluster is incomplete. Waiting. Restore.Status=[%v]",
-				restore.Namespace, restore.Name, restore.Status))
+				"cluster is incomplete. Waiting. Restore.Phase=[%v], "+
+				"Restore.Warnings=[%v], Restore.Errors=[%v]",
+				restore.Namespace, restore.Name,
+				restore.Status.Phase, restore.Status.Warnings, restore.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case PostRestoreHooks:
