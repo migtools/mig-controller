@@ -362,7 +362,9 @@ func (t *Task) Run() error {
 	case StartRefresh:
 		started, err := t.startRefresh()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error starting refresh of migration plan")
+			t.Log.V(2).Error(err, fmt.Sprintf("Error starting refresh of "+
+				"MigPlan [%v/%v] validations",
+				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -378,7 +380,9 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
-			t.Log.V(2).Info("Migration plan %v/%v is not finished refreshing, waiting.")
+			t.Log.V(2).Info(fmt.Sprintf("MigPlan [%v/%v] is not finished "+
+				"refreshing validations. Waiting.",
+				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 		}
 	case CleanStaleResticCRs:
 		err := t.deleteStaleResticCRs()
@@ -409,7 +413,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Created %v/2 registries, retrying.", nEnsured))
+			t.Log.V(2).Info(fmt.Sprintf("Created [%v/2] registries, retrying.", nEnsured))
 		}
 	case WaitForRegistriesReady:
 		// First registry health check happens here
@@ -429,7 +433,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Found %v/2 registries in healthy state, waiting.", nEnsured))
+			t.Log.V(2).Info(fmt.Sprintf("Found [%v/2] registries in healthy state. Waiting.", nEnsured))
 			t.Requeue = PollReQ
 		}
 	case DeleteRegistries:
@@ -499,7 +503,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Cloud secret has propagated on %v/2 clusters, waiting.", count))
+			t.Log.V(2).Info(fmt.Sprintf("Cloud secret has propagated to Velero Pod "+
+				"on [%v/2] clusters. Waiting.", count))
 			t.Requeue = PollReQ
 		}
 	case PreBackupHooks:
@@ -513,7 +518,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("PreBackupHooks are still running, waiting."))
+			t.Log.V(2).Info(fmt.Sprintf("PreBackupHooks are still running. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureInitialBackup:
@@ -543,8 +548,8 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup %v/%v is still running, waiting.",
-				backup.Namespace, backup.Name))
+			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. Waiting. Backup.Status=[%v]",
+				backup.Namespace, backup.Name, backup.Status))
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
@@ -558,7 +563,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Annotated/labeled %v source cluster resources, requeuing.",
+			t.Log.V(2).Info(fmt.Sprintf("Annotated/labeled [%v] source cluster resources this reconcile, "+
+				"requeuing and continuing.",
 				AnnotationsPerReconcile))
 		}
 	case EnsureStagePodsFromRunning:
@@ -637,7 +643,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Restic is unready on at least one cluster, waiting.")
+			t.Log.V(2).Info("Restic is unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case WaitForVeleroReady:
@@ -651,7 +657,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Velero Pod(s) are unready on at least one cluster, waiting.")
+			t.Log.V(2).Info("Velero Pod(s) are unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
@@ -732,6 +738,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] is incomplete. Waiting.",
+				dvm.Namespace, dvm.Name))
 			t.Requeue = PollReQ
 			criticalWarning, err := t.getWarningForDVM(dvm)
 			if err != nil {
@@ -773,6 +781,9 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is"+
+				"incomplete. Waiting. Backup.Status=[%v]",
+				backup.Namespace, backup.Name, backup.Status))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
@@ -794,6 +805,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Stage Velero Backup [%v/%v] has not yet "+
+				"been replicated to target cluster by Velero. Waiting",
+				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case PostBackupHooks:
@@ -808,6 +822,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("PostBackupHook(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case PreRestoreHooks:
@@ -822,6 +837,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("PreRestoreHooks(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageRestore:
@@ -855,6 +871,9 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
+				"is incomplete. Waiting. Restore.Status=[%v]",
+				restore.Namespace, restore.Name, restore.Status))
 			t.Requeue = PollReQ
 		}
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
@@ -869,8 +888,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking completion of Stage "+
-				"Pod Cleanup.")
+			t.Log.V(2).Error(err, "Error checking completion of Stage Pod Cleanup.")
 			return liberr.Wrap(err)
 		}
 		if terminated {
@@ -878,6 +896,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Stage Pods have not finished terminating. Waiting")
 			t.Requeue = PollReQ
 		}
 	case EnsureAnnotationsDeleted, CleanStaleAnnotations:
@@ -911,6 +930,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup [%v/%v] has not yet "+
+				"been replicated to target cluster by Velero. Waiting",
+				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case EnsureFinalRestore:
@@ -951,11 +973,15 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.V(2).Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
+				"cluster is incomplete. Waiting. Restore.Status=[%v]",
+				restore.Namespace, restore.Name, restore.Status))
 			t.Requeue = PollReQ
 		}
 	case PostRestoreHooks:
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
+			t.Log.V(2).Error(err, "Error getting final Velero Restore from target cluster.")
 			t.fail(PostRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -964,11 +990,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("PostRestoreHooks are incomplete. Waiting")
 			t.Requeue = PollReQ
 		}
 	case Verification:
 		completed, err := t.VerificationCompleted()
 		if err != nil {
+			t.Log.V(2).Error(err, "Error verifying migrated Pod health on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if completed {
@@ -976,6 +1004,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Verification is incomplete. Some Pods that existed on " +
+				"the source cluster have not yet been recreated and verified healthy " +
+				"on target cluster. Waiting")
 			t.Requeue = PollReQ
 		}
 	case Canceling:
@@ -1015,6 +1046,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.V(2).Info("Found resources associated with MigPlan on target cluster " +
+				"that have not finished deleting. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case DeleteBackups:
