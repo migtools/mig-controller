@@ -103,6 +103,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	t.Log.Info("Building Stage Velero Backup resource definition")
 	newBackup, err := t.buildBackup(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -127,12 +128,17 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Spec.IncludedResources = toStringSlice(includedResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedStageResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.LabelSelector = &labelSelector
+<<<<<<< HEAD
 	if Settings.DisImgCopy {
 		if newBackup.Annotations == nil {
 			newBackup.Annotations = map[string]string{}
 		}
 		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
 	}
+=======
+	t.Log.Info(fmt.Sprintf("Creating Stage Velero Backup [%v/%v] on source cluster.",
+		backup.Namespace, backup.Name))
+>>>>>>> 810e646b... Add more context, log during hook creation
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
 		return nil, err
@@ -169,6 +175,7 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 
 // Get an existing Backup on the source cluster.
 func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
+	t.Log.Info(fmt.Sprintf("Getting Velero Backup from source cluster with labels [%v]", labels))
 	client, err := t.getSourceClient()
 	if err != nil {
 		return nil, err
@@ -362,6 +369,8 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 				backup.Name))
 		completed = true
 	}
+	t.Log.Info(fmt.Sprintf("Velero Backup [%s/%s] progress: [%v]",
+		backup.Name, backup.Namespace, progress))
 
 	t.setProgress(progress)
 	return completed, reasons
@@ -387,6 +396,7 @@ func (t *Task) setStageBackupPartialFailureWarning(backup *velero.Backup) {
 	if backup.Status.Phase == velero.BackupPhasePartiallyFailed {
 		message := fmt.Sprintf(
 			"Stage Backup %s/%s: partially failed on source cluster", backup.GetNamespace(), backup.GetName())
+		t.Log.Info(message)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     VeleroStageBackupPartiallyFailed,
 			Status:   True,
@@ -770,6 +780,8 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 		return false, err
 	}
 	replicated := velero.Backup{}
+	t.Log.Info(fmt.Sprintf("Checking if Velero Backup [%v/%v] "+
+		"has been replicated to destination cluster", backup.Namespace, backup.Name))
 	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
@@ -778,6 +790,8 @@ func (t *Task) isBackupReplicated(backup *velero.Backup) (bool, error) {
 		},
 		&replicated)
 	if err == nil {
+		t.Log.Info(fmt.Sprintf("FOUND Velero Backup [%v/%v] "+
+			"has been replicated to destination cluster", replicated.Namespace, replicated.Name))
 		return true, nil
 	}
 	if k8serrors.IsNotFound(err) {

@@ -746,8 +746,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] is incomplete. Waiting.",
-				dvm.Namespace, dvm.Name))
+			t.Log.Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] "+
+				"with phase=[%v] on host cluster is incomplete. Waiting.",
+				dvm.Namespace, dvm.Name, dvm.Status.Phase))
 			t.Requeue = PollReQ
 			criticalWarning, err := t.getWarningForDVM(dvm)
 			if err != nil {
@@ -782,6 +783,9 @@ func (t *Task) Run() error {
 		if completed {
 			t.setStageBackupPartialFailureWarning(backup)
 			if len(reasons) > 0 {
+				t.Log.Info(fmt.Sprintf("Migration FAILED due to Stage Velero Backup"+
+					"[%v/%v] failure on source cluster, reasons=[%v].",
+					backup.Namespace, backup.Name, reasons))
 				t.fail(StageBackupFailed, reasons)
 			} else {
 				if err = t.next(); err != nil {

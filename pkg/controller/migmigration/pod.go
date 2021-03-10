@@ -29,11 +29,11 @@ func (t *Task) shouldResticRestart() (bool, error) {
 	runRestart := false
 	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
 		runRestart = true
-		t.Log.Info("Detected OpenShift 3.7. Restic will restart unless override is set.")
+		t.Log.Info("Detected OpenShift 3.7. Restic WILL restart unless override is set.")
 	}
 	if client.MajorVersion() == 1 && client.MinorVersion() == 9 {
 		runRestart = true
-		t.Log.Info("Detected OpenShift 3.9. Restic will restart unless override is set.")
+		t.Log.Info("Detected OpenShift 3.9. Restic WILL restart unless override is set.")
 	}
 	// User can override default by setting MigCluster.Spec.RestartRestic.
 	if t.PlanResources.SrcMigCluster.Spec.RestartRestic != nil {
@@ -198,8 +198,12 @@ func (t *Task) deleteVeleroPodsForCluster(cluster *migapi.MigCluster) error {
 	}
 	for _, pod := range veleroPods {
 		if pod.Status.Phase != corev1.PodRunning {
+			t.Log.Info(fmt.Sprintf("Skipping deletion of non-running Velero Pod [%v/%v], phase=[%v]",
+				pod.Namespace, pod.Name, pod.Status.Phase))
 			continue
 		}
+		t.Log.Info(fmt.Sprintf("Deleting running Velero Pod [%v/%v] on MigCluster=[%v/%v]",
+			pod.Namespace, pod.Name, cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(
 			context.TODO(),
 			&pod)

@@ -550,12 +550,8 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info(
-				"Pod annotations/labels removed.",
-				"ns",
-				pod.Namespace,
-				"name",
-				pod.Name)
+			log.Info(fmt.Sprintf("Pod [%v/%v] Velero Annotations/Labels removed.",
+				pod.Namespace, pod.Name))
 		}
 	}
 
@@ -630,12 +626,8 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info(
-				"PVC annotations/labels removed.",
-				"ns",
-				pvc.Namespace,
-				"name",
-				pvc.Name)
+			log.Info(fmt.Sprintf("PersistentVolumeClaim [%v/%v] Velero Annotations/Labels removed.",
+				pvc.Namespace, pvc.Name))
 		}
 	}
 
@@ -661,10 +653,8 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(
-			"PV annotations/labels removed.",
-			"name",
-			pv.Name)
+		log.Info(fmt.Sprintf("PersistentVolume [%v/%v] Velero Annotations/Labels removed.",
+			pv.Namespace, pv.Name))
 	}
 
 	return nil
@@ -687,12 +677,8 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(
-			"SA annotations/labels removed.",
-			"ns",
-			sa.Namespace,
-			"name",
-			sa.Name)
+		log.Info(fmt.Sprintf("ServiceAccount [%v/%v] Velero Annotations/Labels removed.",
+			sa.Namespace, sa.Name))
 	}
 	return nil
 }
@@ -714,12 +700,8 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(
-			"ImageStream labels removed.",
-			"ns",
-			is.Namespace,
-			"name",
-			is.Name)
+		log.Info(fmt.Sprintf("ImageStream [%v/%v] Velero Annotations/Labels removed.",
+			is.Namespace, is.Name))
 	}
 	return nil
 }

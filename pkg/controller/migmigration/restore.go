@@ -53,6 +53,8 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
+	t.Log.Info(fmt.Sprintf("Creating Velero Final Restore [%v/%v] on target cluster.",
+		restore.Namespace, restore.Name))
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)

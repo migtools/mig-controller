@@ -135,11 +135,11 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 	for _, stagePod := range stagePods {
 		if existingPods.contains(stagePod) {
-			t.Log.Info(fmt.Sprintf("Found existing stage pod [%v/%v], skipping",
-				stagePod.Namespace, stagePod.Name))
+			t.Log.Info(fmt.Sprintf("Found existing Stage Pod [%v/%v] phase=[%v], skipping",
+				stagePod.Namespace, stagePod.Name, stagePod.Status.Phase))
 			continue
 		}
-		t.Log.Info(fmt.Sprintf("Creating stage pod [%v/%v]",
+		t.Log.Info(fmt.Sprintf("Creating Stage Pod [%v/%v]",
 			stagePod.Namespace, stagePod.Name))
 		err := client.Create(context.TODO(), &stagePod.Pod)
 		if err != nil && !k8serr.IsAlreadyExists(err) {
@@ -704,10 +704,8 @@ func (t *Task) ensureStagePodsDeleted() error {
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			log.Info(
-				"Stage pod deleted.",
-				"ns", pod.Namespace,
-				"name", pod.Name)
+			log.Info(fmt.Sprintf("Stage Pod [%v/%v] deletion requested on source cluster.",
+				pod.Namespace, pod.Name))
 		}
 	}
 
@@ -727,10 +725,8 @@ func (t *Task) ensureStagePodsDeleted() error {
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			log.Info(
-				"Stage pod deleted.",
-				"ns", pod.Namespace,
-				"name", pod.Name)
+			log.Info(fmt.Sprintf("Stage Pod [%v/%v] deletion requested on destination cluster.",
+				pod.Namespace, pod.Name))
 		}
 	}
 

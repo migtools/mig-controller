@@ -25,10 +25,13 @@ func (t *Task) createDirectVolumeMigration() error {
 	if existingDvm != nil {
 		return nil
 	}
+	t.Log.Info("Building DirectVolumeMigration resource definition")
 	dvm := t.buildDirectVolumeMigration()
 	if dvm == nil {
 		return errors.New("failed to build directvolumeclaim list")
 	}
+	t.Log.Info(fmt.Sprintf("Creating DirectVolumeMigration [%v/%v] on host cluster",
+		dvm.Namespace, dvm.Name))
 	err = t.Client.Create(context.TODO(), dvm)
 	return err
 
