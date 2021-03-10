@@ -50,7 +50,7 @@ func (t *Task) createDirectImageMigration() error {
 		return nil
 	}
 	dim = t.buildDirectImageMigration()
-	t.Log.V(2).Info(fmt.Sprintf("Creating directimagemigration resource %v/%v.",
+	t.Log.Info(fmt.Sprintf("Creating directimagemigration resource %v/%v.",
 		dim.Namespace, dim.Name))
 	err = t.Client.Create(context.TODO(), dim)
 	if err != nil {

@@ -140,7 +140,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	}
 
 	if itemsUpdated > AnnotationsPerReconcile {
-		t.Log.V(2).Info("Completed %v annotations/label operations this reconcile, requeueing.")
+		t.Log.Info("Completed %v annotations/label operations this reconcile, requeueing.")
 		return false, nil
 	}
 

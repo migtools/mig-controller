@@ -230,7 +230,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMi
 			return liberr.Wrap(err)
 		}
 		if nEnsured != 2 {
-			log.V(2).Info(fmt.Sprintf("Found %v/2 registries in healthy condition. Registries are unhealthy.", nEnsured), "message", message)
+			log.Info(fmt.Sprintf("Found %v/2 registries in healthy condition. Registries are unhealthy.", nEnsured), "message", message)
 			migration.Status.DeleteCondition(RegistriesHealthy)
 			migration.Status.SetCondition(migapi.Condition{
 				Type:     RegistriesUnhealthy,
@@ -240,7 +240,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMi
 				Durable:  true,
 			})
 		} else if nEnsured == 2 {
-			log.V(2).Info("Found 2/2 registries in healthy condition.", "message", message)
+			log.Info("Found 2/2 registries in healthy condition.", "message", message)
 			migration.Status.DeleteCondition(RegistriesUnhealthy)
 			setMigRegistryHealthyCondition(migration)
 		}
@@ -260,7 +260,7 @@ func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
 
 // Validate that migration registries on both source and dest clusters are healthy
 func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (int, string, error) {
-	log.V(2).Info("Checking registry health")
+	log.Info("Checking registry health")
 
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}

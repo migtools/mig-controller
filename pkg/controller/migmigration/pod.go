@@ -29,16 +29,16 @@ func (t *Task) shouldResticRestart() (bool, error) {
 	runRestart := false
 	if client.MajorVersion() == 1 && client.MinorVersion() == 7 {
 		runRestart = true
-		t.Log.V(2).Info("Detected OpenShift 3.7. Restic will restart unless override is set.")
+		t.Log.Info("Detected OpenShift 3.7. Restic will restart unless override is set.")
 	}
 	if client.MajorVersion() == 1 && client.MinorVersion() == 9 {
 		runRestart = true
-		t.Log.V(2).Info("Detected OpenShift 3.9. Restic will restart unless override is set.")
+		t.Log.Info("Detected OpenShift 3.9. Restic will restart unless override is set.")
 	}
 	// User can override default by setting MigCluster.Spec.RestartRestic.
 	if t.PlanResources.SrcMigCluster.Spec.RestartRestic != nil {
 		runRestart = *t.PlanResources.SrcMigCluster.Spec.RestartRestic
-		t.Log.V(2).Info(fmt.Sprintf("SrcCluster.Spec.RestartRestic override [%v] found.",
+		t.Log.Info(fmt.Sprintf("SrcCluster.Spec.RestartRestic override [%v] found.",
 			runRestart))
 	}
 	return runRestart, nil
@@ -48,7 +48,7 @@ func (t *Task) shouldResticRestart() (bool, error) {
 // Restarted to get around mount propagation requirements.
 func (t *Task) restartResticPods() error {
 	// Verify restic restart is needed before proceeding
-	t.Log.V(2).Info("Checking if Restic Restart is required.")
+	t.Log.Info("Checking if Restic Restart is required.")
 	runRestart, err := t.shouldResticRestart()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -66,7 +66,7 @@ func (t *Task) restartResticPods() error {
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
 	})
-	t.Log.V(2).Info(fmt.Sprintf("Getting Restic Pods on source cluster in namespace [%v]",
+	t.Log.Info(fmt.Sprintf("Getting Restic Pods on source cluster in namespace [%v]",
 		migapi.VeleroNamespace))
 	err = client.List(
 		context.TODO(),
@@ -81,11 +81,11 @@ func (t *Task) restartResticPods() error {
 
 	for _, pod := range list.Items {
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.V(2).Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state, skipping restart.",
+			t.Log.Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state, skipping restart.",
 				pod.Namespace, pod.Name))
 			continue
 		}
-		t.Log.V(2).Info(fmt.Sprintf("Deleting Restic Pod [%v/%v] in source cluster to trigger restart.",
+		t.Log.Info(fmt.Sprintf("Deleting Restic Pod [%v/%v] in source cluster to trigger restart.",
 			pod.Namespace, pod.Name))
 		err = client.Delete(
 			context.TODO(),
@@ -120,7 +120,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		"name": "restic",
 	})
 
-	t.Log.V(2).Info("Getting Restic DaemonSet on source cluster")
+	t.Log.Info("Getting Restic DaemonSet on source cluster")
 	err = client.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
@@ -132,7 +132,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		return false, liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Getting list of Restic Pods on source cluster")
+	t.Log.Info("Getting list of Restic Pods on source cluster")
 	err = client.Get(
 		context.TODO(),
 		types.NamespacedName{
@@ -146,19 +146,19 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 
 	for _, pod := range list.Items {
 		if pod.DeletionTimestamp != nil {
-			t.Log.V(2).Info(fmt.Sprintf("Deletion timestamp found on Restic Pod [%v/%v], "+
+			t.Log.Info(fmt.Sprintf("Deletion timestamp found on Restic Pod [%v/%v], "+
 				"Pod is in the process of deleting. Requeuing and waiting for restart.",
 				pod.Namespace, pod.Name))
 			return false, nil
 		}
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.V(2).Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state."+
+			t.Log.Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state."+
 				" Requeuing and waiting for restart.", pod.Namespace, pod.Name))
 			return false, nil
 		}
 	}
 	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
-		t.Log.V(2).Info(fmt.Sprintf("Restic DaemonSet [%v/%v] .Status.CurrentNumberScheduled "+
+		t.Log.Info(fmt.Sprintf("Restic DaemonSet [%v/%v] .Status.CurrentNumberScheduled "+
 			" differs from .Status.NumberReady. Requeuing and waiting for these to match.",
 			ds.Namespace, ds.Name))
 		return false, nil
@@ -251,20 +251,20 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 
 		for _, pod := range list.Items {
 			if pod.DeletionTimestamp != nil {
-				t.Log.V(2).Info(fmt.Sprintf("Found Velero Pod [%v/%v] with deletion timestamp."+
+				t.Log.Info(fmt.Sprintf("Found Velero Pod [%v/%v] with deletion timestamp."+
 					" Requeuing and waiting for Pod to finish deleting and restart.",
 					pod.Namespace, pod.Name))
 				return false, nil
 			}
 			if pod.Status.Phase != corev1.PodRunning {
-				t.Log.V(2).Info(fmt.Sprintf("Found Velero Pod [%v/%v] with Status.Phase != Running."+
+				t.Log.Info(fmt.Sprintf("Found Velero Pod [%v/%v] with Status.Phase != Running."+
 					" Requeuing and waiting for Pod to enter running state.",
 					pod.Namespace, pod.Name))
 				return false, nil
 			}
 		}
 		if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
-			t.Log.V(2).Info(fmt.Sprintf("Found Velero Deployment [%v/%v] with "+
+			t.Log.Info(fmt.Sprintf("Found Velero Deployment [%v/%v] with "+
 				"Spec.Replicas != Status.ReadyReplicas. Requeuing and waiting for these fields to match.",
 				deployment.Namespace, deployment.Name))
 			return false, nil
@@ -317,7 +317,7 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 				RestCfg: restCfg,
 				Pod:     &pod,
 			}
-			t.Log.V(2).Info(fmt.Sprintf("Execing into Velero Pod [%v/%v]"+
+			t.Log.Info(fmt.Sprintf("Execing into Velero Pod [%v/%v]"+
 				"on MigCluster [%v/%v] with command [%v] to check for Cloud Credentials",
 				pod.Namespace, pod.Name, cluster.Namespace, cluster.Name,
 				"cat "+provider.GetCloudCredentialsPath()))

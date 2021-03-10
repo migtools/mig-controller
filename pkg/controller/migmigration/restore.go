@@ -445,7 +445,7 @@ func (t *Task) deleteCorrelatedRestores() error {
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, int, error) {
-	t.Log.V(2).Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster %v/%v",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
@@ -506,7 +506,7 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error) {
-	t.Log.V(2).Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster %v/%v",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
@@ -611,7 +611,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombined := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
 			t.Log.Info(fmt.Sprintf("Searching for destination cluster resources "+
-				" associated with MigPlan in namespace=[%v] with GVK=[%v]",
+				"associated with MigPlan in namespace=[%v] with GVK=[%v]",
 				ns, gvkCombined))
 			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
@@ -635,7 +635,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info("Deleted resource from destination cluster",
+				log.Info("DELETED resource from destination cluster",
 					"GVK", gvkCombined,
 					"ns/name", ns+"/"+r.GetName())
 			}
@@ -702,9 +702,9 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 			}
 			// Wait for resources with deletion timestamps
 			if len(list.Items) > 0 {
-				t.Log.Info(fmt.Sprintf("Resource(s) found with GVK=[%v] in namespace [%v]"+
-					"in destination cluster that have not finished terminating. "+
-					"These resources are associated with the MigPlan and were marked for deletion.",
+				t.Log.Info(fmt.Sprintf("Resource(s) found with GVK=[%v] in destination cluster "+
+					"namespace=[%v] that have NOT finished terminating. These resource(s) "+
+					"are associated with the MigPlan and deletion has been requested.",
 					gvkCombinedName, ns))
 				return false, err
 			}

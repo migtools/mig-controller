@@ -336,13 +336,12 @@ func (t *Task) Run() error {
 	// Set stage, phase, phase description, migplan name
 	t.Log = t.Log.WithValues("Phase", t.Phase)
 	t.Requeue = FastReQ
-	t.Log.Info("[RUN]")
 
-	// Log the extended description of current phase, complain at debug level
-	// if we forgot to add a description.
+	// Log the extended description of current phase
 	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
-		t.Log.Info(phaseDescription)
+		t.Log.Info("[RUN] " + phaseDescription)
 	} else {
+		t.Log.Info("[RUN]")
 		t.Log.V(4).Info("Missing phase description for phase.")
 	}
 
@@ -1399,7 +1398,7 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 
 // Phase fail.
 func (t *Task) fail(nextPhase string, reasons []string) {
-	log.V(2).Info("Marking migration as failed.")
+	log.Info("Marking migration as failed.")
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{

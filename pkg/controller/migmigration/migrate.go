@@ -50,7 +50,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Started
 	if migration.Status.StartTimestamp == nil {
-		log.V(2).Info("Marking migration as started.")
+		log.Info("Marking migration as started.")
 		migration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 

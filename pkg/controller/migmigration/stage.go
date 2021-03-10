@@ -135,11 +135,11 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 	for _, stagePod := range stagePods {
 		if existingPods.contains(stagePod) {
-			t.Log.V(2).Info(fmt.Sprintf("Found existing stage pod [%v/%v], skipping",
+			t.Log.Info(fmt.Sprintf("Found existing stage pod [%v/%v], skipping",
 				stagePod.Namespace, stagePod.Name))
 			continue
 		}
-		t.Log.V(2).Info(fmt.Sprintf("Creating stage pod [%v/%v]",
+		t.Log.Info(fmt.Sprintf("Creating stage pod [%v/%v]",
 			stagePod.Namespace, stagePod.Name))
 		err := client.Create(context.TODO(), &stagePod.Pod)
 		if err != nil && !k8serr.IsAlreadyExists(err) {
@@ -190,7 +190,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Getting list of existing Stage Pods")
+	t.Log.Info("Getting list of existing Stage Pods")
 	existingStagePods, err := t.listStagePods(client)
 	if err != nil {
 		log.Trace(err)
@@ -212,15 +212,15 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		return false
 	}
 
-	t.Log.V(2).Info("Getting list of PVCs")
+	t.Log.Info("Getting list of PVCs")
 	pvcMapping := t.getPVCs()
 
-	t.Log.V(2).Info("Building resource limit mapping for Stage Pods from Orphaned PVCs")
+	t.Log.Info("Building resource limit mapping for Stage Pods from Orphaned PVCs")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	t.Log.V(2).Info("Getting Stage Pod image")
+	t.Log.Info("Getting Stage Pod image")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -255,7 +255,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		}
 	}
 
-	t.Log.V(2).Info("Creating Stage Pods on source cluster from Orphaned PVCs")
+	t.Log.Info("Creating Stage Pods on source cluster from Orphaned PVCs")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -283,31 +283,31 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Getting list of Stage Pods to create for DeploymentConfigs, Deployments, " +
+	t.Log.Info("Getting list of Stage Pods to create for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	podTemplates, err := migpods.ListTemplatePods(client, t.sourceNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Building Stage Pod resource mappings for DeploymentConfigs, Deployments, " +
+	t.Log.Info("Building Stage Pod resource mappings for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Getting Stage Pod image for source cluster")
+	t.Log.Info("Getting Stage Pod image for source cluster")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Building Stage Pod definitions for DeploymentConfigs, Deployments, " +
+	t.Log.Info("Building Stage Pod definitions for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, stagePodImage, resourceLimitMapping)
 
-	t.Log.V(2).Info("Creating Stage Pods for DeploymentConfigs, Deployments, " +
+	t.Log.Info("Creating Stage Pods for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
@@ -388,18 +388,18 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		return liberr.Wrap(err)
 	}
 	stagePods := StagePodList{}
-	t.Log.V(2).Info("Building resource limit mapping for stage pods")
+	t.Log.Info("Building resource limit mapping for stage pods")
 	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	t.Log.V(2).Info("Retrieving stage pod image")
+	t.Log.Info("Retrieving stage pod image")
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	for _, ns := range t.sourceNamespaces() {
-		t.Log.V(2).Info("Building list of stage pods for src cluster namespace", "namespace", ns)
+		t.Log.Info("Building list of stage pods for src cluster namespace", "namespace", ns)
 		podList := corev1.PodList{}
 		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &podList)
 		if err != nil {
@@ -408,7 +408,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping)...)
 	}
 
-	t.Log.V(2).Info("Creating stage pods on source cluster")
+	t.Log.Info("Creating stage pods on source cluster")
 	created, err := t.createStagePods(client, stagePods)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -436,7 +436,7 @@ func (t *Task) ensureSourceStagePodsStarted() (report PodStartReport, err error)
 		err = liberr.Wrap(err)
 		return
 	}
-	t.Log.V(2).Info("Checking health of Stage Pods on source cluster.")
+	t.Log.Info("Checking health of Stage Pods on source cluster.")
 	return t.stagePodReport(client)
 }
 
@@ -447,7 +447,7 @@ func (t *Task) ensureDestinationStagePodsStarted() (report PodStartReport, err e
 		err = liberr.Wrap(err)
 		return
 	}
-	t.Log.V(2).Info("Checking health of Stage Pods on destination cluster.")
+	t.Log.Info("Checking health of Stage Pods on destination cluster.")
 	return t.stagePodReport(client)
 }
 
@@ -518,14 +518,14 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 				// If the pod has unhealthy claims, we will fail the migration
 				// So the user can fix the plan/pvc.
 				if !hasHealthyClaims(&pod) {
-					t.Log.V(2).Info(fmt.Sprintf("Found unhealthy PersistentVolumeClaims attached to "+
+					t.Log.Info(fmt.Sprintf("Found unhealthy PersistentVolumeClaims attached to "+
 						"Stage Pod [%v/%v] container [%v]. ",
 						pod.Namespace, pod.Name, c.Name))
 					report.failed = true
 					return
 				}
 				initReady = false
-				t.Log.V(2).Info(fmt.Sprintf("Found Stage Pod [%v/%v] container [%v] with "+
+				t.Log.Info(fmt.Sprintf("Found Stage Pod [%v/%v] container [%v] with "+
 					"pod.Status.InitContainerStatuses.State.Waiting=true",
 					pod.Namespace, pod.Name, c.Name))
 				report.progress = append(
@@ -538,7 +538,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 						c.State.Waiting.Message))
 			}
 			if c.State.Terminated != nil && c.State.Terminated.ExitCode != 0 {
-				t.Log.V(2).Info(fmt.Sprintf("Found unhealthy (terminated) Stage Pod [%v/%v] container [%v]. "+
+				t.Log.Info(fmt.Sprintf("Found unhealthy (terminated) Stage Pod [%v/%v] container [%v]. "+
 					"Init container failed with exit code %v.",
 					pod.Namespace, pod.Name, c.Name, c.State.Terminated.ExitCode))
 				initReady = false
@@ -558,7 +558,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		// if Pod is running, then move on
 		// pod succeeded phase should never occur for a stage pod
 		if pod.Status.Phase == corev1.PodRunning {
-			t.Log.V(2).Info(fmt.Sprintf("Found healthy running Stage Pod [%v/%v].",
+			t.Log.Info(fmt.Sprintf("Found healthy running Stage Pod [%v/%v].",
 				pod.Namespace, pod.Name))
 			report.progress = append(
 				report.progress,
@@ -577,10 +577,10 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			// So the user can fix the plan/pvc.
 			// pod Spec having the node name, means the pod has been scheduled
 			// becuase the pod has been scheduled we know that the PVC should be bound
-			t.Log.V(2).Info(fmt.Sprintf("Found pending Stage Pod [%v/%v].",
+			t.Log.Info(fmt.Sprintf("Found pending Stage Pod [%v/%v].",
 				pod.Namespace, pod.Name))
 			if pod.Spec.NodeName != "" && !hasHealthyClaims(&pod) {
-				t.Log.V(2).Info(fmt.Sprintf("Pending Stage Pod [%v/%v] has unhealthy "+
+				t.Log.Info(fmt.Sprintf("Pending Stage Pod [%v/%v] has unhealthy "+
 					"claims after being scheduled to Spec.NodeName: %v.",
 					pod.Namespace, pod.Name, pod.Spec.NodeName))
 				report.failed = true
@@ -588,7 +588,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			}
 			for _, c := range pod.Status.ContainerStatuses {
 				if c.State.Waiting != nil {
-					t.Log.V(2).Info(fmt.Sprintf("Pending Stage Pod [%v/%v] "+
+					t.Log.Info(fmt.Sprintf("Pending Stage Pod [%v/%v] "+
 						"container [%v] is waiting. Message=%v",
 						pod.Namespace, pod.Name, c.Name, c.State.Waiting.Message))
 					report.progress = append(
@@ -605,7 +605,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 
 		//TODO: [shurley] eventually, this should cause us to backoff and re-try to the create the pod.
 		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodUnknown {
-			t.Log.V(2).Info(fmt.Sprintf("Found Stage Pod [%v/%v] with Status.Phase=[%v].",
+			t.Log.Info(fmt.Sprintf("Found Stage Pod [%v/%v] with Status.Phase=[%v].",
 				pod.Namespace, pod.Name, pod.Status.Phase))
 			report.failed = true
 			report.progress = append(report.progress, report.reasons...)
@@ -616,7 +616,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 
 // Match number of stage pods in source and destination cluster
 func (t *Task) allStagePodsMatch() (report []string, err error) {
-	t.Log.V(2).Info("Checking that Stage Pods match on source and destination clusters.")
+	t.Log.Info("Checking that Stage Pods match on source and destination clusters.")
 	dstClient, err := t.getDestinationClient()
 	if err != nil {
 		err = liberr.Wrap(err)
@@ -653,7 +653,7 @@ func (t *Task) allStagePodsMatch() (report []string, err error) {
 	for _, pod := range podSList.Items {
 		if _, exists := namespaces[pod.Namespace]; exists {
 			if _, exist := dPods[pod.Name]; !exist {
-				t.Log.V(2).Info(fmt.Sprintf("Missing Stage Pod [%v/%v] on destination cluster. "+
+				t.Log.Info(fmt.Sprintf("Missing Stage Pod [%v/%v] on destination cluster. "+
 					"Migration may fail.", pod.Namespace, pod.Name))
 				report = append(report, pod.Name+" is missing. Migration might fail")
 			}
@@ -688,7 +688,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.V(2).Info("Preparing to delete Stage Pods on source cluster")
+	t.Log.Info("Preparing to delete Stage Pods on source cluster")
 	// Clean up source cluster namespaces
 	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
@@ -698,7 +698,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 			return err
 		}
 		for _, pod := range podList.Items {
-			t.Log.V(2).Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on source cluster",
+			t.Log.Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on source cluster",
 				pod.Namespace, pod.Name))
 			err := srcClient.Delete(context.TODO(), &pod)
 			if err != nil && !k8serr.IsNotFound(err) {
@@ -711,7 +711,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 		}
 	}
 
-	t.Log.V(2).Info("Preparing to delete Stage Pods on destination cluster")
+	t.Log.Info("Preparing to delete Stage Pods on destination cluster")
 	// Clean up destination cluster namespaces
 	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
@@ -721,7 +721,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 			return err
 		}
 		for _, pod := range podList.Items {
-			t.Log.V(2).Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on destination cluster",
+			t.Log.Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on destination cluster",
 				pod.Namespace, pod.Name))
 			err := destClient.Delete(context.TODO(), &pod)
 			if err != nil && !k8serr.IsNotFound(err) {
@@ -754,7 +754,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 		corev1.PodUnknown:   true,
 	}
 
-	t.Log.V(2).Info("Checking if source cluster Stage Pods are terminated")
+	t.Log.Info("Checking if source cluster Stage Pods are terminated")
 	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
 		podList := corev1.PodList{}
@@ -767,13 +767,13 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			t.Log.V(2).Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v]"+
+			t.Log.Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v] "+
 				"in source cluster.", pod.Namespace, pod.Name, pod.Status.Phase))
 			return false, nil
 		}
 	}
 
-	t.Log.V(2).Info("Checking if destination cluster Stage Pods are terminated")
+	t.Log.Info("Checking if destination cluster Stage Pods are terminated")
 	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
 		podList := corev1.PodList{}
@@ -786,7 +786,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			t.Log.V(2).Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v] "+
+			t.Log.Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v] "+
 				"in destination cluster.", pod.Namespace, pod.Name, pod.Status.Phase))
 			return false, nil
 		}
