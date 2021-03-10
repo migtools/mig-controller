@@ -362,7 +362,7 @@ func (t *Task) Run() error {
 	case StartRefresh:
 		started, err := t.startRefresh()
 		if err != nil {
-			t.Log.V(2).Error(err, fmt.Sprintf("Error starting refresh of "+
+			t.Log.Error(err, fmt.Sprintf("Error starting refresh of "+
 				"MigPlan [%v/%v] validations",
 				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 			return liberr.Wrap(err)
@@ -380,14 +380,14 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
-			t.Log.V(2).Info(fmt.Sprintf("MigPlan [%v/%v] is not finished "+
+			t.Log.Info(fmt.Sprintf("MigPlan [%v/%v] is not finished "+
 				"refreshing validations. Waiting.",
 				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 		}
 	case CleanStaleResticCRs:
 		err := t.deleteStaleResticCRs()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error deleting stale Restic resources")
+			t.Log.Error(err, "Error deleting stale Restic resources")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -396,7 +396,7 @@ func (t *Task) Run() error {
 	case CleanStaleVeleroCRs:
 		err := t.deleteStaleVeleroCRs()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error deleting stale Velero resources")
+			t.Log.Error(err, "Error deleting stale Velero resources")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -405,7 +405,7 @@ func (t *Task) Run() error {
 	case CreateRegistries:
 		nEnsured, err := t.ensureMigRegistries()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating migration registries")
+			t.Log.Error(err, "Error creating migration registries")
 			return liberr.Wrap(err)
 		}
 		if nEnsured == 2 {
@@ -413,7 +413,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Created [%v/2] registries, retrying.", nEnsured))
+			t.Log.Info(fmt.Sprintf("Created [%v/2] registries, retrying.", nEnsured))
 		}
 	case WaitForRegistriesReady:
 		// First registry health check happens here
@@ -421,7 +421,7 @@ func (t *Task) Run() error {
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
 			if err.Error() == "ImagePullBackOff" {
-				t.Log.V(2).Error(err, "Migration failed due to registry pod ImagePullBackoff")
+				t.Log.Error(err, "Migration failed due to registry pod ImagePullBackoff")
 				t.fail(WaitForRegistriesReady, []string{message})
 			} else {
 				return liberr.Wrap(err)
@@ -433,13 +433,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Found [%v/2] registries in healthy state. Waiting.", nEnsured))
+			t.Log.Info(fmt.Sprintf("Found [%v/2] registries in healthy state. Waiting.", nEnsured))
 			t.Requeue = PollReQ
 		}
 	case DeleteRegistries:
 		err := t.deleteImageRegistryResources()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error deleting image registry resources.")
+			t.Log.Error(err, "Error deleting image registry resources.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -449,7 +449,7 @@ func (t *Task) Run() error {
 		// Create the DirectImageMigration CR
 		err := t.createDirectImageMigration()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating DirectImageMigration resource.")
+			t.Log.Error(err, "Error creating DirectImageMigration resource.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -473,7 +473,7 @@ func (t *Task) Run() error {
 		if completed {
 			if len(reasons) > 0 {
 				t.setDirectImageMigrationWarning(dim)
-				t.Log.V(2).Info(fmt.Sprintf("DirectImageMigration [%v/%v] completed with warnings.",
+				t.Log.Info(fmt.Sprintf("DirectImageMigration [%v/%v] completed with warnings.",
 					dim.Namespace, dim.Name))
 				// Once supported, add reasons to Status.Warnings for the Step
 			}
@@ -481,7 +481,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Waiting for DirectImageMigration [%v/%v] to complete.",
+			t.Log.Info(fmt.Sprintf("Waiting for DirectImageMigration [%v/%v] to complete.",
 				dim.Namespace, dim.Name))
 			t.Requeue = PollReQ
 		}
@@ -503,7 +503,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Cloud secret has propagated to Velero Pod "+
+			t.Log.Info(fmt.Sprintf("Cloud secret has propagated to Velero Pod "+
 				"on [%v/2] clusters. Waiting.", count))
 			t.Requeue = PollReQ
 		}
@@ -518,7 +518,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("PreBackupHooks are still running. Waiting."))
+			t.Log.Info(fmt.Sprintf("PreBackupHooks are still running. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureInitialBackup:
@@ -548,14 +548,14 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. Waiting. Backup.Status=[%v]",
+			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. Waiting. Backup.Status=[%v]",
 				backup.Namespace, backup.Name, backup.Status))
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
 		finished, err := t.annotateStageResources()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error annotating source cluster resources to be migrated")
+			t.Log.Error(err, "Error annotating source cluster resources to be migrated")
 			return liberr.Wrap(err)
 		}
 		if finished {
@@ -563,14 +563,14 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Annotated/labeled [%v] source cluster resources this reconcile, "+
+			t.Log.Info(fmt.Sprintf("Annotated/labeled [%v] source cluster resources this reconcile, "+
 				"requeuing and continuing.",
 				AnnotationsPerReconcile))
 		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating stage pods on source cluster from running pods")
+			t.Log.Error(err, "Error creating stage pods on source cluster from running pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -579,7 +579,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating stage pods on source cluster from templates")
+			t.Log.Error(err, "Error creating stage pods on source cluster from templates")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -588,7 +588,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromOrphanedPVCs:
 		err := t.ensureStagePodsFromOrphanedPVCs()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating stage pods on source cluster from orphaned PVCs")
+			t.Log.Error(err, "Error creating stage pods on source cluster from orphaned PVCs")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -597,11 +597,11 @@ func (t *Task) Run() error {
 	case StagePodsCreated:
 		report, err := t.ensureSourceStagePodsStarted()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking if stage pods have started on source cluster")
+			t.Log.Error(err, "Error checking if stage pods have started on source cluster")
 			return liberr.Wrap(err)
 		}
 		if report.failed {
-			t.Log.V(2).Info("Migration failed due to a problem with source cluster stage pods")
+			t.Log.Info("Migration failed due to a problem with source cluster stage pods")
 			t.fail(SourceStagePodsFailed, report.reasons)
 			break
 		}
@@ -610,14 +610,14 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Waiting for Stage Pods to be ready on source cluster")
+			t.Log.Info("Waiting for Stage Pods to be ready on source cluster")
 			t.Requeue = PollReQ
 		}
 		t.setProgress(report.progress)
 	case RestartRestic:
 		err := t.restartResticPods()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error restarting Restic Pods on source cluster")
+			t.Log.Error(err, "Error restarting Restic Pods on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -626,7 +626,7 @@ func (t *Task) Run() error {
 	case RestartVelero:
 		err := t.restartVeleroPods()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error restarting Velero Pod on source cluster")
+			t.Log.Error(err, "Error restarting Velero Pod on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -635,7 +635,7 @@ func (t *Task) Run() error {
 	case WaitForResticReady:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking if Restic Pods are ready on source cluster")
+			t.Log.Error(err, "Error checking if Restic Pods are ready on source cluster")
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -643,13 +643,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Restic is unready on the source or target cluster. Waiting.")
+			t.Log.Info("Restic is unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case WaitForVeleroReady:
 		started, err := t.haveVeleroPodsStarted()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking if Velero Pods are ready.")
+			t.Log.Error(err, "Error checking if Velero Pods are ready.")
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -657,13 +657,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Velero Pod(s) are unready on the source or target cluster. Waiting.")
+			t.Log.Info("Velero Pod(s) are unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
 		err := t.quiesceApplications()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error quiescing applications on the source cluster.")
+			t.Log.Error(err, "Error quiescing applications on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -672,7 +672,7 @@ func (t *Task) Run() error {
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking for quiescing app termination on the source cluster.")
+			t.Log.Error(err, "Error checking for quiescing app termination on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if quiesced {
@@ -680,14 +680,14 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Quiescing on source cluster is incomplete. " +
+			t.Log.Info("Quiescing on source cluster is incomplete. " +
 				"Pods are not yet terminated, waiting.")
 			t.Requeue = PollReQ
 		}
 	case UnQuiesceSrcApplications:
 		err := t.unQuiesceSrcApplications()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error unquiescing apps on source cluster.")
+			t.Log.Error(err, "Error unquiescing apps on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -696,7 +696,7 @@ func (t *Task) Run() error {
 	case UnQuiesceDestApplications:
 		err := t.unQuiesceDestApplications()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error unquiescing apps on destination cluster.")
+			t.Log.Error(err, "Error unquiescing apps on destination cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -705,7 +705,7 @@ func (t *Task) Run() error {
 	case CreateDirectVolumeMigration:
 		err := t.createDirectVolumeMigration()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating DirectVolumeMigration resource.")
+			t.Log.Error(err, "Error creating DirectVolumeMigration resource.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -714,12 +714,12 @@ func (t *Task) Run() error {
 	case WaitForDirectVolumeMigrationToComplete:
 		dvm, err := t.getDirectVolumeMigration()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking DirectVolumeMigration completion.")
+			t.Log.Error(err, "Error checking DirectVolumeMigration completion.")
 			return liberr.Wrap(err)
 		}
 		// if no dvm, continue to next task
 		if dvm == nil {
-			t.Log.V(2).Info("No DVM resource found, continuing to next phase.")
+			t.Log.Info("No DVM resource found, continuing to next phase.")
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
@@ -738,7 +738,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] is incomplete. Waiting.",
+			t.Log.Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] is incomplete. Waiting.",
 				dvm.Namespace, dvm.Name))
 			t.Requeue = PollReQ
 			criticalWarning, err := t.getWarningForDVM(dvm)
@@ -754,7 +754,7 @@ func (t *Task) Run() error {
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating Stage Velero Backup on source cluster.")
+			t.Log.Error(err, "Error creating Stage Velero Backup on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -763,7 +763,7 @@ func (t *Task) Run() error {
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking Stage Velero Backup "+
+			t.Log.Error(err, "Error checking Stage Velero Backup "+
 				"completion on source cluster.")
 			return liberr.Wrap(err)
 		}
@@ -781,7 +781,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is"+
+			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is"+
 				"incomplete. Waiting. Backup.Status=[%v]",
 				backup.Namespace, backup.Name, backup.Status))
 			t.Requeue = PollReQ
@@ -789,7 +789,7 @@ func (t *Task) Run() error {
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking for Stage Velero Backup "+
+			t.Log.Error(err, "Error checking for Stage Velero Backup "+
 				"repliction on target cluster.")
 			return liberr.Wrap(err)
 		}
@@ -805,7 +805,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Stage Velero Backup [%v/%v] has not yet "+
+			t.Log.Info(fmt.Sprintf("Stage Velero Backup [%v/%v] has not yet "+
 				"been replicated to target cluster by Velero. Waiting",
 				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
@@ -813,7 +813,7 @@ func (t *Task) Run() error {
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
-			t.Log.V(2).Error(err, "Error running PostBackupHooks.")
+			t.Log.Error(err, "Error running PostBackupHooks.")
 			t.fail(PostBackupHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -822,13 +822,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("PostBackupHook(s) are incomplete. Waiting."))
+			t.Log.Info(fmt.Sprintf("PostBackupHook(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case PreRestoreHooks:
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
-			t.Log.V(2).Error(err, "Error running PreRestoreHooks.")
+			t.Log.Error(err, "Error running PreRestoreHooks.")
 			t.fail(PreRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -837,13 +837,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("PreRestoreHooks(s) are incomplete. Waiting."))
+			t.Log.Info(fmt.Sprintf("PreRestoreHooks(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageRestore:
 		_, err := t.ensureStageRestore()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating Stage Velero Restore on target cluster.")
+			t.Log.Error(err, "Error creating Stage Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -852,7 +852,7 @@ func (t *Task) Run() error {
 	case StageRestoreCreated:
 		restore, err := t.getStageRestore()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking completion of Stage "+
+			t.Log.Error(err, "Error checking completion of Stage "+
 				"Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
@@ -871,7 +871,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
+			t.Log.Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
 				"is incomplete. Waiting. Restore.Status=[%v]",
 				restore.Namespace, restore.Name, restore.Status))
 			t.Requeue = PollReQ
@@ -879,7 +879,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error cleaning up Stage Pods")
+			t.Log.Error(err, "Error cleaning up Stage Pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -888,7 +888,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking completion of Stage Pod Cleanup.")
+			t.Log.Error(err, "Error checking completion of Stage Pod Cleanup.")
 			return liberr.Wrap(err)
 		}
 		if terminated {
@@ -896,14 +896,14 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Stage Pods have not finished terminating. Waiting")
+			t.Log.Info("Stage Pods have not finished terminating. Waiting")
 			t.Requeue = PollReQ
 		}
 	case EnsureAnnotationsDeleted, CleanStaleAnnotations:
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {
-				t.Log.V(2).Error(err, "Error cleaning up annotations on migrated resources")
+				t.Log.Error(err, "Error cleaning up annotations on migrated resources")
 				return liberr.Wrap(err)
 			}
 		}
@@ -913,7 +913,7 @@ func (t *Task) Run() error {
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error getting initial Velero Backup from source cluster.")
+			t.Log.Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -921,7 +921,7 @@ func (t *Task) Run() error {
 		}
 		replicated, err := t.isBackupReplicated(backup)
 		if err != nil {
-			t.Log.V(2).Error(err, "Error checking initial Velero Backup "+
+			t.Log.Error(err, "Error checking initial Velero Backup "+
 				"replication to target cluster.")
 			return liberr.Wrap(err)
 		}
@@ -930,7 +930,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Initial Velero Backup [%v/%v] has not yet "+
+			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] has not yet "+
 				"been replicated to target cluster by Velero. Waiting",
 				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
@@ -938,7 +938,7 @@ func (t *Task) Run() error {
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error getting initial Velero Backup from source cluster.")
+			t.Log.Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -946,7 +946,7 @@ func (t *Task) Run() error {
 		}
 		_, err = t.ensureFinalRestore()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error creating final Velero Restore on target cluster.")
+			t.Log.Error(err, "Error creating final Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		t.Requeue = PollReQ
@@ -956,7 +956,7 @@ func (t *Task) Run() error {
 	case FinalRestoreCreated:
 		restore, err := t.getFinalRestore()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error getting final Velero Restore from target cluster.")
+			t.Log.Error(err, "Error getting final Velero Restore from target cluster.")
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
@@ -973,7 +973,7 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.V(2).Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
+			t.Log.Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
 				"cluster is incomplete. Waiting. Restore.Status=[%v]",
 				restore.Namespace, restore.Name, restore.Status))
 			t.Requeue = PollReQ
@@ -981,7 +981,7 @@ func (t *Task) Run() error {
 	case PostRestoreHooks:
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
-			t.Log.V(2).Error(err, "Error getting final Velero Restore from target cluster.")
+			t.Log.Error(err, "Error getting final Velero Restore from target cluster.")
 			t.fail(PostRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -990,13 +990,13 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("PostRestoreHooks are incomplete. Waiting")
+			t.Log.Info("PostRestoreHooks are incomplete. Waiting")
 			t.Requeue = PollReQ
 		}
 	case Verification:
 		completed, err := t.VerificationCompleted()
 		if err != nil {
-			t.Log.V(2).Error(err, "Error verifying migrated Pod health on target cluster.")
+			t.Log.Error(err, "Error verifying migrated Pod health on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if completed {
@@ -1004,7 +1004,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Verification is incomplete. Some Pods that existed on " +
+			t.Log.Info("Verification is incomplete. Some Pods that existed on " +
 				"the source cluster have not yet been recreated and verified healthy " +
 				"on target cluster. Waiting")
 			t.Requeue = PollReQ
@@ -1046,7 +1046,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.V(2).Info("Found resources associated with MigPlan on target cluster " +
+			t.Log.Info("Found resources associated with MigPlan on target cluster " +
 				"that have not finished deleting. Waiting.")
 			t.Requeue = PollReQ
 		}

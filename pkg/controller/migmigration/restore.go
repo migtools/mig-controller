@@ -609,6 +609,10 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
+			gvkCombined := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
+			t.Log.Info(fmt.Sprintf("Searching for destination cluster resources "+
+				" associated with MigPlan in namespace=[%v] with GVK=[%v]",
+				ns, gvkCombined))
 			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
@@ -632,7 +636,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					return err
 				}
 				log.Info("Deleted resource from destination cluster",
-					"GVK", gvr.Group+"/"+gvr.Version+"/"+gvr.Resource,
+					"GVK", gvkCombined,
 					"ns/name", ns+"/"+r.GetName())
 			}
 		}
@@ -691,12 +695,17 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	}).AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
+			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
 				return false, liberr.Wrap(err)
 			}
 			// Wait for resources with deletion timestamps
 			if len(list.Items) > 0 {
+				t.Log.Info(fmt.Sprintf("Resource(s) found with GVK=[%v] in namespace [%v]"+
+					"in destination cluster that have not finished terminating. "+
+					"These resources are associated with the MigPlan and were marked for deletion.",
+					gvkCombinedName, ns))
 				return false, err
 			}
 		}
