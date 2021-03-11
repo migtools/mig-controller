@@ -375,8 +375,8 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		}
 		// Update
 		log.Info(
-			"Adding annotations/labels to source cluster PersistentVolumeClaim [%v/%v].",
-			pv.PVC.Namespace, pv.PVC.Name)
+			fmt.Sprintf("Adding annotations/labels to source cluster PersistentVolumeClaim [%v/%v].",
+				pv.PVC.Namespace, pv.PVC.Name))
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -422,8 +422,8 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 				return itemsUpdated, liberr.Wrap(err)
 			}
 			log.Info(
-				"Added annotations/labels to source cluster Service Account [%v/%v].",
-				sa.Namespace, sa.Name)
+				fmt.Sprintf("Added annotations/labels to source cluster Service Account [%v/%v].",
+					sa.Namespace, sa.Name))
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
 				t.setProgress([]string{fmt.Sprintf("%v/%v SA annotations/labels added in the namespace: %s", i, total, sa.Namespace)})

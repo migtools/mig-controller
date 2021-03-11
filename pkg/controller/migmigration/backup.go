@@ -660,7 +660,7 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 		if backup.Status.Phase != velero.BackupPhaseNew &&
 			backup.Status.Phase != velero.BackupPhaseInProgress &&
 			backup.Status.Phase != "" {
-			t.Log.Info(fmt.Sprintf("Backup [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("Backup [%v/%v] with "+
 				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
 				backup.Namespace, backup.Name, backup.Status.Phase))
 			continue
@@ -670,7 +670,7 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 		corrKey, _ := t.Owner.GetCorrelationLabel()
 		migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
 		if !ok {
-			t.Log.Info(fmt.Sprintf("Backup [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("Backup [%v/%v] with "+
 				"Status.Phase=[%v] does not have an attached label "+
 				"[%v] associating it with a MigMigration. Skipping deletion.",
 				backup.Namespace, backup.Name, backup.Status.Phase, corrKey))
@@ -750,7 +750,7 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 		if pvb.Status.Phase != velero.PodVolumeBackupPhaseNew &&
 			pvb.Status.Phase != velero.PodVolumeBackupPhaseInProgress &&
 			pvb.Status.Phase != "" {
-			t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
 				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
 				pvb.Namespace, pvb.Name, pvb.Status.Phase))
 			continue
@@ -759,7 +759,7 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 		pvbHasRunningMigration := false
 		for _, ownerRef := range pvb.OwnerReferences {
 			if ownerRef.Kind != "Backup" {
-				t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+				t.Log.V(4).Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
 					"Status.Phase=[%v] does not have an OwnerRef associated "+
 					"with a Velero Backup. Skipping deletion.",
 					pvb.Namespace, pvb.Name, pvb.Status.Phase))
@@ -782,7 +782,7 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 			corrKey, _ := t.Owner.GetCorrelationLabel()
 			migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
 			if !ok {
-				t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+				t.Log.V(4).Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
 					"Status.Phase=[%v] does not have an attached label "+
 					"[%v] associating it with a MigMigration. Skipping deletion.",
 					pvb.Namespace, pvb.Name, pvb.Status.Phase, corrKey))

@@ -178,8 +178,11 @@ func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
 	}
 	stagePodImage, ok := clusterConfig.Data[migapi.StagePodImageKey]
 	if !ok {
-		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", migapi.StagePodImageKey))
+		return "", liberr.Wrap(errors.Errorf("Key [%v] not found in ConfigMap [%v/%v]",
+			migapi.StagePodImageKey, clusterConfigRef.Namespace, clusterConfigRef.Name))
 	}
+	t.Log.Info(fmt.Sprintf("Got Stage Pod image [%v] from ConfigMap [%v/%v]",
+		stagePodImage, clusterConfigRef.Namespace, clusterConfigRef.Name))
 	return stagePodImage, nil
 }
 
@@ -688,7 +691,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 		return liberr.Wrap(err)
 	}
 
-	t.Log.Info("Preparing to delete Stage Pods on source cluster")
+	t.Log.Info("Checking for leftover Stage Pods on source cluster")
 	// Clean up source cluster namespaces
 	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
@@ -709,7 +712,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 		}
 	}
 
-	t.Log.Info("Preparing to delete Stage Pods on destination cluster")
+	t.Log.Info("Checking for leftover Stage Pods on destination cluster")
 	// Clean up destination cluster namespaces
 	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
 		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
