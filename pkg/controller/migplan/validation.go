@@ -526,8 +526,7 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
 	if plan.Status.HasAnyCondition(
 		InvalidDestinationClusterRef, InvalidDestinationCluster,
-		InvalidSourceClusterRef, InvalidSourceClusterRef,
-	) {
+		InvalidSourceClusterRef, InvalidSourceClusterRef) {
 		return nil
 	}
 	destRef := plan.Spec.DestMigClusterRef
