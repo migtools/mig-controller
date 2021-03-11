@@ -367,7 +367,7 @@ func (t *Task) hasBackupCompleted(backup *velero.Backup) (bool, []string) {
 		completed = true
 	}
 	t.Log.Info(fmt.Sprintf("Velero Backup [%s/%s] progress: [%v]",
-		backup.Name, backup.Namespace, progress))
+		backup.Namespace, backup.Name, progress))
 
 	t.setProgress(progress)
 	return completed, reasons

@@ -313,7 +313,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	}
 
 	t.Log.Info(fmt.Sprintf("Velero Restore [%s/%s] progress: [%v]",
-		restore.Name, restore.Namespace, progress))
+		restore.Namespace, restore.Name, progress))
 
 	t.setProgress(progress)
 	return completed, reasons
@@ -475,7 +475,7 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		if restore.Status.Phase != velero.RestorePhaseNew &&
 			restore.Status.Phase != velero.RestorePhaseInProgress &&
 			restore.Status.Phase != "" {
-			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("Restore [%v/%v] with "+
 				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
 				restore.Namespace, restore.Name, restore.Status.Phase))
 			continue
@@ -485,7 +485,7 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		corrKey, _ := t.Owner.GetCorrelationLabel()
 		migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 		if !ok {
-			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("Restore [%v/%v] with "+
 				"Status.Phase=[%v] does not have an attached label "+
 				"[%v] associating it with a MigMigration. Skipping deletion.",
 				restore.Namespace, restore.Name, restore.Status.Phase, corrKey))
@@ -544,7 +544,7 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		if pvr.Status.Phase != velero.PodVolumeRestorePhaseNew &&
 			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress &&
 			pvr.Status.Phase != "" {
-			t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+			t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
 				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
 				pvr.Namespace, pvr.Name, pvr.Status.Phase))
 			continue
@@ -554,7 +554,7 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		pvrHasRunningMigration := false
 		for _, ownerRef := range pvr.OwnerReferences {
 			if ownerRef.Kind != "Restore" {
-				t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+				t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
 					"Status.Phase=[%v] does not have an OwnerRef associated "+
 					"with a Velero Backup. Skipping deletion.",
 					pvr.Namespace, pvr.Name, pvr.Status.Phase))
@@ -577,7 +577,7 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			corrKey, _ := t.Owner.GetCorrelationLabel()
 			migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 			if !ok {
-				t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+				t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
 					"Status.Phase=[%v] does not have an attached label "+
 					"[%v] associating it with a MigMigration. Skipping deletion.",
 					pvr.Namespace, pvr.Name, pvr.Status.Phase, corrKey))

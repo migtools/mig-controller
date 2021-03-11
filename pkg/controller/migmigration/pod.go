@@ -54,6 +54,7 @@ func (t *Task) restartResticPods() error {
 		return liberr.Wrap(err)
 	}
 	if !runRestart {
+		t.Log.Info("Restic restart was not required. Skipping.")
 		return nil
 	}
 
@@ -176,6 +177,9 @@ func (t *Task) restartVeleroPods() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+	} else {
+		t.Log.Info("Velero Pod restart not required on source cluster " +
+			"since Velero CRs were not deleted.")
 	}
 	// Restart target cluster Velero pod if needed
 	if t.Owner.Status.HasCondition(StaleDestVeleroCRsDeleted) {
@@ -183,6 +187,9 @@ func (t *Task) restartVeleroPods() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+	} else {
+		t.Log.Info("Velero Pod restart not required on destination cluster " +
+			"since Velero CRs were not deleted.")
 	}
 	return nil
 }

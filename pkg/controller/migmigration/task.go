@@ -339,13 +339,7 @@ func (t *Task) Run() error {
 	t.Requeue = FastReQ
 
 	// Log the extended description of current phase
-	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
-		t.Log.Info("[RUN] " + phaseDescription)
-	} else {
-		t.Log.Info("[RUN]")
-		t.Log.V(4).Info("Missing phase description for phase.")
-	}
-
+	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
 	err := t.init()
 	if err != nil {
 		return err
@@ -1382,9 +1376,10 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 
 // Phase fail.
 func (t *Task) fail(nextPhase string, reasons []string) {
-	log.Info("Marking migration as failed.")
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
+	t.Log.Info(fmt.Sprintf("Marking migration as FAILED. See Status.Errors=[%v]",
+		t.Owner.Status.Errors))
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     Failed,
 		Status:   True,

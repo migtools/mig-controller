@@ -70,10 +70,8 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
-		log.Info(fmt.Sprintf("Migration failed with Error=[%v], "+
-			"Status.Errors=[%v], Phase=[%v], Description=[%v]",
-			errorutil.Unwrap(err).Error(), migration.Status.Errors, task.Phase,
-			task.getPhaseDescription(task.Phase)))
+		log.Info(fmt.Sprintf("Phase [%v] execution FAILED with Error=[%v], Phase.Description=[%v]",
+			task.Phase, errorutil.Unwrap(err).Error(), task.getPhaseDescription(task.Phase)))
 		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil

@@ -189,6 +189,8 @@ func (t *Task) deleteImageRegistryResourcesForClient(client k8sclient.Client, pl
 		return liberr.Wrap(err)
 	}
 	if secret != nil {
+		t.Log.Info(fmt.Sprintf("Deleting registry secret [%v/%v] created for migration.",
+			secret.Namespace, secret.Name))
 		err := client.Delete(context.Background(), secret)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -204,6 +206,8 @@ func (t *Task) deleteImageRegistryResourcesForClient(client k8sclient.Client, pl
 		return liberr.Wrap(err)
 	}
 	if foundService != nil {
+		t.Log.Info(fmt.Sprintf("Deleting registry service [%v/%v] created for migration.",
+			secret.Namespace, secret.Name))
 		err := client.Delete(context.Background(), foundService)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -219,6 +223,8 @@ func (t *Task) deleteImageRegistryDeploymentForClient(client k8sclient.Client, p
 		return liberr.Wrap(err)
 	}
 	if foundDeployment != nil {
+		t.Log.Info(fmt.Sprintf("Deleting registry deployment [%v/%v] created for migration.",
+			foundDeployment.Namespace, foundDeployment.Name))
 		err := client.Delete(context.Background(), foundDeployment, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
 			return liberr.Wrap(err)
@@ -310,7 +316,6 @@ func (t *Task) ensureRegistryService(client k8sclient.Client, secret *kapi.Secre
 }
 
 func (t *Task) deleteImageRegistryResources() error {
-	t.Log.Info(fmt.Sprintf("Deleting image registries created for migration."))
 	t.Owner.Status.Conditions.DeleteCondition(RegistriesHealthy)
 	t.Owner.Status.Conditions.DeleteCondition(RegistriesUnhealthy)
 
