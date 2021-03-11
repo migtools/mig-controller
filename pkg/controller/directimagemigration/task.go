@@ -277,3 +277,13 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 	}
 	return client, nil
 }
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
+	return ""
+}

@@ -38,7 +38,8 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return 0, liberr.Wrap(err)
 	}
 	if !plan.Status.IsReady() {
-		log.Info("Plan not ready. Migration can't run unless Plan is ready.", "name", migration.Name)
+		log.Info("Plan not ready. Migration can't run unless Plan is ready.",
+			"migplan_name", migration.Name)
 		return 0, liberr.Wrap(err)
 	}
 
@@ -50,7 +51,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Started
 	if migration.Status.StartTimestamp == nil {
-		log.Info("Marking migration as started.")
+		log.Info("Marking MigMigration as started.")
 		migration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
