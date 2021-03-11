@@ -735,7 +735,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
-			log.Info(fmt.Sprintf("Checking for leftover resources with GVK=[%v] "+
+			log.Info(fmt.Sprintf("Rollback: Checking for leftover resources with GVK=[%v] "+
 				"in namespace=[%v] in destination cluster", gvkCombinedName, ns))
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {

@@ -140,7 +140,7 @@ func (t *Task) annotateStageResources() (bool, error) {
 	}
 
 	if itemsUpdated > AnnotationsPerReconcile {
-		t.Log.Info("Completed %v annotations/label operations this reconcile, requeueing.")
+		t.Log.Info("Completed [%v] annotations/label operations this reconcile, requeueing.")
 		return false, nil
 	}
 
@@ -213,9 +213,8 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 		}
 		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
 		log.Info(
-			"Adding migration annotations/labels to source cluster namespace.",
-			"namespace",
-			namespace.Name)
+			fmt.Sprintf("Adding migration annotations/labels to source cluster namespace [%v].",
+				namespace.Name))
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -268,8 +267,8 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 
 		// Update
 		log.Info(
-			"Adding annotations/labels to source cluster Pod.",
-			"ns", pod.Namespace, "Pod", pod.Name)
+			fmt.Sprintf("Adding annotations/labels to source cluster Pod [%v/%v].",
+				pod.Namespace, pod.Name))
 		err = client.Update(context.TODO(), &pod)
 		if err != nil {
 			return itemsUpdated, nil, liberr.Wrap(err)
@@ -333,8 +332,8 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		pvResource.Labels[IncludedInStageBackupLabel] = t.UID()
 
 		// Update
-		log.Info("Adding annotations/labels to source cluster PersistentVolume.",
-			"PersistentVolume", pv.Name)
+		log.Info(fmt.Sprintf("Adding annotations/labels to source cluster "+
+			"PersistentVolume [%v].", pv.Name))
 		err = client.Update(context.TODO(), &pvResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -376,8 +375,8 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		}
 		// Update
 		log.Info(
-			"Adding annotations/labels to source cluster PersistentVolumeClaim.",
-			"ns", pv.PVC.Namespace, "PersistentVolumeClaim", pv.PVC.Name)
+			"Adding annotations/labels to source cluster PersistentVolumeClaim [%v/%v].",
+			pv.PVC.Namespace, pv.PVC.Name)
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -423,11 +422,8 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 				return itemsUpdated, liberr.Wrap(err)
 			}
 			log.Info(
-				"Added annotations/labels to source cluster Service Account.",
-				"ns",
-				sa.Namespace,
-				"serviceaccount",
-				sa.Name)
+				"Added annotations/labels to source cluster Service Account [%v/%v].",
+				sa.Namespace, sa.Name)
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
 				t.setProgress([]string{fmt.Sprintf("%v/%v SA annotations/labels added in the namespace: %s", i, total, sa.Namespace)})
@@ -458,9 +454,8 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 			}
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 
-			log.Info("Adding labels to source cluster ImageStream.",
-				"ns", is.Namespace,
-				"ImageStream", is.Name)
+			log.Info(fmt.Sprintf("Adding labels to source cluster ImageStream [%v/%v].",
+				is.Namespace, is.Name))
 			err = client.Update(context.Background(), &is)
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)

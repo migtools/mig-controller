@@ -141,7 +141,10 @@ func (t *Task) startRefresh() (bool, error) {
 // Verify plan finished with refresh before migrating
 func (t *Task) waitForRefresh() bool {
 	if t.PlanResources.MigPlan.Spec.Refresh == true {
-		t.Log.Info("Refresh of associated migplan (spec.refresh) not yet finished, waiting...")
+		t.Log.Info(fmt.Sprintf("Refresh of associated MigPlan [%v/%v] "+
+			"not yet finished (Spec.Refresh=[%v]) waiting...",
+			t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name,
+			t.PlanResources.MigPlan.Spec.Refresh))
 		return false
 	}
 	return true
