@@ -527,15 +527,17 @@ func (t *Task) deleteStaleVeleroCRs() error {
 	}
 	// Only set condition if 'InProgress' Backups/Restores were deleted
 	if nInProgressBackupsDeleted > 0 || nInProgressRestoresDeleted > 0 {
+		msg := fmt.Sprintf(
+			"Deleted stale Velero CRs: %v Backups, %v Restores. "+
+				"Velero will be restarted on source MigCluster %v/%v.",
+			nBackupsDeleted, nRestoresDeleted, srcCluster.Namespace, srcCluster.Name)
+		t.Log.Info(msg)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StaleSrcVeleroCRsDeleted,
 			Status:   True,
 			Category: migapi.Required,
-			Message: fmt.Sprintf(
-				"Deleted stale Velero CRs: %v Backups, %v Restores. "+
-					"Velero will be restarted on source MigCluster %v/%v.",
-				nBackupsDeleted, nRestoresDeleted, srcCluster.Namespace, srcCluster.Name),
-			Durable: true,
+			Message:  msg,
+			Durable:  true,
 		})
 	}
 
@@ -584,20 +586,25 @@ func (t *Task) deleteStaleResticCRs() error {
 	}
 
 	if pvbsDeleted > 0 || pvrsDeleted > 0 {
+		msg := fmt.Sprintf("Deleted stale Restic CRs: "+
+			"%v PodVolumeBackups,  %v PodVolumeRestores. ",
+			pvbsDeleted, pvrsDeleted)
+		t.Log.Info(msg)
+
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StaleResticCRsDeleted,
 			Status:   True,
 			Category: migapi.Required,
-			Message: fmt.Sprintf("Deleted stale Restic CRs: "+
-				"%v PodVolumeBackups,  %v PodVolumeRestores. ",
-				pvbsDeleted, pvrsDeleted),
-			Durable: true,
+			Message:  msg,
+			Durable:  true,
 		})
 	}
 	return nil
 }
 
 func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
+	t.Log.Info(fmt.Sprintf("Checking if migration with UID [%v] is running",
+		migrationUID))
 	corrKey, _ := t.Owner.GetCorrelationLabel()
 	corrLabel := map[string]string{corrKey: migrationUID}
 	migrationList := migapi.MigMigrationList{}
@@ -612,16 +619,25 @@ func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
 	migrationIsRunning := false
 	for _, migration := range migrationList.Items {
 		if migration.Status.Phase != Completed {
+			t.Log.Info(fmt.Sprintf("Migration [%v/%v] with UID [%v] and phase=[%v] IS running.",
+				migration.Namespace, migration.Name,
+				migrationUID, migration.Status.Phase))
 			migrationIsRunning = true
+		} else {
+			t.Log.Info(fmt.Sprintf("Migration [%v/%v] with UID [%v] "+
+				"and phase=[%v] is NOT running.",
+				migration.Namespace, migration.Name,
+				migrationUID, migration.Status.Phase))
 		}
 	}
+
 	return migrationIsRunning, nil
 }
 
 // Delete stale Velero Backups in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale Velero Backups on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale Velero Backups on MigCluster [%v/%v]",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
@@ -644,6 +660,9 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 		if backup.Status.Phase != velero.BackupPhaseNew &&
 			backup.Status.Phase != velero.BackupPhaseInProgress &&
 			backup.Status.Phase != "" {
+			t.Log.Info(fmt.Sprintf("Backup [%v/%v] with "+
+				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
+				backup.Namespace, backup.Name, backup.Status.Phase))
 			continue
 		}
 		// Skip if missing a migmigration correlation label (only delete our own CRs)
@@ -651,6 +670,10 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 		corrKey, _ := t.Owner.GetCorrelationLabel()
 		migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
 		if !ok {
+			t.Log.Info(fmt.Sprintf("Backup [%v/%v] with "+
+				"Status.Phase=[%v] does not have an attached label "+
+				"[%v] associating it with a MigMigration. Skipping deletion.",
+				backup.Namespace, backup.Name, backup.Status.Phase, corrKey))
 			continue
 		}
 		// Skip if correlation label points to an existing, running migration
@@ -659,6 +682,9 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		if isRunning {
+			t.Log.Info(fmt.Sprintf("Backup [%v/%v] with "+
+				"Status.Phase=[%v] is running. Skipping deletion.",
+				backup.Namespace, backup.Name, backup.Status.Phase))
 			continue
 		}
 		// Submit a request to remove backup assets from storage
@@ -672,6 +698,11 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 				BackupName: backup.Name,
 			},
 		}
+		t.Log.Info(fmt.Sprintf(
+			"CREATING Velero DeleteBackupRequest for Backup [%v/%v] phase=[%v] "+
+				"on MigCluster [%v/%v]",
+			backup.Namespace, backup.Name, backup.Status.Phase,
+			cluster.Namespace, cluster.Name))
 		err = clusterClient.Create(context.TODO(), deleteBackupRequest)
 		if err != nil {
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
@@ -679,7 +710,7 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 		// Also delete the backup CR directly
 		// This should work since backup is still in-progress.
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero Backup %v/%v [phase=%v] from MigCluster %v/%v",
+			"DELETING stale Velero Backup [%v/%v] phase=[%v] from MigCluster [%v/%v]",
 			backup.Namespace, backup.Name, backup.Status.Phase, cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &backup)
 		if err != nil && !k8serrors.IsNotFound(err) {
@@ -698,7 +729,7 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 // Delete stale Velero PodVolumeBackups in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeBackups on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeBackups on MigCluster [%v/%v]",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
@@ -719,12 +750,19 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 		if pvb.Status.Phase != velero.PodVolumeBackupPhaseNew &&
 			pvb.Status.Phase != velero.PodVolumeBackupPhaseInProgress &&
 			pvb.Status.Phase != "" {
+			t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
+				pvb.Namespace, pvb.Name, pvb.Status.Phase))
 			continue
 		}
 		// Skip delete if PVB is associated with running migration
 		pvbHasRunningMigration := false
 		for _, ownerRef := range pvb.OwnerReferences {
 			if ownerRef.Kind != "Backup" {
+				t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+					"Status.Phase=[%v] does not have an OwnerRef associated "+
+					"with a Velero Backup. Skipping deletion.",
+					pvb.Namespace, pvb.Name, pvb.Status.Phase))
 				continue
 			}
 			backup := velero.Backup{}
@@ -744,6 +782,10 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 			corrKey, _ := t.Owner.GetCorrelationLabel()
 			migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
 			if !ok {
+				t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+					"Status.Phase=[%v] does not have an attached label "+
+					"[%v] associating it with a MigMigration. Skipping deletion.",
+					pvb.Namespace, pvb.Name, pvb.Status.Phase, corrKey))
 				continue
 			}
 			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
@@ -755,12 +797,15 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 			}
 		}
 		if pvbHasRunningMigration == true {
+			t.Log.Info(fmt.Sprintf("PodVolumeBackup [%v/%v] with "+
+				"Status.Phase=[%v] is associated with a running migration. Skipping deletion.",
+				pvb.Namespace, pvb.Name, pvb.Status.Phase))
 			continue
 		}
 
 		// Delete the PVB
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero PodVolumeBackup %v/%v [phase=%v] from MigCluster %v/%v",
+			"DELETING stale Velero PodVolumeBackup [%v/%v] phase=[%v] from MigCluster [%v/%v]",
 			pvb.Namespace, pvb.Name, pvb.Status.Phase, cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &pvb)
 		if err != nil && !k8serrors.IsNotFound(err) {

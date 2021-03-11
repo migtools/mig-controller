@@ -1053,14 +1053,18 @@ func (t *Task) Run() error {
 		t.Phase = Completed
 		t.Step = StepCleanup
 	case DeleteMigrated:
-		err := t.deleteMigrated()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+		// err := t.deleteMigrated()
+		// if err != nil {
+		// 	return liberr.Wrap(err)
+		// }
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
 	case EnsureMigratedDeleted:
+		err := t.deleteMigrated()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)

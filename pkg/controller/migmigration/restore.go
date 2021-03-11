@@ -452,7 +452,7 @@ func (t *Task) deleteCorrelatedRestores() error {
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster [%v/%v]",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
@@ -475,6 +475,9 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		if restore.Status.Phase != velero.RestorePhaseNew &&
 			restore.Status.Phase != velero.RestorePhaseInProgress &&
 			restore.Status.Phase != "" {
+			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
+				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
+				restore.Namespace, restore.Name, restore.Status.Phase))
 			continue
 		}
 		// Skip if missing a migmigration correlation label (only delete our own CRs)
@@ -482,6 +485,10 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		corrKey, _ := t.Owner.GetCorrelationLabel()
 		migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 		if !ok {
+			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
+				"Status.Phase=[%v] does not have an attached label "+
+				"[%v] associating it with a MigMigration. Skipping deletion.",
+				restore.Namespace, restore.Name, restore.Status.Phase, corrKey))
 			continue
 		}
 		// Skip if correlation label points to an existing, running migration
@@ -490,11 +497,14 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		if isRunning {
+			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
+				"Status.Phase=[%v] is running. Skipping deletion.",
+				restore.Namespace, restore.Name, restore.Status.Phase))
 			continue
 		}
 		// Delete the Restore
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero Restore %v/%v [phase=%v] from MigCluster %v/%v",
+			"DELETING stale Velero Restore [%v/%v] phase=[%v] on MigCluster [%v/%v]",
 			restore.Namespace, restore.Name, restore.Status.Phase, cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -513,7 +523,7 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster %v/%v",
+	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster [%v/%v]",
 		cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
@@ -534,6 +544,9 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		if pvr.Status.Phase != velero.PodVolumeRestorePhaseNew &&
 			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress &&
 			pvr.Status.Phase != "" {
+			t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
+				pvr.Namespace, pvr.Name, pvr.Status.Phase))
 			continue
 		}
 
@@ -541,6 +554,10 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		pvrHasRunningMigration := false
 		for _, ownerRef := range pvr.OwnerReferences {
 			if ownerRef.Kind != "Restore" {
+				t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+					"Status.Phase=[%v] does not have an OwnerRef associated "+
+					"with a Velero Backup. Skipping deletion.",
+					pvr.Namespace, pvr.Name, pvr.Status.Phase))
 				continue
 			}
 			restore := velero.Restore{}
@@ -560,6 +577,10 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			corrKey, _ := t.Owner.GetCorrelationLabel()
 			migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 			if !ok {
+				t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+					"Status.Phase=[%v] does not have an attached label "+
+					"[%v] associating it with a MigMigration. Skipping deletion.",
+					pvr.Namespace, pvr.Name, pvr.Status.Phase, corrKey))
 				continue
 			}
 			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
@@ -571,12 +592,15 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			}
 		}
 		if pvrHasRunningMigration == true {
+			t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
+				"Status.Phase=[%v] is associated with a running migration. Skipping deletion.",
+				pvr.Namespace, pvr.Name, pvr.Status.Phase))
 			continue
 		}
 
 		// Delete the PVR
 		t.Log.Info(fmt.Sprintf(
-			"Deleting stale Velero PodVolumeRestore %v/%v [phase=%v] from MigCluster %v/%v",
+			"DELETING stale Velero PodVolumeRestore [%v/%v] [phase=%v] from MigCluster [%v/%v]",
 			pvr.Namespace, pvr.Name, pvr.Status.Phase, cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -590,6 +614,8 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 
 // Delete namespace and cluster-scoped resources on dest cluster
 func (t *Task) deleteMigrated() error {
+	// TODO: delete 'deployer' Pods associated with DCs even if phase=completed
+
 	err := t.deleteMigratedNamespaceScopedResources()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -605,7 +631,7 @@ func (t *Task) deleteMigrated() error {
 
 // Delete migrated namespace-scoped resources on dest cluster
 func (t *Task) deleteMigratedNamespaceScopedResources() error {
-	t.Log.Info("Scanning all GVKs in all migrated namespaces for " +
+	t.Log.Info("Rollback: Scanning all GVKs in all migrated namespaces for " +
 		"MigPlan associated resources to delete.")
 	client, GVRs, err := gvk.GetNamespacedGVRsForCluster(t.PlanResources.DestMigCluster, t.Client)
 	if err != nil {
@@ -619,9 +645,9 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombined := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
-			t.Log.Info(fmt.Sprintf("Searching for destination cluster resources "+
-				"associated with MigPlan in namespace=[%v] with GVK=[%v]",
-				ns, gvkCombined))
+			t.Log.Info(fmt.Sprintf("Rollback: Searching for destination cluster resources "+
+				"with label [%v: %v] in namespace=[%v] with GVK=[%v]",
+				MigPlanLabel, string(t.PlanResources.MigPlan.UID), ns, gvkCombined))
 			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
@@ -644,7 +670,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info(fmt.Sprintf("DELETED resource GVK=[%v] [%v/%v] from destination cluster",
+				log.Info(fmt.Sprintf("DELETION REQUESTED for resource GVK=[%v] [%v/%v] on destination cluster",
 					gvkCombined, ns, r.GetName()))
 			}
 		}
@@ -655,6 +681,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 
 // Delete migrated NFS PV resources that were "moved" to the dest cluster
 func (t *Task) deleteMovedNfsPVs() error {
+	t.Log.Info("Starting deletion of any 'moved' NFS PVs from destination cluster")
 	dstClient, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -678,6 +705,8 @@ func (t *Task) deleteMovedNfsPVs() error {
 		if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
 			continue
 		}
+		t.Log.Info(fmt.Sprintf("Deleting 'moved' NFS PV [%v/%v] from destination cluster",
+			pv.Namespace, pv.Name))
 		err := dstClient.Delete(context.TODO(), &pv)
 		if err != nil {
 			if k8serror.IsMethodNotSupported(err) || k8serror.IsNotFound(err) {
