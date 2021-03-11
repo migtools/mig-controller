@@ -81,6 +81,8 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 
 		return result, nil
 	}
+	t.Log.Info(fmt.Sprintf("No hook attached to MigPlan for HookPhase=[%v], continuing.",
+		hookPhase))
 	return true, nil
 }
 
