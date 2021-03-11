@@ -281,7 +281,8 @@ func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
 func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []string {
 	items := []string{}
 	// If validation for destination cluster ref failed, we can't check this
-	if plan.Status.HasAnyCondition(InvalidDestinationClusterRef) {
+	if plan.Status.HasAnyCondition(
+		InvalidDestinationClusterRef, InvalidDestinationCluster) {
 		return items
 	}
 	// This is not relevant if the plan is not running DVM
