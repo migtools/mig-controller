@@ -156,7 +156,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if errors.IsNotFound(err) {
 			err = r.deleted()
 		}
-		log.Error(err, "Error getting migmigration for reconcile, requeueing.")
+		log.Info("Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -164,19 +164,20 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Ensure debugging labels are present on migmigration
 	err = r.ensureDebugLabels(migration)
 	if err != nil {
-		log.Error(err, "Error setting debug labels, requeueing.")
+		log.Info("Error setting debug labels, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Report reconcile error.
 	defer func() {
-		// This should only be turned on in debug mode IMO,
-		// in normal mode we should only show condition deltas.
-		// log.Info("CR", "conditions", migration.Status.Conditions)
+		// Only log critical conditions.
+		critConditions := migration.Status.Conditions.FindConditionByCategory(Critical)
+		if len(critConditions) > 0 {
+			log.Info("CR", "critical_conditions", critConditions)
+		}
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
-			// log.V(4).Error(err, "Error recording conditions as events.")
 			return
 		}
 		migration.Status.SetReconcileFailed(err)
@@ -196,7 +197,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Owner Reference
 	err = r.setOwnerReference(migration)
 	if err != nil {
-		log.Error(err, "Failed to set owner references, requeuing.")
+		log.Info("Failed to set owner references, requeuing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
@@ -210,7 +211,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	// Validate
 	err = r.validate(migration)
 	if err != nil {
-		log.Error(err, "Validation failed, requeueing")
+		log.Info("Validation failed, requeueing")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -221,7 +222,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
-			log.Error(err, "Failed to check if postpone required.")
+			log.Info("Failed to check if postpone required, requeueing")
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, err
 		}
@@ -231,7 +232,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(migration)
 		if err != nil {
-			log.Error(err, "Error executing phase logic.", "phase", migration.Status.Phase)
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
