@@ -10,6 +10,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -361,9 +362,6 @@ func (t *Task) Run() error {
 	case StartRefresh:
 		started, err := t.startRefresh()
 		if err != nil {
-			t.Log.Error(err, fmt.Sprintf("Error starting refresh of "+
-				"MigPlan [%v/%v] validations",
-				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -386,7 +384,6 @@ func (t *Task) Run() error {
 	case CleanStaleResticCRs:
 		err := t.deleteStaleResticCRs()
 		if err != nil {
-			t.Log.Error(err, "Error deleting stale Restic resources")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -395,7 +392,6 @@ func (t *Task) Run() error {
 	case CleanStaleVeleroCRs:
 		err := t.deleteStaleVeleroCRs()
 		if err != nil {
-			t.Log.Error(err, "Error deleting stale Velero resources")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -404,7 +400,6 @@ func (t *Task) Run() error {
 	case CreateRegistries:
 		nEnsured, err := t.ensureMigRegistries()
 		if err != nil {
-			t.Log.Error(err, "Error creating migration registries")
 			return liberr.Wrap(err)
 		}
 		if nEnsured == 2 {
@@ -420,7 +415,6 @@ func (t *Task) Run() error {
 		nEnsured, message, err := ensureRegistryHealth(t.Client, t.Owner)
 		if err != nil {
 			if err.Error() == "ImagePullBackOff" {
-				t.Log.Error(err, "Migration failed due to registry pod ImagePullBackoff")
 				t.fail(WaitForRegistriesReady, []string{message})
 			} else {
 				return liberr.Wrap(err)
@@ -438,7 +432,6 @@ func (t *Task) Run() error {
 	case DeleteRegistries:
 		err := t.deleteImageRegistryResources()
 		if err != nil {
-			t.Log.Error(err, "Error deleting image registry resources.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -448,7 +441,6 @@ func (t *Task) Run() error {
 		// Create the DirectImageMigration CR
 		err := t.createDirectImageMigration()
 		if err != nil {
-			t.Log.Error(err, "Error creating DirectImageMigration resource.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -563,7 +555,6 @@ func (t *Task) Run() error {
 	case AnnotateResources:
 		finished, err := t.annotateStageResources()
 		if err != nil {
-			t.Log.Error(err, "Error annotating source cluster resources to be migrated")
 			return liberr.Wrap(err)
 		}
 		if finished {
@@ -596,7 +587,6 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromOrphanedPVCs:
 		err := t.ensureStagePodsFromOrphanedPVCs()
 		if err != nil {
-			t.Log.Error(err, "Error creating stage pods on source cluster from orphaned PVCs")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -605,7 +595,6 @@ func (t *Task) Run() error {
 	case StagePodsCreated:
 		report, err := t.ensureSourceStagePodsStarted()
 		if err != nil {
-			t.Log.Error(err, "Error checking if stage pods have started on source cluster")
 			return liberr.Wrap(err)
 		}
 		if report.failed {
@@ -625,7 +614,6 @@ func (t *Task) Run() error {
 	case RestartRestic:
 		err := t.restartResticPods()
 		if err != nil {
-			t.Log.Error(err, "Error restarting Restic Pods on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -634,7 +622,6 @@ func (t *Task) Run() error {
 	case RestartVelero:
 		err := t.restartVeleroPods()
 		if err != nil {
-			t.Log.Error(err, "Error restarting Velero Pod on source cluster")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -643,7 +630,6 @@ func (t *Task) Run() error {
 	case WaitForResticReady:
 		started, err := t.haveResticPodsStarted()
 		if err != nil {
-			t.Log.Error(err, "Error checking if Restic Pods are ready on source cluster")
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -657,7 +643,6 @@ func (t *Task) Run() error {
 	case WaitForVeleroReady:
 		started, err := t.haveVeleroPodsStarted()
 		if err != nil {
-			t.Log.Error(err, "Error checking if Velero Pods are ready.")
 			return liberr.Wrap(err)
 		}
 		if started {
@@ -671,7 +656,6 @@ func (t *Task) Run() error {
 	case QuiesceApplications:
 		err := t.quiesceApplications()
 		if err != nil {
-			t.Log.Error(err, "Error quiescing applications on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -680,7 +664,6 @@ func (t *Task) Run() error {
 	case EnsureQuiesced:
 		quiesced, err := t.ensureQuiescedPodsTerminated()
 		if err != nil {
-			t.Log.Error(err, "Error checking for quiescing app termination on the source cluster.")
 			return liberr.Wrap(err)
 		}
 		if quiesced {
@@ -695,7 +678,6 @@ func (t *Task) Run() error {
 	case UnQuiesceSrcApplications:
 		err := t.unQuiesceSrcApplications()
 		if err != nil {
-			t.Log.Error(err, "Error unquiescing apps on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -704,7 +686,6 @@ func (t *Task) Run() error {
 	case UnQuiesceDestApplications:
 		err := t.unQuiesceDestApplications()
 		if err != nil {
-			t.Log.Error(err, "Error unquiescing apps on destination cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -713,7 +694,6 @@ func (t *Task) Run() error {
 	case CreateDirectVolumeMigration:
 		err := t.createDirectVolumeMigration()
 		if err != nil {
-			t.Log.Error(err, "Error creating DirectVolumeMigration resource.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -722,7 +702,6 @@ func (t *Task) Run() error {
 	case WaitForDirectVolumeMigrationToComplete:
 		dvm, err := t.getDirectVolumeMigration()
 		if err != nil {
-			t.Log.Error(err, "Error checking DirectVolumeMigration completion.")
 			return liberr.Wrap(err)
 		}
 		// if no dvm, continue to next task
@@ -763,7 +742,6 @@ func (t *Task) Run() error {
 	case EnsureStageBackup:
 		_, err := t.ensureStageBackup()
 		if err != nil {
-			t.Log.Error(err, "Error creating Stage Velero Backup on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -772,8 +750,6 @@ func (t *Task) Run() error {
 	case StageBackupCreated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			t.Log.Error(err, "Error checking Stage Velero Backup "+
-				"completion on source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -809,8 +785,6 @@ func (t *Task) Run() error {
 	case EnsureStageBackupReplicated:
 		backup, err := t.getStageBackup()
 		if err != nil {
-			t.Log.Error(err, "Error checking for Stage Velero Backup "+
-				"repliction on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -833,7 +807,6 @@ func (t *Task) Run() error {
 	case PostBackupHooks:
 		status, err := t.runHooks(migapi.PostBackupHookPhase)
 		if err != nil {
-			t.Log.Error(err, "Error running PostBackupHooks.")
 			t.fail(PostBackupHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -848,7 +821,6 @@ func (t *Task) Run() error {
 	case PreRestoreHooks:
 		status, err := t.runHooks(migapi.PreRestoreHookPhase)
 		if err != nil {
-			t.Log.Error(err, "Error running PreRestoreHooks.")
 			t.fail(PreRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -863,7 +835,6 @@ func (t *Task) Run() error {
 	case EnsureStageRestore:
 		_, err := t.ensureStageRestore()
 		if err != nil {
-			t.Log.Error(err, "Error creating Stage Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -872,8 +843,6 @@ func (t *Task) Run() error {
 	case StageRestoreCreated:
 		restore, err := t.getStageRestore()
 		if err != nil {
-			t.Log.Error(err, "Error checking completion of Stage "+
-				"Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
@@ -901,7 +870,6 @@ func (t *Task) Run() error {
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
 		err := t.ensureStagePodsDeleted()
 		if err != nil {
-			t.Log.Error(err, "Error cleaning up Stage Pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -910,7 +878,6 @@ func (t *Task) Run() error {
 	case EnsureStagePodsTerminated, WaitForStaleStagePodsTerminated:
 		terminated, err := t.ensureStagePodsTerminated()
 		if err != nil {
-			t.Log.Error(err, "Error checking completion of Stage Pod Cleanup.")
 			return liberr.Wrap(err)
 		}
 		if terminated {
@@ -925,7 +892,6 @@ func (t *Task) Run() error {
 		if !t.keepAnnotations() {
 			err := t.deleteAnnotations()
 			if err != nil {
-				t.Log.Error(err, "Error cleaning up annotations on migrated resources")
 				return liberr.Wrap(err)
 			}
 		}
@@ -935,7 +901,6 @@ func (t *Task) Run() error {
 	case EnsureInitialBackupReplicated:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			t.Log.Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -943,8 +908,6 @@ func (t *Task) Run() error {
 		}
 		replicated, err := t.isBackupReplicated(backup)
 		if err != nil {
-			t.Log.Error(err, "Error checking initial Velero Backup "+
-				"replication to target cluster.")
 			return liberr.Wrap(err)
 		}
 		if replicated {
@@ -960,7 +923,6 @@ func (t *Task) Run() error {
 	case EnsureFinalRestore:
 		backup, err := t.getInitialBackup()
 		if err != nil {
-			t.Log.Error(err, "Error getting initial Velero Backup from source cluster.")
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
@@ -968,7 +930,6 @@ func (t *Task) Run() error {
 		}
 		_, err = t.ensureFinalRestore()
 		if err != nil {
-			t.Log.Error(err, "Error creating final Velero Restore on target cluster.")
 			return liberr.Wrap(err)
 		}
 		t.Requeue = PollReQ
@@ -978,7 +939,6 @@ func (t *Task) Run() error {
 	case FinalRestoreCreated:
 		restore, err := t.getFinalRestore()
 		if err != nil {
-			t.Log.Error(err, "Error getting final Velero Restore from target cluster.")
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
@@ -1020,7 +980,6 @@ func (t *Task) Run() error {
 	case Verification:
 		completed, err := t.VerificationCompleted()
 		if err != nil {
-			t.Log.Error(err, "Error verifying migrated Pod health on target cluster.")
 			return liberr.Wrap(err)
 		}
 		if completed {
@@ -1053,18 +1012,14 @@ func (t *Task) Run() error {
 		t.Phase = Completed
 		t.Step = StepCleanup
 	case DeleteMigrated:
-		// err := t.deleteMigrated()
-		// if err != nil {
-		// 	return liberr.Wrap(err)
-		// }
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case EnsureMigratedDeleted:
 		err := t.deleteMigrated()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case EnsureMigratedDeleted:
 		deleted, err := t.ensureMigratedResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -1672,5 +1627,24 @@ func (r *Itinerary) GetStepForPhase(phaseName string) string {
 			return phase.Step
 		}
 	}
+	return ""
+}
+
+// Emits an INFO level warning message (no stack trace) letting the
+// user know an error was encountered with a description of the phase
+// where available. Stack trace will be printed shortly after this.
+// This is meant to help contextualize the stack trace for the user.
+func (t *Task) logErrorForPhase(phaseName string, err error) {
+	t.Log.Info(fmt.Sprintf("Exited with Error=[%v] while executing Phase=[%v] Description=[%v]",
+		errorutil.Unwrap(err).Error(), phaseName, t.getPhaseDescription(phaseName)))
+}
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
 	return ""
 }
