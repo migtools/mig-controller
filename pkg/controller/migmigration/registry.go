@@ -323,13 +323,15 @@ func (t *Task) deleteImageRegistryResources() error {
 	if plan == nil {
 		return nil
 	}
-	clients, err := t.getBothClients()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	for _, client := range clients {
-		err := t.deleteImageRegistryResourcesForClient(client, plan)
+	clusters := t.getBothClusters()
+	for _, cluster := range clusters {
+		t.Log.Info(fmt.Sprintf("Deleting image registry for MigCluster [%v/%v]",
+			cluster.Namespace, cluster.Name))
+		clusterClient, err := cluster.GetClient(t.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.deleteImageRegistryResourcesForClient(clusterClient, plan)
 		if err != nil {
 			return liberr.Wrap(err)
 		}

@@ -698,10 +698,10 @@ func (t *Task) Run() error {
 		}
 		// if no dvm, continue to next task
 		if dvm == nil {
-			t.Log.Info("No DVM resource found, continuing to next phase.")
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+			break
 		}
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)

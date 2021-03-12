@@ -125,7 +125,16 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
-				t.Log.Info(fmt.Sprintf("Found non-running Rsync Transfer Pod [%v/%v] with Phase=[%v] on destination cluster.",
+				for _, podCond := range pod.Status.Conditions {
+					if podCond.Reason == corev1.PodReasonUnschedulable {
+						t.Log.Info(fmt.Sprintf("Found UNSCHEDULABLE Rsync Transfer Pod [%v/%v] "+
+							"with Phase=[%v] on destination cluster. Message: [%v].",
+							pod.Namespace, pod.Name, pod.Status.Phase, podCond.Message))
+						return false, nil
+					}
+				}
+				t.Log.Info(fmt.Sprintf("Found non-running Rsync Transfer Pod [%v/%v] "+
+					"with Phase=[%v] on destination cluster.",
 					pod.Namespace, pod.Name, pod.Status.Phase))
 				return false, nil
 			}
@@ -1219,6 +1228,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
 	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
 	var pendingPods []string
+	var runningPods []string
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
@@ -1242,6 +1252,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
+				runningPods = append(runningPods, fmt.Sprintf("%s/%s", objRef.Name, objRef.Namespace))
 			case dvmp.Status.PodPhase == corev1.PodFailed:
 				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, &migapi.PodProgress{
 					ObjectReference:             objRef,
@@ -1260,8 +1271,6 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
-				t.Log.Info(fmt.Sprintf("Rsync Client Pod [%s/%s] Status.Phase=[%v] has not started running yet.",
-					objRef.Namespace, objRef.Name, dvmp.Status.PodPhase))
 				pendingPods = append(pendingPods, fmt.Sprintf("%s/%s", objRef.Name, objRef.Namespace))
 			}
 		}
@@ -1270,6 +1279,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
+	isAnyRunning := len(t.Owner.Status.RunningPods) > 0
 	if isAnyPending {
 		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
 		t.Log.Info(pendingMessage)
@@ -1280,6 +1290,9 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 			Category: migapi.Warn,
 			Message:  pendingMessage,
 		})
+	}
+	if isAnyRunning {
+		t.Log.Info(fmt.Sprintf("Rsync Client Pods [%v] are running. Waiting for completion.", strings.Join(runningPods[:], ", ")))
 	}
 	return isCompleted, hasAnyFailed, nil
 }

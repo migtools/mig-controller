@@ -339,7 +339,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info("Rsync Transfer Pod(s) are not yet Running. Waiting...")
 			t.Requeue = PollReQ
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
@@ -387,7 +386,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info("Stunnel Client Pod(s) are not yet Running. Waiting...")
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
 			if cond == nil {
@@ -479,6 +477,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Rsync Client Pods have not yet completed. Waiting...")
 			t.Requeue = PollReQ
 		}
 	case DeleteRsyncResources:

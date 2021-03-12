@@ -602,6 +602,14 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				for _, podCond := range pod.Status.Conditions {
+					if podCond.Reason == corev1.PodReasonUnschedulable {
+						t.Log.Info(fmt.Sprintf("Found UNSCHEDULABLE Stunnel Client Pod [%v/%v] "+
+							"with Phase=[%v] on source cluster. Message: [%v].",
+							pod.Namespace, pod.Name, pod.Status.Phase, podCond.Message))
+						return false, nil
+					}
+				}
 				t.Log.Info(fmt.Sprintf("Stunnel Client Pod [%v/%v] Phase=[%v] is not yet running on source cluster.",
 					pod.Namespace, pod.Name, pod.Status.Phase))
 				return false, nil
