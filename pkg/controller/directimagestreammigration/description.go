@@ -21,7 +21,7 @@ var PhaseDescriptions = map[string]string{
 	Created:            "DirectImageStreamMigration created.",
 	Started:            "DirectImageStreamMigration started.",
 	Prepare:            "Preparing for DirectImageStreamMigration.",
-	MigrateImageStream: "Migrating images found in the ImageStream from source to target cluster.",
+	MigrateImageStream: "Migrating internal images found in ImageStreams from source to target cluster.",
 	MigrationFailed:    "Migration failed.",
 	Completed:          "Migration completed.",
 }

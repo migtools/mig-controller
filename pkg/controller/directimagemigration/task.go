@@ -126,7 +126,7 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN]", "phase", t.Phase)
+	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
 
 	err := t.init()
 	if err != nil {
@@ -285,5 +285,6 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 		return phaseDescription
 	}
 	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
-	return ""
+	// If no description available, just return phase name.
+	return phaseName
 }

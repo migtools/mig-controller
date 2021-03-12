@@ -180,7 +180,8 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN]", "phase", t.Phase)
+	// Log the extended description of current phase
+	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
 
 	err := t.init()
 	if err != nil {
@@ -271,6 +272,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Some Rsync Transfer Routes have not yet been admitted. Waiting...")
 			t.Requeue = PollReQ
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
@@ -278,6 +280,9 @@ func (t *Task) Run() error {
 				return fmt.Errorf("unable to find running condition")
 			}
 			now := time.Now().UTC()
+			msg := fmt.Sprintf("Some or all rsync transfer routes have failed to be admitted within 3 mins on "+
+				"destination cluster. Errors: %v", reasons)
+			t.Log.Info(msg)
 			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 3*time.Minute {
 				t.Owner.Status.SetCondition(
 					migapi.Condition{
@@ -285,7 +290,7 @@ func (t *Task) Run() error {
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  fmt.Sprintf("Some or all rsync transfer routes have failed to be admitted within 3 mins on destination cluster. Errors: %v", reasons),
+						Message:  msg,
 					},
 				)
 			}
@@ -334,6 +339,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Some Rsync Transfer Pods are not yet Running. Waiting...")
 			t.Requeue = PollReQ
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
@@ -342,13 +348,15 @@ func (t *Task) Run() error {
 			}
 			now := time.Now().UTC()
 			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 10*time.Minute {
+				msg := "Some or all Rsync Transfer Pods have not started Running after 10 minutes on destination cluster"
+				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
 					migapi.Condition{
 						Type:     RsyncTransferPodsPending,
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  "Some or all transfer pods are not running for more than 10 mins on destination cluster",
+						Message:  msg,
 					},
 				)
 			}
@@ -379,6 +387,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Some Stunnel Client Pods are not yet Running. Waiting...")
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
 			if cond == nil {
@@ -596,4 +605,15 @@ func (t *Task) buildDVMLabels() map[string]string {
 	dvmLabels["owner"] = DirectVolumeMigration
 
 	return dvmLabels
+}
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := phaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
+	// If no description available, just return phase name.
+	return phaseName
 }

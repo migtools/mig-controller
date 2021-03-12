@@ -20,8 +20,8 @@ package directimagemigration
 var PhaseDescriptions = map[string]string{
 	Started:                           "Migration started.",
 	MigrationFailed:                   "Migration failed.",
-	CreateDestinationNamespaces:       "Creating target cluster namespaces for ImageStreams to be migrated to.",
-	ListImageStreams:                  "Searching for ImageStreams to be migrated in source cluster namespace(s).",
+	CreateDestinationNamespaces:       "Creating target cluster namespaces for ImageStreams to be migrated into.",
+	ListImageStreams:                  "Searching source cluster namespaces for ImageStreams to be migrated.",
 	CreateDirectImageStreamMigrations: "Launching DirectImageStreamMigrations for all discovered ImageStreams.",
 	WaitingForDirectImageStreamMigrationsToComplete: "Waiting for all DirectImageStreamMigrations to complete.",
 	Completed: "Migration completed.",

@@ -466,8 +466,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Waiting for DirectImageMigration [%v/%v] to complete.",
-				dim.Namespace, dim.Name))
 			t.Requeue = PollReQ
 		}
 	case EnsureCloudSecretPropagated:
@@ -719,9 +717,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("DirectVolumeMigration [%v/%v] "+
-				"with phase=[%v] on host cluster is incomplete. Waiting.",
-				dvm.Namespace, dvm.Name, dvm.Status.Phase))
 			t.Requeue = PollReQ
 			criticalWarning, err := t.getWarningForDVM(dvm)
 			if err != nil {
@@ -1641,5 +1636,6 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 		return phaseDescription
 	}
 	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
-	return ""
+	// If no description available, just return phase name.
+	return phaseName
 }

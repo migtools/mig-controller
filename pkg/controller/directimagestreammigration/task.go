@@ -120,7 +120,7 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN]", "phase", t.Phase)
+	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
 
 	err := t.init()
 	if err != nil {
@@ -236,4 +236,15 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
+	// If no description available, just return phase name.
+	return phaseName
 }

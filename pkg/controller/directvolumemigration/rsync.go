@@ -125,6 +125,8 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				t.Log.Info(fmt.Sprintf("Found non-running Rsync Transfer Pod [%v/%v] with Phase=[%v] on destination cluster.",
+					pod.Namespace, pod.Name, pod.Status.Phase))
 				return false, nil
 			}
 		}
@@ -233,6 +235,8 @@ func (t *Task) createRsyncConfig() error {
 		// Note: when this configmap changes the rsync pod
 		// needs to restart
 		// Need to launch new pod when configmap changes
+		t.Log.Info(fmt.Sprintf("Creating Rsync Transfer Pod ConfigMap [%v/%v] on destination cluster",
+			configMap.Namespace, configMap.Name))
 		err = destClient.Create(context.TODO(), &configMap)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Configmap already exists on destination", "namespace", configMap.Namespace)
@@ -264,6 +268,8 @@ func (t *Task) createRsyncConfig() error {
 				"RSYNC_PASSWORD": []byte(password),
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Creating Rsync Password Secret [%v/%v] on source cluster",
+			srcSecret.Namespace, srcSecret.Name))
 		err = srcClient.Create(context.TODO(), &srcSecret)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Secret already exists on source", "namespace", srcSecret.Namespace)
@@ -282,6 +288,8 @@ func (t *Task) createRsyncConfig() error {
 				"credentials": []byte("root:" + password),
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Creating Rsync Password Secret [%v/%v] on destination cluster",
+			destSecret.Namespace, destSecret.Name))
 		err = destClient.Create(context.TODO(), &destSecret)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Secret already exists on destination", "namespace", destSecret.Namespace)
@@ -332,6 +340,8 @@ func (t *Task) createRsyncTransferRoute() error {
 				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Creating Rsync Transfer Service [%v/%v] for Stunnel connection "+
+			"on destination MigCluster ", svc.Namespace, svc.Name))
 		err = destClient.Create(context.TODO(), &svc)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Rsync transfer svc already exists on destination", "namespace", ns)
@@ -385,6 +395,8 @@ func (t *Task) createRsyncTransferRoute() error {
 			host := fmt.Sprintf("%s.%s", prefix, subdomain)
 			route.Spec.Host = host
 		}
+		t.Log.Info(fmt.Sprintf("Creating Rsync Transfer Route [%v/%v] for Stunnel connection "+
+			"on destination MigCluster ", route.Namespace, route.Name))
 		err = destClient.Create(context.TODO(), &route)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Rsync transfer route already exists on destination", "namespace", ns)
@@ -415,10 +427,12 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+	t.Log.Info("Getting Rsync Transfer Pod image from ConfigMap.")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return err
 	}
+	t.Log.Info("Getting Rsync Transfer Pod limits and requests from ConfigMap.")
 	limits, requests, err := getPodResourceLists(t.Client, TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
@@ -435,6 +449,7 @@ func (t *Task) createRsyncTransferPods() error {
 
 	// Generate pubkey bytes
 	// TODO: Use a secret for this so we aren't regenerating every time
+	t.Log.Info("Generating SSH public key for Rsync Transfer Pod")
 	publicRsaKey, err := ssh.NewPublicKey(t.SSHKeys.PublicKey)
 	if err != nil {
 		return err
@@ -446,6 +461,8 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Rsync Transfer pod will be created with privileged=[%v]",
+		isRsyncPrivileged))
 	// Loop through namespaces and create transfer pod
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
@@ -611,6 +628,8 @@ func (t *Task) createRsyncTransferPods() error {
 				},
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Creating Rsync Transfer Pod [%v/%v] with containers [rsyncd, stunnel] on destination cluster.",
+			transferPod.Namespace, transferPod.Name))
 		err = destClient.Create(context.TODO(), &transferPod)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Rsync transfer pod already exists on destination", "namespace", transferPod.Namespace)
@@ -712,11 +731,15 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		for _, ingress := range route.Status.Ingress {
 			for _, condition := range ingress.Conditions {
 				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
+					t.Log.Info(fmt.Sprintf("Rsync Transfer Route [%v/%v] has not been admitted.",
+						route.Namespace, route.Name))
 					admitted = false
 					message = condition.Message
 					break
 				}
 				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
+					t.Log.Info(fmt.Sprintf("Rsync Transfer Route [%v/%v] has been admitted successfully.",
+						route.Namespace, route.Name))
 					admitted = true
 					break
 				}
@@ -753,6 +776,8 @@ func (t *Task) createRsyncPassword() (string, error) {
 		},
 		Type: corev1.SecretTypeBasicAuth,
 	}
+	t.Log.Info(fmt.Sprintf("Creating Rsync Password Secret [%v/%v] on host cluster",
+		secret.Namespace, secret.Name))
 	err := t.Client.Create(context.TODO(), &secret)
 	if k8serror.IsAlreadyExists(err) {
 		t.Log.Info("Secret already exists on host", "name", "directvolumemigration-rsync-pass", "namespace", migapi.OpenshiftMigrationNamespace)
@@ -765,6 +790,8 @@ func (t *Task) createRsyncPassword() (string, error) {
 func (t *Task) getRsyncPassword() (string, error) {
 	rsyncSecret := corev1.Secret{}
 	key := types.NamespacedName{Name: DirectVolumeMigrationRsyncPass, Namespace: migapi.OpenshiftMigrationNamespace}
+	t.Log.Info(fmt.Sprintf("Getting Rsync Password from Secret [%v/%v] on host cluster",
+		rsyncSecret.Namespace, rsyncSecret.Name))
 	err := t.Client.Get(context.TODO(), key, &rsyncSecret)
 	if k8serror.IsNotFound(err) {
 		t.Log.Info("Secret is not found", "name", DirectVolumeMigrationRsyncPass, "namespace", migapi.OpenshiftMigrationNamespace)
@@ -786,6 +813,8 @@ func (t *Task) deleteRsyncPassword() error {
 			Name:      DirectVolumeMigrationRsyncPass,
 		},
 	}
+	t.Log.Info(fmt.Sprintf("Deleting Rsync password Secret [%v/%v] on host MigCluster",
+		secret.Namespace, secret.Name))
 	err := t.Client.Delete(context.TODO(), secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if k8serror.IsNotFound(err) {
 		t.Log.Info("Secret is not found", "name", DirectVolumeMigrationRsyncPass, "namespace", migapi.OpenshiftMigrationNamespace)
@@ -1148,6 +1177,8 @@ func (t *Task) createPVProgressCR() error {
 				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
 			migapi.SetOwnerReference(t.Owner, t.Owner, &dvmp)
+			t.Log.Info(fmt.Sprintf("Creating DVMP [%v/%v] on host cluster to track Rsync Pod [%v/%v] completion.",
+				dvmp.Namespace, dvmp.Name, dvmp.Spec.PodRef.Namespace, dvmp.Spec.PodRef.Name))
 			err := t.Client.Create(context.TODO(), &dvmp)
 			if k8serror.IsAlreadyExists(err) {
 				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvmp.Namespace, "name", dvmp.Name)
@@ -1222,7 +1253,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
 	if isAnyPending {
-		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins",strings.Join(pendingPods[:], ", "))
+		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     RsyncClientPodsPending,
 			Status:   migapi.True,
@@ -1291,11 +1322,15 @@ func (t *Task) deleteRsyncResources() error {
 		return err
 	}
 
+	t.Log.Info(fmt.Sprintf("Checking for stale Rsync resources on source MigCluster [%v/%v]",
+		t.PlanResources.SrcMigCluster.Namespace, t.PlanResources.SrcMigCluster.Name))
 	err = t.findAndDeleteResources(srcClient)
 	if err != nil {
 		return err
 	}
 
+	t.Log.Info(fmt.Sprintf("Checking for stale Rsync resources on destination MigCluster [%v/%v]",
+		t.PlanResources.DestMigCluster.Namespace, t.PlanResources.DestMigCluster.Name))
 	err = t.findAndDeleteResources(destClient)
 	if err != nil {
 		return err
@@ -1310,6 +1345,7 @@ func (t *Task) deleteRsyncResources() error {
 		return nil
 	}
 
+	t.Log.Info("Checking for stale DVMP resources on [host] MigCluster")
 	err = t.deleteProgressReportingCRs(t.Client)
 	if err != nil {
 		return err
@@ -1437,6 +1473,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		routeList := routev1.RouteList{}
 
 		// Get Pod list
+		t.Log.Info(fmt.Sprintf("Listing Pods in namespace [%v] for DVM stale resource cleanup", ns))
 		err := client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1448,6 +1485,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 			return err
 		}
 		// Get Secret list
+		t.Log.Info(fmt.Sprintf("Listing Secrets in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1460,6 +1498,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		}
 
 		// Get configmap list
+		t.Log.Info(fmt.Sprintf("Listing ConfigMaps in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1472,6 +1511,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		}
 
 		// Get svc list
+		t.Log.Info(fmt.Sprintf("Listing Services in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1497,6 +1537,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete pods
 		for _, pod := range podList.Items {
+			t.Log.Info(fmt.Sprintf("DELETING stale DVM Pod [%v/%v]", pod.Namespace, pod.Name))
 			err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
@@ -1505,6 +1546,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete secrets
 		for _, secret := range secretList.Items {
+			t.Log.Info(fmt.Sprintf("DELETING stale DVM Secret [%v/%v]", secret.Namespace, secret.Name))
 			err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
@@ -1513,6 +1555,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete routes
 		for _, route := range routeList.Items {
+			t.Log.Info(fmt.Sprintf("DELETING stale DVM Route [%v/%v]", route.Namespace, route.Name))
 			err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
@@ -1521,6 +1564,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete svcs
 		for _, svc := range svcList.Items {
+			t.Log.Info(fmt.Sprintf("DELETING stale DVM Service [%v/%v]", svc.Namespace, svc.Name))
 			err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
@@ -1529,6 +1573,7 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 
 		// Delete configmaps
 		for _, cm := range cmList.Items {
+			t.Log.Info(fmt.Sprintf("DELETING stale DVM ConfigMap [%v/%v]", cm.Namespace, cm.Name))
 			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil && !k8serror.IsNotFound(err) {
 				return err
@@ -1543,9 +1588,11 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
+			dvmpName := getMD5Hash(t.Owner.Name + vol.Name + ns)
+			t.Log.Info(fmt.Sprintf("DELETING stale DVMP CR [%v/%v]", dvmpName, ns))
 			err := client.Delete(context.TODO(), &migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
+					Name:      dvmpName,
 					Namespace: ns,
 				},
 			}, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
