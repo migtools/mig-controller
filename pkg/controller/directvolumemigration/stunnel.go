@@ -415,7 +415,7 @@ func (t *Task) createStunnelClientPods() error {
 		return err
 	}
 
-	t.Log.Info("Getting image for Stunnel client Pods")
+	t.Log.Info("Getting image for Stunnel client Pods that will be created on source MigCluster")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return err
@@ -602,7 +602,7 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
-				t.Log.Info(fmt.Sprintf("Stunnel Client Pod [%v/%v] Phase=[%v] is not yet running on sourc cluster.",
+				t.Log.Info(fmt.Sprintf("Stunnel Client Pod [%v/%v] Phase=[%v] is not yet running on source cluster.",
 					pod.Namespace, pod.Name, pod.Status.Phase))
 				return false, nil
 			}

@@ -437,6 +437,8 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Using limits=[%v] requests=[%v] for Rsync Transfer Pod(s)",
+		limits, requests))
 	// one transfer pod should be created per namespace and should mount all
 	// PVCs that are being written to in that namespace
 
@@ -1008,31 +1010,41 @@ func (t *Task) createRsyncClientPods() error {
 	if err != nil {
 		return err
 	}
+	t.Log.Info("Getting image for Rsync client Pods that will be created on source MigCluster")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Using image [%v] for Rsync client Pods", transferImage))
 
+	t.Log.Info("Getting [NS=>PVCWithSecurityContext] mappings for PVCs to be migrated")
 	pvcMap, err := t.getfsGroupMapForNamespace()
 	if err != nil {
 		return err
 	}
 
+	t.Log.Info("Getting Rsync password for Rsync client Pods")
 	password, err := t.getRsyncPassword()
 	if err != nil {
 		return err
 	}
+
+	t.Log.Info("Getting [PVC=>NodeName] mapping for PVCs to be migrated")
 	pvcNodeMap, err := t.getPVCNodeNameMap()
 	if err != nil {
 		return err
 	}
 
+	t.Log.Info("Getting limits and requests for Rsync client Pods")
 	limits, requests, err := getPodResourceLists(t.Client, CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Using limits=[%v] requests=[%v] for Rsync client Pods",
+		limits, requests))
 
 	isPrivileged, err := isRsyncPrivileged(srcClient)
+	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
 
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
@@ -1071,7 +1083,8 @@ func (t *Task) createRsyncClientPods() error {
 			}
 			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol.name))
 			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol.name))
-			t.Log.Info(fmt.Sprintf("Using Rsync command [%s]", strings.Join(rsyncCommand, " ")))
+			t.Log.Info(fmt.Sprintf("Container [%v] will use Rsync command [%s]",
+				DirectVolumeMigrationRsyncClient, strings.Join(rsyncCommand, " ")))
 			containers = append(containers, corev1.Container{
 				Name:  DirectVolumeMigrationRsyncClient,
 				Image: transferImage,
@@ -1122,6 +1135,8 @@ func (t *Task) createRsyncClientPods() error {
 					},
 				},
 			}
+			t.Log.Info(fmt.Sprintf("Creating Rsync client Pod [%v/%v] on source cluster.",
+				clientPod.Namespace, clientPod.Name))
 			err = srcClient.Create(context.TODO(), &clientPod)
 			if k8serror.IsAlreadyExists(err) {
 				t.Log.Info("Rsync client pod already exists on source", "namespace", clientPod.Namespace)
@@ -1177,8 +1192,9 @@ func (t *Task) createPVProgressCR() error {
 				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
 			migapi.SetOwnerReference(t.Owner, t.Owner, &dvmp)
-			t.Log.Info(fmt.Sprintf("Creating DVMP [%v/%v] on host cluster to track Rsync Pod [%v/%v] completion.",
-				dvmp.Namespace, dvmp.Name, dvmp.Spec.PodRef.Namespace, dvmp.Spec.PodRef.Name))
+			t.Log.Info(fmt.Sprintf("Creating DVMP [%v/%v] on [host] MigCluster to track Rsync Pod [%v/%v] completion on MigCluster [%v/%v].",
+				dvmp.Namespace, dvmp.Name, dvmp.Spec.PodRef.Namespace, dvmp.Spec.PodRef.Name,
+				t.Owner.Spec.SrcMigClusterRef.Namespace, t.Owner.Spec.SrcMigClusterRef.Name))
 			err := t.Client.Create(context.TODO(), &dvmp)
 			if k8serror.IsAlreadyExists(err) {
 				t.Log.Info("Rsync client progress CR already exists on destination", "namespace", dvmp.Namespace, "name", dvmp.Name)
@@ -1244,6 +1260,8 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 					LastObservedProgressPercent: dvmp.Status.LastObservedProgressPercent,
 					LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
 				})
+				t.Log.Info(fmt.Sprintf("Rsync Client Pod [%s/%s] Status.Phase=[%v] has not started running yet.",
+					objRef.Namespace, objRef.Name, dvmp.Status.PodPhase))
 				pendingPods = append(pendingPods, fmt.Sprintf("%s/%s", objRef.Name, objRef.Namespace))
 			}
 		}
@@ -1253,7 +1271,8 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
 	if isAnyPending {
-		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
+		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
+		t.Log.Info(pendingMessage)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     RsyncClientPodsPending,
 			Status:   migapi.True,
@@ -1345,7 +1364,7 @@ func (t *Task) deleteRsyncResources() error {
 		return nil
 	}
 
-	t.Log.Info("Checking for stale DVMP resources on [host] MigCluster")
+	t.Log.Info("Checking for stale DVMP resources on MigCluster [host]")
 	err = t.deleteProgressReportingCRs(t.Client)
 	if err != nil {
 		return err
@@ -1363,6 +1382,7 @@ func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
 	if err != nil {
 		return err, false
 	}
+	t.Log.Info("Checking if Rsync resource deletion has completed on source MigCluster")
 	err, deleted := t.areRsyncResourcesDeleted(srcClient)
 	if err != nil {
 		return err, false
@@ -1370,6 +1390,7 @@ func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
 	if !deleted {
 		return nil, false
 	}
+	t.Log.Info("Checking if Rsync resource deletion has completed on destination MigCluster")
 	err, deleted = t.areRsyncResourcesDeleted(destClient)
 	if err != nil {
 		return err, false
@@ -1386,6 +1407,8 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 	})
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, _ := range pvcMap {
+		t.Log.Info(fmt.Sprintf("Searching namespace=[%v] for leftover Rsync Pods, ConfigMaps, "+
+			"Services, Secrets, Routes with label [app: %v]", ns, DirectVolumeMigrationRsyncTransfer))
 		podList := corev1.PodList{}
 		cmList := corev1.ConfigMapList{}
 		svcList := corev1.ServiceList{}
@@ -1403,6 +1426,11 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 		if err != nil {
 			return err, false
 		}
+		if len(podList.Items) > 0 {
+			t.Log.Info(fmt.Sprintf("Found stale Rsync Pod [%v/%v] Phase=[%v].",
+				podList.Items[0].Namespace, podList.Items[0].Name, podList.Items[0].Status.Phase))
+			return nil, false
+		}
 		// Get Secret list
 		err = client.List(
 			context.TODO(),
@@ -1414,7 +1442,11 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 		if err != nil {
 			return err, false
 		}
-
+		if len(secretList.Items) > 0 {
+			t.Log.Info(fmt.Sprintf("Found stale Rsync Secret [%v/%v].",
+				secretList.Items[0].Namespace, secretList.Items[0].Name))
+			return nil, false
+		}
 		// Get configmap list
 		err = client.List(
 			context.TODO(),
@@ -1426,7 +1458,11 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 		if err != nil {
 			return err, false
 		}
-
+		if len(cmList.Items) > 0 {
+			t.Log.Info(fmt.Sprintf("Found stale Rsync ConfigMap [%v/%v]",
+				cmList.Items[0].Namespace, cmList.Items[0].Name))
+			return nil, false
+		}
 		// Get svc list
 		err = client.List(
 			context.TODO(),
@@ -1437,6 +1473,11 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 			&svcList)
 		if err != nil {
 			return err, false
+		}
+		if len(svcList.Items) > 0 {
+			t.Log.Info(fmt.Sprintf("Found stale Rsync Service [%v/%v]",
+				svcList.Items[0].Namespace, svcList.Items[0].Name))
+			return nil, false
 		}
 
 		// Get route list
@@ -1450,7 +1491,9 @@ func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
 		if err != nil {
 			return err, false
 		}
-		if len(routeList.Items) > 0 || len(svcList.Items) > 0 || len(cmList.Items) > 0 || len(secretList.Items) > 0 || len(podList.Items) > 0 {
+		if len(routeList.Items) > 0 {
+			t.Log.Info(fmt.Sprintf("Found stale Rsync Route [%v/%v]",
+				routeList.Items[0].Namespace, routeList.Items[0].Name))
 			return nil, false
 		}
 	}
