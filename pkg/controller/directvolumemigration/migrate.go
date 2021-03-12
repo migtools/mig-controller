@@ -3,9 +3,10 @@ package directvolumemigration
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
-	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,6 +25,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 
 	// Started
 	if direct.Status.StartTimestamp == nil {
+		log.Info("Marking DirectVolumeMigration as started.")
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
@@ -40,8 +42,11 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 	err = task.Run()
 	if err != nil {
 		if k8serrors.IsConflict(errorutil.Unwrap(err)) {
+			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
+		log.Info(fmt.Sprintf("Phase [%v] execution FAILED with Error=[%v], Phase.Description=[%v]",
+			task.Phase, errorutil.Unwrap(err).Error(), task.getPhaseDescription(task.Phase)))
 		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil

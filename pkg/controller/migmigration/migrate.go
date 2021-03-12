@@ -38,8 +38,7 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		return 0, liberr.Wrap(err)
 	}
 	if !plan.Status.IsReady() {
-		log.Info("Plan not ready. Migration can't run unless Plan is ready.",
-			"migplan_name", migration.Name)
+		log.Info("Plan not ready. Migration can't run unless Plan is ready.")
 		return 0, liberr.Wrap(err)
 	}
 

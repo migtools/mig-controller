@@ -126,7 +126,8 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
+	// Log "[RUN] <Phase Description>"
+	t.logRunHeader()
 
 	err := t.init()
 	if err != nil {
@@ -287,4 +288,14 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
 	// If no description available, just return phase name.
 	return phaseName
+}
+
+// Log the "[RUN] <Phase description>" phase kickoff string unless
+// DISMs are already logging a duplicate phase description.
+// This is meant to cut down on log noise when two controllers
+// are waiting on the same thing.
+func (t *Task) logRunHeader() {
+	if t.Phase != WaitingForDirectImageStreamMigrationsToComplete {
+		t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
+	}
 }

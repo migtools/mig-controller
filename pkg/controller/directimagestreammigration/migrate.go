@@ -18,8 +18,9 @@ package directimagestreammigration
 
 import (
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,7 @@ import (
 func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *migapi.DirectImageStreamMigration) (time.Duration, error) {
 	// Started
 	if imageStreamMigration.Status.StartTimestamp == nil {
+		log.Info("Marking DirectImageStreamMigration as started.")
 		imageStreamMigration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
@@ -44,6 +46,8 @@ func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *miga
 		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
+		log.Info(fmt.Sprintf("Phase [%v] execution FAILED with Error=[%v], Phase.Description=[%v]",
+			task.Phase, errorutil.Unwrap(err).Error(), task.getPhaseDescription(task.Phase)))
 		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
