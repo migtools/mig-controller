@@ -427,8 +427,6 @@ func (t *Task) createStunnelClientPods() error {
 	if err != nil {
 		return err
 	}
-	t.Log.Info(fmt.Sprintf("Using limits=[%v] requests=[%v] for Stunnel client Pods",
-		limits, requests))
 	pvcMap := t.getPVCNamespaceMap()
 
 	dvmLabels := t.buildDVMLabels()

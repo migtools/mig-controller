@@ -19,11 +19,11 @@ package directvolumemigration
 var phaseDescriptions = map[string]string{
 	Created:                              "DVM CR has been created",
 	Started:                              "DVM Controller is configuring DVM CR",
-	Prepare:                              "DVM Controller is preparing the environment for volume migration. Currently it is non-operational",
+	Prepare:                              "DVM Controller is preparing the environment for volume migration.",
 	CleanStaleRsyncResources:             "Cleaning up stale resources from previous migrations",
 	WaitForStaleRsyncResourcesTerminated: "Waiting for stale resources to terminate",
 	CreateDestinationNamespaces:          "Creating target namespaces",
-	DestinationNamespacesCreated:         "Checking if the target namespaces have been created, currently it is non-operational",
+	DestinationNamespacesCreated:         "Checking if the target namespaces have been created.",
 	CreateDestinationPVCs:                "Creating PVCs in the target namespaces",
 	DestinationPVCsCreated:               "Checking whether the created PVCs are bound",
 	CreateRsyncRoute:                     "Creating one route for each namespace for Rsync on the target cluster",

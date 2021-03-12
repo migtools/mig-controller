@@ -39,7 +39,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
-	log.Info(fmt.Sprintf("[PV Discovery] Starting for for MigPlan [%v/%v] in namespaces [%v]",
+	log.Info(fmt.Sprintf("PV Discovery: Starting for for MigPlan [%v/%v] in namespaces [%v]",
 		plan.Namespace, plan.Name, plan.Spec.Namespaces))
 
 	// Get srcMigCluster
@@ -71,16 +71,12 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 	}
 
 	// Get StorageClasses
-	log.Info(fmt.Sprintf("[PV Discovery] Getting StorageClasses on source MigCluster [%v/%v] ",
-		srcMigCluster.Namespace, srcMigCluster.Name))
 	srcStorageClasses, err := srcMigCluster.GetStorageClasses(srcClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	plan.Status.SrcStorageClasses = srcStorageClasses
 
-	log.Info(fmt.Sprintf("[PV Discovery] Getting StorageClasses on destination MigCluster [%v/%v] ",
-		srcMigCluster.Namespace, srcMigCluster.Name))
 	destStorageClasses, err := destMigCluster.GetStorageClasses(destClient)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -89,7 +85,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
-		log.Info(fmt.Sprintf("[PV Discovery] 'persistentvolumeclaims' found in MigPlan [%v/%v] "+
+		log.Info(fmt.Sprintf("PV Discovery: 'persistentvolumeclaims' found in MigPlan [%v/%v] "+
 			"Status.ExcludedResources, ending PV discovery",
 			plan.Namespace, plan.Name))
 		plan.Spec.ResetPvs()
@@ -104,14 +100,10 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 	// Build PV map.
-	log.Info(fmt.Sprintf("[PV Discovery] Listing PersistentVolumes on source cluster [%v/%v]",
-		srcMigCluster.Namespace, srcMigCluster.Name))
 	pvMap, err := r.getPvMap(srcClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	log.Info(fmt.Sprintf("[PV Discovery] Listing PersistentVolumeClaims on source cluster [%v/%v]",
-		srcMigCluster.Namespace, srcMigCluster.Name))
 	claims, err := r.getClaims(srcClient, plan)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -186,7 +178,7 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		})
 	}
 
-	log.Info(fmt.Sprintf("[PV Discovery] Finished for MigPlan [%v/%v] in namespaces [%v]",
+	log.Info(fmt.Sprintf("PV Discovery: Finished for MigPlan [%v/%v] in namespaces [%v]",
 		plan.Namespace, plan.Name, plan.Spec.Namespaces))
 	return nil
 }
@@ -225,16 +217,12 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return nil, liberr.Wrap(err)
 	}
 
-	log.Info(fmt.Sprintf("[PV Discovery] Listing template Pods for MigPlan [%v/%v]",
-		plan.Namespace, plan.Name))
 	podList, err := migpods.ListTemplatePods(client, plan.GetSourceNamespaces())
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 
 	runningPods := &core.PodList{}
-	log.Info(fmt.Sprintf("[PV Discovery] Listing running Pods for MigPlan [%v/%v]",
-		plan.Namespace, plan.Name))
 	err = client.List(context.TODO(), &k8sclient.ListOptions{}, runningPods)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -332,9 +320,9 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 			}
 		}
 	}
-	log.Info(fmt.Sprintf("[PV Discovery] Default selections for PV [%v/%v]: "+
+	log.Info(fmt.Sprintf("PV Discovery: Setting default selections for PV [%v]: "+
 		"Action=[%v], StorageClass=[%v], CopyMethod=[%v]",
-		pv.Namespace, pv.Name, selectedAction,
+		pv.Name, selectedAction,
 		selectedStorageClass, migapi.PvFilesystemCopyMethod))
 	return migapi.Selection{
 		Action:       selectedAction,

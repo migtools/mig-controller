@@ -155,6 +155,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = r.deleted()
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Info("Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)

@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("imagestreammigration")
+var log = logging.WithName("directimagestream")
 
 // Add creates a new DirectImageStreamMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -100,7 +100,7 @@ type ReconcileDirectImageStreamMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Reset()
-	log.SetValues("DISM", request.Name)
+	log.SetValues("DirectImageStreamMigration", request.Name)
 	// Fetch the DirectImageStreamMigration instance
 	imageStreamMigration := &migapi.DirectImageStreamMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageStreamMigration)

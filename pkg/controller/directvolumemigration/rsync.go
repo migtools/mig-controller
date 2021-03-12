@@ -446,8 +446,6 @@ func (t *Task) createRsyncTransferPods() error {
 	if err != nil {
 		return err
 	}
-	t.Log.Info(fmt.Sprintf("Using limits=[%v] requests=[%v] for Rsync Transfer Pod(s)",
-		limits, requests))
 	// one transfer pod should be created per namespace and should mount all
 	// PVCs that are being written to in that namespace
 
@@ -1026,7 +1024,7 @@ func (t *Task) createRsyncClientPods() error {
 	}
 	t.Log.Info(fmt.Sprintf("Using image [%v] for Rsync client Pods", transferImage))
 
-	t.Log.Info("Getting [NS=>PVCWithSecurityContext] mappings for PVCs to be migrated")
+	t.Log.Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
 	pvcMap, err := t.getfsGroupMapForNamespace()
 	if err != nil {
 		return err
@@ -1038,7 +1036,7 @@ func (t *Task) createRsyncClientPods() error {
 		return err
 	}
 
-	t.Log.Info("Getting [PVC=>NodeName] mapping for PVCs to be migrated")
+	t.Log.Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
 	pvcNodeMap, err := t.getPVCNodeNameMap()
 	if err != nil {
 		return err
@@ -1049,8 +1047,6 @@ func (t *Task) createRsyncClientPods() error {
 	if err != nil {
 		return err
 	}
-	t.Log.Info(fmt.Sprintf("Using limits=[%v] requests=[%v] for Rsync client Pods",
-		limits, requests))
 
 	isPrivileged, err := isRsyncPrivileged(srcClient)
 	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
@@ -1529,7 +1525,6 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		routeList := routev1.RouteList{}
 
 		// Get Pod list
-		t.Log.Info(fmt.Sprintf("Listing Pods in namespace [%v] for DVM stale resource cleanup", ns))
 		err := client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1541,7 +1536,6 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 			return err
 		}
 		// Get Secret list
-		t.Log.Info(fmt.Sprintf("Listing Secrets in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1554,7 +1548,6 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		}
 
 		// Get configmap list
-		t.Log.Info(fmt.Sprintf("Listing ConfigMaps in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{
@@ -1567,7 +1560,6 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 		}
 
 		// Get svc list
-		t.Log.Info(fmt.Sprintf("Listing Services in namespace [%v] for DVM stale resource cleanup", ns))
 		err = client.List(
 			context.TODO(),
 			&k8sclient.ListOptions{

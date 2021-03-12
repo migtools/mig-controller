@@ -272,7 +272,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info("Some Rsync Transfer Routes have not yet been admitted. Waiting...")
+			t.Log.Info("Some Rsync Transfer Routes have not yet been admitted. Waiting.")
 			t.Requeue = PollReQ
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
@@ -477,7 +477,6 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info("Rsync Client Pods have not yet completed. Waiting...")
 			t.Requeue = PollReQ
 		}
 	case DeleteRsyncResources:
@@ -500,7 +499,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
-		t.Log.Info("Stale Rsync resources are still terminating. Waiting...")
+		t.Log.Info("Stale Rsync resources are still terminating. Waiting.")
 		t.Requeue = PollReQ
 	case Completed:
 	default:
