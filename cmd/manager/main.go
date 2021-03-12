@@ -26,6 +26,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/controller"
 	"github.com/konveyor/mig-controller/pkg/imagescheme"
 	"github.com/konveyor/mig-controller/pkg/webhook"
+	"github.com/konveyor/mig-controller/pkg/zapmod"
 	appsv1 "github.com/openshift/api/apps/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

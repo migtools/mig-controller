@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package zapcustom contains utilities for fetching a logger that actually aligns log messages.
-package zapcustom
+// Package zapmod contains utilities for fetching a logger that actually aligns log messages.
+package zapmod
 
 import (
 	"io"
