@@ -251,7 +251,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.MarkReconciled()
 	err = r.Update(context.TODO(), migration)
 	if err != nil {
-		// log.Error(err, "Error updating migmigration at end of reconcile.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
