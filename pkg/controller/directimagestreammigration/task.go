@@ -17,6 +17,7 @@ limitations under the License.
 package directimagestreammigration
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -120,12 +121,14 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
-
+	// Init
 	err := t.init()
 	if err != nil {
 		return err
 	}
+
+	// Log '[RUN] (Step 12/37) <Extended Phase Description>'
+	t.logRunHeader()
 
 	// Run the current phase.
 	switch t.Phase {
@@ -247,4 +250,12 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
 	// If no description available, just return phase name.
 	return phaseName
+}
+
+// Log the "[RUN] (Step 12/37) <Phase description>" phase kickoff string
+// This is meant to cut down on log noise when two controllers
+// are waiting on the same thing.
+func (t *Task) logRunHeader() {
+	_, n, total := t.Itinerary.progressReport(t.Phase)
+	t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package directimagemigration
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -126,13 +127,14 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	// Log "[RUN] <Phase Description>"
-	t.logRunHeader()
-
+	// Init
 	err := t.init()
 	if err != nil {
 		return err
 	}
+
+	// Log "[RUN] <Phase Description>"
+	t.logRunHeader()
 
 	// Run the current phase.
 	switch t.Phase {
@@ -296,6 +298,7 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 // are waiting on the same thing.
 func (t *Task) logRunHeader() {
 	if t.Phase != WaitingForDirectImageStreamMigrationsToComplete {
-		t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
+		_, n, total := t.Itinerary.progressReport(t.Phase)
+		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 	}
 }

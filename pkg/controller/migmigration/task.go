@@ -338,14 +338,14 @@ func (t *Task) Run() error {
 	t.Log = t.Log.WithValues("Phase", t.Phase)
 	t.Requeue = FastReQ
 
-	// Log "[RUN] <Phase Description>" unless we are waiting on
-	// DIM or DVM (they will log their own [RUN]) with the same message.
-	t.logRunHeader()
-
 	err := t.init()
 	if err != nil {
 		return err
 	}
+
+	// Log "[RUN] <Phase Description>" unless we are waiting on
+	// DIM or DVM (they will log their own [RUN]) with the same message.
+	t.logRunHeader()
 
 	defer t.updatePipeline()
 
@@ -1649,6 +1649,7 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 func (t *Task) logRunHeader() {
 	if t.Phase != WaitForDirectVolumeMigrationToComplete &&
 		t.Phase != WaitForDirectImageMigrationToComplete {
-		t.Log.Info("[RUN] " + t.getPhaseDescription(t.Phase))
+		_, n, total := t.Itinerary.progressReport(t.Phase)
+		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 	}
 }
