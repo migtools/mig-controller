@@ -373,9 +373,6 @@ func (t *Task) Run() error {
 			}
 		} else {
 			t.Requeue = PollReQ
-			t.Log.Info(fmt.Sprintf("MigPlan [%v/%v] is not finished "+
-				"refreshing validations. Waiting.",
-				t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name))
 		}
 	case CleanStaleResticCRs:
 		err := t.deleteStaleResticCRs()
