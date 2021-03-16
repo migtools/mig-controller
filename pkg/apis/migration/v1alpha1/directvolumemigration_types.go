@@ -17,9 +17,17 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"reflect"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// labels
+const (
+	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
+	RsyncPodIdentityLabel = "openshift.migration.io/created-for-pvc"
 )
 
 type PVCToMigrate struct {
@@ -34,6 +42,9 @@ type DirectVolumeMigrationSpec struct {
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
+	// BackOffLimit retry limit on Rsync pods
+	BackOffLimit int `json:"backOffLimit,omitempty"`
+
 	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims []PVCToMigrate `json:"persistentVolumeClaims,omitempty"`
 
@@ -47,16 +58,34 @@ type DirectVolumeMigrationSpec struct {
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
 type DirectVolumeMigrationStatus struct {
 	Conditions       `json:","`
-	ObservedDigest   string         `json:"observedDigest"`
-	StartTimestamp   *metav1.Time   `json:"startTimestamp,omitempty"`
-	PhaseDescription string         `json:"phaseDescription"`
-	Phase            string         `json:"phase,omitempty"`
-	Itinerary        string         `json:"itinerary,omitempty"`
-	Errors           []string       `json:"errors,omitempty"`
-	SuccessfulPods   []*PodProgress `json:"successfulPods,omitempty"`
-	FailedPods       []*PodProgress `json:"failedPods,omitempty"`
-	RunningPods      []*PodProgress `json:"runningPods,omitempty"`
-	PendingPods      []*PodProgress `json:"pendingPods,omitempty"`
+	ObservedDigest   string            `json:"observedDigest"`
+	StartTimestamp   *metav1.Time      `json:"startTimestamp,omitempty"`
+	PhaseDescription string            `json:"phaseDescription"`
+	Phase            string            `json:"phase,omitempty"`
+	Itinerary        string            `json:"itinerary,omitempty"`
+	Errors           []string          `json:"errors,omitempty"`
+	SuccessfulPods   []*PodProgress    `json:"successfulPods,omitempty"`
+	FailedPods       []*PodProgress    `json:"failedPods,omitempty"`
+	RunningPods      []*PodProgress    `json:"runningPods,omitempty"`
+	PendingPods      []*PodProgress    `json:"pendingPods,omitempty"`
+	RsyncOperations  []*RsyncOperation `json:"rsyncOperations,omitempty"`
+}
+
+// GetRsyncOperationStatusForPVC returns RsyncOperation from status for matching PVC, creates new one if doesn't exist already
+func (ds *DirectVolumeMigrationStatus) GetRsyncOperationStatusForPVC(pvcRef *kapi.ObjectReference) *RsyncOperation {
+	for i := range ds.RsyncOperations {
+		rsyncOperation := ds.RsyncOperations[i]
+		if reflect.DeepEqual(rsyncOperation.PVCReference, pvcRef) {
+			return rsyncOperation
+		}
+	}
+	newStatus := &RsyncOperation{
+		PVCReference:   pvcRef,
+		CurrentAttempt: 0,
+		FailedAttempts: 0,
+	}
+	ds.RsyncOperations = append(ds.RsyncOperations, newStatus)
+	return newStatus
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
@@ -89,6 +118,25 @@ type PodProgress struct {
 	*kapi.ObjectReference       `json:",inline"`
 	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
 	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
+}
+
+// RsyncOperation defines observed state of an Rsync Operation
+type RsyncOperation struct {
+	// PVCReference pvc to which this Rsync operation corresponds to
+	PVCReference *kapi.ObjectReference `json:"pvcReference,omitempty"`
+	// CurrentAttempt current ongoing attempt of an Rsync operation
+	CurrentAttempt int `json:"currentAttempt,omitempty"`
+	// FailedAttempts number of Rsync attempts failed so far
+	FailedAttempts int `json:"failedAttempts,omitempty"`
+	// Succeeded whether operation as a whole succeded
+	Succeeded bool `json:"succeeded,omitempty"`
+	// Failed whether operation as a whole failed
+	Failed bool `json:"failed,omitempty"`
+}
+
+// IsComplete tells whether the operation as a whole is in terminal state
+func (r *RsyncOperation) IsComplete() bool {
+	return r.Failed || r.Succeeded
 }
 
 func (r *DirectVolumeMigration) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {
