@@ -525,6 +525,9 @@ func (t *Task) createStunnelClientPods() error {
 				Privileged:             &isRsyncPrivileged,
 				RunAsUser:              &runAsUser,
 				ReadOnlyRootFilesystem: &trueBool,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+				},
 			},
 			Resources: corev1.ResourceRequirements{
 				Limits:   limits,
