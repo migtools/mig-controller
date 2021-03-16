@@ -5,7 +5,7 @@ mig-controller is installed by [mig-operator](https://github.com/konveyor/mig-op
 
 ## Demo Video 
 
-This [video](https://www.youtube.com/watch?v=OaRp4_j9F_A) shows a CLI driven migration of a [rocket-chat](https://github.com/konveyor/mig-demo-apps/tree/master/apps/rocket-chat) demo app and associated PersistentVolume data.
+This [video](https://www.youtube.com/watch?v=OaRp4_j9F_A) shows a CLI driven migration of a [rocket-chat](https://github.com/konveyor/mig-demo-apps/tree/master/apps/rocket-chat) demo app and associated PersistentVolume data from OpenShift 3.11 to OpenShift 4.6.
 
 [![Watch the demo](https://user-images.githubusercontent.com/7576968/111339370-16061300-864e-11eb-8ae5-37a250c65f08.png)](https://www.youtube.com/watch?v=OaRp4_j9F_A)
 
