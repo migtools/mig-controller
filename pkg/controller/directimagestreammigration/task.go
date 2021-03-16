@@ -247,7 +247,7 @@ func (t *Task) getPhaseDescription(phaseName string) string {
 	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
 		return phaseDescription
 	}
-	t.Log.V(4).Info("Missing phase description for phase: " + phaseName)
+	t.Log.Info("Missing phase description for phase: " + phaseName)
 	// If no description available, just return phase name.
 	return phaseName
 }
