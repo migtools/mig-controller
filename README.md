@@ -3,6 +3,9 @@
 ## Installing
 mig-controller is installed by [mig-operator](https://github.com/konveyor/mig-operator).
 
+## Demo Video
+[![Watch the demo](https://user-images.githubusercontent.com/7576968/111339370-16061300-864e-11eb-8ae5-37a250c65f08.png)](https://www.youtube.com/watch?v=d6w25kvQd3o)
+
 ## Development
 
 [HACKING.md](./HACKING.md) has instructions for:
