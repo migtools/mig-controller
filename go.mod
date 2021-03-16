@@ -16,6 +16,7 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-logr/logr v0.3.0
+	github.com/go-logr/zapr v0.3.0
 	github.com/google/uuid v1.1.2
 	github.com/joho/godotenv v1.3.0
 	github.com/konveyor/controller v0.2.1
@@ -29,6 +30,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/vmware-tanzu/velero v1.4.2
 	go.opencensus.io v0.22.5 // indirect
+	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
 	google.golang.org/api v0.35.0

@@ -2,6 +2,7 @@ package migmigration
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -9,6 +10,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -332,13 +334,18 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
+	// Set stage, phase, phase description, migplan name
+	t.Log = t.Log.WithValues("Phase", t.Phase)
 	t.Requeue = FastReQ
-	t.Log.Info("[RUN]", "stage", t.stage(), "phase", t.Phase)
 
 	err := t.init()
 	if err != nil {
 		return err
 	}
+
+	// Log "[RUN] <Phase Description>" unless we are waiting on
+	// DIM or DVM (they will log their own [RUN]) with the same message.
+	t.logRunHeader()
 
 	defer t.updatePipeline()
 
@@ -392,6 +399,8 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Log.Info(fmt.Sprintf("Created [%v/2] registries, retrying.", nEnsured))
 		}
 	case WaitForRegistriesReady:
 		// First registry health check happens here
@@ -410,6 +419,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Found [%v/2] registries in healthy state. Waiting.", nEnsured))
 			t.Requeue = PollReQ
 		}
 	case DeleteRegistries:
@@ -441,11 +451,14 @@ func (t *Task) Run() error {
 
 		completed, reasons, progress := dim.HasCompleted()
 		t.setProgress(progress)
-		t.Log.Info("is migrations", "name", dim.Name, "completed", completed, "phase", dim.Status.Phase)
+		t.Log.Info("Waiting for ImageStream migrations to complete",
+			"name", dim.Name, "completed", completed, "phase", dim.Status.Phase)
 
 		if completed {
 			if len(reasons) > 0 {
 				t.setDirectImageMigrationWarning(dim)
+				t.Log.Info(fmt.Sprintf("DirectImageMigration [%v/%v] completed with warnings.",
+					dim.Namespace, dim.Name))
 				// Once supported, add reasons to Status.Warnings for the Step
 			}
 			if err = t.next(); err != nil {
@@ -472,6 +485,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Cloud secret has propagated to Velero Pod "+
+				"on [%v/2] clusters. Waiting.", count))
 			t.Requeue = PollReQ
 		}
 	case PreBackupHooks:
@@ -485,6 +500,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("PreBackupHooks are still running. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureInitialBackup:
@@ -514,6 +530,17 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			backupProgress := ""
+			if backup.Status.Progress != nil {
+				backupProgress = fmt.Sprintf("%v/%v",
+					backup.Status.Progress.ItemsBackedUp,
+					backup.Status.Progress.TotalItems)
+			}
+			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. "+
+				"Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
+				"Backup.Warnings=[%v], Backup.Errors=[%v]",
+				backup.Namespace, backup.Name, backup.Status.Phase, backupProgress,
+				backup.Status.Warnings, backup.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
@@ -525,10 +552,15 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+		} else {
+			t.Log.Info(fmt.Sprintf("Annotated/labeled [%v] source cluster resources this reconcile, "+
+				"requeuing and continuing.",
+				AnnotationsPerReconcile))
 		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
 		if err != nil {
+			t.Log.Error(err, "Error creating stage pods on source cluster from running pods")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -537,6 +569,7 @@ func (t *Task) Run() error {
 	case EnsureStagePodsFromTemplates:
 		err := t.ensureStagePodsFromTemplates()
 		if err != nil {
+			t.Log.Error(err, "Error creating stage pods on source cluster from templates")
 			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
@@ -556,6 +589,7 @@ func (t *Task) Run() error {
 			return liberr.Wrap(err)
 		}
 		if report.failed {
+			t.Log.Info("Migration failed due to a problem with source cluster stage pods")
 			t.fail(SourceStagePodsFailed, report.reasons)
 			break
 		}
@@ -564,6 +598,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Waiting for Stage Pods to be ready on source cluster")
 			t.Requeue = PollReQ
 		}
 		t.setProgress(report.progress)
@@ -593,6 +628,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Restic is unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case WaitForVeleroReady:
@@ -605,6 +641,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Velero Pod(s) are unready on the source or target cluster. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case QuiesceApplications:
@@ -625,6 +662,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Quiescing on source cluster is incomplete. " +
+				"Pods are not yet terminated, waiting.")
 			t.Requeue = PollReQ
 		}
 	case UnQuiesceSrcApplications:
@@ -661,6 +700,7 @@ func (t *Task) Run() error {
 			if err = t.next(); err != nil {
 				return liberr.Wrap(err)
 			}
+			break
 		}
 		// Check if DVM is complete and report progress
 		completed, reasons, progress := t.hasDirectVolumeMigrationCompleted(dvm)
@@ -707,6 +747,9 @@ func (t *Task) Run() error {
 		if completed {
 			t.setStageBackupPartialFailureWarning(backup)
 			if len(reasons) > 0 {
+				t.Log.Info(fmt.Sprintf("Migration FAILED due to Stage Velero Backup"+
+					"[%v/%v] failure on source cluster, reasons=[%v].",
+					backup.Namespace, backup.Name, reasons))
 				t.fail(StageBackupFailed, reasons)
 			} else {
 				if err = t.next(); err != nil {
@@ -714,6 +757,17 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			backupProgress := ""
+			if backup.Status.Progress != nil {
+				backupProgress = fmt.Sprintf("%v/%v",
+					backup.Status.Progress.ItemsBackedUp,
+					backup.Status.Progress.TotalItems)
+			}
+			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is "+
+				"incomplete. Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
+				"Backup.Warnings=[%v], Backup.Errors=[%v]",
+				backup.Namespace, backup.Name, backup.Status.Phase,
+				backupProgress, backup.Status.Warnings, backup.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
@@ -733,6 +787,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Stage Velero Backup [%v/%v] has not yet "+
+				"been replicated to target cluster by Velero. Waiting",
+				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case PostBackupHooks:
@@ -746,6 +803,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("PostBackupHook(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case PreRestoreHooks:
@@ -759,6 +817,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("PreRestoreHooks(s) are incomplete. Waiting."))
 			t.Requeue = PollReQ
 		}
 	case EnsureStageRestore:
@@ -789,6 +848,11 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
+				"is incomplete. Waiting. Restore.Phase=[%v], "+
+				"Restore.Warnings=[%v], Restore.Errors=[%v]",
+				restore.Namespace, restore.Name, restore.Status.Phase,
+				restore.Status.Warnings, restore.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
@@ -809,6 +873,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Stage Pods have not finished terminating. Waiting")
 			t.Requeue = PollReQ
 		}
 	case EnsureAnnotationsDeleted, CleanStaleAnnotations:
@@ -838,6 +903,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] has not yet "+
+				"been replicated to target cluster by Velero. Waiting",
+				backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case EnsureFinalRestore:
@@ -875,11 +943,17 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
+			t.Log.Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
+				"cluster is incomplete. Waiting. Restore.Phase=[%v], "+
+				"Restore.Warnings=[%v], Restore.Errors=[%v]",
+				restore.Namespace, restore.Name,
+				restore.Status.Phase, restore.Status.Warnings, restore.Status.Errors))
 			t.Requeue = PollReQ
 		}
 	case PostRestoreHooks:
 		status, err := t.runHooks(migapi.PostRestoreHookPhase)
 		if err != nil {
+			t.Log.Error(err, "Error getting final Velero Restore from target cluster.")
 			t.fail(PostRestoreHooksFailed, []string{err.Error()})
 			return liberr.Wrap(err)
 		}
@@ -888,6 +962,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("PostRestoreHooks are incomplete. Waiting")
 			t.Requeue = PollReQ
 		}
 	case Verification:
@@ -900,6 +975,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Verification is incomplete. Some Pods that existed on " +
+				"the source cluster have not yet been recreated and verified healthy " +
+				"on target cluster. Waiting")
 			t.Requeue = PollReQ
 		}
 	case Canceling:
@@ -939,6 +1017,8 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Found resources associated with MigPlan on target cluster " +
+				"that have not finished deleting. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case DeleteBackups:
@@ -1013,6 +1093,7 @@ func (t *Task) Run() error {
 
 // Initialize.
 func (t *Task) init() error {
+	t.Log.V(4).Info("Running task init")
 	t.Requeue = FastReQ
 	if t.failed() {
 		t.Itinerary = FailedItinerary
@@ -1098,6 +1179,7 @@ func (t *Task) initPipeline(prevItinerary string) error {
 }
 
 func (t *Task) updatePipeline() {
+	t.Log.V(4).Info("Updating pipeline view of progress")
 	currentStep := t.Owner.Status.FindStep(t.Step)
 	for _, step := range t.Owner.Status.Pipeline {
 		if currentStep != step && step.MarkedStarted() {
@@ -1290,6 +1372,8 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 func (t *Task) fail(nextPhase string, reasons []string) {
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
+	t.Log.Info(fmt.Sprintf("Marking migration as FAILED. See Status.Errors=[%v]",
+		t.Owner.Status.Errors))
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     Failed,
 		Status:   True,
@@ -1533,4 +1617,36 @@ func (r *Itinerary) GetStepForPhase(phaseName string) string {
 		}
 	}
 	return ""
+}
+
+// Emits an INFO level warning message (no stack trace) letting the
+// user know an error was encountered with a description of the phase
+// where available. Stack trace will be printed shortly after this.
+// This is meant to help contextualize the stack trace for the user.
+func (t *Task) logErrorForPhase(phaseName string, err error) {
+	t.Log.Info(fmt.Sprintf("Exited with Error=[%v] while executing Phase=[%v] Description=[%v]",
+		errorutil.Unwrap(err).Error(), phaseName, t.getPhaseDescription(phaseName)))
+}
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := PhaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.Info("Missing phase description for phase: " + phaseName)
+	// If no description available, just return phase name.
+	return phaseName
+}
+
+// Log the "[RUN] <Phase description>" phase kickoff string unless
+// DVM or DIM is already logging a duplicate phase description.
+// This is meant to cut down on log noise when two controllers
+// are waiting on the same thing.
+func (t *Task) logRunHeader() {
+	if t.Phase != WaitForDirectVolumeMigrationToComplete &&
+		t.Phase != WaitForDirectImageMigrationToComplete {
+		_, n, total := t.Itinerary.progressReport(t.Phase)
+		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
+	}
 }

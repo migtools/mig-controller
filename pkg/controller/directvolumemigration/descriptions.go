@@ -1,13 +1,29 @@
+/*
+Copyright 2021 Red Hat Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package directvolumemigration
 
 var phaseDescriptions = map[string]string{
 	Created:                              "DVM CR has been created",
 	Started:                              "DVM Controller is configuring DVM CR",
-	Prepare:                              "DVM Controller is preparing the environment for volume migration. Currently it is non-operational",
+	Prepare:                              "DVM Controller is preparing the environment for volume migration.",
 	CleanStaleRsyncResources:             "Cleaning up stale resources from previous migrations",
 	WaitForStaleRsyncResourcesTerminated: "Waiting for stale resources to terminate",
 	CreateDestinationNamespaces:          "Creating target namespaces",
-	DestinationNamespacesCreated:         "Checking if the target namespaces have been created, currently it is non-operational",
+	DestinationNamespacesCreated:         "Checking if the target namespaces have been created.",
 	CreateDestinationPVCs:                "Creating PVCs in the target namespaces",
 	DestinationPVCsCreated:               "Checking whether the created PVCs are bound",
 	CreateRsyncRoute:                     "Creating one route for each namespace for Rsync on the target cluster",
@@ -20,8 +36,8 @@ var phaseDescriptions = map[string]string{
 	WaitForStunnelClientPodsRunning:      "Waiting for the Stunnel client pods to run",
 	CreateRsyncClientPods:                "Creating Rsync client pods",
 	WaitForRsyncClientPodsCompleted:      "Waiting for the Rsync client pods to be completed",
-	DeleteRsyncResources:                 "Deleting resources created by this migration",
-	WaitForRsyncResourcesTerminated:      "Waiting for resources to terminate",
+	DeleteRsyncResources:                 "Deleting Rsync resources created by this migration",
+	WaitForRsyncResourcesTerminated:      "Waiting for Rsync resources to terminate",
 	Verification:                         "Verifying migration was successful",
 	MigrationFailed:                      "The migration attempt failed, please see errors for more details",
 	Completed:                            "Complete",

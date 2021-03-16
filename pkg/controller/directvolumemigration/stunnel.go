@@ -113,6 +113,8 @@ func (t *Task) generateStunnelProxyConfig() (stunnelProxyConfig, error) {
 	var proxyConfig stunnelProxyConfig
 	tcpProxyString := settings.Settings.DvmOpts.StunnelTCPProxy
 	if tcpProxyString != "" {
+		t.Log.Info(fmt.Sprintf("Found TCP proxy string [%v]. Configuring Stunnel proxy.",
+			tcpProxyString))
 		url, err := url.Parse(tcpProxyString)
 		if err != nil {
 			t.Log.Error(err, fmt.Sprintf("failed to parse %s setting", settings.TCPProxyKey))
@@ -257,6 +259,8 @@ func (t *Task) createStunnelConfig() error {
 		}
 
 		// Create configmaps on source + dest
+		t.Log.Info(fmt.Sprintf("Creating Stunnel client ConfigMap [%v/%v] on source cluster.",
+			clientConfigMap.Namespace, clientConfigMap.Name))
 		err = srcClient.Create(context.TODO(), &clientConfigMap)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Configmap already exists on destination", "namespace", clientConfigMap.Namespace)
@@ -264,6 +268,8 @@ func (t *Task) createStunnelConfig() error {
 			return err
 		}
 
+		t.Log.Info(fmt.Sprintf("Creating Stunnel client ConfigMap [%v/%v] on destination cluster.",
+			clientConfigMap.Namespace, clientConfigMap.Name))
 		err = destClient.Create(context.TODO(), &destConfigMap)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Configmap already exists on destination", "namespace", destConfigMap.Namespace)
@@ -295,7 +301,7 @@ func (t *Task) setupCerts() error {
 	// Skip CAbundle generation if configmap already exists
 	// TODO: Need to handle case where configmap gets deleted and 2 versions of
 	// CA bundle exist
-
+	t.Log.Info("Generating CA Bundle for Stunnel")
 	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return err
@@ -332,6 +338,7 @@ func (t *Task) setupCerts() error {
 		return err
 	}
 
+	t.Log.Info("Generating ca.crt/tls.crt for Stunnel")
 	caPEM := new(bytes.Buffer)
 	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
@@ -341,6 +348,7 @@ func (t *Task) setupCerts() error {
 		return err
 	}
 
+	t.Log.Info("Generating tls.key for Stunnel")
 	caPrivKeyPEM := new(bytes.Buffer)
 	err = pem.Encode(caPrivKeyPEM, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
@@ -374,12 +382,16 @@ func (t *Task) setupCerts() error {
 			},
 		}
 		destSecret := srcSecret
+		t.Log.Info(fmt.Sprintf("Creating Stunnel CA Bundle and Cert/Key Secret [%v/%v] on source cluster",
+			srcSecret.Namespace, srcSecret.Name))
 		err = srcClient.Create(context.TODO(), &srcSecret)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Secret already exists on source", "namespace", srcSecret.Namespace)
 		} else if err != nil {
 			return err
 		}
+		t.Log.Info(fmt.Sprintf("Creating Stunnel CA Bundle and Cert/Key Secret [%v/%v] on destination cluster",
+			destSecret.Namespace, destSecret.Name))
 		err = destClient.Create(context.TODO(), &destSecret)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Secret already exists on destination", "namespace", destSecret.Namespace)
@@ -402,11 +414,15 @@ func (t *Task) createStunnelClientPods() error {
 	if err != nil {
 		return err
 	}
+
+	t.Log.Info("Getting image for Stunnel client Pods that will be created on source MigCluster")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Using image [%v] for Stunnel client Pods", transferImage))
 
+	t.Log.Info("Getting limits and requests for Stunnel client Pods")
 	limits, requests, err := getPodResourceLists(t.Client, STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
@@ -420,6 +436,8 @@ func (t *Task) createStunnelClientPods() error {
 	if err != nil {
 		return err
 	}
+	t.Log.Info(fmt.Sprintf("Stunnel client pods will be created with privileged=[%v]",
+		isRsyncPrivileged))
 
 	for ns, _ := range pvcMap {
 		svc := corev1.Service{
@@ -528,6 +546,8 @@ func (t *Task) createStunnelClientPods() error {
 				Containers: containers,
 			},
 		}
+		t.Log.Info(fmt.Sprintf("Creating Stunnel Client Service [%v/%v] on source cluster",
+			svc.Namespace, svc.Name))
 		err := srcClient.Create(context.TODO(), &svc)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Stunnel client svc already exists on source", "namespace", svc.Namespace)
@@ -535,6 +555,8 @@ func (t *Task) createStunnelClientPods() error {
 			return err
 		}
 		t.Log.Info("stunnel client svc created", "name", clientPod.Name, "namespace", svc.Namespace)
+		t.Log.Info(fmt.Sprintf("Creating Stunnel Client Pod [%v/%v] on source cluster",
+			svc.Namespace, svc.Name))
 		err = srcClient.Create(context.TODO(), &clientPod)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Stunnel client pod already exists on source", "namespace", clientPod.Namespace)
@@ -578,6 +600,16 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				for _, podCond := range pod.Status.Conditions {
+					if podCond.Reason == corev1.PodReasonUnschedulable {
+						t.Log.Info(fmt.Sprintf("Found UNSCHEDULABLE Stunnel Client Pod [%v/%v] "+
+							"with Phase=[%v] on source cluster. Message: [%v].",
+							pod.Namespace, pod.Name, pod.Status.Phase, podCond.Message))
+						return false, nil
+					}
+				}
+				t.Log.Info(fmt.Sprintf("Stunnel Client Pod [%v/%v] Phase=[%v] is not yet running on source cluster.",
+					pod.Namespace, pod.Name, pod.Status.Phase))
 				return false, nil
 			}
 		}

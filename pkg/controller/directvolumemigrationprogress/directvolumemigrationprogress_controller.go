@@ -19,14 +19,15 @@ package directvolumemigrationprogress
 import (
 	"context"
 	"fmt"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"path"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -123,6 +124,7 @@ type ReconcileDirectVolumeMigrationProgress struct {
 func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
+	log.SetValues("DVMP", request.Name)
 	// Fetch the DirectVolumeMigrationProgress instance
 	pvProgress := &migapi.DirectVolumeMigrationProgress{}
 	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)

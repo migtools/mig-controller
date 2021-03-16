@@ -180,12 +180,14 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log.Info("[RUN]", "phase", t.Phase)
-
+	// Init
 	err := t.init()
 	if err != nil {
 		return err
 	}
+
+	// Log '[RUN] (Step 12/37) <Extended Phase Description>'
+	t.logRunHeader()
 
 	// Run the current phase.
 	switch t.Phase {
@@ -271,6 +273,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
+			t.Log.Info("Some Rsync Transfer Routes have not yet been admitted. Waiting.")
 			t.Requeue = PollReQ
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
@@ -278,6 +281,9 @@ func (t *Task) Run() error {
 				return fmt.Errorf("unable to find running condition")
 			}
 			now := time.Now().UTC()
+			msg := fmt.Sprintf("Rsync Transfer Routes have failed to be admitted within 3 minutes on "+
+				"destination cluster. Errors: %v", reasons)
+			t.Log.Info(msg)
 			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 3*time.Minute {
 				t.Owner.Status.SetCondition(
 					migapi.Condition{
@@ -285,7 +291,7 @@ func (t *Task) Run() error {
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  fmt.Sprintf("Some or all rsync transfer routes have failed to be admitted within 3 mins on destination cluster. Errors: %v", reasons),
+						Message:  msg,
 					},
 				)
 			}
@@ -338,17 +344,19 @@ func (t *Task) Run() error {
 			t.Owner.Status.StageCondition(Running)
 			cond := t.Owner.Status.FindCondition(Running)
 			if cond == nil {
-				return fmt.Errorf("unable to find running condition")
+				return fmt.Errorf("'Running' condition not found on DVM [%v/%v]", t.Owner.Namespace, t.Owner.Name)
 			}
 			now := time.Now().UTC()
 			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 10*time.Minute {
+				msg := "Rsync Transfer Pod(s) on destination cluster have not started Running after 10 minutes."
+				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
 					migapi.Condition{
 						Type:     RsyncTransferPodsPending,
 						Status:   True,
 						Reason:   migapi.NotReady,
 						Category: Warn,
-						Message:  "Some or all transfer pods are not running for more than 10 mins on destination cluster",
+						Message:  msg,
 					},
 				)
 			}
@@ -393,7 +401,7 @@ func (t *Task) Run() error {
 							Status:   True,
 							Reason:   migapi.NotReady,
 							Category: Warn,
-							Message:  "Some or all stunnel client pods are not ready for more than 10 mins on the source cluster",
+							Message:  "Stunnel Client Pod(s) on the source cluster are not ready after 10 minutes.",
 							Durable:  true,
 						},
 					)
@@ -440,7 +448,7 @@ func (t *Task) Run() error {
 						"source namespace to destination",
 					Durable: true,
 				})
-				t.fail(MigrationFailed, []string{"all the source rsync pods have timed out, look at error condition for more details"})
+				t.fail(MigrationFailed, []string{"All the source cluster Rsync Pods have timed out, look at error condition for more details"})
 				t.Requeue = NoReQ
 				return nil
 			}
@@ -454,16 +462,16 @@ func (t *Task) Run() error {
 					Status:   True,
 					Reason:   SourceToDestinationNetworkError,
 					Category: migapi.Error,
-					Message: "All the rsync client pods on source failing because of \"no route to host\" error," +
+					Message: "All Rsync client Pods on Source Cluster are failing because of \"no route to host\" error," +
 						"please check your network configuration",
 					Durable: true,
 				})
-				t.fail(MigrationFailed, []string{"all the source rsync pods have timed out, look at error condition for more details"})
+				t.fail(MigrationFailed, []string{"All the source Rsync client Pods have timed out, look at error condition for more details"})
 				t.Requeue = NoReQ
 				return nil
 			}
 			if failed {
-				t.fail(MigrationFailed, []string{"One or more pods are in error state"})
+				t.fail(MigrationFailed, []string{"One or more Rsync client Pods are in error state"})
 			}
 			t.Requeue = NoReQ
 			if err = t.next(); err != nil {
@@ -492,6 +500,7 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		}
+		t.Log.Info("Stale Rsync resources are still terminating. Waiting.")
 		t.Requeue = PollReQ
 	case Completed:
 	default:
@@ -596,4 +605,23 @@ func (t *Task) buildDVMLabels() map[string]string {
 	dvmLabels["owner"] = DirectVolumeMigration
 
 	return dvmLabels
+}
+
+// Get the extended phase description for a phase.
+func (t *Task) getPhaseDescription(phaseName string) string {
+	// Log the extended description of current phase
+	if phaseDescription, found := phaseDescriptions[t.Phase]; found {
+		return phaseDescription
+	}
+	t.Log.Info("Missing phase description for phase: " + phaseName)
+	// If no description available, just return phase name.
+	return phaseName
+}
+
+// Log the "[RUN] (Step 12/37) <Phase description>" phase kickoff string
+// This is meant to cut down on log noise when two controllers
+// are waiting on the same thing.
+func (t *Task) logRunHeader() {
+	_, n, total := t.Itinerary.progressReport(t.Phase)
+	t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 }

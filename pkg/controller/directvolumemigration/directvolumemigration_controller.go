@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("direct")
+var log = logging.WithName("directvolume")
 
 // Add creates a new DirectVolumeMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -105,7 +105,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	}
 
 	// Set values
-	log.SetValues("direct", request)
+	log.SetValues("DVM", request.Name)
 
 	// Check if completed
 	if direct.Status.Phase == Completed {

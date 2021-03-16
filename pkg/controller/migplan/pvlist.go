@@ -39,6 +39,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
+	log.Info(fmt.Sprintf("PV Discovery: Starting for for MigPlan [%v/%v] in namespaces [%v]",
+		plan.Namespace, plan.Name, plan.Spec.Namespaces))
+
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
 	if err != nil {
@@ -82,6 +85,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
+		log.Info(fmt.Sprintf("PV Discovery: 'persistentvolumeclaims' found in MigPlan [%v/%v] "+
+			"Status.ExcludedResources, ending PV discovery",
+			plan.Namespace, plan.Name))
 		plan.Spec.ResetPvs()
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvsDiscovered,
@@ -172,6 +178,8 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		})
 	}
 
+	log.Info(fmt.Sprintf("PV Discovery: Finished for MigPlan [%v/%v] in namespaces [%v]",
+		plan.Namespace, plan.Name, plan.Spec.Namespaces))
 	return nil
 }
 
@@ -312,7 +320,10 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 			}
 		}
 	}
-
+	log.Info(fmt.Sprintf("PV Discovery: Setting default selections for PV [%v]: "+
+		"Action=[%v], StorageClass=[%v], CopyMethod=[%v]",
+		pv.Name, selectedAction,
+		selectedStorageClass, migapi.PvFilesystemCopyMethod))
 	return migapi.Selection{
 		Action:       selectedAction,
 		StorageClass: selectedStorageClass,

@@ -33,6 +33,8 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 	migHook := migapi.MigHook{}
 
 	if hook.Reference != nil {
+		t.Log.Info("Found MigHook ref [%v/%v] attached for phase=[%v], starting hook job.",
+			hook.Reference.Namespace, hook.Reference.Name, hookPhase)
 		err = t.Client.Get(
 			context.TODO(),
 			types.NamespacedName{
@@ -44,6 +46,8 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 			return false, liberr.Wrap(err)
 		}
 
+		t.Log.Info("Getting k8s client for MigHook [%v/%v]",
+			migHook.Namespace, migHook.Name)
 		client, err = t.getHookClient(migHook)
 		if err != nil {
 			return false, liberr.Wrap(err)
@@ -54,16 +58,22 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 			Namespace: hook.ExecutionNamespace,
 			Name:      hook.ServiceAccount,
 		}
+		t.Log.Info("Getting executor ServiceAccount [%v/%v] for MigHook [%v/%v]",
+			svc.Namespace, svc.Name, migHook.Namespace, migHook.Name)
 		err = client.Get(context.TODO(), ref, &svc)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
 
+		t.Log.Info("Building Job resource definition for MigHook [%v/%v]",
+			migHook.Namespace, migHook.Name)
 		job, err := t.prepareJob(hook, migHook, client)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
 
+		t.Log.Info("Creating Job [%v/%v] for MigHook [%v/%v]",
+			job.Namespace, job.Name, migHook.Namespace, migHook.Name)
 		result, err := t.ensureJob(job, hook, migHook, client)
 		if err != nil {
 			return false, liberr.Wrap(err)
@@ -71,6 +81,8 @@ func (t *Task) runHooks(hookPhase string) (bool, error) {
 
 		return result, nil
 	}
+	t.Log.Info(fmt.Sprintf("No hook attached to MigPlan for HookPhase=[%v], continuing.",
+		hookPhase))
 	return true, nil
 }
 
@@ -80,10 +92,14 @@ func (t *Task) stopHookJobs() (bool, error) {
 
 	migHook := migapi.MigHook{}
 	for _, hook := range t.PlanResources.MigPlan.Spec.Hooks {
+		t.Log.Info("Found MigHook ref [%v/%v], stopping hook job(s).",
+			hook.Reference.Namespace, hook.Reference.Name)
 		if hook.Reference == nil {
 			continue
 		}
 
+		t.Log.Info("Getting MigHook [%v/%v]",
+			hook.Reference.Namespace, hook.Reference.Name)
 		err = t.Client.Get(
 			context.TODO(),
 			types.NamespacedName{
@@ -95,17 +111,27 @@ func (t *Task) stopHookJobs() (bool, error) {
 			return false, liberr.Wrap(err)
 		}
 
+		t.Log.Info("Getting k8s client for MigHook [%v/%v]",
+			migHook.Namespace, migHook.Name)
 		client, err = t.getHookClient(migHook)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
 
 		// Get the job for the hook and kill it.
+		t.Log.Info("Attempting to kill job for MigHook [%v/%v] phase=[%v]",
+			hook.Reference.Namespace, hook.Reference.Name, hook.Phase)
 		runningJob, err := migHook.GetPhaseJob(client, hook.Phase, string(t.Owner.UID))
 		if runningJob == nil && err == nil {
 			// No active Job for hook
+			t.Log.Info("No active job found for MigHook [%v/%v] for phase=[%v]. Continuing.",
+				hook.Reference.Namespace, hook.Reference.Name, hook.Phase)
 			continue
 		} else {
+			// Job found
+			t.Log.Info("Deleting hook job [%v/%v] found for MigHook [%v/%v] phase=[%v]. Continuing.",
+				runningJob.Namespace, runningJob.Name,
+				hook.Reference.Namespace, hook.Reference.Name, hook.Phase)
 			err = client.Delete(context.TODO(), runningJob,
 				k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {

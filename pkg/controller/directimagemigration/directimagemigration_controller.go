@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("imagemigration")
+var log = logging.WithName("directimage")
 
 // Add creates a new DirectImageMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -110,7 +110,7 @@ type ReconcileDirectImageMigration struct {
 func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the DirectImageMigration instance
 	log.Reset()
-	log.SetValues("directImageMigration", request)
+	log.SetValues("DirectImageMigration", request.Name)
 	imageMigration := &migapi.DirectImageMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageMigration)
 	if err != nil {

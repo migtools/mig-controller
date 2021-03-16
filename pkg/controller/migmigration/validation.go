@@ -70,18 +70,21 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 	// Plan
 	plan, err := r.validatePlan(migration)
 	if err != nil {
+		log.V(4).Error(err, "Validation check for attached plan failed")
 		err = liberr.Wrap(err)
 	}
 
 	// Final migration.
 	err = r.validateFinalMigration(plan, migration)
 	if err != nil {
+		log.V(4).Error(err, "Validation check for existing final migration failed")
 		err = liberr.Wrap(err)
 	}
 
 	// Validate registries running.
 	err = r.validateRegistriesRunning(migration)
 	if err != nil {
+		log.V(4).Error(err, "Validation of running registries failed")
 		err = liberr.Wrap(err)
 	}
 
@@ -90,6 +93,7 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 
 // Validate the referenced plan.
 func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*migapi.MigPlan, error) {
+	log.V(4).Info("Validating plan spec references")
 	ref := migration.Spec.MigPlanRef
 
 	// NotSet
@@ -101,6 +105,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Category: Critical,
 			Message:  fmt.Sprintf("The `migPlanRef` must reference a valid `migplan`."),
 		})
+		log.V(4).Info("The `migPlanRef` does not reference a valid `migplan`.")
 		return nil, nil
 	}
 
@@ -119,6 +124,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Message: fmt.Sprintf("The `migPlanRef` must reference a valid `migplan`, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
+		log.V(4).Info("The `migPlanRef` does not reference a valid `migplan`.")
 		return plan, nil
 	}
 
@@ -131,6 +137,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Message: fmt.Sprintf("The referenced `migPlanRef` does not have a `Ready` condition, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
+		log.V(4).Info("The referenced `migPlanRef` does not have a `Ready` condition")
 	}
 
 	// Closed
@@ -142,6 +149,7 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 			Message: fmt.Sprintf("The associated migration plan is closed, subject: %s.",
 				path.Join(migration.Spec.MigPlanRef.Namespace, migration.Spec.MigPlanRef.Name)),
 		})
+		log.V(4).Info("The associated migration plan is closed")
 	}
 
 	return plan, nil
@@ -197,8 +205,10 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 			}
 		}
 	}
+
 	// Allow perform Rollback on finished Plan.
 	if hasCondition && !migration.Spec.Rollback {
+		log.V(4).Info("The associated MigPlan already has a final migration")
 		migration.Status.SetCondition(migapi.Condition{
 			Type:     HasFinalMigration,
 			Status:   True,
@@ -220,6 +230,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMi
 			return liberr.Wrap(err)
 		}
 		if nEnsured != 2 {
+			log.Info(fmt.Sprintf("Found %v/2 registries in healthy condition. Registries are unhealthy.", nEnsured), "message", message)
 			migration.Status.DeleteCondition(RegistriesHealthy)
 			migration.Status.SetCondition(migapi.Condition{
 				Type:     RegistriesUnhealthy,
@@ -229,6 +240,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMi
 				Durable:  true,
 			})
 		} else if nEnsured == 2 {
+			log.Info("Found 2/2 registries in healthy condition.", "message", message)
 			migration.Status.DeleteCondition(RegistriesUnhealthy)
 			setMigRegistryHealthyCondition(migration)
 		}
@@ -248,6 +260,7 @@ func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
 
 // Validate that migration registries on both source and dest clusters are healthy
 func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (int, string, error) {
+	log.Info("Checking registry health")
 
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}
