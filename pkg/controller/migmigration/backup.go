@@ -135,7 +135,6 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
 	}
 	t.Log.Info(fmt.Sprintf("Creating Stage Velero Backup [%v/%v] on source cluster.",
-		backup.Namespace, backup.Name))
 		newBackup.Namespace, newBackup.Name))
 	err = client.Create(context.TODO(), newBackup)
 	if err != nil {
