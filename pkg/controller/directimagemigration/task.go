@@ -127,6 +127,8 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
+	t.Log = t.Log.WithValues("Phase", t.Phase)
+
 	// Init
 	err := t.init()
 	if err != nil {
@@ -213,7 +215,7 @@ func (t *Task) next() error {
 	if cond != nil {
 		now := time.Now().UTC()
 		elapsed := now.Sub(cond.LastTransitionTime.Time.UTC())
-		t.Log.Info("Phase completed", "Phase_Elapsed", elapsed)
+		t.Log.Info("Phase completed", "Elapsed", elapsed)
 	}
 
 	current := -1
