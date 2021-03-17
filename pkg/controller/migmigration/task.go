@@ -1227,7 +1227,7 @@ func (t *Task) next() error {
 	if cond != nil {
 		now := time.Now().UTC()
 		elapsed := now.Sub(cond.LastTransitionTime.Time.UTC())
-		t.Log.Info("Phase completed", "Elapsed", elapsed)
+		t.Log.Info("[NEXT]", "Elapsed", elapsed)
 	}
 
 	current := -1
