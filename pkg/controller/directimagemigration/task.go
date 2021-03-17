@@ -207,6 +207,15 @@ func (t *Task) Run() error {
 
 // Advance the task to the next phase.
 func (t *Task) next() error {
+	// Write time taken to complete phase
+	t.Owner.Status.StageCondition(migapi.Running)
+	cond := t.Owner.Status.FindCondition(migapi.Running)
+	if cond != nil {
+		now := time.Now().UTC()
+		elapsed := now.Sub(cond.LastTransitionTime.Time.UTC())
+		t.Log.Info("Phase completed", "Phase_Elapsed", elapsed)
+	}
+
 	current := -1
 	for i, step := range t.Itinerary.Steps {
 		if step.phase != t.Phase {

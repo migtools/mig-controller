@@ -18,11 +18,12 @@ package directimagemigration
 
 // PhaseDescriptions are human readable strings that describe a phase
 var PhaseDescriptions = map[string]string{
-	Started:                           "Migration started.",
-	MigrationFailed:                   "Migration failed.",
+	Prepare:                           "Preparing for Direct Image Migration",
+	Started:                           "Direct Image Migration started.",
+	MigrationFailed:                   "Direct Image Migration failed.",
 	CreateDestinationNamespaces:       "Creating target cluster namespaces for ImageStreams to be migrated into.",
 	ListImageStreams:                  "Searching source cluster namespaces for ImageStreams to be migrated.",
 	CreateDirectImageStreamMigrations: "Launching DirectImageStreamMigrations for all discovered ImageStreams.",
 	WaitingForDirectImageStreamMigrationsToComplete: "Waiting for all DirectImageStreamMigrations to complete.",
-	Completed: "Migration completed.",
+	Completed: "Direct Image Migration completed.",
 }

@@ -32,6 +32,7 @@ var phaseDescriptions = map[string]string{
 	CreatePVProgressCRs:                  "Creating a Direct Volume Migration Progress CR to get progress percentage and transfer rate",
 	CreateRsyncTransferPods:              "Creating Rsync daemon pods on the target cluster",
 	WaitForRsyncTransferPodsRunning:      "Waiting for the Rsync daemon pod to run",
+	EnsureRsyncRouteAdmitted:             "Waiting for Rsync route to be admitted.",
 	CreateStunnelClientPods:              "Creating Stunnel client pods on the source cluster",
 	WaitForStunnelClientPodsRunning:      "Waiting for the Stunnel client pods to run",
 	CreateRsyncClientPods:                "Creating Rsync client pods",
