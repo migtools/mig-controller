@@ -37,6 +37,7 @@ const (
 	CreateStunnelClientPods              = "CreateStunnelClientPods"
 	WaitForStunnelClientPodsRunning      = "WaitForStunnelClientPodsRunning"
 	CreatePVProgressCRs                  = "CreatePVProgressCRs"
+	RunRsyncOperations                   = "RunRsyncOperations"
 	CreateRsyncClientPods                = "CreateRsyncClientPods"
 	WaitForRsyncClientPodsCompleted      = "WaitForRsyncClientPodsCompleted"
 	Verification                         = "Verification"
@@ -124,8 +125,9 @@ var VolumeMigration = Itinerary{
 		{phase: WaitForRsyncTransferPodsRunning},
 		{phase: CreateStunnelClientPods},
 		{phase: WaitForStunnelClientPodsRunning},
-		{phase: CreateRsyncClientPods},
-		{phase: WaitForRsyncClientPodsCompleted},
+		// {phase: CreateRsyncClientPods},
+		// {phase: WaitForRsyncClientPodsCompleted},
+		{phase: RunRsyncOperations},
 		{phase: DeleteRsyncResources},
 		{phase: WaitForRsyncResourcesTerminated},
 		{phase: Completed},
@@ -432,14 +434,16 @@ func (t *Task) Run() error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
-	case CreateRsyncClientPods:
-		err := t.createRsyncClientPods()
+	case RunRsyncOperations:
+		done, err := t.runRsyncOperations()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
+		if done {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	case WaitForRsyncClientPodsCompleted:
 		completed, failed, err := t.haveRsyncClientPodsCompletedOrFailed()

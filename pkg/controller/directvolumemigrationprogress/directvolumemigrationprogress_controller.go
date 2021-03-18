@@ -22,6 +22,7 @@ import (
 	"io"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -280,11 +281,11 @@ func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgres
 			return err
 		}
 		pvProgress.Status.LogMessage = logMessage
-		percentProgress := r.GetProgressPercent(logMessage)
+		percentProgress := GetProgressPercent(logMessage)
 		if percentProgress != "" {
 			pvProgress.Status.LastObservedProgressPercent = percentProgress
 		}
-		transferRate := r.GetTransferRate(logMessage)
+		transferRate := GetTransferRate(logMessage)
 		if transferRate != "" {
 			pvProgress.Status.LastObservedTransferRate = transferRate
 		}
@@ -372,19 +373,42 @@ func (r *ReconcileDirectVolumeMigrationProgress) GetPodLogs(cluster *migapi.MigC
 	return parseLogs(readCloser)
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) GetProgressPercent(message string) string {
-	return GetLastMatch(`\d+\%`, message)
+// GetProgressPercent given logs from Rsync Pod, returns logged progress percentage
+func GetProgressPercent(message string) string {
+	return getLastMatch(`\d+\%`, message)
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) GetTransferRate(message string) string {
-	// Transfer Rate
-	return GetLastMatch(`\d+\.\w*\/s`, message)
+// GetTransferRate given logs from Rsync Pod, returns logged transfer rate
+func GetTransferRate(message string) string {
+	return getLastMatch(`\d+\.\w*\/s`, message)
 }
 
-func GetLastMatch(regex string, message string) string {
+// ProgressPercentageToQuantity parses string and returns percentage as a value
+func ProgressPercentageToQuantity(progressPercentage string) *int64 {
+	var value int64
+	r := regexp.MustCompile(`(\d+)\%`)
+	matched := r.FindStringSubmatch(progressPercentage)
+	if len(matched) == 2 {
+		v, err := strconv.ParseInt(matched[1], 10, 64)
+		if err == nil {
+			value = v
+		}
+	}
+	return &value
+}
+
+// ProgressPercentageToString parses string and returns percentage as a value
+func ProgressPercentageToString(progressPercentage *int64) string {
+	if progressPercentage == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d%%", progressPercentage)
+}
+
+func getLastMatch(regex string, message string) string {
 	r := regexp.MustCompile(regex)
 	matches := r.FindAllString(message, -1)
-	if matches != nil && len(matches) > 0 {
+	if len(matches) > 0 {
 		return matches[len(matches)-1]
 	}
 	return ""
