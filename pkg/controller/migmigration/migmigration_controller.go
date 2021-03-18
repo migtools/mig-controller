@@ -156,7 +156,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = r.deleted()
-			return reconcile.Result{Requeue: false}, nil
+			return reconcile.Result{}, nil
 		}
 		log.Info("Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
@@ -210,9 +210,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{Requeue: true}, err
 	}
 
-	// Re-queue (after) in seconds.
-	requeueAfter := time.Duration(PollReQ)
-
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
 
@@ -223,6 +220,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Default to PollReQ, can be overridden by r.postpone() or r.migrate()
+	requeueAfter := time.Duration(PollReQ)
 
 	// Ensure that migrations run serially ordered by when created
 	// and grouped with stage migrations followed by final migrations.

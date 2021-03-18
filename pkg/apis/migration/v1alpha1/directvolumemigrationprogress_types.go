@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 
-	"github.com/google/uuid"
 	liberr "github.com/konveyor/controller/pkg/error"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,11 +107,9 @@ type DirectVolumeMigrationProgress struct {
 }
 
 func (d *DirectVolumeMigrationProgress) MarkReconciled() {
-	u, _ := uuid.NewUUID()
 	if d.Annotations == nil {
 		d.Annotations = map[string]string{}
 	}
-	d.Annotations[TouchAnnotation] = u.String()
 	d.Status.ObservedDigest = digest(d.Spec)
 }
 

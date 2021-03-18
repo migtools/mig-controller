@@ -167,11 +167,9 @@ func (r *DirectVolumeMigration) GetName() string {
 }
 
 func (r *DirectVolumeMigration) MarkReconciled() {
-	uuid, _ := uuid.NewUUID()
 	if r.Annotations == nil {
 		r.Annotations = map[string]string{}
 	}
-	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
@@ -269,11 +267,9 @@ func (r *DirectImageMigration) GetName() string {
 }
 
 func (r *DirectImageMigration) MarkReconciled() {
-	uuid, _ := uuid.NewUUID()
 	if r.Annotations == nil {
 		r.Annotations = map[string]string{}
 	}
-	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 
@@ -303,11 +299,9 @@ func (r *DirectImageStreamMigration) GetName() string {
 }
 
 func (r *DirectImageStreamMigration) MarkReconciled() {
-	uuid, _ := uuid.NewUUID()
 	if r.Annotations == nil {
 		r.Annotations = map[string]string{}
 	}
-	r.Annotations[TouchAnnotation] = uuid.String()
 	r.Status.ObservedDigest = digest(r.Spec)
 }
 

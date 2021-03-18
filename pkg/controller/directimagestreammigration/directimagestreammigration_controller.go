@@ -18,6 +18,7 @@ package directimagestreammigration
 
 import (
 	"context"
+	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -113,7 +114,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Reques
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Set up jaeger tracing
@@ -137,8 +138,11 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Reques
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Default to PollReQ, can be overridden by r.migrate phase-specific ReQ interval
+	requeueAfter := time.Duration(PollReQ)
+
 	if !imageStreamMigration.Status.HasBlockerCondition() {
-		_, err = r.migrate(imageStreamMigration, reconcileSpan)
+		requeueAfter, err = r.migrate(imageStreamMigration, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
@@ -162,6 +166,10 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Reques
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Done
+	// Requeue
+	if requeueAfter > 0 {
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+	}
+
 	return reconcile.Result{}, nil
 }

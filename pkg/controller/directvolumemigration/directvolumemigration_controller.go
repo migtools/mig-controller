@@ -18,6 +18,7 @@ package directvolumemigration
 
 import (
 	"context"
+	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -103,7 +104,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Set up jaeger tracing
@@ -130,8 +131,11 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Default to PollReQ, can be overridden by r.migrate phase-specific ReQ interval
+	requeueAfter := time.Duration(PollReQ)
+
 	if !direct.Status.HasBlockerCondition() {
-		_, err = r.migrate(direct, reconcileSpan)
+		requeueAfter, err = r.migrate(direct, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
@@ -153,6 +157,11 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Requeue
+	if requeueAfter > 0 {
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	// Done

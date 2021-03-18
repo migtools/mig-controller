@@ -178,10 +178,6 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if !pvProgress.Status.IsReady() {
-		return reconcile.Result{Requeue: true}, nil
-	}
-
 	// we will requeue this every 5 seconds
 	return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 }
