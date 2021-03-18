@@ -107,10 +107,12 @@ func (t *Task) getDestinationPVCs() error {
 }
 
 func (t *Task) findMatchingPV(plan *migapi.MigPlan, pvcName string, pvcNamespace string) *migapi.PV {
-	for i := range plan.Spec.PersistentVolumes.List {
-		planVol := &plan.Spec.PersistentVolumes.List[i]
-		if planVol.PVC.Name == pvcName && planVol.PVC.Namespace == pvcNamespace {
-			return planVol
+	if plan != nil {
+		for i := range plan.Spec.PersistentVolumes.List {
+			planVol := &plan.Spec.PersistentVolumes.List[i]
+			if planVol.PVC.Name == pvcName && planVol.PVC.Namespace == pvcNamespace {
+				return planVol
+			}
 		}
 	}
 	return nil
