@@ -37,13 +37,11 @@ func (r *ReconcileMigMigration) initTracer(migration *migapi.MigMigration) (open
 		r.tracer, _ = migtrace.InitJaeger("MigMigration")
 	}
 	// Get migration span, add to global map if does not yet exist.
-	migrationSpan := migtrace.GetSpanForMigrationUID(string(migration.GetUID()))
+	migrationUID := string(migration.GetUID())
+	migrationSpan := migtrace.GetSpanForMigrationUID(migrationUID)
 	if migrationSpan == nil {
-		migrationSpan = r.tracer.StartSpan("migration-" + string(migration.UID))
-		migtrace.SetSpanForMigrationUID(string(migration.GetUID()), migrationSpan)
-	}
-	if migrationSpan == nil {
-		return nil, nil
+		migrationSpan = r.tracer.StartSpan("migration-" + migrationUID)
+		migtrace.SetSpanForMigrationUID(migrationUID, migrationSpan)
 	}
 	// Begin reconcile span
 	reconcileSpan := r.tracer.StartSpan(

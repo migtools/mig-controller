@@ -73,7 +73,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) initTracer(dvmp migapi.DirectVo
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile"+dvmp.Name, opentracing.ChildOf(migrationSpan.Context()),
+			"reconcile-"+dvmp.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 
