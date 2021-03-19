@@ -164,7 +164,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	}
 
 	// Get jaeger spans for migration and reconcile
-	migrationSpan, reconcileSpan := r.initTracer(migration)
+	_, reconcileSpan := r.initTracer(migration)
 	if reconcileSpan != nil {
 		defer reconcileSpan.Finish()
 	}
