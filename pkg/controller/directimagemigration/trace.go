@@ -43,11 +43,6 @@ func (r *ReconcileDirectImageMigration) initTracer(dim *migapi.DirectImageMigrat
 		}
 		migrationUID := string(ownerRef.UID)
 		migrationSpan = migtrace.GetSpanForMigrationUID(migrationUID)
-		// Set up migrationSpan if doesn't exist yet
-		if migrationSpan == nil {
-			migrationSpan = r.tracer.StartSpan("migration-" + migrationUID)
-			migtrace.SetSpanForMigrationUID(migrationUID, migrationSpan)
-		}
 	}
 	if migrationSpan == nil {
 		return nil
@@ -57,7 +52,7 @@ func (r *ReconcileDirectImageMigration) initTracer(dim *migapi.DirectImageMigrat
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile", opentracing.ChildOf(migrationSpan.Context()),
+			"dim-reconcile-"+dim.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 

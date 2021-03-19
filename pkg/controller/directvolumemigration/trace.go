@@ -44,11 +44,6 @@ func (r *ReconcileDirectVolumeMigration) initTracer(direct *migapi.DirectVolumeM
 		}
 		migrationUID := ownerRef.UID
 		migrationSpan = migtrace.GetSpanForMigrationUID(string(migrationUID))
-		// Set up migrationSpan if doesn't exist yet
-		if migrationSpan == nil {
-			migrationSpan = r.tracer.StartSpan("migration-" + string(migrationUID))
-			migtrace.SetSpanForMigrationUID(string(migrationUID), migrationSpan)
-		}
 	}
 	if migrationSpan == nil {
 		return nil
@@ -58,7 +53,7 @@ func (r *ReconcileDirectVolumeMigration) initTracer(direct *migapi.DirectVolumeM
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile-"+direct.Name, opentracing.ChildOf(migrationSpan.Context()),
+			"dvm-reconcile-"+direct.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 

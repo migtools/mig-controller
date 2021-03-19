@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	jaeger "github.com/uber/jaeger-client-go"
@@ -70,6 +71,20 @@ func SetSpanForMigrationUID(migrationUID string, span opentracing.Span) {
 	return
 }
 
+// RemoveSpanForMigrationUID removes a span from the span map once migration is complete.
+func RemoveSpanForMigrationUID(migrationUID string) {
+	// Init map if needed
+	createMsmMapOnce.Do(func() {
+		msmInstance = MigrationSpanMap{}
+		msmInstance.migrationUIDToSpan = make(map[string]opentracing.Span)
+	})
+	msmInstance.mutex.RLock()
+	defer msmInstance.mutex.RUnlock()
+
+	delete(msmInstance.migrationUIDToSpan, migrationUID)
+	return
+}
+
 // GetSpanForMigrationUID returns the parent jaeger span for a migration
 func GetSpanForMigrationUID(migrationUID string) opentracing.Span {
 	// Init map if needed
@@ -85,4 +100,19 @@ func GetSpanForMigrationUID(migrationUID string) opentracing.Span {
 		return nil
 	}
 	return migrationSpan
+}
+
+// CloseMigrationSpan closes out the parent Migration Span safely
+func CloseMigrationSpan(migrationUID string) {
+	migrationSpan := GetSpanForMigrationUID(migrationUID)
+	if migrationSpan != nil {
+		// Immediately remove span from map so other controllers stop adding child spans
+		RemoveSpanForMigrationUID(migrationUID)
+		// Wait 5 minutes before terminating span, since other controllers writing to span
+		// post-close will result in undefined jaeger behavior (e.g. broken statistics page)
+		go func(migrationSpan opentracing.Span) {
+			time.Sleep(5 * time.Minute)
+			migrationSpan.Finish()
+		}(migrationSpan)
+	}
 }

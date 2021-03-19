@@ -30,6 +30,10 @@ func (r *ReconcileMigMigration) initTracer(migration *migapi.MigMigration) (open
 	if !settings.Settings.JaegerOpts.Enabled {
 		return nil, nil
 	}
+	// Exit if migration is finished
+	if migration.Status.Phase == Completed {
+		return nil, nil
+	}
 
 	// Set tracer on reconciler if it's not already present.
 	// We will never close this, so the 'closer' is discarded.
@@ -45,7 +49,7 @@ func (r *ReconcileMigMigration) initTracer(migration *migapi.MigMigration) (open
 	}
 	// Begin reconcile span
 	reconcileSpan := r.tracer.StartSpan(
-		"reconcile-"+migration.Name, opentracing.ChildOf(migrationSpan.Context()),
+		"migration-reconcile-"+migration.Name, opentracing.ChildOf(migrationSpan.Context()),
 	)
 
 	return migrationSpan, reconcileSpan

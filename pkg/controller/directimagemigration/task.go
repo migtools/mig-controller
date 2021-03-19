@@ -143,7 +143,7 @@ func (t *Task) Run() error {
 	// Set up Jaeger span for task.Run
 	if t.ReconcileSpan != nil {
 		phaseSpan := t.Tracer.StartSpan(
-			"phase-"+t.Phase,
+			"dim-phase-"+t.Phase,
 			opentracing.ChildOf(t.ReconcileSpan.Context()),
 		)
 		defer phaseSpan.Finish()

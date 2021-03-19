@@ -65,15 +65,14 @@ func (r *ReconcileDirectImageStreamMigration) initTracer(dism migapi.DirectImage
 	migrationUID := string(migration.GetUID())
 	migrationSpan := migtrace.GetSpanForMigrationUID(migrationUID)
 	if migrationSpan == nil {
-		migrationSpan = r.tracer.StartSpan("migration-" + migrationUID)
-		migtrace.SetSpanForMigrationUID(migrationUID, migrationSpan)
+		return nil, nil
 	}
 
 	// Get span for current reconcile
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile-"+dism.Name, opentracing.ChildOf(migrationSpan.Context()),
+			"dism-reconcile-"+dism.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 

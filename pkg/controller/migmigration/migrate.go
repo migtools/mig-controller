@@ -87,10 +87,8 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration, reconcil
 
 	// Completed
 	if task.Phase == Completed {
-		migrationSpan := migtrace.GetSpanForMigrationUID(string(migration.GetUID()))
-		if migrationSpan != nil {
-			migrationSpan.Finish()
-		}
+		// Close the Jaeger span for the migration
+		migtrace.CloseMigrationSpan(string(migration.GetUID()))
 
 		migration.Status.DeleteCondition(Running)
 		failed := task.Owner.Status.FindCondition(Failed)

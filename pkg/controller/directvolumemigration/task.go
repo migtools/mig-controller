@@ -196,7 +196,7 @@ func (t *Task) Run() error {
 	// Set up span for task.Run
 	if t.ReconcileSpan != nil {
 		phaseSpan := t.Tracer.StartSpan(
-			"phase-"+t.Phase,
+			"dvm-phase-"+t.Phase,
 			opentracing.ChildOf(t.ReconcileSpan.Context()),
 		)
 		defer phaseSpan.Finish()

@@ -329,7 +329,6 @@ type Task struct {
 
 	Tracer        opentracing.Tracer
 	ReconcileSpan opentracing.Span
-	MigrationSpan opentracing.Span
 }
 
 // Run the task.
@@ -346,7 +345,7 @@ func (t *Task) Run() error {
 	// Set up Jaeger span for task.Run
 	if t.ReconcileSpan != nil {
 		phaseSpan := t.Tracer.StartSpan(
-			"phase-"+t.Phase,
+			"migration-phase-"+t.Phase,
 			opentracing.ChildOf(t.ReconcileSpan.Context()),
 		)
 		defer phaseSpan.Finish()
