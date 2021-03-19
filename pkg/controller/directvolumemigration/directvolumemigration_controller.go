@@ -114,7 +114,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	}
 
 	// Set values
-	log.SetValues("DVM", request.Name)
+	log.SetValues("dvm", request.Name)
 
 	// Check if completed
 	if direct.Status.Phase == Completed {

@@ -103,7 +103,7 @@ type ReconcileDirectImageStreamMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Reset()
-	log.SetValues("DirectImageStreamMigration", request.Name)
+	log.SetValues("dism", request.Name)
 	// Fetch the DirectImageStreamMigration instance
 	imageStreamMigration := &migapi.DirectImageStreamMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageStreamMigration)

@@ -124,7 +124,7 @@ type MigAnalyticPersistentVolumeDetails struct {
 func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	log.SetValues("analytic", request)
+	log.SetValues("migAnalytic", request.Name)
 
 	// Fetch the MigAnalytic instance
 	analytic := &migapi.MigAnalytic{}

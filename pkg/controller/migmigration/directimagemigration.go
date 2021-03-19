@@ -19,6 +19,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -50,8 +51,8 @@ func (t *Task) createDirectImageMigration() error {
 		return nil
 	}
 	dim = t.buildDirectImageMigration()
-	t.Log.Info(fmt.Sprintf("Creating directimagemigration resource %v/%v.",
-		dim.Namespace, dim.Name))
+	t.Log.Info("Creating DirectImageMigration resource.",
+		"directImageMigration", path.Join(dim.Namespace, dim.Name))
 	err = t.Client.Create(context.TODO(), dim)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -101,8 +102,9 @@ func (t *Task) deleteDirectImageMigrationResources() error {
 
 	if dim != nil {
 		// delete the DIM instance
-		t.Log.Info(fmt.Sprintf("Deleting DirectImageMigration [%v/%v] on host cluster "+
-			"due to correlation with MigPlan", dim.Namespace, dim.Name))
+		t.Log.Info("Deleting DirectImageMigration on host cluster "+
+			"due to correlation with MigPlan",
+			"directImageMigration", path.Join(dim.Namespace, dim.Name))
 		err = t.Client.Delete(context.TODO(), dim)
 		if err != nil {
 			return liberr.Wrap(err)

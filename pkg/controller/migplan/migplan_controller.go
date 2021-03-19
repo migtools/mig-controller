@@ -180,7 +180,7 @@ type ReconcileMigPlan struct {
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	log.SetValues("plan", request)
+	log.SetValues("migPlan", request.Name)
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}

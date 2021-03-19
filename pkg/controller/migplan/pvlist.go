@@ -3,6 +3,7 @@ package migplan
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -39,8 +40,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		return nil
 	}
 
-	log.Info(fmt.Sprintf("PV Discovery: Starting for for MigPlan [%v/%v] in namespaces [%v]",
-		plan.Namespace, plan.Name, plan.Spec.Namespaces))
+	log.Info("PV Discovery: Starting for Migration Plan",
+		"migPlan", path.Join(plan.Namespace, plan.Name),
+		"migPlanNamespaces", plan.Spec.Namespaces)
 
 	// Get srcMigCluster
 	srcMigCluster, err := plan.GetSourceCluster(r.Client)
@@ -85,9 +87,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
-		log.Info(fmt.Sprintf("PV Discovery: 'persistentvolumeclaims' found in MigPlan [%v/%v] "+
+		log.Info("PV Discovery: 'persistentvolumeclaims' found in MigPlan "+
 			"Status.ExcludedResources, ending PV discovery",
-			plan.Namespace, plan.Name))
+			"migPlan", path.Join(plan.Namespace, plan.Name))
 		plan.Spec.ResetPvs()
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     PvsDiscovered,
@@ -178,8 +180,9 @@ func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
 		})
 	}
 
-	log.Info(fmt.Sprintf("PV Discovery: Finished for MigPlan [%v/%v] in namespaces [%v]",
-		plan.Namespace, plan.Name, plan.Spec.Namespaces))
+	log.Info("PV Discovery: Finished for Migration Plan",
+		"migPlan", path.Join(plan.Namespace, plan.Name),
+		"migPlanNamespaces", plan.Spec.Namespaces)
 	return nil
 }
 
@@ -328,10 +331,11 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 			}
 		}
 	}
-	log.Info(fmt.Sprintf("PV Discovery: Setting default selections for PV [%v]: "+
-		"Action=[%v], StorageClass=[%v], CopyMethod=[%v]",
-		pv.Name, selectedAction,
-		selectedStorageClass, migapi.PvFilesystemCopyMethod))
+	log.Info("PV Discovery: Setting default selections for discovered PV.",
+		"persistentVolume", pv.Name,
+		"pvSelectedAction", selectedAction,
+		"pvSelectedStorageClass", selectedStorageClass,
+		"pvCopyMethod", migapi.PvFilesystemCopyMethod)
 	return migapi.Selection{
 		Action:       selectedAction,
 		StorageClass: selectedStorageClass,

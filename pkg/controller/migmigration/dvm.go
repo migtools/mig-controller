@@ -30,8 +30,8 @@ func (t *Task) createDirectVolumeMigration() error {
 	if dvm == nil {
 		return errors.New("failed to build directvolumeclaim list")
 	}
-	t.Log.Info(fmt.Sprintf("Creating DirectVolumeMigration [%v/%v] on host cluster",
-		dvm.Namespace, dvm.Name))
+	t.Log.Info("Creating DirectVolumeMigration on host cluster",
+		"directVolumeMigration", path.Join(dvm.Namespace, dvm.Name))
 	err = t.Client.Create(context.TODO(), dvm)
 	return err
 
@@ -213,8 +213,9 @@ func (t *Task) deleteDirectVolumeMigrationResources() error {
 
 	if dvm != nil {
 		// delete the DVM instance
-		t.Log.Info(fmt.Sprintf("Deleting DirectVolumeMigration [%v/%v] on host cluster "+
-			"due to correlation with MigPlan", dvm.Namespace, dvm.Name))
+		t.Log.Info("Deleting DirectVolumeMigration on host cluster "+
+			"due to correlation with MigPlan",
+			"directVolumeMigration", path.Join(dvm.Namespace, dvm.Name))
 		err = t.Client.Delete(context.TODO(), dvm)
 		if err != nil {
 			return liberr.Wrap(err)

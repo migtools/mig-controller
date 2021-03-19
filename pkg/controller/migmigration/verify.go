@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -57,8 +58,9 @@ func (t *Task) updateResourcesHealth(client k8sclient.Client) error {
 func (t *Task) getAppState(client k8sclient.Client) error {
 	// Scan namespaces
 	for _, namespace := range t.PlanResources.MigPlan.Spec.Namespaces {
-		t.Log.Info(fmt.Sprintf("Checking migrated app health in destination"+
-			"cluster namespace [%v]", namespace))
+		t.Log.Info("Checking migrated app health in destination"+
+			"cluster namespace.",
+			"namespace", namespace)
 		options := k8sclient.InNamespace(namespace)
 
 		unhealthyPods, err := health.PodsUnhealthy(client, options)
@@ -68,8 +70,10 @@ func (t *Task) getAppState(client k8sclient.Client) error {
 
 		unhealthyPodCount := len(*unhealthyPods)
 		if unhealthyPodCount > 0 {
-			t.Log.Info(fmt.Sprintf("Found [%v] unhealthy Pods in destination "+
-				"cluster namespace [%v]", unhealthyPodCount, namespace))
+			t.Log.Info("Found unhealthy Pods in destination "+
+				"cluster namespace",
+				"unhealthyPodCount", unhealthyPodCount,
+				"namespace", namespace)
 		}
 		destinationNamespaces := &t.Owner.Status.UnhealthyResources.Namespaces
 		t.Owner.Status.UnhealthyResources.AddResources(
@@ -141,10 +145,9 @@ func (t *Task) startRefresh() (bool, error) {
 // Verify plan finished with refresh before migrating
 func (t *Task) waitForRefresh() bool {
 	if t.PlanResources.MigPlan.Spec.Refresh == true {
-		t.Log.Info(fmt.Sprintf("Refresh of associated MigPlan [%v/%v] "+
-			"not yet finished (Spec.Refresh=[%v]) waiting...",
-			t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name,
-			t.PlanResources.MigPlan.Spec.Refresh))
+		t.Log.Info("Refresh of associated MigPlan not yet finished. Waiting.",
+			"migPlan", path.Join(t.PlanResources.MigPlan.Namespace, t.PlanResources.MigPlan.Name),
+			"migPlan.Spec.Refresh", t.PlanResources.MigPlan.Spec.Refresh)
 		return false
 	}
 	return true

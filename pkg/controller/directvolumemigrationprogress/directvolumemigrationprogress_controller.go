@@ -126,7 +126,7 @@ type ReconcileDirectVolumeMigrationProgress struct {
 func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	log.SetValues("DVMP", request.Name)
+	log.SetValues("dvmp", request.Name)
 	// Fetch the DirectVolumeMigrationProgress instance
 	pvProgress := &migapi.DirectVolumeMigrationProgress{}
 	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)

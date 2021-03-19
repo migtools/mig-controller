@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"text/template"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -113,8 +114,8 @@ func (t *Task) generateStunnelProxyConfig() (stunnelProxyConfig, error) {
 	var proxyConfig stunnelProxyConfig
 	tcpProxyString := settings.Settings.DvmOpts.StunnelTCPProxy
 	if tcpProxyString != "" {
-		t.Log.Info(fmt.Sprintf("Found TCP proxy string [%v]. Configuring Stunnel proxy.",
-			tcpProxyString))
+		t.Log.Info("Found TCP proxy string. Configuring Stunnel proxy.",
+			"tcpProxyString", tcpProxyString)
 		url, err := url.Parse(tcpProxyString)
 		if err != nil {
 			t.Log.Error(err, fmt.Sprintf("failed to parse %s setting", settings.TCPProxyKey))
@@ -259,20 +260,22 @@ func (t *Task) createStunnelConfig() error {
 		}
 
 		// Create configmaps on source + dest
-		t.Log.Info(fmt.Sprintf("Creating Stunnel client ConfigMap [%v/%v] on source cluster.",
-			clientConfigMap.Namespace, clientConfigMap.Name))
+		t.Log.Info("Creating Stunnel client ConfigMap on source cluster.",
+			"configMap", path.Join(clientConfigMap.Namespace, clientConfigMap.Name))
 		err = srcClient.Create(context.TODO(), &clientConfigMap)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Configmap already exists on destination", "namespace", clientConfigMap.Namespace)
+			t.Log.Info("Configmap already exists on source cluster",
+				"configMap", path.Join(clientConfigMap.Namespace, clientConfigMap.Name))
 		} else if err != nil {
 			return err
 		}
 
-		t.Log.Info(fmt.Sprintf("Creating Stunnel client ConfigMap [%v/%v] on destination cluster.",
-			clientConfigMap.Namespace, clientConfigMap.Name))
+		t.Log.Info("Creating Stunnel client ConfigMap on destination cluster.",
+			"configMap", path.Join(destConfigMap.Namespace, destConfigMap.Name))
 		err = destClient.Create(context.TODO(), &destConfigMap)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Configmap already exists on destination", "namespace", destConfigMap.Namespace)
+			t.Log.Info("Configmap already exists on destination",
+				"configMap", path.Join(destConfigMap.Namespace, destConfigMap.Name))
 		} else if err != nil {
 			return err
 		}
@@ -382,19 +385,21 @@ func (t *Task) setupCerts() error {
 			},
 		}
 		destSecret := srcSecret
-		t.Log.Info(fmt.Sprintf("Creating Stunnel CA Bundle and Cert/Key Secret [%v/%v] on source cluster",
-			srcSecret.Namespace, srcSecret.Name))
+		t.Log.Info("Creating Stunnel CA Bundle and Cert/Key Secret on source cluster",
+			"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
 		err = srcClient.Create(context.TODO(), &srcSecret)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Secret already exists on source", "namespace", srcSecret.Namespace)
+			t.Log.Info("Stunnel CA Bundle and Cert/Key Secret already exists on source",
+				"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
 		} else if err != nil {
 			return err
 		}
-		t.Log.Info(fmt.Sprintf("Creating Stunnel CA Bundle and Cert/Key Secret [%v/%v] on destination cluster",
-			destSecret.Namespace, destSecret.Name))
+		t.Log.Info("Creating Stunnel CA Bundle and Cert/Key Secret on destination cluster",
+			"secret", path.Join(destSecret.Namespace, destSecret.Name))
 		err = destClient.Create(context.TODO(), &destSecret)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Secret already exists on destination", "namespace", destSecret.Namespace)
+			t.Log.Info("Stunnel CA Bundle and Cert/Key Secret already exists on destination cluster",
+				"secret", path.Join(destSecret.Namespace, destSecret.Name))
 		} else if err != nil {
 			return err
 		}
@@ -420,7 +425,8 @@ func (t *Task) createStunnelClientPods() error {
 	if err != nil {
 		return err
 	}
-	t.Log.Info(fmt.Sprintf("Using image [%v] for Stunnel client Pods", transferImage))
+	t.Log.Info("Found transfer image for Stunnel client Pods",
+		"transferImage", transferImage)
 
 	t.Log.Info("Getting limits and requests for Stunnel client Pods")
 	limits, requests, err := getPodResourceLists(t.Client, STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
@@ -549,24 +555,24 @@ func (t *Task) createStunnelClientPods() error {
 				Containers: containers,
 			},
 		}
-		t.Log.Info(fmt.Sprintf("Creating Stunnel Client Service [%v/%v] on source cluster",
-			svc.Namespace, svc.Name))
+		t.Log.Info("Creating Stunnel client Service on source cluster",
+			"service", path.Join(svc.Namespace, svc.Name))
 		err := srcClient.Create(context.TODO(), &svc)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Stunnel client svc already exists on source", "namespace", svc.Namespace)
+			t.Log.Info("Stunnel client Service already exists on source cluster",
+				"service", path.Join(svc.Namespace, svc.Name))
 		} else if err != nil {
 			return err
 		}
-		t.Log.Info("stunnel client svc created", "name", clientPod.Name, "namespace", svc.Namespace)
-		t.Log.Info(fmt.Sprintf("Creating Stunnel Client Pod [%v/%v] on source cluster",
-			svc.Namespace, svc.Name))
+		t.Log.Info("Creating Stunnel client Pod on source cluster",
+			"pod", path.Join(clientPod.Namespace, clientPod.Name))
 		err = srcClient.Create(context.TODO(), &clientPod)
 		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Stunnel client pod already exists on source", "namespace", clientPod.Namespace)
+			t.Log.Info("Stunnel client Pod already exists on source cluster",
+				"pod", path.Join(clientPod.Namespace, clientPod.Name))
 		} else if err != nil {
 			return err
 		}
-		t.Log.Info("stunnel client pod created", "name", clientPod.Name, "namespace", clientPod.Namespace)
 	}
 	return nil
 }
@@ -598,21 +604,25 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 			return false, err
 		}
 		if len(pods.Items) != 1 {
-			t.Log.Info(fmt.Sprintf("dvm cr: %s/%s, number of stunnel pods expected %d, found %d", t.Owner.Namespace, t.Owner.Name, 1, len(pods.Items)))
+			t.Log.Info("Found unexpected number of Stunnel Pods on source cluster.",
+				"expectedStunnelPods", 1, "foundStunnelPods", len(pods.Items))
 			return false, nil
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
-						t.Log.Info(fmt.Sprintf("Found UNSCHEDULABLE Stunnel Client Pod [%v/%v] "+
-							"with Phase=[%v] on source cluster. Message: [%v].",
-							pod.Namespace, pod.Name, pod.Status.Phase, podCond.Message))
+						t.Log.Info("Found UNSCHEDULABLE Stunnel Client Pod "+
+							"on source cluster. See message.",
+							"pod", path.Join(pod.Namespace, pod.Name),
+							"podPhase", pod.Status.Phase,
+							"podConditionMessage", podCond.Message)
 						return false, nil
 					}
 				}
-				t.Log.Info(fmt.Sprintf("Stunnel Client Pod [%v/%v] Phase=[%v] is not yet running on source cluster.",
-					pod.Namespace, pod.Name, pod.Status.Phase))
+				t.Log.Info("Stunnel Client Pod is not yet running on source cluster.",
+					"pod", path.Join(pod.Namespace, pod.Name),
+					"podPhase", pod.Status.Phase)
 				return false, nil
 			}
 		}

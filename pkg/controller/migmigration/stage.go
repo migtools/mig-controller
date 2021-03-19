@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -135,12 +136,13 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 
 	for _, stagePod := range stagePods {
 		if existingPods.contains(stagePod) {
-			t.Log.Info(fmt.Sprintf("Found existing Stage Pod [%v/%v] phase=[%v], skipping",
-				stagePod.Namespace, stagePod.Name, stagePod.Status.Phase))
+			t.Log.Info("Found existing Stage Pod, skipping",
+				"pod", path.Join(stagePod.Namespace, stagePod.Name),
+				"podPhase", stagePod.Status.Phase)
 			continue
 		}
-		t.Log.Info(fmt.Sprintf("Creating Stage Pod [%v/%v]",
-			stagePod.Namespace, stagePod.Name))
+		t.Log.Info("Creating Stage Pod.",
+			"pod", path.Join(stagePod.Namespace, stagePod.Name))
 		err := client.Create(context.TODO(), &stagePod.Pod)
 		if err != nil && !k8serr.IsAlreadyExists(err) {
 			return 0, liberr.Wrap(err)
@@ -181,8 +183,9 @@ func (t *Task) getStagePodImage(client k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(errors.Errorf("Key [%v] not found in ConfigMap [%v/%v]",
 			migapi.StagePodImageKey, clusterConfigRef.Namespace, clusterConfigRef.Name))
 	}
-	t.Log.Info(fmt.Sprintf("Got Stage Pod image [%v] from ConfigMap [%v/%v]",
-		stagePodImage, clusterConfigRef.Namespace, clusterConfigRef.Name))
+	t.Log.Info("Got Stage Pod image from ConfigMap",
+		"stagePodImage", stagePodImage,
+		"configMap", path.Join(clusterConfigRef.Namespace, clusterConfigRef.Name))
 	return stagePodImage, nil
 }
 
@@ -512,8 +515,8 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 	}
 	report.started = false
 	for _, pod := range podList.Items {
-		t.Log.V(4).Info(fmt.Sprintf("Checking if Stage Pod [%v/%v] is healthy.",
-			pod.Namespace, pod.Name))
+		t.Log.V(4).Info("Checking if Stage Pod is healthy.",
+			"pod", path.Join(pod.Namespace, pod.Name))
 		initReady := true
 		for _, c := range pod.Status.InitContainerStatuses {
 			// If the init contianer is waiting, then nothing can happen.
@@ -521,16 +524,17 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 				// If the pod has unhealthy claims, we will fail the migration
 				// So the user can fix the plan/pvc.
 				if !hasHealthyClaims(&pod) {
-					t.Log.Info(fmt.Sprintf("Found unhealthy PersistentVolumeClaims attached to "+
-						"Stage Pod [%v/%v] container [%v]. ",
-						pod.Namespace, pod.Name, c.Name))
+					t.Log.Info("Found unhealthy PersistentVolumeClaims attached to Stage Pod container. ",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"container", c.Name)
 					report.failed = true
 					return
 				}
 				initReady = false
-				t.Log.Info(fmt.Sprintf("Found Stage Pod [%v/%v] container [%v] with "+
+				t.Log.Info("Found Stage Pod container with "+
 					"pod.Status.InitContainerStatuses.State.Waiting=true",
-					pod.Namespace, pod.Name, c.Name))
+					"pod", path.Join(pod.Namespace, pod.Name),
+					"container", c.Name)
 				report.progress = append(
 					report.progress,
 					fmt.Sprintf(
@@ -541,9 +545,11 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 						c.State.Waiting.Message))
 			}
 			if c.State.Terminated != nil && c.State.Terminated.ExitCode != 0 {
-				t.Log.Info(fmt.Sprintf("Found unhealthy (terminated) Stage Pod [%v/%v] container [%v]. "+
+				t.Log.Info("Found unhealthy (terminated) Stage Pod container. "+
 					"Init container failed with exit code %v.",
-					pod.Namespace, pod.Name, c.Name, c.State.Terminated.ExitCode))
+					"pod", path.Join(pod.Namespace, pod.Name),
+					"container", c.Name,
+					"containerExitCode", c.State.Terminated.ExitCode)
 				initReady = false
 				report.progress = append(
 					report.progress,
@@ -561,8 +567,8 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		// if Pod is running, then move on
 		// pod succeeded phase should never occur for a stage pod
 		if pod.Status.Phase == corev1.PodRunning {
-			t.Log.Info(fmt.Sprintf("Found healthy running Stage Pod [%v/%v].",
-				pod.Namespace, pod.Name))
+			t.Log.Info("Found healthy running Stage Pod.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			report.progress = append(
 				report.progress,
 				fmt.Sprintf(
@@ -580,20 +586,22 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			// So the user can fix the plan/pvc.
 			// pod Spec having the node name, means the pod has been scheduled
 			// becuase the pod has been scheduled we know that the PVC should be bound
-			t.Log.Info(fmt.Sprintf("Found pending Stage Pod [%v/%v].",
-				pod.Namespace, pod.Name))
+			t.Log.Info("Found pending Stage Pod.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			if pod.Spec.NodeName != "" && !hasHealthyClaims(&pod) {
-				t.Log.Info(fmt.Sprintf("Pending Stage Pod [%v/%v] has unhealthy "+
-					"claims after being scheduled to Spec.NodeName: %v.",
-					pod.Namespace, pod.Name, pod.Spec.NodeName))
+				t.Log.Info("Pending Stage Pod has unhealthy "+
+					"claims after being scheduled to node",
+					"pod", path.Join(pod.Namespace, pod.Name),
+					"node", pod.Spec.NodeName)
 				report.failed = true
 				return
 			}
 			for _, c := range pod.Status.ContainerStatuses {
 				if c.State.Waiting != nil {
-					t.Log.Info(fmt.Sprintf("Pending Stage Pod [%v/%v] "+
-						"container [%v] is waiting. Message=%v",
-						pod.Namespace, pod.Name, c.Name, c.State.Waiting.Message))
+					t.Log.Info("Pending Stage Pod container is waiting with message.",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"container", c.Name,
+						"containerWaitingMessage", c.State.Waiting.Message)
 					report.progress = append(
 						report.progress,
 						fmt.Sprintf(
@@ -608,8 +616,9 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 
 		//TODO: [shurley] eventually, this should cause us to backoff and re-try to the create the pod.
 		if pod.Status.Phase == corev1.PodFailed || pod.Status.Phase == corev1.PodUnknown {
-			t.Log.Info(fmt.Sprintf("Found Stage Pod [%v/%v] with Status.Phase=[%v].",
-				pod.Namespace, pod.Name, pod.Status.Phase))
+			t.Log.Info("Found Stage Pod with Status.Phase.",
+				"pod", path.Join(pod.Namespace, pod.Name),
+				"podPhase", pod.Status.Phase)
 			report.failed = true
 			report.progress = append(report.progress, report.reasons...)
 		}
@@ -656,8 +665,8 @@ func (t *Task) allStagePodsMatch() (report []string, err error) {
 	for _, pod := range podSList.Items {
 		if _, exists := namespaces[pod.Namespace]; exists {
 			if _, exist := dPods[pod.Name]; !exist {
-				t.Log.Info(fmt.Sprintf("Missing Stage Pod [%v/%v] on destination cluster. "+
-					"Migration may fail.", pod.Namespace, pod.Name))
+				t.Log.Info("Missing Stage Pod on destination cluster. Migration may fail.",
+					"pod", path.Join(pod.Namespace, pod.Name))
 				report = append(report, pod.Name+" is missing. Migration might fail")
 			}
 		}
@@ -701,14 +710,14 @@ func (t *Task) ensureStagePodsDeleted() error {
 			return err
 		}
 		for _, pod := range podList.Items {
-			t.Log.Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on source cluster",
-				pod.Namespace, pod.Name))
+			t.Log.Info("Deleting Stage Pod on source cluster",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			err := srcClient.Delete(context.TODO(), &pod)
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			log.Info(fmt.Sprintf("Stage Pod [%v/%v] deletion requested on source cluster.",
-				pod.Namespace, pod.Name))
+			log.Info("Stage Pod deletion requested on source cluster.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}
 
@@ -722,14 +731,14 @@ func (t *Task) ensureStagePodsDeleted() error {
 			return err
 		}
 		for _, pod := range podList.Items {
-			t.Log.Info(fmt.Sprintf("Deleting Stage Pod [%v/%v] on destination cluster",
-				pod.Namespace, pod.Name))
+			t.Log.Info("Deleting Stage Pod on destination cluster",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			err := destClient.Delete(context.TODO(), &pod)
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			log.Info(fmt.Sprintf("Stage Pod [%v/%v] deletion requested on destination cluster.",
-				pod.Namespace, pod.Name))
+			log.Info("Stage Pod deletion requested on destination cluster.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}
 
@@ -766,8 +775,9 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			t.Log.Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v] "+
-				"in source cluster.", pod.Namespace, pod.Name, pod.Status.Phase))
+			t.Log.Info("Found un-terminated Stage Pod in source cluster.",
+				"pod", path.Join(pod.Namespace, pod.Name),
+				"podPhase", pod.Status.Phase)
 			return false, nil
 		}
 	}
@@ -785,8 +795,9 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 			if terminatedPhases[pod.Status.Phase] {
 				continue
 			}
-			t.Log.Info(fmt.Sprintf("Found un-terminated Stage Pod [%v/%v] phase=[%v] "+
-				"in destination cluster.", pod.Namespace, pod.Name, pod.Status.Phase))
+			t.Log.Info("Found un-terminated Stage Pod in destination cluster.",
+				"pod", path.Join(pod.Namespace, pod.Name),
+				"podPhase", pod.Status.Phase)
 			return false, nil
 		}
 	}

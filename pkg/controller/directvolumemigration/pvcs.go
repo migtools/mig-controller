@@ -2,7 +2,7 @@ package directvolumemigration
 
 import (
 	"context"
-	"fmt"
+	"path"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -86,11 +86,11 @@ func (t *Task) createDestinationPVCs() error {
 			},
 			Spec: newSpec,
 		}
-		t.Log.Info(fmt.Sprintf("Creating PVC [%v/%v] with StorageClassName=[%v] "+
-			"AccessModes=[%v] Requests=[%v] on destination MigCluster",
-			pvc.Namespace, pvc.Name,
-			destPVC.Spec.StorageClassName, destPVC.Spec.AccessModes,
-			destPVC.Spec.Resources.Requests))
+		t.Log.Info("Creating PVC on destination MigCluster",
+			"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
+			"pvcStorageClassName", destPVC.Spec.StorageClassName,
+			"pvcAccessModes", destPVC.Spec.AccessModes,
+			"pvcRequests", destPVC.Spec.Resources.Requests)
 		err = destClient.Create(context.TODO(), &destPVC)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("PVC already exists on destination", "name", pvc.Name)
