@@ -238,7 +238,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Migrate
 	if !migration.Status.HasBlockerCondition() {
-		requeueAfter, err = r.migrate(migration, migrationSpan)
+		requeueAfter, err = r.migrate(migration, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
