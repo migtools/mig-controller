@@ -35,7 +35,7 @@ type DirectVolumeMigrationProgressSpec struct {
 
 const (
 	// DVMPDoneLabelKey used to track progress of dvmp operations
-	DVMPDoneLabelKey = "openshift.migration.io/dvmp-done"
+	DVMPDoneLabelKey = "migration.openshift.io/dvmp-done"
 )
 
 // DirectVolumeMigrationProgressStatus defines the observed state of DirectVolumeMigrationProgress
@@ -45,8 +45,8 @@ type DirectVolumeMigrationProgressStatus struct {
 	RsyncPodStatus `json:",inline"`
 	// RsyncPodStatuses history of all Rsync attempts
 	RsyncPodStatuses []RsyncPodStatus `json:"rsyncPodStatuses,omitempty"`
-	// Succeded whether Rsync operation succeded
-	Succeded bool `json:"succeded,omitempty"`
+	// Succeeded whether Rsync operation succeded
+	Succeeded bool `json:"succeeded,omitempty"`
 	// Failed whether Rsync operation failed
 	Failed bool `json:"failed,omitempty"`
 	// Completed wether Rsync operation completed

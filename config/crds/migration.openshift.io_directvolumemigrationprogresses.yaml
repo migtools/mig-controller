@@ -247,8 +247,8 @@ spec:
                     type: string
                 type: object
               type: array
-            succeded:
-              description: Succeded whether Rsync operation succeded
+            succeeded:
+              description: Succeeded whether Rsync operation succeded
               type: boolean
             totalProgressPercentage:
               description: TotalProgressPercentage cumulative percentage of all Rsync

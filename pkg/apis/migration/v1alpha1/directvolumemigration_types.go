@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"reflect"
-
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,7 +25,7 @@ import (
 // labels
 const (
 	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
-	RsyncPodIdentityLabel = "openshift.migration.io/created-for-pvc"
+	RsyncPodIdentityLabel = "migration.openshift.io/created-for-pvc"
 )
 
 type PVCToMigrate struct {
@@ -44,6 +42,9 @@ type DirectVolumeMigrationSpec struct {
 
 	// BackOffLimit retry limit on Rsync pods
 	BackOffLimit int `json:"backOffLimit,omitempty"`
+
+	// RsyncPodGarbageCollection whether to clean up failed pods during retry
+	RsyncPodGarbageCollection bool `json:"rsyncPodGarbageCollection,omitempty"`
 
 	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims []PVCToMigrate `json:"persistentVolumeClaims,omitempty"`
@@ -75,14 +76,14 @@ type DirectVolumeMigrationStatus struct {
 func (ds *DirectVolumeMigrationStatus) GetRsyncOperationStatusForPVC(pvcRef *kapi.ObjectReference) *RsyncOperation {
 	for i := range ds.RsyncOperations {
 		rsyncOperation := ds.RsyncOperations[i]
-		if reflect.DeepEqual(rsyncOperation.PVCReference, pvcRef) {
+		if rsyncOperation.PVCReference.Namespace == pvcRef.Namespace &&
+			rsyncOperation.PVCReference.Name == pvcRef.Name {
 			return rsyncOperation
 		}
 	}
 	newStatus := &RsyncOperation{
 		PVCReference:   pvcRef,
 		CurrentAttempt: 0,
-		FailedAttempts: 0,
 	}
 	ds.RsyncOperations = append(ds.RsyncOperations, newStatus)
 	return newStatus
@@ -126,8 +127,6 @@ type RsyncOperation struct {
 	PVCReference *kapi.ObjectReference `json:"pvcReference,omitempty"`
 	// CurrentAttempt current ongoing attempt of an Rsync operation
 	CurrentAttempt int `json:"currentAttempt,omitempty"`
-	// FailedAttempts number of Rsync attempts failed so far
-	FailedAttempts int `json:"failedAttempts,omitempty"`
 	// Succeeded whether operation as a whole succeded
 	Succeeded bool `json:"succeeded,omitempty"`
 	// Failed whether operation as a whole failed
