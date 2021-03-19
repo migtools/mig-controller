@@ -180,10 +180,15 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Check for blocker conditions
+	if analytic.Status.HasBlockerCondition() {
+		return reconcile.Result{RequeueAfter: time.Second * RequeueInterval}, nil
+	}
+
 	// Analyze
-	if !analytic.Status.HasBlockerCondition() {
-		err = r.analyze(analytic)
-	} else {
+	err = r.analyze(analytic)
+	if err != nil {
+		log.Info("Error calculating migration analytics", "error", err.Error())
 		return reconcile.Result{RequeueAfter: time.Second * RequeueInterval}, nil
 	}
 
@@ -216,6 +221,10 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if plan == nil {
+		return fmt.Errorf("migplan %v/%v referenced from miganalytic %v/%v not found",
+			plan.Namespace, plan.Name, analytic.Namespace, analytic.Name)
+	}
 
 	if analytic.Status.Analytics.PercentComplete == 100 && !analytic.Spec.Refresh {
 		return nil
@@ -225,10 +234,19 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if srcCluster == nil {
+		return fmt.Errorf("source migcluster %v/%v referenced by migplan %v/%v could not be found",
+			plan.Spec.SrcMigClusterRef.Namespace, plan.Spec.SrcMigClusterRef.Name,
+			plan.Namespace, plan.Name)
+	}
 
 	client, err := srcCluster.GetClient(r)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if client == nil {
+		return fmt.Errorf("source migcluster %v/%v client could not be built",
+			srcCluster.Namespace, srcCluster.Name)
 	}
 
 	resources, err := collectResources(client)
