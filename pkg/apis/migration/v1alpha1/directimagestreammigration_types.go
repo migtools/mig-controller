@@ -80,17 +80,21 @@ func (r *DirectImageStreamMigration) GetDestinationCluster(client k8sclient.Clie
 }
 
 // Get the DirectImageMigration that owns this DirectImageStreamMigration. If not owned, return nil.
-func (r *DirectImageStreamMigration) GetOwner(client k8sclient.Client) (*DirectImageMigration, error) {
+func (r *DirectImageStreamMigration) GetDIMforDISM(client k8sclient.Client) (*DirectImageMigration, error) {
 	owner := &DirectImageMigration{}
 	ownerRefs := r.GetOwnerReferences()
-	if len(ownerRefs) > 0 {
-		ownerRef := types.NamespacedName{Name: ownerRefs[0].Name, Namespace: r.Namespace}
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "DirectImageMigration" {
+			continue
+		}
+		ownerRef := types.NamespacedName{Name: ownerRef.Name, Namespace: r.Namespace}
 		err := client.Get(context.TODO(), ownerRef, owner)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
+		return owner, nil
 	}
-	return owner, nil
+	return nil, nil
 }
 
 func (r *DirectImageStreamMigration) GetImageStream(c k8sclient.Client) (*imagev1.ImageStream, error) {

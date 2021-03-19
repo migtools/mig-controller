@@ -93,17 +93,21 @@ func (r *DirectImageMigration) GetDestinationCluster(client k8sclient.Client) (*
 }
 
 // Get the MigMigration that owns this DirectImageMigration. If not owned, return nil.
-func (r *DirectImageMigration) GetOwner(client k8sclient.Client) (*MigMigration, error) {
+func (r *DirectImageMigration) GetMigrationForDIM(client k8sclient.Client) (*MigMigration, error) {
 	owner := &MigMigration{}
 	ownerRefs := r.GetOwnerReferences()
-	if len(ownerRefs) > 0 {
-		ownerRef := types.NamespacedName{Name: ownerRefs[0].Name, Namespace: r.Namespace}
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "MigMigration" {
+			continue
+		}
+		ownerRef := types.NamespacedName{Name: ownerRef.Name, Namespace: r.Namespace}
 		err := client.Get(context.TODO(), ownerRef, owner)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
+		return owner, nil
 	}
-	return owner, nil
+	return nil, nil
 }
 
 // GetSourceNamespaces get source namespaces without mapping

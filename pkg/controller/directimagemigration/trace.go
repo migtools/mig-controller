@@ -29,7 +29,7 @@ func (r *ReconcileDirectImageMigration) initTracer(dim *migapi.DirectImageMigrat
 		return nil
 	}
 	// Set tracer on reconciler if it's not already present.
-	// We will never close this, so the 'closer' is discarded.
+	// We will close spans, but not the tracer, so the 'closer' is discarded.
 	if r.tracer == nil {
 		r.tracer, _ = migtrace.InitJaeger("DirectImageMigration")
 	}
@@ -37,14 +37,20 @@ func (r *ReconcileDirectImageMigration) initTracer(dim *migapi.DirectImageMigrat
 	// Get overall migration span
 	var migrationSpan opentracing.Span
 	ownerRefs := dim.GetOwnerReferences()
-	if len(ownerRefs) > 0 {
-		migrationUID := ownerRefs[0].UID
-		migrationSpan = migtrace.GetSpanForMigrationUID(string(migrationUID))
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "MigMigration" {
+			continue
+		}
+		migrationUID := string(ownerRef.UID)
+		migrationSpan = migtrace.GetSpanForMigrationUID(migrationUID)
 		// Set up migrationSpan if doesn't exist yet
 		if migrationSpan == nil {
-			migrationSpan = r.tracer.StartSpan("migration-" + string(migrationUID))
-			migtrace.SetSpanForMigrationUID(string(migrationUID), migrationSpan)
+			migrationSpan = r.tracer.StartSpan("migration-" + migrationUID)
+			migtrace.SetSpanForMigrationUID(migrationUID, migrationSpan)
 		}
+	}
+	if migrationSpan == nil {
+		return nil
 	}
 
 	// Get span for current reconcile

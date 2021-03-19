@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Red Hat Inc.
+Copyright 2021 Red Hat Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,19 +39,26 @@ func (r *ReconcileDirectImageStreamMigration) initTracer(dism migapi.DirectImage
 	}
 
 	// Go from dism -> dim -> migration, use migration UID to get span
-	dim, err := dism.GetOwner(r)
+	dim, err := dism.GetDIMforDISM(r)
 	if err != nil {
 		if errors.IsNotFound(errorutil.Unwrap(err)) {
 			return nil, nil
 		}
 		return nil, liberr.Wrap(err)
 	}
-	migration, err := dim.GetOwner(r)
+	if dim == nil {
+		return nil, nil
+	}
+	// dim -> migration
+	migration, err := dim.GetMigrationForDIM(r)
 	if err != nil {
 		if errors.IsNotFound(errorutil.Unwrap(err)) {
 			return nil, nil
 		}
 		return nil, liberr.Wrap(err)
+	}
+	if migration == nil {
+		return nil, nil
 	}
 
 	// Get overall migration span
@@ -66,7 +73,7 @@ func (r *ReconcileDirectImageStreamMigration) initTracer(dism migapi.DirectImage
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile", opentracing.ChildOf(migrationSpan.Context()),
+			"reconcile-"+dism.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 

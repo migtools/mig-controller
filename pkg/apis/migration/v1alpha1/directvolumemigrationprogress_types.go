@@ -78,17 +78,21 @@ func (d *DirectVolumeMigrationProgress) MarkReconciled() {
 }
 
 // Get the DirectVolumeMigration that owns this DirectVolumeMigrationProgress. If not owned, return nil.
-func (r *DirectVolumeMigrationProgress) GetOwner(client k8sclient.Client) (*DirectVolumeMigration, error) {
+func (r *DirectVolumeMigrationProgress) GetDVMforDVMP(client k8sclient.Client) (*DirectVolumeMigration, error) {
 	owner := &DirectVolumeMigration{}
 	ownerRefs := r.GetOwnerReferences()
-	if len(ownerRefs) > 0 {
-		ownerRef := types.NamespacedName{Name: ownerRefs[0].Name, Namespace: r.Namespace}
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "DirectVolumeMigration" {
+			continue
+		}
+		ownerRef := types.NamespacedName{Name: ownerRef.Name, Namespace: r.Namespace}
 		err := client.Get(context.TODO(), ownerRef, owner)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
+		return owner, nil
 	}
-	return owner, nil
+	return nil, nil
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -24,6 +24,7 @@ import (
 	migtrace "github.com/konveyor/mig-controller/pkg/tracing"
 )
 
+// Given a migration, return a migration-scoped and reconcile-scoped Jaeger spans.
 func (r *ReconcileMigMigration) initTracer(migration *migapi.MigMigration) (opentracing.Span, opentracing.Span) {
 	// Exit if tracing disabled
 	if !settings.Settings.JaegerOpts.Enabled {
@@ -41,9 +42,12 @@ func (r *ReconcileMigMigration) initTracer(migration *migapi.MigMigration) (open
 		migrationSpan = r.tracer.StartSpan("migration-" + string(migration.UID))
 		migtrace.SetSpanForMigrationUID(string(migration.GetUID()), migrationSpan)
 	}
+	if migrationSpan == nil {
+		return nil, nil
+	}
 	// Begin reconcile span
 	reconcileSpan := r.tracer.StartSpan(
-		"reconcile", opentracing.ChildOf(migrationSpan.Context()),
+		"reconcile-"+migration.Name, opentracing.ChildOf(migrationSpan.Context()),
 	)
 
 	return migrationSpan, reconcileSpan

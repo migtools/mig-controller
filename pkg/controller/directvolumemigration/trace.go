@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Red Hat Inc.
+Copyright 2021 Red Hat Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,8 +38,11 @@ func (r *ReconcileDirectVolumeMigration) initTracer(direct *migapi.DirectVolumeM
 	// Get overall migration span
 	var migrationSpan opentracing.Span
 	ownerRefs := direct.GetOwnerReferences()
-	if len(ownerRefs) > 0 {
-		migrationUID := ownerRefs[0].UID
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "MigMigration" {
+			continue
+		}
+		migrationUID := ownerRef.UID
 		migrationSpan = migtrace.GetSpanForMigrationUID(string(migrationUID))
 		// Set up migrationSpan if doesn't exist yet
 		if migrationSpan == nil {
@@ -47,12 +50,15 @@ func (r *ReconcileDirectVolumeMigration) initTracer(direct *migapi.DirectVolumeM
 			migtrace.SetSpanForMigrationUID(string(migrationUID), migrationSpan)
 		}
 	}
+	if migrationSpan == nil {
+		return nil
+	}
 
 	// Get span for current reconcile
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile", opentracing.ChildOf(migrationSpan.Context()),
+			"reconcile-"+direct.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 

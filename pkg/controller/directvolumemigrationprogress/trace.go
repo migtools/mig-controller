@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Red Hat Inc.
+Copyright 2021 Red Hat Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,13 +40,17 @@ func (r *ReconcileDirectVolumeMigrationProgress) initTracer(dvmp migapi.DirectVo
 	}
 
 	// Go from dvmp -> dvm -> migration, use migration UID to get span
-	dvm, err := dvmp.GetOwner(r)
+	dvm, err := dvmp.GetDVMforDVMP(r)
 	if err != nil {
 		if errors.IsNotFound(errorutil.Unwrap(err)) {
 			return nil, nil
 		}
 		return nil, liberr.Wrap(err)
 	}
+	if dvm == nil {
+		return nil, nil
+	}
+	// dvm -> migration
 	migration, err := dvm.GetMigrationForDVM(r)
 	if err != nil {
 		if errors.IsNotFound(errorutil.Unwrap(err)) {
@@ -54,7 +58,9 @@ func (r *ReconcileDirectVolumeMigrationProgress) initTracer(dvmp migapi.DirectVo
 		}
 		return nil, liberr.Wrap(err)
 	}
-
+	if migration == nil {
+		return nil, nil
+	}
 	// Get overall migration span
 	migrationUID := string(migration.GetUID())
 	migrationSpan := migtrace.GetSpanForMigrationUID(migrationUID)
@@ -67,7 +73,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) initTracer(dvmp migapi.DirectVo
 	var reconcileSpan opentracing.Span
 	if migrationSpan != nil {
 		reconcileSpan = r.tracer.StartSpan(
-			"reconcile", opentracing.ChildOf(migrationSpan.Context()),
+			"reconcile"+dvmp.Name, opentracing.ChildOf(migrationSpan.Context()),
 		)
 	}
 
