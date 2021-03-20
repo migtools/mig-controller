@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -131,6 +133,13 @@ type RsyncOperation struct {
 	Succeeded bool `json:"succeeded,omitempty"`
 	// Failed whether operation as a whole failed
 	Failed bool `json:"failed,omitempty"`
+}
+
+func (r *RsyncOperation) String() string {
+	if r.PVCReference != nil {
+		return fmt.Sprintf("%s/%s", r.PVCReference.Namespace, r.PVCReference.Name)
+	}
+	return ""
 }
 
 // IsComplete tells whether the operation as a whole is in terminal state

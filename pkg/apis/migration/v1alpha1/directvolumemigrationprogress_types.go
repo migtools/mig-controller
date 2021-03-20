@@ -27,10 +27,9 @@ import (
 
 // DirectVolumeMigrationProgressSpec defines the desired state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressSpec struct {
-	ClusterRef   *kapi.ObjectReference `json:"clusterRef,omitempty"`
-	PodRef       *kapi.ObjectReference `json:"podRef,omitempty"`
-	PodSelector  map[string]string     `json:"podSelector,omitempty"`
-	BackOffLimit int                   `json:"backOffLimit,omitempty"`
+	ClusterRef  *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	PodRef      *kapi.ObjectReference `json:"podRef,omitempty"`
+	PodSelector map[string]string     `json:"podSelector,omitempty"`
 }
 
 const (
@@ -45,12 +44,6 @@ type DirectVolumeMigrationProgressStatus struct {
 	RsyncPodStatus `json:",inline"`
 	// RsyncPodStatuses history of all Rsync attempts
 	RsyncPodStatuses []RsyncPodStatus `json:"rsyncPodStatuses,omitempty"`
-	// Succeeded whether Rsync operation succeded
-	Succeeded bool `json:"succeeded,omitempty"`
-	// Failed whether Rsync operation failed
-	Failed bool `json:"failed,omitempty"`
-	// Completed wether Rsync operation completed
-	Completed bool `json:"completed,omitempty"`
 	// RsyncElapsedTime total elapsed time of Rsync operation
 	RsyncElapsedTime *metav1.Duration `json:"rsyncElapsedTime,omitempty"`
 	// TotalProgressPercentage cumulative percentage of all Rsync attempts

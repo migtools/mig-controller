@@ -59,8 +59,6 @@ spec:
           description: DirectVolumeMigrationProgressSpec defines the desired state
             of DirectVolumeMigrationProgress
           properties:
-            backOffLimit:
-              type: integer
             clusterRef:
               description: ObjectReference contains enough information to let you
                 inspect or modify the referred object.
@@ -144,9 +142,6 @@ spec:
           description: DirectVolumeMigrationProgressStatus defines the observed state
             of DirectVolumeMigrationProgress
           properties:
-            completed:
-              description: Completed wether Rsync operation completed
-              type: boolean
             conditions:
               items:
                 description: Condition Type - The condition type. Status - The condition
@@ -189,9 +184,6 @@ spec:
               description: ExitCode exit code of terminated Rsync Pod
               format: int32
               type: integer
-            failed:
-              description: Failed whether Rsync operation failed
-              type: boolean
             lastObservedProgressPercent:
               description: LastObservedProgressPercent progress of Rsync in percentage
               type: string
@@ -247,9 +239,6 @@ spec:
                     type: string
                 type: object
               type: array
-            succeeded:
-              description: Succeeded whether Rsync operation succeded
-              type: boolean
             totalProgressPercentage:
               description: TotalProgressPercentage cumulative percentage of all Rsync
                 attempts
