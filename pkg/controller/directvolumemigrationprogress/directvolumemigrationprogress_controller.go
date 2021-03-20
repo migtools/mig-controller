@@ -20,12 +20,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/opentracing/opentracing-go"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +35,6 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,23 +52,12 @@ var log = logging.WithName("pvmigrationprogress")
 var TimeLimit = 10 * time.Minute
 
 const (
-	NotFound    = "NotFound"
-	NotSet      = "NotSet"
-	NotDistinct = "NotDistinct"
-	NotReady    = "NotReady"
-)
-
-const (
-	InvalidClusterRef = "InvalidClusterRef"
-	ClusterNotReady   = "ClusterNotReady"
-	InvalidPodRef     = "InvalidPodRef"
-	InvalidPod        = "InvalidPod"
-	PodNotReady       = "PodNotReady"
-)
-
-const (
 	// CreatingContainer initial container state
 	ContainerCreating = "ContainerCreating"
+)
+
+const (
+	RsyncContainerName = "rsync-client"
 )
 
 // Add creates a new DirectVolumeMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -95,16 +84,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by DirectVolumeMigrationProgress - change this for objects you create
-	//err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-	//	IsController: true,
-	//	OwnerType:    &migrationv1alpha1.DirectVolumeMigrationProgress{},
-	//})
-	//if err != nil {
-	//	return err
-	//}
 
 	return nil
 }
@@ -160,15 +139,29 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	// Begin staging conditions.
 	pvProgress.Status.BeginStagingConditions()
 
-	err = r.reportContainerStatus(pvProgress, "rsync-client")
+	// Validate
+	cluster, srcClient, err := r.validate(pvProgress)
 	if err != nil {
-		return reconcile.Result{Requeue: true}, liberr.Wrap(err)
+		log.Info("Validation failed, requeueing")
+		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
 	}
 
-	pvProgress.Status.SetReady(!pvProgress.Status.HasCriticalCondition(), "The progress is available")
-	if pvProgress.Status.HasCriticalCondition() {
-		pvProgress.Status.PodPhase = ""
+	// Analyze pod(s)
+	if !pvProgress.Status.HasBlockerCondition() {
+		task := RsyncPodProgressTask{
+			Cluster: cluster,
+			Client:  srcClient,
+			Owner:   pvProgress,
+		}
+		err = task.Run()
+		if err != nil {
+			return reconcile.Result{Requeue: true}, liberr.Wrap(err)
+		}
 	}
+
+	// set ready
+	pvProgress.Status.SetReady(!pvProgress.Status.HasBlockerCondition(), "The progress is ready")
 
 	pvProgress.Status.EndStagingConditions()
 
@@ -183,160 +176,178 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) reportContainerStatus(pvProgress *migapi.DirectVolumeMigrationProgress, containerName string) error {
-	podRef := pvProgress.Spec.PodRef
-	ref := pvProgress.Spec.ClusterRef
+type RsyncPodProgressTask struct {
+	Cluster *migapi.MigCluster
+	Client  compat.Client
+	Owner   *migapi.DirectVolumeMigrationProgress
+}
 
-	// NotSet
-	if !migref.RefSet(ref) {
-		pvProgress.Status.SetCondition(migapi.Condition{
-			Type:     InvalidClusterRef,
-			Status:   migapi.True,
-			Reason:   NotSet,
-			Category: migapi.Critical,
-			Message:  "The spec.clusterRef must reference name and namespace of a valid `MigCluster",
-		})
-		return nil
-	}
-
-	cluster, err := migapi.GetCluster(r, ref)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// NotFound
-	if cluster == nil {
-		pvProgress.Status.SetCondition(migapi.Condition{
-			Type:     InvalidClusterRef,
-			Status:   migapi.True,
-			Reason:   NotFound,
-			Category: migapi.Critical,
-			Message: fmt.Sprintf("The spec.clusterRef must reference a valid `MigCluster` %s",
-				path.Join(ref.Namespace, ref.Name)),
-		})
-		return nil
-	}
-
-	// Not ready
-	if !cluster.Status.IsReady() {
-		pvProgress.Status.SetCondition(migapi.Condition{
-			Type:     ClusterNotReady,
-			Status:   migapi.True,
-			Reason:   NotReady,
-			Category: migapi.Critical,
-			Message: fmt.Sprintf("The `MigCluster` spec.ClusterRef %s is not ready",
-				path.Join(ref.Namespace, ref.Name)),
-		})
-	}
-
-	pod, err := r.Pod(cluster, podRef)
-	switch {
-	case errors.IsNotFound(err):
-		// handle not found and return
-		pvProgress.Status.SetCondition(migapi.Condition{
-			Type:     InvalidPod,
-			Status:   migapi.True,
-			Reason:   NotFound,
-			Category: migapi.Critical,
-			Message: fmt.Sprintf("The spec.podRef %s must reference a valid `Pod` ",
-				path.Join(podRef.Namespace, podRef.Name)),
-		})
-		return nil
-	case err != nil:
-		return liberr.Wrap(err)
-	}
-
-	var containerStatus *kapi.ContainerStatus
-	for _, c := range pod.Status.ContainerStatuses {
-		if c.Name == containerName {
-			containerStatus = &c
-		}
-	}
-
-	if containerStatus == nil {
-		if pod.Status.Phase == kapi.PodFailed {
-			pvProgress.Status.PodPhase = kapi.PodFailed
-			pvProgress.Status.LogMessage = pod.Status.Message
-			pvProgress.Status.ContainerElapsedTime = nil
-		} else {
-			pvProgress.Status.SetCondition(migapi.Condition{
-				Type:     InvalidPod,
-				Status:   migapi.True,
-				Reason:   NotFound,
-				Category: migapi.Critical,
-				Message: fmt.Sprintf("The spec.podRef %s must reference a `Pod` with container name %s",
-					path.Join(podRef.Namespace, podRef.Name), containerName),
-			})
-		}
-		return nil
-	}
-
-	switch {
-	case containerStatus.Ready:
-		// report pod running and return
-		pvProgress.Status.PodPhase = kapi.PodRunning
-		numberOfLogLines := int64(5)
-		logMessage, err := r.GetPodLogs(cluster, podRef, &numberOfLogLines, false)
+func (r *RsyncPodProgressTask) Run() error {
+	pvProgress, podRef, podSelector := r.Owner, r.Owner.Spec.PodRef, r.Owner.Spec.PodRef
+	if podRef != nil && podSelector == nil {
+		pod, err := getPod(r.Client, podRef)
 		if err != nil {
-			return err
+			return liberr.Wrap(err)
 		}
-		pvProgress.Status.LogMessage = logMessage
-		percentProgress := GetProgressPercent(logMessage)
-		if percentProgress != "" {
-			pvProgress.Status.LastObservedProgressPercent = percentProgress
+		rsyncPodStatus, _, err := r.getRsyncClientContainerStatus(pod)
+		if err != nil {
+			return liberr.Wrap(err)
 		}
-		transferRate := GetTransferRate(logMessage)
-		if transferRate != "" {
-			pvProgress.Status.LastObservedTransferRate = transferRate
+		if rsyncPodStatus != nil {
+			pvProgress.Status.RsyncPodStatus = *rsyncPodStatus
 		}
-		pvProgress.Status.ContainerElapsedTime = nil
-	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
-		// pod has a failure, report last failure reason
-		pvProgress.Status.PodPhase = kapi.PodFailed
-		pvProgress.Status.LogMessage = containerStatus.LastTerminationState.Terminated.Message
-		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
-		pvProgress.Status.ExitCode = &exitCode
-		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
-	case !containerStatus.Ready && pod.Status.Phase == kapi.PodPending && containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == ContainerCreating:
-		// if pod is not in running state after 10 mins of its creation, raise a
-		if time.Now().UTC().Sub(pod.CreationTimestamp.Time.UTC()) > TimeLimit {
-			pvProgress.Status.PodPhase = kapi.PodPending
-			pvProgress.Status.LogMessage = fmt.Sprintf("Pod %s/%s is stuck in Pending state for more than 10 mins", pod.Namespace, pod.Name)
-			pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: time.Now().Sub(pod.CreationTimestamp.Time).Round(time.Second)}
+	} else if podSelector != nil && podRef != nil && podRef.Namespace != "" {
+		podList, err := r.getAllMatchingRsyncPods()
+		if err != nil {
+			return liberr.Wrap(err)
 		}
-	case pod.Status.Phase == kapi.PodFailed:
-		// Its possible for the succeeded pod to not have containerStatuses at all
-		pvProgress.Status.PodPhase = kapi.PodFailed
-		pvProgress.Status.LogMessage = containerStatus.State.Terminated.Message
-		exitCode := containerStatus.State.Terminated.ExitCode
-		pvProgress.Status.ExitCode = &exitCode
-		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
-	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 0:
-		// succeeded dont ever requeue
-		pvProgress.Status.PodPhase = kapi.PodSucceeded
-		pvProgress.Status.LastObservedProgressPercent = "100%"
-		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
-		pvProgress.Status.ExitCode = &exitCode
-		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
-	case pod.Status.Phase == kapi.PodSucceeded:
-		// Its possible for the succeeded pod to not have containerStatuses at all
-		pvProgress.Status.PodPhase = kapi.PodSucceeded
-		pvProgress.Status.LastObservedProgressPercent = "100%"
-		exitCode := containerStatus.State.Terminated.ExitCode
-		pvProgress.Status.ExitCode = &exitCode
-		pvProgress.Status.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
+		var mostRecentPodStatus *migapi.RsyncPodStatus
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			// if already part of the history, skip
+			if pvProgress.Status.RsyncPodExistsInHistory(pod.Name) {
+				continue
+			}
+			rsyncPodStatus, terminal, err := r.getRsyncClientContainerStatus(pod)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if rsyncPodStatus != nil {
+				// pods in their terminal state will always go in the history
+				if terminal {
+					pvProgress.Status.RsyncPodStatuses = append(pvProgress.Status.RsyncPodStatuses, *rsyncPodStatus)
+				}
+				if mostRecentPodStatus == nil {
+					mostRecentPodStatus = rsyncPodStatus
+				} else if rsyncPodStatus.CreationTimestamp.After(mostRecentPodStatus.CreationTimestamp.Time) {
+					mostRecentPodStatus = rsyncPodStatus
+				}
+			}
+		}
+		if mostRecentPodStatus != nil {
+			// top level inline field will always hold most recent pod status
+			pvProgress.Status.RsyncPodStatus = *mostRecentPodStatus
+		}
+		pvProgress.Status.TotalProgressPercentage = r.getCumulativeProgressPercentage(pvProgress)
+		pvProgress.Status.RsyncElapsedTime = r.getCumulativeElapsedTime(pvProgress)
 	}
-
 	return nil
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) Pod(cluster *migapi.MigCluster, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
-	cli, err := cluster.GetClient(r)
-	if err != nil {
-		return nil, liberr.Wrap(err)
+// getCumulativeProgressPercentage computes overall progress percentage of Rsync
+func (r *RsyncPodProgressTask) getCumulativeProgressPercentage(pvProgress *migapi.DirectVolumeMigrationProgress) string {
+	totalProgress := int64(0)
+	for _, podHistory := range pvProgress.Status.RsyncPodStatuses {
+		if podHistory.PodName != pvProgress.Status.PodName {
+			totalProgress += ProgressPercentageToQuantity(podHistory.LastObservedProgressPercent)
+		}
 	}
+	totalProgress += ProgressPercentageToQuantity(pvProgress.Status.LastObservedProgressPercent)
+	totalProgress = int64(math.Min(float64(totalProgress), float64(100)))
+	return ProgressPercentageToString(totalProgress)
+}
+
+// getCumulativeElapsedTime computes overall elapsed time of Rsync
+func (r *RsyncPodProgressTask) getCumulativeElapsedTime(pvProgress *migapi.DirectVolumeMigrationProgress) *metav1.Duration {
+	currentTime, newTime := metav1.Now(), metav1.Now()
+	totalElapsedDuration := metav1.Duration{}
+	for _, podHistory := range pvProgress.Status.RsyncPodStatuses {
+		if podHistory.PodName != pvProgress.Status.PodName && podHistory.ContainerElapsedTime != nil {
+			newTime.Add(podHistory.ContainerElapsedTime.Duration)
+		}
+	}
+	if pvProgress.Status.ContainerElapsedTime != nil {
+		currentTime.Add(pvProgress.Status.ContainerElapsedTime.Duration)
+	}
+	totalElapsedDuration.Duration = newTime.Sub(currentTime.Time)
+	return &totalElapsedDuration
+}
+
+// getRsyncClientContainerStatus returns observed status of Rsync container in the given pod
+// podLogGetterFunction is a function capable of retrieving logs from a given pod, injected to make testing easier
+func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (*migapi.RsyncPodStatus, bool, error) {
+	rsyncPodStatus := migapi.RsyncPodStatus{
+		PodName:           podRef.Name,
+		CreationTimestamp: podRef.CreationTimestamp,
+	}
+	var containerStatus *kapi.ContainerStatus
+	for _, c := range podRef.Status.ContainerStatuses {
+		if c.Name == RsyncContainerName {
+			containerStatus = &c
+		}
+	}
+	if containerStatus == nil {
+		if podRef.Status.Phase == kapi.PodFailed {
+			rsyncPodStatus.PodPhase = kapi.PodFailed
+			rsyncPodStatus.LogMessage = podRef.Status.Message
+			rsyncPodStatus.ContainerElapsedTime = nil
+			return &rsyncPodStatus, true, nil
+		}
+		return nil, false, fmt.Errorf("container not found")
+	}
+	isTerminal := true
+	switch {
+	case containerStatus.Ready:
+		isTerminal = false
+		rsyncPodStatus.PodPhase = kapi.PodRunning
+		numberOfLogLines := int64(5)
+		logMessage, err := r.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
+		if err != nil {
+			return &rsyncPodStatus, false, err
+		}
+		rsyncPodStatus.LogMessage = logMessage
+		percentProgress := GetProgressPercent(logMessage)
+		if percentProgress != "" {
+			rsyncPodStatus.LastObservedProgressPercent = percentProgress
+		}
+		transferRate := GetTransferRate(logMessage)
+		if transferRate != "" {
+			rsyncPodStatus.LastObservedTransferRate = transferRate
+		}
+		rsyncPodStatus.ContainerElapsedTime = nil
+	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode != 0:
+		// pod has a failure, report last failure reason
+		rsyncPodStatus.PodPhase = kapi.PodFailed
+		rsyncPodStatus.LogMessage = containerStatus.LastTerminationState.Terminated.Message
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		rsyncPodStatus.ExitCode = &exitCode
+		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
+	case !containerStatus.Ready && podRef.Status.Phase == kapi.PodPending && containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == ContainerCreating:
+		isTerminal = false
+		// if pod is not in running state after 10 mins of its creation, raise a
+		if time.Now().UTC().Sub(podRef.CreationTimestamp.Time.UTC()) > TimeLimit {
+			rsyncPodStatus.PodPhase = kapi.PodPending
+			rsyncPodStatus.LogMessage = fmt.Sprintf("Pod %s/%s is stuck in Pending state for more than 10 mins", podRef.Namespace, podRef.Name)
+			rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: time.Now().Sub(podRef.CreationTimestamp.Time).Round(time.Second)}
+		}
+	case podRef.Status.Phase == kapi.PodFailed:
+		// Its possible for the succeeded pod to not have containerStatuses at all
+		rsyncPodStatus.PodPhase = kapi.PodFailed
+		rsyncPodStatus.LogMessage = containerStatus.State.Terminated.Message
+		exitCode := containerStatus.State.Terminated.ExitCode
+		rsyncPodStatus.ExitCode = &exitCode
+		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
+	case !containerStatus.Ready && containerStatus.LastTerminationState.Terminated != nil && containerStatus.LastTerminationState.Terminated.ExitCode == 0:
+		// succeeded dont ever requeue
+		rsyncPodStatus.PodPhase = kapi.PodSucceeded
+		rsyncPodStatus.LastObservedProgressPercent = "100%"
+		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+		rsyncPodStatus.ExitCode = &exitCode
+		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
+	case podRef.Status.Phase == kapi.PodSucceeded:
+		// Its possible for the succeeded pod to not have containerStatuses at all
+		rsyncPodStatus.PodPhase = kapi.PodSucceeded
+		rsyncPodStatus.LastObservedProgressPercent = "100%"
+		exitCode := containerStatus.State.Terminated.ExitCode
+		rsyncPodStatus.ExitCode = &exitCode
+		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
+	}
+	return &rsyncPodStatus, isTerminal, nil
+}
+
+func getPod(client compat.Client, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
 	pod := &kapi.Pod{}
-	err = cli.Get(context.TODO(), types.NamespacedName{
+	err := client.Get(context.TODO(), types.NamespacedName{
 		Namespace: podReference.Namespace,
 		Name:      podReference.Name,
 	}, pod)
@@ -346,9 +357,18 @@ func (r *ReconcileDirectVolumeMigrationProgress) Pod(cluster *migapi.MigCluster,
 	return pod, nil
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) GetPodLogs(cluster *migapi.MigCluster, podReference *kapi.ObjectReference, tailLines *int64, previous bool) (string, error) {
+func (r *RsyncPodProgressTask) getAllMatchingRsyncPods() (*kapi.PodList, error) {
+	podList := kapi.PodList{}
+	err := r.Client.List(context.TODO(),
+		client.InNamespace(r.Owner.Spec.PodNamespace).MatchingLabels(r.Owner.Spec.PodSelector), &podList)
+	if err != nil {
+		return nil, err
+	}
+	return &podList, nil
+}
 
-	config, err := cluster.BuildRestConfig(r.Client)
+func (r *RsyncPodProgressTask) getPodLogs(pod *kapi.Pod, containerName string, tailLines *int64, previous bool) (string, error) {
+	config, err := r.Cluster.BuildRestConfig(r.Client)
 	if err != nil {
 		return "", err
 	}
@@ -358,10 +378,10 @@ func (r *ReconcileDirectVolumeMigrationProgress) GetPodLogs(cluster *migapi.MigC
 		return "", err
 	}
 
-	req := clientset.CoreV1().Pods(podReference.Namespace).GetLogs(podReference.Name, &kapi.PodLogOptions{
+	req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &kapi.PodLogOptions{
 		TailLines: tailLines,
 		Previous:  previous,
-		Container: "rsync-client",
+		Container: containerName,
 	})
 	readCloser, err := req.Stream()
 	if err != nil {
@@ -384,24 +404,20 @@ func GetTransferRate(message string) string {
 }
 
 // ProgressPercentageToQuantity parses string and returns percentage as a value
-func ProgressPercentageToQuantity(progressPercentage string) *int64 {
-	var value int64
+func ProgressPercentageToQuantity(progressPercentage string) int64 {
+	value := int64(0)
 	r := regexp.MustCompile(`(\d+)\%`)
 	matched := r.FindStringSubmatch(progressPercentage)
 	if len(matched) == 2 {
-		v, err := strconv.ParseInt(matched[1], 10, 64)
-		if err == nil {
+		if v, err := strconv.ParseInt(matched[1], 10, 64); err == nil {
 			value = v
 		}
 	}
-	return &value
+	return value
 }
 
 // ProgressPercentageToString parses string and returns percentage as a value
-func ProgressPercentageToString(progressPercentage *int64) string {
-	if progressPercentage == nil {
-		return ""
-	}
+func ProgressPercentageToString(progressPercentage int64) string {
 	return fmt.Sprintf("%d%%", progressPercentage)
 }
 

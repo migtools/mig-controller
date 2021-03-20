@@ -18,15 +18,15 @@ package directvolumemigrationprogress
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	migrationv1alpha1 "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"
-	"golang.org/x/net/context"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,7 +45,7 @@ const timeout = time.Second * 5
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := &migrationv1alpha1.DirectVolumeMigrationProgress{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	instance := &migapi.DirectVolumeMigrationProgress{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
@@ -141,6 +141,75 @@ func Test_parseLogs(t *testing.T) {
 			}
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseLogs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(t *testing.T) {
+	type args struct {
+		pvProgress *migapi.DirectVolumeMigrationProgress
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "given all valid distinct rsync progress percentages, should return addition of all percentages",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-4", LastObservedProgressPercent: "10%"},
+						RsyncPodStatuses: []migapi.RsyncPodStatus{
+							{PodName: "pod-1", LastObservedProgressPercent: "0%"},
+							{PodName: "pod-2", LastObservedProgressPercent: "10%"},
+							{PodName: "pod-3", LastObservedProgressPercent: "20%"},
+						},
+					},
+				},
+			},
+			want: "40%",
+		},
+		{
+			name: "given all valid, some indistinct rsync progress percentages, should return addition of all percentages, should not count the same pod twice",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-3", LastObservedProgressPercent: "10%"},
+						RsyncPodStatuses: []migapi.RsyncPodStatus{
+							{PodName: "pod-1", LastObservedProgressPercent: "0%"},
+							{PodName: "pod-2", LastObservedProgressPercent: "10%"},
+							{PodName: "pod-3", LastObservedProgressPercent: "10%"},
+						},
+					},
+				},
+			},
+			want: "20%",
+		},
+		{
+			name: "given some valid and some invalid, some distinct and some indistinct rsync progress percentages, should return addition of all percentages, should not count the same pod twice, should not include the invalid percentage",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-4", LastObservedProgressPercent: "10%"},
+						RsyncPodStatuses: []migapi.RsyncPodStatus{
+							{PodName: "pod-1", LastObservedProgressPercent: "20%"},
+							{PodName: "pod-2", LastObservedProgressPercent: "A%"},
+							{PodName: "pod-3"},
+							{PodName: "pod-4", LastObservedProgressPercent: "10%"},
+						},
+					},
+				},
+			},
+			want: "30%",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &RsyncPodProgressTask{}
+			if got := r.getCumulativeProgressPercentage(tt.args.pvProgress); got != tt.want {
+				t.Errorf("ReconcileDirectVolumeMigrationProgress.getCumulativeProgressPercentage() = %v, want %v", got, tt.want)
 			}
 		})
 	}

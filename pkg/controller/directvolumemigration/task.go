@@ -425,6 +425,22 @@ func (t *Task) Run() error {
 			}
 			t.Requeue = PollReQ
 		}
+	case RunRsyncOperations:
+		allCompleted, anyFailed, failureReasons, err := t.runRsyncOperations()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = PollReQ
+		if allCompleted {
+			t.Requeue = NoReQ
+			if anyFailed {
+				t.fail(MigrationFailed, failureReasons)
+				return nil
+			}
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	case CreatePVProgressCRs:
 		err := t.createPVProgressCR()
 		if err != nil {
@@ -433,70 +449,6 @@ func (t *Task) Run() error {
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
-		}
-	case RunRsyncOperations:
-		done, err := t.runRsyncOperations()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		t.Requeue = NoReQ
-		if done {
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		}
-	case WaitForRsyncClientPodsCompleted:
-		completed, failed, err := t.haveRsyncClientPodsCompletedOrFailed()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if completed {
-			isStunnelTimeout, err := hasAllRsyncClientPodsTimedOut(t.getPVCNamespaceMap(), t.Client, t.Owner.Name)
-			if err != nil {
-				return err
-			}
-			if isStunnelTimeout {
-				t.Owner.Status.SetCondition(migapi.Condition{
-					Type:     migapi.ReconcileFailed,
-					Status:   True,
-					Reason:   SourceToDestinationNetworkError,
-					Category: migapi.Error,
-					Message: "All the rsync client pods on source are timing out at 20 seconds, " +
-						"please check your network configuration (like egressnetworkpolicy) that would block traffic from " +
-						"source namespace to destination",
-					Durable: true,
-				})
-				t.fail(MigrationFailed, []string{"All the source cluster Rsync Pods have timed out, look at error condition for more details"})
-				t.Requeue = NoReQ
-				return nil
-			}
-			isNoRouteToHost, err := isAllRsyncClientPodsNoRouteToHost(t.getPVCNamespaceMap(), t.Client, t.Owner.Name)
-			if err != nil {
-				return err
-			}
-			if isNoRouteToHost {
-				t.Owner.Status.SetCondition(migapi.Condition{
-					Type:     migapi.ReconcileFailed,
-					Status:   True,
-					Reason:   SourceToDestinationNetworkError,
-					Category: migapi.Error,
-					Message: "All Rsync client Pods on Source Cluster are failing because of \"no route to host\" error," +
-						"please check your network configuration",
-					Durable: true,
-				})
-				t.fail(MigrationFailed, []string{"All the source Rsync client Pods have timed out, look at error condition for more details"})
-				t.Requeue = NoReQ
-				return nil
-			}
-			if failed {
-				t.fail(MigrationFailed, []string{"One or more Rsync client Pods are in error state"})
-			}
-			t.Requeue = NoReQ
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		} else {
-			t.Requeue = PollReQ
 		}
 	case DeleteRsyncResources:
 		err := t.deleteRsyncResources()
