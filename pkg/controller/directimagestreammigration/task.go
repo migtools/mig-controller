@@ -172,9 +172,8 @@ func (t *Task) next() error {
 	t.Owner.Status.Conditions.StageCondition(migapi.Running)
 	cond := t.Owner.Status.FindCondition(migapi.Running)
 	if cond != nil {
-		now := time.Now().UTC()
-		elapsed := now.Sub(cond.LastTransitionTime.Time.UTC())
-		t.Log.Info("[NEXT]", "Elapsed", elapsed)
+		elapsed := time.Since(cond.LastTransitionTime.Time)
+		t.Log.Info("Phase completed", "Elapsed", elapsed)
 	}
 	current := -1
 	for i, step := range t.Itinerary.Steps {
