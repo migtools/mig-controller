@@ -1,14 +1,15 @@
 package directvolumemigration
 
 import (
+	"strings"
+	"testing"
+	"time"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"strings"
-	"testing"
-	"time"
 )
 
 func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
@@ -39,14 +40,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}),
 				dvmName: "test",
 			},
@@ -69,14 +70,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}),
 				dvmName: "test",
 			},
@@ -99,14 +100,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodSucceeded, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 20}}},
 				}),
 				dvmName: "test",
 			},
@@ -129,14 +130,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20490}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20490}}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20500}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20500}}},
 				}),
 				dvmName: "test",
 			},
@@ -159,14 +160,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20490}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20490}}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20450}},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed, ContainerElapsedTime: &metav1.Duration{Duration: time.Millisecond * 20450}}},
 				}),
 				dvmName: "test",
 			},
@@ -189,14 +190,14 @@ func Test_hasAllRsyncClientPodsTimedOut(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed}},
 				}),
 				dvmName: "test",
 			},
@@ -249,15 +250,16 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &ten,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &ten,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
@@ -265,16 +267,17 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &ten,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
-				}),
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &ten,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						},
+					}}),
 				dvmName: "test",
 			},
 			want:    true,
@@ -297,15 +300,16 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &ten,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &ten,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
@@ -313,15 +317,16 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &twelve,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &twelve,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						}},
 				}),
 				dvmName: "test",
 			},
@@ -345,15 +350,16 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &ten,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to: connection reset error",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): connection reset error (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &ten,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to: connection reset error",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): connection reset error (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
@@ -361,15 +367,16 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 					},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{},
 					Status: migapi.DirectVolumeMigrationProgressStatus{
-						PodPhase:             corev1.PodFailed,
-						ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
-						ExitCode:             &ten,
-						LogMessage: strings.Join([]string{
-							"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
-							"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
-							"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
-					},
+						RsyncPodStatus: migapi.RsyncPodStatus{
+							PodPhase:             corev1.PodFailed,
+							ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 2},
+							ExitCode:             &ten,
+							LogMessage: strings.Join([]string{
+								"      2021/02/10 23:31:18 [1] rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"      2021/02/10 23:31:18 [1] rsync error: error in socket IO (code 10) at clientserver.c(127) [sender=3.1.3]",
+								"      rsync: failed to connect to 172.30.12.121 (172.30.12.121): No route to host (113)",
+								"rsync, error: error in socket IO (code 10) at clientserver.c(127) [sender = 3.1.3]"}, "\n"),
+						}},
 				}),
 				dvmName: "test",
 			},
@@ -392,14 +399,14 @@ func Test_isAllRsyncClientPodsNoRouteToHost(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed}},
 				}, &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      getMD5Hash("test" + "pvc-1" + "foo"),
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Spec:   migapi.DirectVolumeMigrationProgressSpec{},
-					Status: migapi.DirectVolumeMigrationProgressStatus{PodPhase: corev1.PodFailed},
+					Status: migapi.DirectVolumeMigrationProgressStatus{RsyncPodStatus: migapi.RsyncPodStatus{PodPhase: corev1.PodFailed}},
 				}),
 				dvmName: "test",
 			},
