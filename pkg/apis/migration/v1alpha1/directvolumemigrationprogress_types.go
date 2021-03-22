@@ -27,9 +27,10 @@ import (
 
 // DirectVolumeMigrationProgressSpec defines the desired state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressSpec struct {
-	ClusterRef  *kapi.ObjectReference `json:"clusterRef,omitempty"`
-	PodRef      *kapi.ObjectReference `json:"podRef,omitempty"`
-	PodSelector map[string]string     `json:"podSelector,omitempty"`
+	ClusterRef   *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	PodRef       *kapi.ObjectReference `json:"podRef,omitempty"`
+	PodNamespace string                `json:"podNamespace,omitempty"`
+	PodSelector  map[string]string     `json:"podSelector,omitempty"`
 }
 
 const (
