@@ -45,9 +45,6 @@ type DirectVolumeMigrationSpec struct {
 	// BackOffLimit retry limit on Rsync pods
 	BackOffLimit int `json:"backOffLimit,omitempty"`
 
-	// RsyncPodGarbageCollection whether to clean up failed pods during retry
-	RsyncPodGarbageCollection bool `json:"rsyncPodGarbageCollection,omitempty"`
-
 	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims []PVCToMigrate `json:"persistentVolumeClaims,omitempty"`
 
