@@ -74,7 +74,7 @@ type RsyncPodStatus struct {
 	// LastObservedTransferRate rate of transfer of Rsync
 	LastObservedTransferRate string `json:"lastObservedTransferRate,omitempty"`
 	// CreationTimestamp pod creation time
-	CreationTimestamp metav1.Time `json:"creationTimestamp,omitempty"`
+	CreationTimestamp *metav1.Time `json:"creationTimestamp,omitempty"`
 }
 
 // RsyncPodExistsInHistory checks whether Rsync pod status is already part of the history
