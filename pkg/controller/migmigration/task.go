@@ -1221,6 +1221,14 @@ func (t *Task) setProgress(progress []string) {
 
 // Advance the task to the next phase.
 func (t *Task) next() error {
+	// Write time taken to complete phase
+	t.Owner.Status.StageCondition(Running)
+	cond := t.Owner.Status.FindCondition(Running)
+	if cond != nil {
+		elapsed := time.Since(cond.LastTransitionTime.Time)
+		t.Log.Info("Phase completed", "phaseElapsed", elapsed)
+	}
+
 	current := -1
 	for i, phase := range t.Itinerary.Phases {
 		if phase.Name != t.Phase {

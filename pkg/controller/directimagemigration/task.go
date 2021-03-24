@@ -127,6 +127,8 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
+	t.Log = t.Log.WithValues("Phase", t.Phase)
+
 	// Init
 	err := t.init()
 	if err != nil {
@@ -207,6 +209,14 @@ func (t *Task) Run() error {
 
 // Advance the task to the next phase.
 func (t *Task) next() error {
+	// Write time taken to complete phase
+	t.Owner.Status.StageCondition(migapi.Running)
+	cond := t.Owner.Status.FindCondition(migapi.Running)
+	if cond != nil {
+		elapsed := time.Since(cond.LastTransitionTime.Time)
+		t.Log.Info("Phase completed", "phaseElapsed", elapsed)
+	}
+
 	current := -1
 	for i, step := range t.Itinerary.Steps {
 		if step.phase != t.Phase {
