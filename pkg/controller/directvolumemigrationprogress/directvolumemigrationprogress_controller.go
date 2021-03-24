@@ -183,7 +183,7 @@ type RsyncPodProgressTask struct {
 }
 
 func (r *RsyncPodProgressTask) Run() error {
-	pvProgress, podRef, podSelector := r.Owner, r.Owner.Spec.PodRef, r.Owner.Spec.PodRef
+	pvProgress, podRef, podSelector := r.Owner, r.Owner.Spec.PodRef, r.Owner.Spec.PodSelector
 	if podRef != nil && podSelector == nil {
 		pod, err := getPod(r.Client, podRef)
 		if err != nil {
@@ -216,6 +216,12 @@ func (r *RsyncPodProgressTask) Run() error {
 				// pods in their terminal state will always go in the history
 				if terminal {
 					pvProgress.Status.RsyncPodStatuses = append(pvProgress.Status.RsyncPodStatuses, *rsyncPodStatus)
+					// for terminal pods, indicate that we are done collecting information, can safely garbage collect
+					pod.Labels[migapi.DVMPDoneLabelKey] = migapi.True
+					err := r.Client.Update(context.TODO(), pod)
+					if err != nil {
+						return err
+					}
 				}
 				if mostRecentPodStatus == nil {
 					mostRecentPodStatus = rsyncPodStatus

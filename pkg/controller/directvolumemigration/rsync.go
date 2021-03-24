@@ -2155,9 +2155,43 @@ func (t *Task) ensureRsyncOperations(client compat.Client, podRequirements []rsy
 
 // garbageCollectRsyncPods garbage collection routine
 // will run in background, returns list of failures when encountered
-func (t *Task) garbageCollectPodsForRequirements(podRequirements []rsyncClientPodRequirements) []error {
+func (t *Task) garbageCollectPodsForRequirements(client compat.Client, podRequirements []rsyncClientPodRequirements) []error {
 	errors := make([]error, 0)
-	// check for pods that are
+	for _, req := range podRequirements {
+		op := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
+			Name:      req.pvInfo.name,
+			Namespace: req.namespace,
+		})
+		podList, err := t.getAllPodsForOperation(client, op)
+		if err != nil {
+			errors = append(errors, liberr.Wrap(err))
+		}
+		for i := range podList.Items {
+			pod := podList.Items[i]
+			shouldDelete := false
+			if label, exists := pod.Labels[RsyncAttemptLabel]; exists {
+				if podAttempt, err := strconv.Atoi(label); err != nil {
+					// Delete the pod when it was created for a past attempt and DVMP is done gathering info from this pod
+					if _, present := pod.Labels[migapi.DVMPDoneLabelKey]; present && podAttempt < op.CurrentAttempt {
+						shouldDelete = true
+					}
+				} else {
+					// Delete the pod when the attempt label cannot be parsed as int, we never consider this pod anyway
+					shouldDelete = true
+				}
+			} else {
+				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
+				shouldDelete = true
+			}
+			if shouldDelete {
+				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
+				err := client.Delete(context.TODO(), &pod)
+				if err != nil {
+					errors = append(errors, liberr.Wrap(err))
+				}
+			}
+		}
+	}
 	return errors
 }
 
