@@ -57,7 +57,8 @@ const (
 )
 
 const (
-	RsyncContainerName = "rsync-client"
+	DefaultReconcileConcurrency = 5
+	RsyncContainerName          = "rsync-client"
 )
 
 // Add creates a new DirectVolumeMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -74,7 +75,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("directvolumemigrationprogress-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("directvolumemigrationprogress-controller", mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: DefaultReconcileConcurrency})
 	if err != nil {
 		return err
 	}
@@ -149,10 +150,11 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 
 	// Analyze pod(s)
 	if !pvProgress.Status.HasBlockerCondition() {
-		task := RsyncPodProgressTask{
-			Cluster: cluster,
-			Client:  srcClient,
-			Owner:   pvProgress,
+		task := &RsyncPodProgressTask{
+			Cluster:   cluster,
+			Client:    r.Client,
+			SrcClient: srcClient,
+			Owner:     pvProgress,
 		}
 		err = task.Run()
 		if err != nil {
@@ -177,15 +179,16 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 }
 
 type RsyncPodProgressTask struct {
-	Cluster *migapi.MigCluster
-	Client  compat.Client
-	Owner   *migapi.DirectVolumeMigrationProgress
+	Cluster   *migapi.MigCluster
+	Client    client.Client
+	SrcClient compat.Client
+	Owner     *migapi.DirectVolumeMigrationProgress
 }
 
 func (r *RsyncPodProgressTask) Run() error {
-	pvProgress, podRef, podSelector := r.Owner, r.Owner.Spec.PodRef, r.Owner.Spec.PodSelector
+	pvProgress, podRef, podSelector, podNamespace := r.Owner, r.Owner.Spec.PodRef, r.Owner.Spec.PodSelector, r.Owner.Spec.PodNamespace
 	if podRef != nil && podSelector == nil {
-		pod, err := getPod(r.Client, podRef)
+		pod, err := getPod(r.SrcClient, podRef)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -196,7 +199,7 @@ func (r *RsyncPodProgressTask) Run() error {
 		if rsyncPodStatus != nil {
 			pvProgress.Status.RsyncPodStatus = *rsyncPodStatus
 		}
-	} else if podSelector != nil && podRef != nil && podRef.Namespace != "" {
+	} else if podSelector != nil && podNamespace != "" {
 		podList, err := r.getAllMatchingRsyncPods()
 		if err != nil {
 			return liberr.Wrap(err)
@@ -218,14 +221,18 @@ func (r *RsyncPodProgressTask) Run() error {
 					pvProgress.Status.RsyncPodStatuses = append(pvProgress.Status.RsyncPodStatuses, *rsyncPodStatus)
 					// for terminal pods, indicate that we are done collecting information, can safely garbage collect
 					pod.Labels[migapi.DVMPDoneLabelKey] = migapi.True
-					err := r.Client.Update(context.TODO(), pod)
+					err := r.SrcClient.Update(context.TODO(), pod)
 					if err != nil {
 						return err
 					}
 				}
 				if mostRecentPodStatus == nil {
 					mostRecentPodStatus = rsyncPodStatus
-				} else if rsyncPodStatus.CreationTimestamp.After(mostRecentPodStatus.CreationTimestamp.Time) {
+				} else if rsyncPodStatus.CreationTimestamp != nil &&
+					mostRecentPodStatus.CreationTimestamp != nil &&
+					!mostRecentPodStatus.CreationTimestamp.After(rsyncPodStatus.CreationTimestamp.Time) {
+					mostRecentPodStatus = rsyncPodStatus
+				} else if rsyncPodStatus.CreationTimestamp == nil {
 					mostRecentPodStatus = rsyncPodStatus
 				}
 			}
@@ -259,13 +266,13 @@ func (r *RsyncPodProgressTask) getCumulativeElapsedTime(pvProgress *migapi.Direc
 	totalElapsedDuration := metav1.Duration{}
 	for _, podHistory := range pvProgress.Status.RsyncPodStatuses {
 		if podHistory.PodName != pvProgress.Status.PodName && podHistory.ContainerElapsedTime != nil {
-			newTime.Add(podHistory.ContainerElapsedTime.Duration)
+			newTime.Time = newTime.Add(podHistory.ContainerElapsedTime.Duration)
 		}
 	}
 	if pvProgress.Status.ContainerElapsedTime != nil {
-		currentTime.Add(pvProgress.Status.ContainerElapsedTime.Duration)
+		newTime.Time = newTime.Add(pvProgress.Status.ContainerElapsedTime.Duration)
 	}
-	totalElapsedDuration.Duration = newTime.Sub(currentTime.Time)
+	totalElapsedDuration.Duration = newTime.Sub(currentTime.Time).Round(time.Second)
 	return &totalElapsedDuration
 }
 
@@ -274,7 +281,7 @@ func (r *RsyncPodProgressTask) getCumulativeElapsedTime(pvProgress *migapi.Direc
 func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (*migapi.RsyncPodStatus, bool, error) {
 	rsyncPodStatus := migapi.RsyncPodStatus{
 		PodName:           podRef.Name,
-		CreationTimestamp: podRef.CreationTimestamp,
+		CreationTimestamp: &podRef.CreationTimestamp,
 	}
 	var containerStatus *kapi.ContainerStatus
 	for _, c := range podRef.Status.ContainerStatuses {
@@ -365,7 +372,7 @@ func getPod(client compat.Client, podReference *kapi.ObjectReference) (*kapi.Pod
 
 func (r *RsyncPodProgressTask) getAllMatchingRsyncPods() (*kapi.PodList, error) {
 	podList := kapi.PodList{}
-	err := r.Client.List(context.TODO(),
+	err := r.SrcClient.List(context.TODO(),
 		client.InNamespace(r.Owner.Spec.PodNamespace).MatchingLabels(r.Owner.Spec.PodSelector), &podList)
 	if err != nil {
 		return nil, err

@@ -88,6 +88,23 @@ func (ds *DirectVolumeMigrationStatus) GetRsyncOperationStatusForPVC(pvcRef *kap
 	return newStatus
 }
 
+// AddRsyncOperation adds a new RsyncOperation to list, updates an existing one if found
+func (ds *DirectVolumeMigrationStatus) AddRsyncOperation(podStatus *RsyncOperation) {
+	if podStatus == nil {
+		return
+	}
+	for i := range ds.RsyncOperations {
+		existing := ds.RsyncOperations[i]
+		if existing.Equal(podStatus) {
+			existing.CurrentAttempt = podStatus.CurrentAttempt
+			existing.Failed = podStatus.Failed
+			existing.Succeeded = podStatus.Succeeded
+			return
+		}
+	}
+	ds.RsyncOperations = append(ds.RsyncOperations, podStatus)
+}
+
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
 // DirectVolumeMigrationStatus
 
@@ -130,6 +147,24 @@ type RsyncOperation struct {
 	Succeeded bool `json:"succeeded,omitempty"`
 	// Failed whether operation as a whole failed
 	Failed bool `json:"failed,omitempty"`
+}
+
+func (r *RsyncOperation) Equal(other *RsyncOperation) bool {
+	if other == nil || r.PVCReference == nil || other.PVCReference == nil {
+		return false
+	}
+	if other.PVCReference.Name == r.PVCReference.Name &&
+		other.PVCReference.Namespace == r.PVCReference.Namespace {
+		return true
+	}
+	return false
+}
+
+func (r *RsyncOperation) GetPVDetails() (string, string) {
+	if r.PVCReference != nil {
+		return r.PVCReference.Namespace, r.PVCReference.Name
+	}
+	return "", ""
 }
 
 func (r *RsyncOperation) String() string {

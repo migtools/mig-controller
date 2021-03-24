@@ -65,7 +65,6 @@ const (
 	DirectVolumeMigrationStunnel            = "stunnel"
 	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"      // (migplan UID)
 	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
-	PartOfLabel                             = "openshift-migration"
 )
 
 // Flags
@@ -125,8 +124,6 @@ var VolumeMigration = Itinerary{
 		{phase: WaitForRsyncTransferPodsRunning},
 		{phase: CreateStunnelClientPods},
 		{phase: WaitForStunnelClientPodsRunning},
-		// {phase: CreateRsyncClientPods},
-		// {phase: WaitForRsyncClientPodsCompleted},
 		{phase: RunRsyncOperations},
 		{phase: DeleteRsyncResources},
 		{phase: WaitForRsyncResourcesTerminated},
@@ -581,7 +578,7 @@ func (t *Task) buildDVMLabels() map[string]string {
 
 	dvmLabels["app"] = DirectVolumeMigrationRsyncTransfer
 	dvmLabels["owner"] = DirectVolumeMigration
-	dvmLabels["app.kubernetes.io/part-of"] = PartOfLabel
+	dvmLabels[migapi.PartOfLabel] = migapi.Application
 
 	return dvmLabels
 }

@@ -40,7 +40,6 @@ var phaseDescriptions = map[string]string{
 	DeleteRsyncResources:                 "Deleting Rsync resources created by this migration",
 	WaitForRsyncResourcesTerminated:      "Waiting for Rsync resources to terminate",
 	RunRsyncOperations:                   "Running Rsync Pods to migrate Persistent Volume data",
-	EnsureRsyncRouteAdmitted:             "Waiting for Rsync transfer Routes to get admitted in the target cluster",
 	Verification:                         "Verifying migration was successful",
 	MigrationFailed:                      "The migration attempt failed, please see errors for more details",
 	Completed:                            "Complete",

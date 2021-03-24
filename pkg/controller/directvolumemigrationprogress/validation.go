@@ -32,9 +32,14 @@ const (
 
 func (r *ReconcileDirectVolumeMigrationProgress) validate(pvProgress *migapi.DirectVolumeMigrationProgress) (
 	cluster *migapi.MigCluster, client compat.Client, err error) {
-	client, err = r.validateCluster(pvProgress)
+	cluster, err = r.validateCluster(pvProgress)
 	if err != nil {
 		log.V(4).Error(err, "Validation check for referenced MigCluster failed")
+		err = liberr.Wrap(err)
+		return
+	}
+	client, err = cluster.GetClient(r)
+	if err != nil {
 		err = liberr.Wrap(err)
 		return
 	}
@@ -90,7 +95,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) validateSpec(srcClient compat.C
 	return
 }
 
-func (r *ReconcileDirectVolumeMigrationProgress) validateCluster(pvProgress *migapi.DirectVolumeMigrationProgress) (client compat.Client, err error) {
+func (r *ReconcileDirectVolumeMigrationProgress) validateCluster(pvProgress *migapi.DirectVolumeMigrationProgress) (cluster *migapi.MigCluster, err error) {
 	clusterRef := pvProgress.Spec.ClusterRef
 	// NotSet
 	if !migref.RefSet(clusterRef) {
@@ -104,7 +109,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) validateCluster(pvProgress *mig
 		return
 	}
 
-	cluster, err := migapi.GetCluster(r, clusterRef)
+	cluster, err = migapi.GetCluster(r, clusterRef)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -134,12 +139,5 @@ func (r *ReconcileDirectVolumeMigrationProgress) validateCluster(pvProgress *mig
 				path.Join(clusterRef.Namespace, clusterRef.Name)),
 		})
 	}
-
-	client, err = cluster.GetClient(r)
-	if err != nil {
-		err = liberr.Wrap(err)
-		return
-	}
-
 	return
 }

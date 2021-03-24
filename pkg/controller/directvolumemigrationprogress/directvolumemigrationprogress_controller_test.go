@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -210,6 +211,84 @@ func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(
 			r := &RsyncPodProgressTask{}
 			if got := r.getCumulativeProgressPercentage(tt.args.pvProgress); got != tt.want {
 				t.Errorf("ReconcileDirectVolumeMigrationProgress.getCumulativeProgressPercentage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
+	type args struct {
+		pvProgress *migapi.DirectVolumeMigrationProgress
+	}
+	tests := []struct {
+		name string
+		args args
+		want *metav1.Duration
+	}{
+		{
+			name: "given empty history of Rsync pods, elapsed time should be 0",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{},
+				},
+			},
+			want: &metav1.Duration{Duration: 0},
+		},
+		{
+			name: "given 1 pod in the history, total elapsed time should be equal to elapsed time of that pod",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatuses: []v1alpha1.RsyncPodStatus{
+							{PodName: "pod-0", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 10}},
+						},
+					},
+				},
+			},
+			want: &metav1.Duration{Duration: time.Second * 10},
+		},
+		{
+			name: "given multiple pods in the history and one recent pod, total elapsed time should be equal to sum of elapsed times of all pods",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatus: v1alpha1.RsyncPodStatus{
+							PodName: "pod-3", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40},
+						},
+						RsyncPodStatuses: []v1alpha1.RsyncPodStatus{
+							{PodName: "pod-0", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 10}},
+							{PodName: "pod-1", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 30}},
+							{PodName: "pod-2", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40}},
+						},
+					},
+				},
+			},
+			want: &metav1.Duration{Duration: time.Second * 120},
+		},
+		{
+			name: "given multiple pods in the history and one recent pod, one pod present in history and recent both, total elapsed time should be equal to sum of elapsed times of all pods, same pod shouldn't be counted twice",
+			args: args{
+				pvProgress: &migapi.DirectVolumeMigrationProgress{
+					Status: migapi.DirectVolumeMigrationProgressStatus{
+						RsyncPodStatus: v1alpha1.RsyncPodStatus{
+							PodName: "pod-2", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40},
+						},
+						RsyncPodStatuses: []v1alpha1.RsyncPodStatus{
+							{PodName: "pod-0", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 10}},
+							{PodName: "pod-1", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 30}},
+							{PodName: "pod-2", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40}},
+						},
+					},
+				},
+			},
+			want: &metav1.Duration{Duration: time.Second * 80},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &RsyncPodProgressTask{}
+			if got := r.getCumulativeElapsedTime(tt.args.pvProgress); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RsyncPodProgressTask.getCumulativeElapsedTime() = %v, want %v", got, tt.want)
 			}
 		})
 	}

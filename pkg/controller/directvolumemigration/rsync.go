@@ -20,7 +20,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
-	migsettings "github.com/konveyor/mig-controller/pkg/settings"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
@@ -913,7 +913,7 @@ func (t *Task) getRsyncOptions() []string {
 		"--port", "2222",
 		"--log-file", "/dev/stdout",
 	}
-	rsyncOptions := migsettings.Settings.RsyncOpts
+	rsyncOptions := settings.Settings.DvmOpts.RsyncOpts
 	if rsyncOptions.BwLimit != -1 {
 		rsyncOpts = append(rsyncOpts,
 			fmt.Sprintf("--bwlimit=%d", rsyncOptions.BwLimit))
@@ -1217,31 +1217,34 @@ func (t *Task) createPVProgressCR() error {
 					Namespace: migapi.OpenshiftMigrationNamespace,
 				},
 				Spec: migapi.DirectVolumeMigrationProgressSpec{
-					ClusterRef: t.Owner.Spec.SrcMigClusterRef,
-					PodRef: &corev1.ObjectReference{
-						Namespace: ns,
-					},
-					PodSelector: GetRsyncPodSelector(vol.Name),
+					ClusterRef:   t.Owner.Spec.SrcMigClusterRef,
+					PodNamespace: ns,
+					PodSelector:  GetRsyncPodSelector(vol.Name),
 				},
-				Status: migapi.DirectVolumeMigrationProgressStatus{},
 			}
 			existingDvmp := migapi.DirectVolumeMigrationProgress{}
+			shouldDelete := false
 			// Make sure existing DVMP CRs which don't have required fields are deleted
 			err := t.Client.Get(context.TODO(), types.NamespacedName{Name: dvmp.Name, Namespace: dvmp.Namespace}, &existingDvmp)
 			if err != nil {
-				return err
+				if !k8serror.IsNotFound(err) {
+					return err
+				}
 			}
-			if existingDvmp.Spec.PodSelector != nil {
-				if _, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]; !exists {
+			if existingDvmp.Name != "" && existingDvmp.Namespace != "" {
+				if existingDvmp.Spec.PodSelector != nil {
+					if _, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]; !exists {
+						shouldDelete = true
+					}
+				} else {
+					shouldDelete = true
+				}
+				if shouldDelete {
 					err := t.Client.Delete(context.TODO(), &existingDvmp)
 					if err != nil {
 						return err
 					}
-				}
-			} else {
-				err := t.Client.Delete(context.TODO(), &existingDvmp)
-				if err != nil {
-					return err
+					t.Log.Info("Deleted DVMP as it was missing required fields", "DVMP", path.Join(dvmp.Namespace, dvmp.Name))
 				}
 			}
 			migapi.SetOwnerReference(t.Owner, t.Owner, &dvmp)
@@ -1742,9 +1745,10 @@ type rsyncClientPodRequirements struct {
 }
 
 // getRsyncClientPodTemplate given RsyncClientPodRequirements, returns a Pod template
-func (req *rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
+func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	runAsUser := int64(0)
 	trueBool := true
+	isPrivileged := req.privileged
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 	containers := []corev1.Container{}
@@ -1767,6 +1771,7 @@ func (req *rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	labels := map[string]string{
 		"app":                   DirectVolumeMigrationRsyncTransfer,
 		"directvolumemigration": DirectVolumeMigrationRsyncClient,
+		migapi.PartOfLabel:      migapi.Application,
 	}
 	labels = Union(labels, GetRsyncPodSelector(req.pvInfo.name))
 	containers = append(containers, corev1.Container{
@@ -1789,7 +1794,7 @@ func (req *rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 		},
 		VolumeMounts: volumeMounts,
 		SecurityContext: &corev1.SecurityContext{
-			Privileged:             &req.privileged,
+			Privileged:             &isPrivileged,
 			RunAsUser:              &runAsUser,
 			ReadOnlyRootFilesystem: &trueBool,
 		},
@@ -1822,27 +1827,33 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
+	t.Log.Info("Getting image for Rsync client Pods that will be created on source MigCluster")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
+	t.Log.Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
 	pvcMap, err := t.getfsGroupMapForNamespace()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
+	t.Log.Info("Getting Rsync password for Rsync client Pods")
 	password, err := t.getRsyncPassword()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
+	t.Log.Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
 	pvcNodeMap, err := t.getPVCNodeNameMap()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
+	t.Log.Info("Getting limits and requests for Rsync client Pods")
 	limits, requests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
 	isPrivileged, _ := isRsyncPrivileged(srcClient)
+	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
 	for ns, vols := range pvcMap {
 		// Get stunnel svc IP
 		svc := corev1.Service{}
@@ -1906,13 +1917,13 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
-	status, err := t.ensureRsyncOperations(srcClient, podRequirements)
+	status, garbageCollectionErrors := t.ensureRsyncOperations(srcClient, podRequirements)
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
 	// report progress of pods
 	t.reportRsyncPodProgress()
-	isComplete, anyFailed, failureReasons, err := t.processRsyncOperationStatus(status)
+	isComplete, anyFailed, failureReasons, err := t.processRsyncOperationStatus(status, garbageCollectionErrors)
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
@@ -1921,7 +1932,7 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 
 // processRsyncOperationStatus processes status of Rsync operations by reading the status list
 // returns whether all operations are completed and whether any of the operation is failed
-func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList) (bool, bool, []string, error) {
+func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList, garbageCollectionErrors []error) (bool, bool, []string, error) {
 	isComplete, anyFailed, failureReasons := false, false, make([]string, 0)
 	if status.AllCompleted() {
 		isComplete = true
@@ -1951,6 +1962,23 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 				Status:   True,
 			})
 		}
+		t.Log.Info("encountered repeated errors attempting to create Rsync Pods")
+	}
+	if len(garbageCollectionErrors) > 0 {
+		// check if we are seeing errors running any of the operation for over 5 minutes
+		// if yes, set a warning condition
+		runningCondition := t.Owner.Status.Conditions.FindCondition(Running)
+		if runningCondition != nil &&
+			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
+			t.Owner.Status.SetCondition(migapi.Condition{
+				Category: Warn,
+				Type:     FailedCreatingRsyncPods,
+				Message:  "Repeated errors occurred when attempting to delete one or more Rsync pods in the source cluster. Please check controller logs for details.",
+				Reason:   Failed,
+				Status:   True,
+			})
+		}
+		t.Log.Info("encountered repeated errors attempting to garbage clean Rsync Pods")
 	}
 	return isComplete, anyFailed, failureReasons, nil
 }
@@ -2002,6 +2030,7 @@ func (t *Task) reportAdvancedErrorHeuristics() ([]string, error) {
 
 // rsyncClientOperationStatus defines status of one Rsync operation
 type rsyncClientOperationStatus struct {
+	operation *migapi.RsyncOperation
 	// When set,.means that all attempts have been exhausted resulting in a failure
 	failed bool
 	// When set, means that one out of all attempts succeeded
@@ -2107,71 +2136,94 @@ func (r *rsyncClientOperationStatusList) Running() int {
 
 // ensureRsyncOperations orchestrates all attempts of Rsync, updates owner status with observed state of all ongoing Rsync operations
 // returns structured status of all operations, the return value should be used to make decisions about whether to retry in next reconcile
-func (t *Task) ensureRsyncOperations(client compat.Client, podRequirements []rsyncClientPodRequirements) (rsyncClientOperationStatusList, error) {
+func (t *Task) ensureRsyncOperations(client compat.Client, podRequirements []rsyncClientPodRequirements) (rsyncClientOperationStatusList, []error) {
 	statusList := rsyncClientOperationStatusList{}
 	// rateLimiter defines maximum concurrent operations that can be reconciled in one go
-	rateLimiter := make(chan bool, DefaultRsyncOperationConcurrency)
+	operationsRateLimiter, garbageCollectionRateLimiter := make(chan bool, DefaultRsyncOperationConcurrency), make(chan bool, 2)
 	// outputChan streamlines output of concurrent reconcile operations
-	outputChan := make(chan rsyncClientOperationStatus, DefaultRsyncOperationConcurrency)
-	finishChan := make(chan bool)
+	operationOutputChan := make(chan rsyncClientOperationStatus, DefaultRsyncOperationConcurrency)
+	garbageCollectionOutputChan := make(chan []error, 2)
+	finishOperationChan, finishGarbageCollectionChan := make(chan bool), make(chan bool)
+	garbageCollectionErrors := []error{}
 	waitGroup := &sync.WaitGroup{}
 	mutex := &sync.Mutex{}
-	// when garbage collection is enabled, delete intermittent Rsync pods
-	// TODO: implement garbage collection when needed
-	// go t.garbageCollectPodsForRequirements(podRequirements)
 	for i := range podRequirements {
 		req := &podRequirements[i]
 		lastObservedOperationStatus := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
 			Name:      req.pvInfo.name,
 			Namespace: req.namespace,
 		})
+		// from this point onwards, do not mutate the original reference, create a copy and use it
+		threadSafeOperationStatus := *lastObservedOperationStatus.DeepCopy()
 		// if the Rsync operation is already completed, do nothing
 		if lastObservedOperationStatus.IsComplete() {
 			continue
 		}
+		t.garbageCollectPodsForRequirements(
+			client,
+			threadSafeOperationStatus,
+			garbageCollectionRateLimiter,
+			garbageCollectionOutputChan,
+			waitGroup)
 		t.reconcileRsyncOperationState(
 			client,
 			req,
-			lastObservedOperationStatus,
-			rateLimiter,
-			outputChan,
+			threadSafeOperationStatus,
+			operationsRateLimiter,
+			operationOutputChan,
 			waitGroup)
 	}
 	// consume output from concurrent operations
 	go func() {
-		for incomingOutput := range outputChan {
+		for incomingOutput := range operationOutputChan {
 			mutex.Lock()
 			statusList.Add(incomingOutput)
+			t.Owner.Status.AddRsyncOperation(incomingOutput.operation)
 			mutex.Unlock()
 		}
-		finishChan <- true
+		finishOperationChan <- true
+	}()
+	// consume output from garbage collector
+	go func() {
+		for incomingOutput := range garbageCollectionOutputChan {
+			mutex.Lock()
+			garbageCollectionErrors = append(garbageCollectionErrors, incomingOutput...)
+			mutex.Unlock()
+		}
+		finishGarbageCollectionChan <- true
 	}()
 	waitGroup.Wait()
-	close(rateLimiter)
-	close(outputChan)
-	<-finishChan
-	return statusList, nil
+	close(operationsRateLimiter)
+	close(garbageCollectionRateLimiter)
+	close(operationOutputChan)
+	close(garbageCollectionOutputChan)
+	<-finishOperationChan
+	<-finishGarbageCollectionChan
+	return statusList, garbageCollectionErrors
 }
 
 // garbageCollectRsyncPods garbage collection routine
 // will run in background, returns list of failures when encountered
-func (t *Task) garbageCollectPodsForRequirements(client compat.Client, podRequirements []rsyncClientPodRequirements) []error {
-	errors := make([]error, 0)
-	for _, req := range podRequirements {
-		op := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
-			Name:      req.pvInfo.name,
-			Namespace: req.namespace,
-		})
+func (t *Task) garbageCollectPodsForRequirements(client compat.Client, op migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- []error, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rateLimiter <- true
+		errors := []error{}
 		podList, err := t.getAllPodsForOperation(client, op)
 		if err != nil {
 			errors = append(errors, liberr.Wrap(err))
+			outputChan <- errors
+			<-rateLimiter
+			return
 		}
 		for i := range podList.Items {
 			pod := podList.Items[i]
 			shouldDelete := false
 			if label, exists := pod.Labels[RsyncAttemptLabel]; exists {
-				if podAttempt, err := strconv.Atoi(label); err != nil {
+				if podAttempt, err := strconv.Atoi(label); err == nil {
 					// Delete the pod when it was created for a past attempt and DVMP is done gathering info from this pod
+					// keep a safety window of 1 attempt to avoid race conditions
 					if _, present := pod.Labels[migapi.DVMPDoneLabelKey]; present && podAttempt < op.CurrentAttempt {
 						shouldDelete = true
 					}
@@ -2187,23 +2239,28 @@ func (t *Task) garbageCollectPodsForRequirements(client compat.Client, podRequir
 				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
 				err := client.Delete(context.TODO(), &pod)
 				if err != nil {
+					t.Log.Error(err, "failed deleting garbage Rsync pods for operation", "pvc", op)
 					errors = append(errors, liberr.Wrap(err))
 				}
+				t.Log.Info("garbage cleaned pod", "pod", path.Join(pod.Namespace, pod.Name))
 			}
 		}
-	}
-	return errors
+		outputChan <- errors
+		<-rateLimiter
+	}()
 }
 
 // reconcileRsyncOperationState reconciles observed state of 1 Rsync operation
 // takes relevant actions wherever required such as launching a new pod when previous one fails
 func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClientPodRequirements,
-	operation *migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- rsyncClientOperationStatus, wg *sync.WaitGroup) {
+	operation migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- rsyncClientOperationStatus, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		rateLimiter <- true
-		currentStatus := rsyncClientOperationStatus{}
+		currentStatus := rsyncClientOperationStatus{
+			operation: &operation,
+		}
 		pod, err := t.getLatestPodForOperation(client, operation)
 		if err != nil {
 			currentStatus.AddError(err)
@@ -2215,13 +2272,16 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 		// when pod doesn't exist, start fresh
 		if pod != nil {
 			operation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
-			currentStatus = t.analyzeRsyncPodStatus(pod)
+			currentStatus.failed, currentStatus.succeeded,
+				currentStatus.running, currentStatus.pending = t.analyzeRsyncPodStatus(pod)
 			// when pod failed and backoff limit is not reached, create a new pod
 			if currentStatus.failed && operation.CurrentAttempt < t.getRsyncPodBackOffLimit() {
 				err := t.createNewPodForOperation(client, req, operation)
 				if err != nil {
 					currentStatus.AddError(err)
 				}
+				// increment current attempt
+				operation.CurrentAttempt += 1
 				// indicate that the operation is not yet completely failed, we will retry
 				currentStatus.pending = true
 			} else {
@@ -2234,6 +2294,8 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 			if err != nil {
 				currentStatus.AddError(err)
 			} else {
+				// increment current attempt
+				operation.CurrentAttempt += 1
 				// indicate that pod is being created in this round of reconcile, need to come back
 				currentStatus.pending = true
 			}
@@ -2245,23 +2307,22 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 }
 
 // getAllPodsForOperation returns all pods matching given Rsync operation
-func (t *Task) getAllPodsForOperation(client compat.Client, operation *migapi.RsyncOperation) (*corev1.PodList, error) {
+func (t *Task) getAllPodsForOperation(client compat.Client, operation migapi.RsyncOperation) (*corev1.PodList, error) {
 	podList := corev1.PodList{}
-	pvcName := operation.PVCReference.Name
-	pvcNamespace := operation.PVCReference.Namespace
+	pvcNamespace, pvcName := operation.GetPVDetails()
 	labels := GetRsyncPodSelector(pvcName)
 	err := client.List(context.TODO(),
 		k8sclient.InNamespace(pvcNamespace).MatchingLabels(labels), &podList)
 	if err != nil {
 		t.Log.Error(err,
-			"failed to list all Rsync pods for a volume", "pvc", operation)
+			"failed to list all Rsync pods for operation", "pvc", operation)
 		return nil, err
 	}
 	return &podList, nil
 }
 
 // getLatestPodForOperation given an RsyncOperation, returns latest pod for that operator
-func (t *Task) getLatestPodForOperation(client compat.Client, operation *migapi.RsyncOperation) (*corev1.Pod, error) {
+func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.RsyncOperation) (*corev1.Pod, error) {
 	podList, err := t.getAllPodsForOperation(client, operation)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -2287,7 +2348,7 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation *migapi.
 }
 
 // createNewPodForOperation creates a new pod for given RsyncOperation
-func (t *Task) createNewPodForOperation(client compat.Client, req *rsyncClientPodRequirements, operation *migapi.RsyncOperation) error {
+func (t *Task) createNewPodForOperation(client compat.Client, req *rsyncClientPodRequirements, operation migapi.RsyncOperation) error {
 	podTemplate := req.getRsyncClientPodTemplate()
 	nextAttempt := operation.CurrentAttempt + 1
 	existingLabels := podTemplate.Labels
@@ -2298,13 +2359,13 @@ func (t *Task) createNewPodForOperation(client compat.Client, req *rsyncClientPo
 		t.Log.Info(
 			"creating new pod with rsync command", "cmd", strings.Join(podTemplate.Spec.Containers[0].Command, " "))
 	}
-	err := client.Create(context.TODO(), &podTemplate)
+	err := client.Create(context.TODO(), podTemplate.DeepCopy())
 	if k8serror.IsAlreadyExists(err) {
 		t.Log.Info(
-			"rsync pod for given attempt already exists", "pvc", operation)
+			"rsync pod for given attempt already exists", "pvc", operation, "attempt", nextAttempt)
 	} else if err != nil {
 		t.Log.Error(err,
-			"failed creating a new Rsync pod for pvc", "pvc", operation)
+			"failed creating a new Rsync pod for pvc", "pvc", operation, "attempt", nextAttempt)
 		return err
 	}
 	operation.CurrentAttempt = nextAttempt
@@ -2313,16 +2374,16 @@ func (t *Task) createNewPodForOperation(client compat.Client, req *rsyncClientPo
 
 // analyzeRsyncPodStatus looks at Rsync Pod and determines whether the Rsync attempt was successful, failed or the pod is pending
 // returns whether running, succeeded, failed, pending
-func (t *Task) analyzeRsyncPodStatus(pod *corev1.Pod) (currentStatus rsyncClientOperationStatus) {
+func (t *Task) analyzeRsyncPodStatus(pod *corev1.Pod) (failed bool, succeeded bool, running bool, pending bool) {
 	switch pod.Status.Phase {
 	case corev1.PodFailed:
-		currentStatus.failed = true
+		failed = true
 	case corev1.PodSucceeded:
-		currentStatus.succeeded = true
+		succeeded = true
 	case corev1.PodRunning:
-		currentStatus.running = true
+		running = true
 	case corev1.PodPending, corev1.PodUnknown:
-		currentStatus.pending = true
+		pending = true
 	}
 	return
 }

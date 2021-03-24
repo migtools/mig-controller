@@ -629,7 +629,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 			tr := &Task{
 				Log: tt.fields.Log,
 			}
-			got, err := tr.getLatestPodForOperation(tt.args.client, tt.args.operation)
+			got, err := tr.getLatestPodForOperation(tt.args.client, *tt.args.operation)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Task.getLatestPodForOperation() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -662,7 +662,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 		dontWantPods []*corev1.Pod
 		// wantCRStatus expected CR status after one operation
 		wantCRStatus []*migapi.RsyncOperation
-		wantErr      bool
 	}{
 		{
 			name: "when given 0 existing Rsync pods in the source namespace and 0 new pod requirements, status list should be empty",
@@ -678,7 +677,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 			wantCRStatus: []*migapi.RsyncOperation{},
 			wantPods:     []*corev1.Pod{},
 			dontWantPods: []*corev1.Pod{},
-			wantErr:      false,
 		},
 		{
 			name: "when given 0 existing Rsync pods in the source namespace and 1 new pod requirement, 1 new pod should be created in the source namespace",
@@ -711,7 +709,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "0", time.Now()),
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "2", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given 1 existing failed Rsync pod in the source namespace and backOffLimit set to 2, 1 new pod should be created in the source namespace and status should reflect correct attemp no",
@@ -746,7 +743,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "0", time.Now()),
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "3", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given 1 existing failed Rsync pod in the source namespace and backOffLimit set to 1, 1 new pod should not be created and operation should be called complete",
@@ -780,7 +776,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "2", time.Now()),
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "3", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given 1 existing pending Rsync pod in the source namespace and backOffLimit set to 2, 1 new pod should not be created and operation should not be complete",
@@ -814,7 +809,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "2", time.Now()),
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "3", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given 3 existing failed Rsync pods in the source namespace and backOffLimit set to 4, 1 new pod should be created and operation should not be complete",
@@ -851,7 +845,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "0", time.Now()),
 				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "5", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given 3 different failed Rsync pods for 3 different pvcs and backOffLimit set to 2, 1 new pod should be created each pvc and operation should not be complete",
@@ -900,7 +893,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-2", "pvc-1", "ns-2", "3", time.Now()),
 				getTestRsyncPodForPVC("pod-2", "pvc-1", "ns-3", "3", time.Now()),
 			},
-			wantErr: false,
 		},
 		{
 			name: "when given different Rsync pods with mix of different statuses for 10 different pvcs and backOffLimit set to 5, should return correct statuses for each pvc",
@@ -992,7 +984,6 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				getTestRsyncPodForPVC("pod-2", "pvc-1", "ns-3", "2", time.Now()),
 				getTestRsyncPodForPVC("pod-2", "pvc-2", "ns-3", "2", time.Now()),
 			},
-			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -1001,11 +992,7 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				Log:   tt.fields.Log,
 				Owner: tt.fields.Owner,
 			}
-			got, err := tr.ensureRsyncOperations(tt.args.client, tt.args.podRequirements)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Task.ensureRsyncOperations() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got, _ := tr.ensureRsyncOperations(tt.args.client, tt.args.podRequirements)
 			// check whether the returned value matches the expectations
 			if got.Succeeded() != tt.wantReturn.Succeeded() {
 				t.Errorf("RsyncOperationsContext.EnsureRsyncOperations() = got %d succeded operations, want %d", got.Succeeded(), tt.wantReturn.Succeeded())
@@ -1033,8 +1020,8 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 			}
 			podExistsInSource := func(pod *corev1.Pod) bool {
 				srcPods := corev1.PodList{}
-				err = tt.args.client.List(context.TODO(), k8sclient.InNamespace(pod.Namespace).MatchingLabels(pod.Labels), &srcPods)
-				if err != nil {
+				errs := tt.args.client.List(context.TODO(), k8sclient.InNamespace(pod.Namespace).MatchingLabels(pod.Labels), &srcPods)
+				if errs != nil {
 					t.Errorf("RsyncOperationsContext.EnsureRsyncOperations() failed getting pods in source namespace")
 				}
 				return len(srcPods.Items) > 0
@@ -1062,7 +1049,8 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 		Owner  *migapi.DirectVolumeMigration
 	}
 	type args struct {
-		status rsyncClientOperationStatusList
+		status                  rsyncClientOperationStatusList
+		garbageCollectionErrors []error
 	}
 	tests := []struct {
 		name              string
@@ -1142,7 +1130,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				Client: tt.fields.Client,
 				Owner:  tt.fields.Owner,
 			}
-			gotAllCompleted, gotAnyFailed, _, err := tr.processRsyncOperationStatus(tt.args.status)
+			gotAllCompleted, gotAnyFailed, _, err := tr.processRsyncOperationStatus(tt.args.status, tt.args.garbageCollectionErrors)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Task.processRsyncOperationStatus() error = %v, wantErr %v", err, tt.wantErr)
 				return
