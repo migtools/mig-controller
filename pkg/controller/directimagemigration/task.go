@@ -214,7 +214,7 @@ func (t *Task) next() error {
 	cond := t.Owner.Status.FindCondition(migapi.Running)
 	if cond != nil {
 		elapsed := time.Since(cond.LastTransitionTime.Time)
-		t.Log.Info("Phase completed", "Elapsed", elapsed)
+		t.Log.Info("Phase completed", "phaseElapsed", elapsed)
 	}
 
 	current := -1
