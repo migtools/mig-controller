@@ -21,13 +21,14 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *migapi.DirectImageStreamMigration) (time.Duration, error) {
+func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *migapi.DirectImageStreamMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
 	// Started
 	if imageStreamMigration.Status.StartTimestamp == nil {
 		log.Info("Marking DirectImageStreamMigration as started.")
@@ -40,6 +41,9 @@ func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *miga
 		Client: r,
 		Owner:  imageStreamMigration,
 		Phase:  imageStreamMigration.Status.Phase,
+
+		Tracer:        r.tracer,
+		ReconcileSpan: reconcileSpan,
 	}
 	err := task.Run()
 	if err != nil {

@@ -17,11 +17,14 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"errors"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -74,6 +77,24 @@ func (r *DirectImageStreamMigration) GetSourceCluster(client k8sclient.Client) (
 
 func (r *DirectImageStreamMigration) GetDestinationCluster(client k8sclient.Client) (*MigCluster, error) {
 	return GetCluster(client, r.Spec.DestMigClusterRef)
+}
+
+// Get the DirectImageMigration that owns this DirectImageStreamMigration. If not owned, return nil.
+func (r *DirectImageStreamMigration) GetDIMforDISM(client k8sclient.Client) (*DirectImageMigration, error) {
+	owner := &DirectImageMigration{}
+	ownerRefs := r.GetOwnerReferences()
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "DirectImageMigration" {
+			continue
+		}
+		ownerRef := types.NamespacedName{Name: ownerRef.Name, Namespace: r.Namespace}
+		err := client.Get(context.TODO(), ownerRef, owner)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		return owner, nil
+	}
+	return nil, nil
 }
 
 func (r *DirectImageStreamMigration) GetImageStream(c k8sclient.Client) (*imagev1.ImageStream, error) {

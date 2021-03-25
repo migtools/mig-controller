@@ -17,9 +17,14 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+
 	"github.com/google/uuid"
+	liberr "github.com/konveyor/controller/pkg/error"
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -109,6 +114,24 @@ func (d *DirectVolumeMigrationProgress) MarkReconciled() {
 	}
 	d.Annotations[TouchAnnotation] = u.String()
 	d.Status.ObservedDigest = digest(d.Spec)
+}
+
+// Get the DirectVolumeMigration that owns this DirectVolumeMigrationProgress. If not owned, return nil.
+func (r *DirectVolumeMigrationProgress) GetDVMforDVMP(client k8sclient.Client) (*DirectVolumeMigration, error) {
+	owner := &DirectVolumeMigration{}
+	ownerRefs := r.GetOwnerReferences()
+	for _, ownerRef := range ownerRefs {
+		if ownerRef.Kind != "DirectVolumeMigration" {
+			continue
+		}
+		ownerRef := types.NamespacedName{Name: ownerRef.Name, Namespace: r.Namespace}
+		err := client.Get(context.TODO(), ownerRef, owner)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		return owner, nil
+	}
+	return nil, nil
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

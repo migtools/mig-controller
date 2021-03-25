@@ -7,13 +7,14 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration) (time.Duration, error) {
+func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
 
 	migration, planResources, err := r.getDVMMigrationAndPlanResources(direct)
 	if err != nil {
@@ -38,6 +39,9 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 		PhaseDescription: direct.Status.PhaseDescription,
 		PlanResources:    planResources,
 		MigrationUID:     string(migration.UID),
+
+		Tracer:        r.tracer,
+		ReconcileSpan: reconcileSpan,
 	}
 	err = task.Run()
 	if err != nil {

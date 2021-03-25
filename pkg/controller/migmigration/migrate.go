@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	migtrace "github.com/konveyor/mig-controller/pkg/tracing"
+	"github.com/opentracing/opentracing-go"
 
 	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -31,7 +33,7 @@ import (
 )
 
 // Perform the migration.
-func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Duration, error) {
+func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
 	// Ready
 	plan, err := migration.GetPlan(r)
 	if err != nil {
@@ -63,6 +65,8 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 		Phase:           migration.Status.Phase,
 		Annotations:     r.getAnnotations(migration),
 		BackupResources: r.getBackupResources(migration),
+		Tracer:          r.tracer,
+		ReconcileSpan:   reconcileSpan,
 	}
 	err = task.Run()
 	if err != nil {
@@ -83,6 +87,9 @@ func (r *ReconcileMigMigration) migrate(migration *migapi.MigMigration) (time.Du
 
 	// Completed
 	if task.Phase == Completed {
+		// Close the Jaeger span for the migration
+		migtrace.CloseMigrationSpan(string(migration.GetUID()))
+
 		migration.Status.DeleteCondition(Running)
 		failed := task.Owner.Status.FindCondition(Failed)
 		warnings := task.Owner.Status.FindConditionByCategory(migapi.Warn)

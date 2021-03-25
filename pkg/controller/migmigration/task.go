@@ -12,6 +12,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	imagev1 "github.com/openshift/api/image/v1"
+	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -325,6 +326,9 @@ type Task struct {
 	Itinerary       Itinerary
 	Errors          []string
 	Step            string
+
+	Tracer        opentracing.Tracer
+	ReconcileSpan opentracing.Span
 }
 
 // Run the task.
@@ -334,9 +338,18 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
-	// Set stage, phase, phase description, migplan name
+	// Set phase as logger K/V pair
 	t.Log = t.Log.WithValues("Phase", t.Phase)
 	t.Requeue = FastReQ
+
+	// Set up Jaeger span for task.Run
+	if t.ReconcileSpan != nil {
+		phaseSpan := t.Tracer.StartSpan(
+			"migration-phase-"+t.Phase,
+			opentracing.ChildOf(t.ReconcileSpan.Context()),
+		)
+		defer phaseSpan.Finish()
+	}
 
 	err := t.init()
 	if err != nil {

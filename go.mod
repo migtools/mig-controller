@@ -25,9 +25,12 @@ require (
 	github.com/onsi/gomega v1.7.0
 	github.com/openshift/api v0.0.0-20200210091934-a0e53e94816b
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
+	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.1.0
 	github.com/satori/go.uuid v1.2.0 // indirect
+	github.com/uber/jaeger-client-go v2.25.0+incompatible
+	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmware-tanzu/velero v1.4.2
 	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/zap v1.10.0

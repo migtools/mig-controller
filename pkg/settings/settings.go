@@ -35,9 +35,11 @@ type _Settings struct {
 	Discovery
 	Plan
 	DvmOpts
-	Roles      map[string]bool
-	ProxyVars  map[string]string
 	DisImgCopy bool
+	RsyncOpts
+	JaegerOpts
+	Roles     map[string]bool
+	ProxyVars map[string]string
 }
 
 // Load settings.
@@ -51,6 +53,10 @@ func (r *_Settings) Load() error {
 		return err
 	}
 	err = r.DvmOpts.Load()
+	if err != nil {
+		return err
+	}
+	err = r.JaegerOpts.Load()
 	if err != nil {
 		return err
 	}
