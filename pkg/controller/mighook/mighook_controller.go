@@ -18,6 +18,7 @@ package mighook
 
 import (
 	"context"
+
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	"github.com/konveyor/controller/pkg/logging"

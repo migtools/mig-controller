@@ -18,8 +18,9 @@ package migstorage
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"

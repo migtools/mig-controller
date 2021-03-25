@@ -104,7 +104,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{Requeue: true}, err
+		return reconcile.Result{}, err
 	}
 
 	// Set up jaeger tracing
