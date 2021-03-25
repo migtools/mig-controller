@@ -600,6 +600,9 @@ func (t *Task) createRsyncTransferPods() error {
 							Privileged:             &isRsyncPrivileged,
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+							},
 						},
 						Resources: corev1.ResourceRequirements{
 							Limits:   limits,
@@ -632,6 +635,9 @@ func (t *Task) createRsyncTransferPods() error {
 							Privileged:             &isRsyncPrivileged,
 							RunAsUser:              &runAsUser,
 							ReadOnlyRootFilesystem: &trueBool,
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+							},
 						},
 					},
 				},
@@ -1113,6 +1119,9 @@ func (t *Task) createRsyncClientPods() error {
 					Privileged:             &isPrivileged,
 					RunAsUser:              &runAsUser,
 					ReadOnlyRootFilesystem: &trueBool,
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+					},
 				},
 				Resources: corev1.ResourceRequirements{
 					Limits:   limits,
