@@ -106,6 +106,10 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{}, err
 	}
 
+	log.Info("START Reconciling DVM",
+		"preReconcilePhase", direct.Status.Phase,
+		"dvmStatus", direct.Status)
+
 	// Set up jaeger tracing
 	reconcileSpan := r.initTracer(direct)
 	if reconcileSpan != nil {
@@ -117,6 +121,10 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 
 	// Check if completed
 	if direct.Status.Phase == Completed {
+		log.Info("EXIT: DVM is completed",
+			"postReconcilePhase", direct.Status.Phase,
+			"dvmStatus", direct.Status)
+
 		return reconcile.Result{}, nil
 	}
 
@@ -127,6 +135,9 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	err = r.validate(direct)
 	if err != nil {
 		log.Trace(err)
+		log.Info("EXIT: DVM validation error",
+			"postReconcilePhase", direct.Status.Phase,
+			"dvmStatus", direct.Status)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -134,6 +145,9 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		_, err = r.migrate(direct, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
+			log.Info("EXIT: DVM has blocker condition",
+				"postReconcilePhase", direct.Status.Phase,
+				"dvmStatus", direct.Status)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -152,9 +166,15 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	err = r.Update(context.TODO(), direct)
 	if err != nil {
 		log.Trace(err)
+		log.Info("EXIT: DVM is failed to update",
+			"postReconcilePhase", direct.Status.Phase,
+			"dvmStatus", direct.Status)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Done
+	log.Info("EXIT: DVM got to end of reconcile",
+		"postReconcilePhase", direct.Status.Phase,
+		"dvmStatus", direct.Status)
 	return reconcile.Result{}, nil
 }

@@ -114,3 +114,34 @@ You can invoke CI via webhook with an appropriate pull request comment command. 
 ## Design patterns, conventions, and practices
 
 See [devguide.md](https://github.com/konveyor/mig-controller/blob/master/docs/devguide.md)
+
+## Generating a phase performance profile
+
+To understand phase performance and identify areas of the controller with greatest potential for improvement, mig-controller logs a "Phase completed" message at the end of each phase indicating elapsed seconds since the phase began.
+
+```json
+# Phase completion log
+{"[...]", "migMigration": "my-migration", "msg":"Phase completed","Phase": "StartRefresh", "phaseElapsed":0.522302}
+```
+
+We can choose a particular MigMigration name to profile, and turn the series of phase completion messages into a performance report CSV.
+
+First, we need to grab the logs needed for analysis.
+```sh
+# Option 1) Get logs from mig-controller running in-cluster
+oc get logs openshift-migration migration-controller-[...] > controller.log
+
+# Option 2) Run mig-controller locally and output logs to file
+make run-fast 2>&1 | tee controller.log
+```
+
+Once we have the logs, we can use this bash one-liner to generate a CSV of phase timing information.
+```
+# Dependencies: jq, grep
+echo "PhaseName ElapsedSeconds PercentOfTotal" > phase_timing.csv; total_time=$(cat controller.log | grep '\"Phase\ completed\"' | jq '([inputs | .phaseElapsed] | add)'); cat controller.log | grep '\"Phase\ completed\"' | jq -r --arg total_time "$total_time" '"\(.Phase) \(.phaseElapsed) \(.Elapsed / ($total_time|tonumber))"' >> phase_timing.csv
+```
+
+echo "PhaseName ElapsedSeconds PercentOfTotal" > phase_timing.csv; total_time=$(cat controller.log | grep '\"Phase\ completed\"' | jq '([inputs | .phaseElapsed] | add)'); cat controller.log | grep '\"Phase\ completed\"' | jq -r --arg total_time "$total_time" '"\(.Phase) \(.phaseElapsed) \(.phaseElapsed / ($total_time|tonumber))"' >> phase_timing.csv
+
+# Read the 
+
