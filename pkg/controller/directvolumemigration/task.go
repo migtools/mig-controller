@@ -184,7 +184,7 @@ func (t *Task) init() error {
 }
 
 func (t *Task) Run() error {
-	t.Log = t.Log.WithValues("Phase", t.Phase)
+	t.Log = t.Log.WithValues("phase", t.Phase)
 	// Init
 	err := t.init()
 	if err != nil {
