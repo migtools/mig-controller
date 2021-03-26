@@ -36,7 +36,6 @@ type _Settings struct {
 	Plan
 	DvmOpts
 	DisImgCopy bool
-	RsyncOpts
 	JaegerOpts
 	Roles     map[string]bool
 	ProxyVars map[string]string
