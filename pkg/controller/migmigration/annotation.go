@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -212,9 +213,8 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 			continue
 		}
 		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
-		log.Info(
-			fmt.Sprintf("Adding migration annotations/labels to source cluster namespace [%v].",
-				namespace.Name))
+		log.Info("Adding migration annotations/labels to source cluster namespace.",
+			"namespace", namespace.Name)
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -266,9 +266,8 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 		pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
 
 		// Update
-		log.Info(
-			fmt.Sprintf("Adding annotations/labels to source cluster Pod [%v/%v].",
-				pod.Namespace, pod.Name))
+		log.Info("Adding annotations/labels to source cluster Pod.",
+			"pod", path.Join(pod.Namespace, pod.Name))
 		err = client.Update(context.TODO(), &pod)
 		if err != nil {
 			return itemsUpdated, nil, liberr.Wrap(err)
@@ -332,8 +331,8 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		pvResource.Labels[IncludedInStageBackupLabel] = t.UID()
 
 		// Update
-		log.Info(fmt.Sprintf("Adding annotations/labels to source cluster "+
-			"PersistentVolume [%v].", pv.Name))
+		log.Info("Adding annotations/labels to source cluster PersistentVolume.",
+			"persistentVolume", pv.Name)
 		err = client.Update(context.TODO(), &pvResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -374,9 +373,8 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			}
 		}
 		// Update
-		log.Info(
-			fmt.Sprintf("Adding annotations/labels to source cluster PersistentVolumeClaim [%v/%v].",
-				pv.PVC.Namespace, pv.PVC.Name))
+		log.Info("Adding annotations/labels to source cluster PersistentVolumeClaim.",
+			"persistentVolumeClaim", path.Join(pv.PVC.Namespace, pv.PVC.Name))
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
@@ -421,9 +419,8 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)
 			}
-			log.Info(
-				fmt.Sprintf("Added annotations/labels to source cluster Service Account [%v/%v].",
-					sa.Namespace, sa.Name))
+			log.Info("Added annotations/labels to source cluster Service Account.",
+				"serviceAccount", path.Join(sa.Namespace, sa.Name))
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
 				t.setProgress([]string{fmt.Sprintf("%v/%v SA annotations/labels added in the namespace: %s", i, total, sa.Namespace)})
@@ -454,8 +451,8 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 			}
 			is.Labels[IncludedInStageBackupLabel] = t.UID()
 
-			log.Info(fmt.Sprintf("Adding labels to source cluster ImageStream [%v/%v].",
-				is.Namespace, is.Name))
+			log.Info("Adding labels to source cluster ImageStream.",
+				"imageStream", path.Join(is.Namespace, is.Name))
 			err = client.Update(context.Background(), &is)
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)
@@ -545,8 +542,8 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info(fmt.Sprintf("Velero Annotations/Labels removed on Pod [%v/%v].",
-				pod.Namespace, pod.Name))
+			log.Info("Velero Annotations/Labels removed on Pod.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}
 
@@ -621,8 +618,8 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info(fmt.Sprintf("Velero Annotations/Labels removed on PersistentVolumeClaim [%v/%v].",
-				pvc.Namespace, pvc.Name))
+			log.Info("Velero Annotations/Labels removed on PersistentVolumeClaim.",
+				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name))
 		}
 	}
 
@@ -648,8 +645,8 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(fmt.Sprintf("Velero Annotations/Labels removed on PersistentVolume [%v/%v].",
-			pv.Namespace, pv.Name))
+		log.Info("Velero Annotations/Labels removed on PersistentVolume.",
+			"persistentVolume", path.Join(pv.Namespace, pv.Name))
 	}
 
 	return nil
@@ -672,8 +669,8 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(fmt.Sprintf("Velero Annotations/Labels removed on ServiceAccount [%v/%v].",
-			sa.Namespace, sa.Name))
+		log.Info("Velero Annotations/Labels removed on ServiceAccount.",
+			"serviceAccount", path.Join(sa.Namespace, sa.Name))
 	}
 	return nil
 }
@@ -695,8 +692,8 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info(fmt.Sprintf("Velero Annotations/Labels removed on ImageStream [%v/%v].",
-			is.Namespace, is.Name))
+		log.Info("Velero Annotations/Labels removed on ImageStream.",
+			"imageStream", path.Join(is.Namespace, is.Name))
 	}
 	return nil
 }

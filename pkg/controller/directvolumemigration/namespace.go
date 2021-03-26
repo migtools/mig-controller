@@ -2,7 +2,6 @@ package directvolumemigration
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,8 +41,8 @@ func (t *Task) ensureDestinationNamespaces() error {
 				Annotations: srcNS.Annotations,
 			},
 		}
-		t.Log.Info(fmt.Sprintf("Creating namespace [%v] on destination MigCluster",
-			destNs.Name))
+		t.Log.Info("Creating namespace on destination MigCluster",
+			"namespace", destNs.Name)
 		err = destClient.Create(context.TODO(), &destNs)
 		if err != nil {
 			return err

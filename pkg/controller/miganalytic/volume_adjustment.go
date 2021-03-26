@@ -199,12 +199,14 @@ func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*
 		}
 	}
 	if len(pvNames) > 0 {
+		msg := fmt.Sprintf(warningString, strings.Join(pvNames, " "))
+		log.Info(msg)
 		pva.Owner.Status.Conditions.SetCondition(migapi.Condition{
 			Category: migapi.Warn,
 			Status:   True,
 			Type:     ExtendedPVAnalysisFailed,
 			Reason:   FailedRunningDf,
-			Message:  fmt.Sprintf(warningString, strings.Join(pvNames, " ")),
+			Message:  msg,
 		})
 	}
 }

@@ -2,7 +2,7 @@ package migmigration
 
 import (
 	"context"
-	"fmt"
+	"path"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -38,8 +38,9 @@ func (t *Task) shouldResticRestart() (bool, error) {
 	// User can override default by setting MigCluster.Spec.RestartRestic.
 	if t.PlanResources.SrcMigCluster.Spec.RestartRestic != nil {
 		runRestart = *t.PlanResources.SrcMigCluster.Spec.RestartRestic
-		t.Log.Info(fmt.Sprintf("SrcCluster.Spec.RestartRestic override [%v] found.",
-			runRestart))
+		t.Log.Info("SrcCluster.Spec.RestartRestic override found.",
+			"restartRestic", runRestart,
+			"migCluster", path.Join(t.PlanResources.SrcMigCluster.Namespace, t.PlanResources.SrcMigCluster.Name))
 	}
 	return runRestart, nil
 }
@@ -67,8 +68,8 @@ func (t *Task) restartResticPods() error {
 	selector := labels.SelectorFromSet(map[string]string{
 		"name": "restic",
 	})
-	t.Log.Info(fmt.Sprintf("Getting Restic Pods on source cluster in namespace [%v]",
-		migapi.VeleroNamespace))
+	t.Log.Info("Getting Restic Pods on source cluster in namespace",
+		"namespace", migapi.VeleroNamespace)
 	err = client.List(
 		context.TODO(),
 		&k8sclient.ListOptions{
@@ -82,12 +83,12 @@ func (t *Task) restartResticPods() error {
 
 	for _, pod := range list.Items {
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state, skipping restart.",
-				pod.Namespace, pod.Name))
+			t.Log.Info("Found Restic Pod in non-running state, skipping restart.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			continue
 		}
-		t.Log.Info(fmt.Sprintf("Deleting Restic Pod [%v/%v] in source cluster to trigger restart.",
-			pod.Namespace, pod.Name))
+		t.Log.Info("Deleting Restic Pod in source cluster to trigger restart.",
+			"pod", path.Join(pod.Namespace, pod.Name))
 		err = client.Delete(
 			context.TODO(),
 			&pod)
@@ -147,21 +148,22 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 
 	for _, pod := range list.Items {
 		if pod.DeletionTimestamp != nil {
-			t.Log.Info(fmt.Sprintf("Deletion timestamp found on Restic Pod [%v/%v], "+
+			t.Log.Info("Deletion timestamp found on Restic Pod, "+
 				"Pod is in the process of deleting. Requeuing and waiting for restart.",
-				pod.Namespace, pod.Name))
+				"pod", path.Join(pod.Namespace, pod.Name))
 			return false, nil
 		}
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.Info(fmt.Sprintf("Found Restic Pod [%v/%v] in non-running state."+
-				" Requeuing and waiting for restart.", pod.Namespace, pod.Name))
+			t.Log.Info("Found Restic Pod in non-running state."+
+				" Requeuing and waiting for restart.",
+				"pod", path.Join(pod.Namespace, pod.Name))
 			return false, nil
 		}
 	}
 	if ds.Status.CurrentNumberScheduled != ds.Status.NumberReady {
-		t.Log.Info(fmt.Sprintf("Restic DaemonSet [%v/%v] .Status.CurrentNumberScheduled "+
+		t.Log.Info("Restic DaemonSet .Status.CurrentNumberScheduled "+
 			" differs from .Status.NumberReady. Requeuing and waiting for these to match.",
-			ds.Namespace, ds.Name))
+			"daemonSet", path.Join(ds.Namespace, ds.Name))
 		return false, nil
 	}
 
@@ -205,12 +207,14 @@ func (t *Task) deleteVeleroPodsForCluster(cluster *migapi.MigCluster) error {
 	}
 	for _, pod := range veleroPods {
 		if pod.Status.Phase != corev1.PodRunning {
-			t.Log.Info(fmt.Sprintf("Skipping deletion of non-running Velero Pod [%v/%v], phase=[%v]",
-				pod.Namespace, pod.Name, pod.Status.Phase))
+			t.Log.Info("Skipping deletion of non-running Velero Pod",
+				"pod", path.Join(pod.Namespace, pod.Name),
+				"podPhase", pod.Status.Phase)
 			continue
 		}
-		t.Log.Info(fmt.Sprintf("Deleting running Velero Pod [%v/%v] on MigCluster=[%v/%v]",
-			pod.Namespace, pod.Name, cluster.Namespace, cluster.Name))
+		t.Log.Info("Deleting running Velero Pod on MigCluster",
+			"pod", path.Join(pod.Namespace, pod.Name),
+			"migCluster", cluster.Namespace, cluster.Name)
 		err = clusterClient.Delete(
 			context.TODO(),
 			&pod)
@@ -262,22 +266,22 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 
 		for _, pod := range list.Items {
 			if pod.DeletionTimestamp != nil {
-				t.Log.Info(fmt.Sprintf("Found Velero Pod [%v/%v] with deletion timestamp."+
+				t.Log.Info("Found Velero Pod with deletion timestamp."+
 					" Requeuing and waiting for Pod to finish deleting and restart.",
-					pod.Namespace, pod.Name))
+					"pod", path.Join(pod.Namespace, pod.Name))
 				return false, nil
 			}
 			if pod.Status.Phase != corev1.PodRunning {
-				t.Log.Info(fmt.Sprintf("Found Velero Pod [%v/%v] with Status.Phase != Running."+
+				t.Log.Info("Found Velero Pod with Status.Phase != Running."+
 					" Requeuing and waiting for Pod to enter running state.",
-					pod.Namespace, pod.Name))
+					"pod", path.Join(pod.Namespace, pod.Name))
 				return false, nil
 			}
 		}
 		if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
-			t.Log.Info(fmt.Sprintf("Found Velero Deployment [%v/%v] with "+
+			t.Log.Info("Found Velero Deployment with "+
 				"Spec.Replicas != Status.ReadyReplicas. Requeuing and waiting for these fields to match.",
-				deployment.Namespace, deployment.Name))
+				"deployment", path.Join(deployment.Namespace, deployment.Name))
 			return false, nil
 		}
 	}
@@ -305,9 +309,9 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 		return false, liberr.Wrap(err)
 	}
 	if len(list) == 0 {
-		t.Log.Info(fmt.Sprintf("No velero pods found on MigCluster [%v/%v] "+
+		t.Log.Info("No velero pods found on MigCluster "+
 			"while checking for Velero cloud secret propagation.",
-			cluster.Namespace, cluster.Name))
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		return false, nil
 	}
 	restCfg, err := cluster.BuildRestConfig(t.Client)
@@ -328,10 +332,11 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 				RestCfg: restCfg,
 				Pod:     &pod,
 			}
-			t.Log.Info(fmt.Sprintf("Execing into Velero Pod [%v/%v]"+
-				"on MigCluster [%v/%v] with command [%v] to check for Cloud Credentials",
-				pod.Namespace, pod.Name, cluster.Namespace, cluster.Name,
-				"cat "+provider.GetCloudCredentialsPath()))
+			t.Log.Info("Execing into Velero Pod "+
+				"on MigCluster to check for Cloud Credentials",
+				"pod", path.Join(pod.Namespace, pod.Name),
+				"migCluster", path.Join(cluster.Namespace, cluster.Name),
+				"execCommand", "cat "+provider.GetCloudCredentialsPath())
 			err = cmd.Run()
 			if err != nil {
 				exErr, cast := err.(exec.CodeExitError)
@@ -366,7 +371,7 @@ func (t *Task) veleroPodCredSecretPropagated(cluster *migapi.MigCluster) (bool, 
 			}
 		}
 	}
-	t.Log.Info(fmt.Sprintf("Found propagated cloud secret in Velero Pod "+
-		"on MigCluster [%v/%v]", cluster.Name, cluster.Namespace))
+	t.Log.Info("Found propagated cloud secret in Velero Pod on MigCluster",
+		"migCluster", path.Join(cluster.Name, cluster.Namespace))
 	return true, nil
 }

@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -53,8 +54,8 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
 	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
-	t.Log.Info(fmt.Sprintf("Creating Velero Final Restore [%v/%v] on target cluster.",
-		newRestore.Namespace, newRestore.Name))
+	t.Log.Info("Creating Velero Final Restore on target cluster.",
+		"restore", path.Join(newRestore.Namespace, newRestore.Name))
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -312,8 +313,9 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		completed = true
 	}
 
-	t.Log.Info(fmt.Sprintf("Velero Restore [%s/%s] progress: [%v]",
-		restore.Namespace, restore.Name, progress))
+	t.Log.Info("Velero Restore progress report",
+		"restore", path.Join(restore.Namespace, restore.Name),
+		"restoreProgress", progress)
 
 	t.setProgress(progress)
 	return completed, reasons
@@ -438,8 +440,9 @@ func (t *Task) deleteCorrelatedRestores() error {
 		return liberr.Wrap(err)
 	}
 	for _, restore := range list.Items {
-		t.Log.Info(fmt.Sprintf("Deleting Velero Restore [%v/%v] on target cluster "+
-			"due to correlation with MigPlan", restore.Namespace, restore.Name))
+		t.Log.Info("Deleting Velero Restore on target cluster "+
+			"due to correlation with MigPlan",
+			"restore", path.Join(restore.Namespace, restore.Name))
 		err = client.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
@@ -452,8 +455,8 @@ func (t *Task) deleteCorrelatedRestores() error {
 // Delete stale Velero Restores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale Velero Restore on MigCluster [%v/%v]",
-		cluster.Namespace, cluster.Name))
+	t.Log.Info("Checking for stale Velero Restore on MigCluster",
+		"migCluster", path.Join(cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	nInProgressDeleted := 0
 
@@ -475,9 +478,9 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		if restore.Status.Phase != velero.RestorePhaseNew &&
 			restore.Status.Phase != velero.RestorePhaseInProgress &&
 			restore.Status.Phase != "" {
-			t.Log.V(4).Info(fmt.Sprintf("Restore [%v/%v] with "+
-				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
-				restore.Namespace, restore.Name, restore.Status.Phase))
+			t.Log.V(4).Info("Restore with is not 'New' or 'InProgress'. Skipping deletion.",
+				"restore", path.Join(restore.Namespace, restore.Name),
+				"restorePhase", restore.Status.Phase)
 			continue
 		}
 		// Skip if missing a migmigration correlation label (only delete our own CRs)
@@ -485,10 +488,11 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 		corrKey, _ := t.Owner.GetCorrelationLabel()
 		migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 		if !ok {
-			t.Log.V(4).Info(fmt.Sprintf("Restore [%v/%v] with "+
-				"Status.Phase=[%v] does not have an attached label "+
-				"[%v] associating it with a MigMigration. Skipping deletion.",
-				restore.Namespace, restore.Name, restore.Status.Phase, corrKey))
+			t.Log.V(4).Info("Restore does not have an attached label "+
+				"associating it with a MigMigration. Skipping deletion.",
+				"restore", path.Join(restore.Namespace, restore.Name),
+				"restorePhase", restore.Status.Phase,
+				"associationLabel", corrKey)
 			continue
 		}
 		// Skip if correlation label points to an existing, running migration
@@ -497,15 +501,16 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
 		}
 		if isRunning {
-			t.Log.Info(fmt.Sprintf("Restore [%v/%v] with "+
-				"Status.Phase=[%v] is running. Skipping deletion.",
-				restore.Namespace, restore.Name, restore.Status.Phase))
+			t.Log.Info("Restore is running. Skipping deletion.",
+				"restore", path.Join(restore.Namespace, restore.Name),
+				"restorePhase", restore.Status.Phase)
 			continue
 		}
 		// Delete the Restore
-		t.Log.Info(fmt.Sprintf(
-			"DELETING stale Velero Restore [%v/%v] phase=[%v] on MigCluster [%v/%v]",
-			restore.Namespace, restore.Name, restore.Status.Phase, cluster.Namespace, cluster.Name))
+		t.Log.Info("DELETING stale Velero Restore on MigCluster",
+			"restore", path.Join(restore.Namespace, restore.Name),
+			"restorePhase", restore.Status.Phase,
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &restore)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, nInProgressDeleted, liberr.Wrap(err)
@@ -523,8 +528,8 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 // Delete stale Velero PodVolumeRestores in the controller namespace to empty
 // the work queue for next migration.
 func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error) {
-	t.Log.Info(fmt.Sprintf("Checking for stale PodVolumeRestores on MigCluster [%v/%v]",
-		cluster.Namespace, cluster.Name))
+	t.Log.Info("Checking for stale PodVolumeRestores on MigCluster",
+		"migCluster", path.Join(cluster.Namespace, cluster.Name))
 	nDeleted := 0
 	clusterClient, err := cluster.GetClient(t.Client)
 	if err != nil {
@@ -544,9 +549,9 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		if pvr.Status.Phase != velero.PodVolumeRestorePhaseNew &&
 			pvr.Status.Phase != velero.PodVolumeRestorePhaseInProgress &&
 			pvr.Status.Phase != "" {
-			t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
-				"Status.Phase=[%v] is not 'New' or 'InProgress'. Skipping deletion.",
-				pvr.Namespace, pvr.Name, pvr.Status.Phase))
+			t.Log.V(4).Info("PodVolumeRestore is not 'New' or 'InProgress'. Skipping deletion.",
+				"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
+				"podVolumeRestoreStatus", pvr.Status.Phase)
 			continue
 		}
 
@@ -554,10 +559,10 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 		pvrHasRunningMigration := false
 		for _, ownerRef := range pvr.OwnerReferences {
 			if ownerRef.Kind != "Restore" {
-				t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
-					"Status.Phase=[%v] does not have an OwnerRef associated "+
+				t.Log.V(4).Info("PodVolumeRestore does not have an OwnerRef associated "+
 					"with a Velero Backup. Skipping deletion.",
-					pvr.Namespace, pvr.Name, pvr.Status.Phase))
+					"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
+					"podVolumeRestoreStatus", pvr.Status.Phase)
 				continue
 			}
 			restore := velero.Restore{}
@@ -577,10 +582,11 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			corrKey, _ := t.Owner.GetCorrelationLabel()
 			migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
 			if !ok {
-				t.Log.V(4).Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
-					"Status.Phase=[%v] does not have an attached label "+
-					"[%v] associating it with a MigMigration. Skipping deletion.",
-					pvr.Namespace, pvr.Name, pvr.Status.Phase, corrKey))
+				t.Log.V(4).Info("PodVolumeRestore does not have an attached label "+
+					"associating it with a MigMigration. Skipping deletion.",
+					"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
+					"podVolumeRestoreStatus", pvr.Status.Phase,
+					"associationLabel", corrKey)
 				continue
 			}
 			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
@@ -592,16 +598,18 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			}
 		}
 		if pvrHasRunningMigration == true {
-			t.Log.Info(fmt.Sprintf("PodVolumeRestore [%v/%v] with "+
-				"Status.Phase=[%v] is associated with a running migration. Skipping deletion.",
-				pvr.Namespace, pvr.Name, pvr.Status.Phase))
+			t.Log.Info("PodVolumeRestore is associated with a running migration. Skipping deletion.",
+				"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
+				"podVolumeRestoreStatus", pvr.Status.Phase)
 			continue
 		}
 
 		// Delete the PVR
-		t.Log.Info(fmt.Sprintf(
-			"DELETING stale Velero PodVolumeRestore [%v/%v] [phase=%v] from MigCluster [%v/%v]",
-			pvr.Namespace, pvr.Name, pvr.Status.Phase, cluster.Namespace, cluster.Name))
+		t.Log.Info(
+			"DELETING stale Velero PodVolumeRestore from MigCluster",
+			"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
+			"podVolumeRestoreStatus", pvr.Status.Phase,
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		err = clusterClient.Delete(context.TODO(), &pvr)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return nDeleted, liberr.Wrap(err)
@@ -645,9 +653,11 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombined := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
-			t.Log.Info(fmt.Sprintf("Rollback: Searching for destination cluster resources "+
-				"with label [%v: %v] in namespace=[%v] with GVK=[%v]",
-				MigPlanLabel, string(t.PlanResources.MigPlan.UID), ns, gvkCombined))
+			t.Log.Info(fmt.Sprintf("Rollback: Searching destination cluster namespace for resources "+
+				"with migrated-by label."),
+				"namespace", ns,
+				"gvk", gvkCombined,
+				"label", fmt.Sprintf("%v:%v", MigPlanLabel, string(t.PlanResources.MigPlan.UID)))
 			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
@@ -670,8 +680,9 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info(fmt.Sprintf("DELETION REQUESTED for resource GVK=[%v] [%v/%v] on destination cluster",
-					gvkCombined, ns, r.GetName()))
+				log.Info("DELETION REQUESTED for resource on destination cluster with matching migrated-by label",
+					"gvk", gvkCombined,
+					"resource", path.Join(ns, r.GetName()))
 			}
 		}
 	}
@@ -705,17 +716,18 @@ func (t *Task) deleteMovedNfsPVs() error {
 		if pv.Spec.PersistentVolumeReclaimPolicy != corev1.PersistentVolumeReclaimRetain {
 			continue
 		}
-		t.Log.Info(fmt.Sprintf("Deleting 'moved' NFS PV [%v/%v] from destination cluster",
-			pv.Namespace, pv.Name))
+		t.Log.Info("Deleting 'moved' NFS PV from destination cluster",
+			"persistentVolume", pv.Name)
 		err := dstClient.Delete(context.TODO(), &pv)
 		if err != nil {
 			if k8serror.IsMethodNotSupported(err) || k8serror.IsNotFound(err) {
 				continue
 			}
-			log.Error(err, fmt.Sprintf("Failed to request delete on moved PV: %s", pv.Name))
+			log.Error(err, "Failed to request delete on moved PV",
+				"persistentVolume", pv.Name)
 			return err
 		}
-		log.Info("Deleted moved NFS PV from destination cluster", "resource", pv.Name)
+		log.Info("Deleted moved NFS PV from destination cluster", "persistentVolume", pv.Name)
 	}
 
 	return nil
@@ -735,18 +747,19 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
-			log.Info(fmt.Sprintf("Rollback: Checking for leftover resources with GVK=[%v] "+
-				"in namespace=[%v] in destination cluster", gvkCombinedName, ns))
+			log.Info("Rollback: Checking for leftover resources in destination cluster",
+				"gvk", gvkCombinedName, "namespace", ns)
 			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
 			if err != nil {
 				return false, liberr.Wrap(err)
 			}
 			// Wait for resources with deletion timestamps
 			if len(list.Items) > 0 {
-				t.Log.Info(fmt.Sprintf("Resource(s) found with GVK=[%v] in destination cluster "+
-					"namespace=[%v] that have NOT finished terminating. These resource(s) "+
+				t.Log.Info("Resource(s) found with in destination cluster "+
+					"that have NOT finished terminating. These resource(s) "+
 					"are associated with the MigPlan and deletion has been requested.",
-					gvkCombinedName, ns))
+					"gvk", gvkCombinedName,
+					"namespace", ns)
 				return false, err
 			}
 		}

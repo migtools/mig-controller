@@ -18,7 +18,7 @@ package miganalytic
 
 import (
 	"context"
-	"fmt"
+	"path"
 	"sync"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -64,8 +64,9 @@ func (r *ResticDFCommandExecutor) DF(podRef *corev1.Pod, persistentVolumes []Mig
 	}
 	err := podCommand.Run()
 	if err != nil {
-		log.Error(err,
-			fmt.Sprintf("Failed running df command inside pod %s", podRef.Name))
+		log.Error(err, "Failed running df command inside Restic Pod",
+			"pod", path.Join(podRef.Namespace, podRef.Name),
+			"command", cmdString)
 	}
 	dfCmd.StdErr = podCommand.Err.String()
 	dfCmd.StdOut = podCommand.Out.String()

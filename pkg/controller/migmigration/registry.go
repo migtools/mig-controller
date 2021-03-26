@@ -3,6 +3,7 @@ package migmigration
 import (
 	"errors"
 	"fmt"
+	"path"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 
@@ -93,32 +94,32 @@ func (t *Task) ensureMigRegistries() (int, error) {
 		}
 
 		// Migration Registry Secret
-		t.Log.Info(fmt.Sprintf("Creating migration registry secret on MigCluster %v/%v",
-			cluster.Namespace, cluster.Name))
+		t.Log.Info("Creating migration registry secret on MigCluster",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		secret, err := t.ensureRegistrySecret(client)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Get cluster specific registry image
-		t.Log.Info(fmt.Sprintf("Retreiving migration registry image name for MigCluster %v/%v",
-			cluster.Namespace, cluster.Name))
+		t.Log.Info("Retreiving migration registry image name for MigCluster",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		registryImage, err := cluster.GetRegistryImage(client)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Migration Registry DeploymentConfig
-		t.Log.Info(fmt.Sprintf("Creating migration registry deployment for MigCluster %v/%v",
-			cluster.Namespace, cluster.Name))
+		t.Log.Info("Creating migration registry deployment for MigCluster",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		err = t.ensureRegistryDeployment(client, secret, registryImage)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
 
 		// Migration Registry Service
-		t.Log.Info(fmt.Sprintf("Creating migration registry service on MigCluster %v/%v",
-			cluster.Namespace, cluster.Name))
+		t.Log.Info("Creating migration registry service on MigCluster",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		err = t.ensureRegistryService(client, secret)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
@@ -189,8 +190,8 @@ func (t *Task) deleteImageRegistryResourcesForClient(client k8sclient.Client, pl
 		return liberr.Wrap(err)
 	}
 	if secret != nil {
-		t.Log.Info(fmt.Sprintf("Deleting registry secret [%v/%v] created for migration.",
-			secret.Namespace, secret.Name))
+		t.Log.Info("Deleting registry secret created for migration.",
+			"secret", path.Join(secret.Namespace, secret.Name))
 		err := client.Delete(context.Background(), secret)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -206,8 +207,8 @@ func (t *Task) deleteImageRegistryResourcesForClient(client k8sclient.Client, pl
 		return liberr.Wrap(err)
 	}
 	if foundService != nil {
-		t.Log.Info(fmt.Sprintf("Deleting registry service [%v/%v] created for migration.",
-			secret.Namespace, secret.Name))
+		t.Log.Info("Deleting registry service created for migration.",
+			"secret", path.Join(secret.Namespace, secret.Name))
 		err := client.Delete(context.Background(), foundService)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -223,8 +224,8 @@ func (t *Task) deleteImageRegistryDeploymentForClient(client k8sclient.Client, p
 		return liberr.Wrap(err)
 	}
 	if foundDeployment != nil {
-		t.Log.Info(fmt.Sprintf("Deleting registry deployment [%v/%v] created for migration.",
-			foundDeployment.Namespace, foundDeployment.Name))
+		t.Log.Info("Deleting registry deployment created for migration.",
+			"deployment", path.Join(foundDeployment.Namespace, foundDeployment.Name))
 		err := client.Delete(context.Background(), foundDeployment, k8sclient.PropagationPolicy(metav1.DeletePropagationForeground))
 		if err != nil {
 			return liberr.Wrap(err)
@@ -325,8 +326,8 @@ func (t *Task) deleteImageRegistryResources() error {
 	}
 	clusters := t.getBothClusters()
 	for _, cluster := range clusters {
-		t.Log.Info(fmt.Sprintf("Deleting image registry for MigCluster [%v/%v]",
-			cluster.Namespace, cluster.Name))
+		t.Log.Info("Deleting image registry for MigCluster",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
 		clusterClient, err := cluster.GetClient(t.Client)
 		if err != nil {
 			return liberr.Wrap(err)

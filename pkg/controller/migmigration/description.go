@@ -18,6 +18,7 @@ package migmigration
 
 // PhaseDescriptions are human readable strings that describe a phase
 var PhaseDescriptions = map[string]string{
+	Created:                                "Migration created.",
 	Started:                                "Migration started.",
 	StartRefresh:                           "Starting refresh on MigPlan, MigStorage and MigCluster resources",
 	WaitForRefresh:                         "Waiting for refresh of MigPlan, MigStorage and MigCluster resources to complete",

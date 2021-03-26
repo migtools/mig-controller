@@ -148,7 +148,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	var err error
 	log.Reset()
 	// Set values.
-	log.SetValues("MigMigration", request.Name)
+	log.SetValues("migMigration", request.Name)
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}

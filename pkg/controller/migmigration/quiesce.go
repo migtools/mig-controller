@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strconv"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -134,12 +135,12 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 				continue
 			}
 			dc.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
-			t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig. "+
 				"Changing .Spec.Replicas from [%v->0]. "+
 				"Annotating with [%v: %v]",
-				dc.Namespace, dc.Name,
 				dc.Spec.Replicas,
-				ReplicasAnnotation, dc.Spec.Replicas))
+				ReplicasAnnotation, dc.Spec.Replicas),
+				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
 			dc.Spec.Replicas = 0
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
@@ -181,12 +182,12 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if dc.Spec.Replicas == 0 {
 				dc.Spec.Replicas = int32(number)
 			}
-			t.Log.Info(fmt.Sprintf("Unquiescing DeploymentConfig [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Unquiescing DeploymentConfig. "+
 				"Changing .Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
-				dc.Namespace, dc.Name,
 				currentReplicas, number,
-				ReplicasAnnotation))
+				ReplicasAnnotation),
+				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -217,12 +218,12 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 			if *deployment.Spec.Replicas == zero {
 				continue
 			}
-			t.Log.Info(fmt.Sprintf("Quiescing Deployment [%v/%v] "+
+			t.Log.Info(fmt.Sprintf("Quiescing Deployment. "+
 				"Changing spec.Replicas from [%v->0]. "+
 				"Annotating with [%v: %v]",
-				deployment.Namespace, deployment.Name,
 				deployment.Spec.Replicas,
-				ReplicasAnnotation, deployment.Spec.Replicas))
+				ReplicasAnnotation, deployment.Spec.Replicas),
+				"deployment", path.Join(deployment.Namespace, deployment.Name))
 			deployment.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
 			deployment.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &deployment)
@@ -266,12 +267,12 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			if *deployment.Spec.Replicas == 0 {
 				deployment.Spec.Replicas = &restoredReplicas
 			}
-			t.Log.Info(fmt.Sprintf("Unquiescing Deployment [%v/%v] "+
+			t.Log.Info(fmt.Sprintf("Unquiescing Deployment. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
-				deployment.Namespace, deployment.Name,
 				currentReplicas, restoredReplicas,
-				ReplicasAnnotation))
+				ReplicasAnnotation),
+				"deployment", path.Join(deployment.Namespace, deployment.Name))
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -296,12 +297,12 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			t.Log.Info(fmt.Sprintf("Quiescing StatefulSet [%v/%v] "+
+			t.Log.Info(fmt.Sprintf("Quiescing StatefulSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Annotating with [%v: %v]",
-				set.Namespace, set.Name,
 				set.Spec.Replicas, zero,
-				ReplicasAnnotation, set.Spec.Replicas))
+				ReplicasAnnotation, set.Spec.Replicas),
+				"statefulSet", path.Join(set.Namespace, set.Name))
 			if set.Annotations == nil {
 				set.Annotations = make(map[string]string)
 			}
@@ -346,12 +347,12 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			delete(set.Annotations, ReplicasAnnotation)
 			restoredReplicas := int32(number)
 
-			t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v].",
-				set.Namespace, set.Name,
 				set.Spec.Replicas, replicas,
-				ReplicasAnnotation))
+				ReplicasAnnotation),
+				"statefulSet", path.Join(set.Namespace, set.Name))
 
 			// Only change replica count if currently == 0
 			if *set.Spec.Replicas == 0 {
@@ -381,8 +382,8 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 		}
 		for _, set := range list.Items {
 			if len(set.OwnerReferences) > 0 {
-				t.Log.Info(fmt.Sprintf("Quiesce skipping ReplicaSet [%v/%v], has OwnerReferences",
-					set.Namespace, set.Name))
+				t.Log.Info("Quiesce skipping ReplicaSet, has OwnerReferences",
+					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
 			if set.Annotations == nil {
@@ -392,12 +393,12 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 				continue
 			}
 			set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
-			t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Setting Annotation [%v: %v]",
-				set.Namespace, set.Name,
 				set.Spec.Replicas, zero,
-				ReplicasAnnotation, set.Spec.Replicas))
+				ReplicasAnnotation, set.Spec.Replicas),
+				"replicaSet", path.Join(set.Namespace, set.Name))
 			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -422,8 +423,8 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 		}
 		for _, set := range list.Items {
 			if len(set.OwnerReferences) > 0 {
-				t.Log.Info(fmt.Sprintf("Unquiesce skipping ReplicaSet [%v/%v], has OwnerReferences",
-					set.Namespace, set.Name))
+				t.Log.Info("Unquiesce skipping ReplicaSet, has OwnerReferences",
+					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
 			if set.Annotations == nil {
@@ -443,10 +444,11 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 			if *set.Spec.Replicas == 0 {
 				set.Spec.Replicas = &restoredReplicas
 			}
-			t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
-				set.Namespace, set.Name, 0, restoredReplicas, ReplicasAnnotation))
+				0, restoredReplicas, ReplicasAnnotation),
+				"replicaSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -483,11 +485,11 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 			}
 			set.Annotations[NodeSelectorAnnotation] = string(selector)
 			set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector] = "true"
-			t.Log.Info(fmt.Sprintf("Quiescing DaemonSet [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Quiescing DaemonSet. "+
 				"Changing [Spec.Template.Spec.NodeSelector=%v:true]. "+
 				"Setting annotation [%v: %v]",
-				set.Namespace, set.Name, QuiesceNodeSelector,
-				NodeSelectorAnnotation, string(selector)))
+				QuiesceNodeSelector, NodeSelectorAnnotation, string(selector)),
+				"daemonSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -529,10 +531,11 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 			}
 			delete(set.Annotations, NodeSelectorAnnotation)
 			set.Spec.Template.Spec.NodeSelector = nodeSelector
-			t.Log.Info(fmt.Sprintf("Unquiescing DaemonSet [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Unquiescing DaemonSet. "+
 				"Setting [Spec.Template.Spec.NodeSelector=%v]. "+
 				"Removing Annotation [%v].",
-				set.Namespace, set.Name, nodeSelector, NodeSelectorAnnotation))
+				nodeSelector, NodeSelectorAnnotation),
+				"daemonSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -560,10 +563,11 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 			}
 			r.Annotations[SuspendAnnotation] = "true"
 			r.Spec.Suspend = pointer.BoolPtr(true)
-			t.Log.Info(fmt.Sprintf("Quiescing Job [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 				"Setting [Spec.Suspend=true]. "+
 				"Setting Annotation [%v]: true",
-				r.Namespace, r.Name, SuspendAnnotation))
+				SuspendAnnotation),
+				"job", path.Join(r.Namespace, r.Name))
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -593,9 +597,8 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) e
 			}
 			delete(r.Annotations, SuspendAnnotation)
 			r.Spec.Suspend = pointer.BoolPtr(false)
-			t.Log.Info(fmt.Sprintf("Unquiescing Cron Job [%v/%v]."+
-				"Setting [Spec.Suspend=false]",
-				r.Namespace, r.Name))
+			t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
+				"cronJob", path.Join(r.Namespace, r.Name))
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -628,10 +631,11 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 			}
 			job.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
 			job.Spec.Parallelism = &zero
-			t.Log.Info(fmt.Sprintf("Quiescing Job [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 				"Setting [Spec.Parallelism=0]. "+
 				"Annotating with [%v: %v]",
-				job.Namespace, job.Name, ReplicasAnnotation, job.Spec.Parallelism))
+				ReplicasAnnotation, job.Spec.Parallelism),
+				"job", path.Join(job.Namespace, job.Name))
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -672,10 +676,11 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			if *job.Spec.Parallelism == 0 {
 				job.Spec.Parallelism = &parallelReplicas
 			}
-			t.Log.Info(fmt.Sprintf("Unquiescing Job [%v/%v]. "+
+			t.Log.Info(fmt.Sprintf("Unquiescing Job. "+
 				"Setting [Spec.Parallelism=%v]"+
 				"Removing Annotation [%v]",
-				job.Namespace, job.Name, parallelReplicas, ReplicasAnnotation))
+				parallelReplicas, ReplicasAnnotation),
+				"job", path.Join(job.Namespace, job.Name))
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -724,9 +729,10 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 			}
 			for _, ref := range pod.OwnerReferences {
 				if _, found := kinds[ref.Kind]; found {
-					t.Log.Info(fmt.Sprintf("Found quiesced Pod [%v/%v] on source cluster"+
-						" with Phase=[%v] that has not yet terminated. Waiting.",
-						pod.Namespace, pod.Name, pod.Status.Phase))
+					t.Log.Info("Found quiesced Pod on source cluster"+
+						" that has not yet terminated. Waiting.",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"podPhase", pod.Status.Phase)
 					return false, nil
 				}
 			}

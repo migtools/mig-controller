@@ -50,8 +50,10 @@ func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *miga
 		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
-		log.Info(fmt.Sprintf("Phase [%v] execution FAILED with Error=[%v], Phase.Description=[%v]",
-			task.Phase, errorutil.Unwrap(err).Error(), task.getPhaseDescription(task.Phase)))
+		log.Info("Phase execution failed.",
+			"phase", task.Phase,
+			"phaseDescription", task.getPhaseDescription(task.Phase),
+			"error", errorutil.Unwrap(err).Error())
 		log.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil

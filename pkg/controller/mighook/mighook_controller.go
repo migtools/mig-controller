@@ -80,7 +80,7 @@ type ReconcileMigHook struct {
 func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	log.SetValues("hook", request)
+	log.SetValues("migHook", request.Name)
 
 	// Fetch the MigHook instance
 	hook := &migapi.MigHook{}

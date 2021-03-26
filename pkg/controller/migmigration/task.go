@@ -3,6 +3,7 @@ package migmigration
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -338,8 +339,8 @@ type Task struct {
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
 func (t *Task) Run() error {
-	// Set phase as logger K/V pair
-	t.Log = t.Log.WithValues("Phase", t.Phase)
+	// Set stage, phase, phase description, migplan name
+	t.Log = t.Log.WithValues("phase", t.Phase)
 	t.Requeue = FastReQ
 
 	// Set up Jaeger span for task.Run
@@ -465,13 +466,16 @@ func (t *Task) Run() error {
 		completed, reasons, progress := dim.HasCompleted()
 		t.setProgress(progress)
 		t.Log.Info("Waiting for ImageStream migrations to complete",
-			"name", dim.Name, "completed", completed, "phase", dim.Status.Phase)
+			"directImageMigration", path.Join(dim.Namespace, dim.Name),
+			"directImageMigrationPhase", dim.Status.Phase,
+			"completed", completed)
 
 		if completed {
 			if len(reasons) > 0 {
 				t.setDirectImageMigrationWarning(dim)
-				t.Log.Info(fmt.Sprintf("DirectImageMigration [%v/%v] completed with warnings.",
-					dim.Namespace, dim.Name))
+				t.Log.Info("DirectImageMigration completed with warnings.",
+					"directImageMigration", path.Join(dim.Namespace, dim.Name),
+					"warnings", reasons)
 				// Once supported, add reasons to Status.Warnings for the Step
 			}
 			if err = t.next(); err != nil {
@@ -549,11 +553,12 @@ func (t *Task) Run() error {
 					backup.Status.Progress.ItemsBackedUp,
 					backup.Status.Progress.TotalItems)
 			}
-			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] is incomplete. "+
-				"Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
-				"Backup.Warnings=[%v], Backup.Errors=[%v]",
-				backup.Namespace, backup.Name, backup.Status.Phase, backupProgress,
-				backup.Status.Warnings, backup.Status.Errors))
+			t.Log.Info("Initial Velero Backup is incomplete. Waiting.",
+				"backup", path.Join(backup.Namespace, backup.Name),
+				"backupPhase", backup.Status.Phase,
+				"backupProgress", backupProgress,
+				"backupWarnings", backup.Status.Warnings,
+				"backupErrors", backup.Status.Errors)
 			t.Requeue = PollReQ
 		}
 	case AnnotateResources:
@@ -566,9 +571,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Annotated/labeled [%v] source cluster resources this reconcile, "+
+			t.Log.Info("Annotated/labeled source cluster resources this reconcile, "+
 				"requeuing and continuing.",
-				AnnotationsPerReconcile))
+				"annotationsPerReconcile", AnnotationsPerReconcile)
 		}
 	case EnsureStagePodsFromRunning:
 		err := t.ensureStagePodsFromRunning()
@@ -760,9 +765,9 @@ func (t *Task) Run() error {
 		if completed {
 			t.setStageBackupPartialFailureWarning(backup)
 			if len(reasons) > 0 {
-				t.Log.Info(fmt.Sprintf("Migration FAILED due to Stage Velero Backup"+
-					"[%v/%v] failure on source cluster, reasons=[%v].",
-					backup.Namespace, backup.Name, reasons))
+				t.Log.Info("Migration FAILED due to Stage Velero Backup failure on source cluster.",
+					"backup", path.Join(backup.Namespace, backup.Name),
+					"failureReasons", reasons)
 				t.fail(StageBackupFailed, reasons)
 			} else {
 				if err = t.next(); err != nil {
@@ -776,11 +781,13 @@ func (t *Task) Run() error {
 					backup.Status.Progress.ItemsBackedUp,
 					backup.Status.Progress.TotalItems)
 			}
-			t.Log.Info(fmt.Sprintf("Stage Backup [%v/%v] on source cluster is "+
-				"incomplete. Waiting. Backup.Phase=[%v], Backup.Progress=[%v], "+
-				"Backup.Warnings=[%v], Backup.Errors=[%v]",
-				backup.Namespace, backup.Name, backup.Status.Phase,
-				backupProgress, backup.Status.Warnings, backup.Status.Errors))
+			t.Log.Info("Stage Backup on source cluster is "+
+				"incomplete. Waiting.",
+				"backup", path.Join(backup.Namespace, backup.Name),
+				"backupPhase", backup.Status.Phase,
+				"backupProgress", backupProgress,
+				"backupWarnings", backup.Status.Warnings,
+				"backupErrors", backup.Status.Errors)
 			t.Requeue = PollReQ
 		}
 	case EnsureStageBackupReplicated:
@@ -800,9 +807,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Stage Velero Backup [%v/%v] has not yet "+
+			t.Log.Info("Stage Velero Backup has not yet "+
 				"been replicated to target cluster by Velero. Waiting",
-				backup.Namespace, backup.Name))
+				"backup", path.Join(backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case PostBackupHooks:
@@ -861,11 +868,12 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Stage Velero Restore [%v/%v] on target cluster "+
-				"is incomplete. Waiting. Restore.Phase=[%v], "+
-				"Restore.Warnings=[%v], Restore.Errors=[%v]",
-				restore.Namespace, restore.Name, restore.Status.Phase,
-				restore.Status.Warnings, restore.Status.Errors))
+			t.Log.Info("Stage Velero Restore on target cluster "+
+				"is incomplete. Waiting. ",
+				"restore", path.Join(restore.Namespace, restore.Name),
+				"restorePhase", restore.Status.Phase,
+				"restoreWarnings", restore.Status.Warnings,
+				"restoreErrors", restore.Status.Errors)
 			t.Requeue = PollReQ
 		}
 	case EnsureStagePodsDeleted, CleanStaleStagePods:
@@ -916,9 +924,9 @@ func (t *Task) Run() error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Initial Velero Backup [%v/%v] has not yet "+
+			t.Log.Info("Initial Velero Backup has not yet "+
 				"been replicated to target cluster by Velero. Waiting",
-				backup.Namespace, backup.Name))
+				"backup", path.Join(backup.Namespace, backup.Name))
 			t.Requeue = PollReQ
 		}
 	case EnsureFinalRestore:
@@ -956,11 +964,12 @@ func (t *Task) Run() error {
 				}
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("Final Velero Restore [%v/%v] on target "+
-				"cluster is incomplete. Waiting. Restore.Phase=[%v], "+
-				"Restore.Warnings=[%v], Restore.Errors=[%v]",
-				restore.Namespace, restore.Name,
-				restore.Status.Phase, restore.Status.Warnings, restore.Status.Errors))
+			t.Log.Info("Final Velero Restore on target "+
+				"cluster is incomplete. Waiting.",
+				"restore", path.Join(restore.Namespace, restore.Name),
+				"restorePhase", restore.Status.Phase,
+				"restoreWarnings", restore.Status.Warnings,
+				"restoreErrors", restore.Status.Errors)
 			t.Requeue = PollReQ
 		}
 	case PostRestoreHooks:
@@ -1262,6 +1271,8 @@ func (t *Task) next() error {
 			return liberr.Wrap(err)
 		}
 		if !flag {
+			t.Log.Info("Skipped phase due to flag evaluation.",
+				"skippedPhase", next.Name)
 			continue
 		}
 		flag, err = t.anyFlags(next)
@@ -1393,8 +1404,8 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 func (t *Task) fail(nextPhase string, reasons []string) {
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
-	t.Log.Info(fmt.Sprintf("Marking migration as FAILED. See Status.Errors=[%v]",
-		t.Owner.Status.Errors))
+	t.Log.Info("Marking migration as FAILED. See Status.Errors",
+		"migrationErrors", t.Owner.Status.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     Failed,
 		Status:   True,
@@ -1645,8 +1656,10 @@ func (r *Itinerary) GetStepForPhase(phaseName string) string {
 // where available. Stack trace will be printed shortly after this.
 // This is meant to help contextualize the stack trace for the user.
 func (t *Task) logErrorForPhase(phaseName string, err error) {
-	t.Log.Info(fmt.Sprintf("Exited with Error=[%v] while executing Phase=[%v] Description=[%v]",
-		errorutil.Unwrap(err).Error(), phaseName, t.getPhaseDescription(phaseName)))
+	t.Log.Info("Exited Phase with error.",
+		"phase", phaseName,
+		"phaseDescription", t.getPhaseDescription(phaseName),
+		"error", errorutil.Unwrap(err).Error())
 }
 
 // Get the extended phase description for a phase.

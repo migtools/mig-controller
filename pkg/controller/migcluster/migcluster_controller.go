@@ -108,7 +108,7 @@ type ReconcileMigCluster struct {
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	var err error
 	log.Reset()
-	log.SetValues("cluster", request)
+	log.SetValues("migCluster", request.Name)
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
