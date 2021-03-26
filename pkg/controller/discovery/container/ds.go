@@ -69,7 +69,7 @@ func (r *DataSource) IsReady() bool {
 // is for watches added by each collection reference a predicate that handles the change
 // rather than queuing a reconcile event.
 func (r *DataSource) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
 
 //

@@ -115,7 +115,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -180,5 +180,5 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }

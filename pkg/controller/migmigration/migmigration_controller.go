@@ -156,7 +156,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = r.deleted()
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Info("Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
@@ -174,7 +174,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if err != nil {
 		log.Info("Error setting debug labels, requeueing.")
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Report reconcile error.
@@ -199,7 +199,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Completed.
 	if migration.Status.Phase == Completed {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 
 	// Owner Reference
@@ -207,7 +207,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	if err != nil {
 		log.Info("Failed to set owner references, requeuing.")
 		log.Trace(err)
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Begin staging conditions.
@@ -232,7 +232,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		if err != nil {
 			log.Info("Failed to check if postpone required, requeueing")
 			log.Trace(err)
-			return reconcile.Result{}, err
+			return reconcile.Result{Requeue: true}, err
 		}
 	}
 
@@ -267,7 +267,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
 
 // Determine if a migration should be postponed.

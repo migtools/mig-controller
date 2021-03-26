@@ -120,10 +120,10 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Set up jaeger tracing
@@ -134,7 +134,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 
 	// Completed.
 	if imageMigration.Status.Phase == Completed {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 
 	// Begin staging conditions
@@ -180,5 +180,5 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }

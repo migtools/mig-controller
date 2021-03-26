@@ -87,7 +87,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	err = r.Get(context.TODO(), request.NamespacedName, hook)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -135,5 +135,5 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
