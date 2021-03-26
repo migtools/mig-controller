@@ -132,7 +132,7 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	err = r.Get(context.TODO(), request.NamespacedName, analytic)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -141,7 +141,7 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	// Exit early if the MigAnalytic already has a ready condition
 	// and Refresh boolean is unset
 	if analytic.Status.IsReady() && !analytic.Spec.Refresh {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 
 	// Report reconcile error.
@@ -211,7 +211,7 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
 
 func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {

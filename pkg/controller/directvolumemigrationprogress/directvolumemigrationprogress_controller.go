@@ -132,9 +132,9 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Set up jaeger tracing
@@ -175,10 +175,6 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	err = r.Update(context.TODO(), pvProgress)
 	if err != nil {
 		log.Trace(err)
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	if !pvProgress.Status.IsReady() {
 		return reconcile.Result{Requeue: true}, nil
 	}
 

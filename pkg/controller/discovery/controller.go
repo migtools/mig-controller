@@ -146,13 +146,13 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.container.Delete(request.NamespacedName)
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
 		return reQueue, nil
 	}
 	if !r.IsValid(cluster) {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 	err = r.container.Add(
 		cluster,
@@ -174,7 +174,7 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 		return reQueue, nil
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
 
 func (r *ReconcileDiscovery) IsValid(cluster *migapi.MigCluster) bool {

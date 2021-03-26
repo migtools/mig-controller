@@ -18,6 +18,7 @@ package directimagemigration
 
 import (
 	"context"
+	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -119,10 +120,10 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
+		return reconcile.Result{Requeue: true}, err
 	}
 
 	// Set up jaeger tracing
@@ -133,7 +134,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 
 	// Completed.
 	if imageMigration.Status.Phase == Completed {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 
 	// Begin staging conditions
@@ -146,8 +147,11 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	// Default to PollReQ, can be overridden by r.migrate phase-specific ReQ interval
+	requeueAfter := time.Duration(PollReQ)
+
 	if !imageMigration.Status.HasBlockerCondition() {
-		_, err = r.migrate(imageMigration, reconcileSpan)
+		requeueAfter, err = r.migrate(imageMigration, reconcileSpan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
@@ -171,6 +175,10 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Done
-	return reconcile.Result{}, nil
+	// Requeue
+	if requeueAfter > 0 {
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+	}
+
+	return reconcile.Result{Requeue: false}, nil
 }

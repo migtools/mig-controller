@@ -18,8 +18,9 @@ package migstorage
 
 import (
 	"context"
-	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"time"
+
+	"github.com/konveyor/mig-controller/pkg/errorutil"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -112,7 +113,7 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.Get(context.TODO(), request.NamespacedName, storage)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return reconcile.Result{}, nil
+			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -163,5 +164,5 @@ func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	// Done
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }

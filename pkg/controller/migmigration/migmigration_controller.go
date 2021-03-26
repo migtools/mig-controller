@@ -199,7 +199,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Completed.
 	if migration.Status.Phase == Completed {
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, nil
 	}
 
 	// Owner Reference
@@ -209,9 +209,6 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
-
-	// Re-queue (after) in seconds.
-	requeueAfter := time.Duration(PollReQ)
 
 	// Begin staging conditions.
 	migration.Status.BeginStagingConditions()
@@ -223,6 +220,9 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Default to PollReQ, can be overridden by r.postpone() or r.migrate()
+	requeueAfter := time.Duration(PollReQ)
 
 	// Ensure that migrations run serially ordered by when created
 	// and grouped with stage migrations followed by final migrations.
@@ -267,7 +267,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		return reconcile.Result{RequeueAfter: requeueAfter}, nil
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: false}, nil
 }
 
 // Determine if a migration should be postponed.
