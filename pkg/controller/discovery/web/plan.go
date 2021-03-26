@@ -661,7 +661,7 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod,
 		}
 	}
 	pod := PlanPod{}
-	filter := func(c *v1.Container) bool { return c.Name == "cam" }
+	filter := func(c *v1.Container) bool { return c.Name == "mtc" }
 	pod.With(m, cluster, filter)
 	pods = append(pods, pod)
 
