@@ -214,7 +214,7 @@ If you want to view numerical statistics for the trace, head to the top-right of
 
 ![Jaeger](./images/jaeger_guide/jaeger_trace_opts.png)
 
-Here you can view statistics grouped either by Service or Operation name. I find that the operation name view is useful for understanding which phases have the longest active running time. You can turn on *color highlighting* with the checkbox in the top-right corner. to emphasize phases that spent the most time running.
+Here you can view statistics grouped either by Service or Operation name. The operation name view is useful for understanding which phases have the longest active running time. You can turn on *color highlighting* with the checkbox in the top-right corner to emphasize phases that spent the most time running.
 
 ![Jaeger](./images/jaeger_guide/jaeger_span_stats.png)
 
