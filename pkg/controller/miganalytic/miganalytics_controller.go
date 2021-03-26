@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/konveyor/mig-controller/pkg/gvk"
@@ -73,7 +74,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("miganalytic_controller")}
+	return &ReconcileMigAnalytic{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		EventRecorder:    mgr.GetEventRecorderFor("miganalytic_controller"),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -108,8 +114,9 @@ type ReconcileMigAnalytic struct {
 	client.Client
 	record.EventRecorder
 
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	scheme           *runtime.Scheme
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 // MigAnalyticPersistentVolumeDetails defines extended properties of a volume discovered by MigAnalytic
@@ -136,6 +143,11 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(analytic.UID, analytic.Generation) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -217,6 +229,9 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(analytic.UID, analytic.Generation)
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil

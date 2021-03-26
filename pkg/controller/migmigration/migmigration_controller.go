@@ -24,6 +24,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
@@ -52,7 +53,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migmigration_controller")}
+	return &ReconcileMigMigration{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		EventRecorder:    mgr.GetEventRecorderFor("migmigration_controller"),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -157,8 +163,9 @@ type ReconcileMigMigration struct {
 	client.Client
 	record.EventRecorder
 
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	scheme           *runtime.Scheme
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
@@ -179,6 +186,12 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(migration.UID, migration.Generation) {
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// Get jaeger spans for migration and reconcile, add to ctx
 	_, reconcileSpan := r.initTracer(migration)
 	if reconcileSpan != nil {
@@ -278,6 +291,9 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(migration.UID, migration.Generation)
 
 	// Requeue
 	if requeueAfter > 0 {

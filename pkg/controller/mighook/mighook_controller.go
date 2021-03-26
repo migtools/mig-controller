@@ -19,6 +19,7 @@ package mighook
 import (
 	"context"
 
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/opentracing/opentracing-go"
 
@@ -45,7 +46,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("mighook_controller")}
+	return &ReconcileMigHook{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		EventRecorder:    mgr.GetEventRecorderFor("mighook_controller"),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -75,8 +81,9 @@ type ReconcileMigHook struct {
 	client.Client
 	record.EventRecorder
 
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	scheme           *runtime.Scheme
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -91,6 +98,11 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(hook.UID, hook.Generation) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -141,6 +153,9 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(hook.UID, hook.Generation)
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil

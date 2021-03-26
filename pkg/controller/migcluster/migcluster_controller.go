@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/konveyor/mig-controller/pkg/remote"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -56,7 +57,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migcluster_controller")}
+	return &ReconcileMigCluster{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		EventRecorder:    mgr.GetEventRecorderFor("migcluster_controller"),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -107,9 +113,10 @@ type ReconcileMigCluster struct {
 	k8sclient.Client
 	record.EventRecorder
 
-	scheme     *runtime.Scheme
-	Controller controller.Controller
-	tracer     opentracing.Tracer
+	scheme           *runtime.Scheme
+	Controller       controller.Controller
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -124,6 +131,11 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(cluster.UID, cluster.Generation) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -204,6 +216,9 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(cluster.UID, cluster.Generation)
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil

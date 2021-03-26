@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/opentracing/opentracing-go"
 
@@ -48,7 +49,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migstorage_controller")}
+	return &ReconcileMigStorage{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		EventRecorder:    mgr.GetEventRecorderFor("migstorage_controller"),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -98,9 +104,9 @@ var _ reconcile.Reconciler = &ReconcileMigStorage{}
 type ReconcileMigStorage struct {
 	client.Client
 	record.EventRecorder
-
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	scheme           *runtime.Scheme
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -115,6 +121,11 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{Requeue: false}, nil
 		}
 		log.Trace(err)
+		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(storage.UID, storage.Generation) {
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -168,6 +179,9 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(storage.UID, storage.Generation)
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil

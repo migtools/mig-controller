@@ -22,6 +22,7 @@ import (
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/cache"
 	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +44,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileDirectVolumeMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileDirectVolumeMigration{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		uidGenerationMap: cache.CreateUIDToGenerationMap(),
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -79,8 +84,9 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 // ReconcileDirectVolumeMigration reconciles a DirectVolumeMigration object
 type ReconcileDirectVolumeMigration struct {
 	client.Client
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	scheme           *runtime.Scheme
+	tracer           opentracing.Tracer
+	uidGenerationMap *cache.UIDToGenerationMap
 }
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigration object and makes changes based on the state read
@@ -107,6 +113,11 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{Requeue: true}, err
+	}
+
+	// Check if cache is still catching up
+	if r.uidGenerationMap.IsCacheStale(direct.UID, direct.Generation) {
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Set MigMigration name key on logger
@@ -164,6 +175,9 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Record reconciled generation
+	r.uidGenerationMap.RecordReconciledGeneration(direct.UID, direct.Generation)
 
 	// Requeue
 	if requeueAfter > 0 {
