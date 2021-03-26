@@ -1,11 +1,14 @@
 package migstorage
 
 import (
+	"context"
 	"fmt"
+	"path"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
-	"path"
+	"github.com/opentracing/opentracing-go"
 )
 
 // Notes:
@@ -46,12 +49,17 @@ const (
 )
 
 // Validate the storage resource.
-func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
-	err := r.validateBackupStorage(storage)
+func (r ReconcileMigStorage) validate(ctx context.Context, storage *migapi.MigStorage) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+	err := r.validateBackupStorage(ctx, storage)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateVolumeSnapshotStorage(storage)
+	err = r.validateVolumeSnapshotStorage(ctx, storage)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -59,7 +67,12 @@ func (r ReconcileMigStorage) validate(storage *migapi.MigStorage) error {
 	return nil
 }
 
-func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) error {
+func (r ReconcileMigStorage) validateBackupStorage(ctx context.Context, storage *migapi.MigStorage) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateBackupStorage")
+		defer span.Finish()
+	}
+
 	settings := storage.Spec.BackupStorageConfig
 
 	if storage.Spec.BackupStorageProvider == "" {
@@ -155,7 +168,12 @@ func (r ReconcileMigStorage) validateBackupStorage(storage *migapi.MigStorage) e
 	return nil
 }
 
-func (r ReconcileMigStorage) validateVolumeSnapshotStorage(storage *migapi.MigStorage) error {
+func (r ReconcileMigStorage) validateVolumeSnapshotStorage(ctx context.Context, storage *migapi.MigStorage) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateVolumeSnapshotStorage")
+		defer span.Finish()
+	}
+
 	settings := storage.Spec.VolumeSnapshotConfig
 
 	// Provider

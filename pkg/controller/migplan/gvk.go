@@ -1,14 +1,22 @@
 package migplan
 
 import (
+	"context"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
+	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
 
-func (r ReconcileMigPlan) compareGVK(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) compareGVK(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "compareGVK")
+		defer span.Finish()
+	}
+
 	// No spec chage this time
 	if plan.HasReconciled() || !clustersReady(plan) {
 		plan.Status.StageCondition(GVKsIncompatible)

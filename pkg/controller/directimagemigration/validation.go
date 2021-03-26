@@ -25,6 +25,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,24 +45,33 @@ const (
 )
 
 // Validate the image migration resource
-func (r ReconcileDirectImageMigration) validate(imageMigration *migapi.DirectImageMigration) error {
-	err := r.validateSrcCluster(imageMigration)
+func (r ReconcileDirectImageMigration) validate(ctx context.Context, imageMigration *migapi.DirectImageMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+	err := r.validateSrcCluster(ctx, imageMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateDestCluster(imageMigration)
+	err = r.validateDestCluster(ctx, imageMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	// Migrated namespaces.
-	err = r.validateNamespaces(imageMigration)
+	err = r.validateNamespaces(ctx, imageMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	return nil
 }
 
-func (r ReconcileDirectImageMigration) validateSrcCluster(imageMigration *migapi.DirectImageMigration) error {
+func (r ReconcileDirectImageMigration) validateSrcCluster(ctx context.Context, imageMigration *migapi.DirectImageMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSrcCluster")
+		defer span.Finish()
+	}
 	ref := imageMigration.Spec.SrcMigClusterRef
 
 	// Not Set
@@ -119,7 +129,11 @@ func (r ReconcileDirectImageMigration) validateSrcCluster(imageMigration *migapi
 	return nil
 }
 
-func (r ReconcileDirectImageMigration) validateDestCluster(imageMigration *migapi.DirectImageMigration) error {
+func (r ReconcileDirectImageMigration) validateDestCluster(ctx context.Context, imageMigration *migapi.DirectImageMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestCluster")
+		defer span.Finish()
+	}
 	ref := imageMigration.Spec.DestMigClusterRef
 
 	if !migref.RefSet(ref) {
@@ -190,7 +204,11 @@ func (r ReconcileDirectImageMigration) validateDestCluster(imageMigration *migap
 
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileDirectImageMigration) validateNamespaces(imageMigration *migapi.DirectImageMigration) error {
+func (r ReconcileDirectImageMigration) validateNamespaces(ctx context.Context, imageMigration *migapi.DirectImageMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateNamespaces")
+		defer span.Finish()
+	}
 	count := len(imageMigration.Spec.Namespaces)
 	if count == 0 {
 		imageMigration.Status.SetCondition(migapi.Condition{

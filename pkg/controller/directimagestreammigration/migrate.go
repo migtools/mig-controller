@@ -17,18 +17,18 @@ limitations under the License.
 package directimagestreammigration
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
-	"github.com/opentracing/opentracing-go"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *migapi.DirectImageStreamMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
+func (r *ReconcileDirectImageStreamMigration) migrate(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) (time.Duration, error) {
 	// Started
 	if imageStreamMigration.Status.StartTimestamp == nil {
 		log.Info("Marking DirectImageStreamMigration as started.")
@@ -42,10 +42,9 @@ func (r *ReconcileDirectImageStreamMigration) migrate(imageStreamMigration *miga
 		Owner:  imageStreamMigration,
 		Phase:  imageStreamMigration.Status.Phase,
 
-		Tracer:        r.tracer,
-		ReconcileSpan: reconcileSpan,
+		Tracer: r.tracer,
 	}
-	err := task.Run()
+	err := task.Run(ctx)
 	if err != nil {
 		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil

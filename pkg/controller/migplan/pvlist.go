@@ -10,6 +10,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	core "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -18,7 +19,11 @@ type PvMap map[k8sclient.ObjectKey]core.PersistentVolume
 type Claims []migapi.PVC
 
 // Update the PVs listed on the plan.
-func (r *ReconcileMigPlan) updatePvs(plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "updatePvs")
+		defer span.Finish()
+	}
 	if plan.Status.HasAnyCondition(Suspended) {
 		plan.Status.StageCondition(PvsDiscovered)
 		plan.Status.StageCondition(PvNoSupportedAction)

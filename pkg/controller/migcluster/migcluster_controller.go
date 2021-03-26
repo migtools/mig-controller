@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -103,9 +104,11 @@ type ReconcileMigCluster struct {
 
 	scheme     *runtime.Scheme
 	Controller controller.Controller
+	tracer     opentracing.Tracer
 }
 
 func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	var err error
 	log.Reset()
 	log.SetValues("migCluster", request.Name)
@@ -119,6 +122,13 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Get jaeger span for reconcile, add to ctx
+	reconcileSpan := r.initTracer(cluster)
+	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
+		defer reconcileSpan.Finish()
 	}
 
 	// Report reconcile error.
@@ -140,7 +150,7 @@ func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Re
 	cluster.Status.BeginStagingConditions()
 
 	// Validations.
-	err = r.validate(cluster)
+	err = r.validate(ctx, cluster)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -75,9 +76,11 @@ type ReconcileMigHook struct {
 	record.EventRecorder
 
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	var err error
 	log.Reset()
 	log.SetValues("migHook", request.Name)
@@ -91,6 +94,13 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Get jaeger span for reconcile, add to ctx
+	reconcileSpan := r.initTracer(hook)
+	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
+		defer reconcileSpan.Finish()
 	}
 
 	// Report reconcile error.
@@ -112,7 +122,7 @@ func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Resul
 	hook.Status.BeginStagingConditions()
 
 	// Validations.
-	err = r.validate(hook)
+	err = r.validate(ctx, hook)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
