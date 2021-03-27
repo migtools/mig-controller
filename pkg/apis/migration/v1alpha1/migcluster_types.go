@@ -17,16 +17,19 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/remote"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -153,18 +156,126 @@ func (m *MigCluster) GetServiceAccountSecret(client k8sclient.Client) (*kapi.Sec
 	return GetSecret(client, m.Spec.ServiceAccountSecretRef)
 }
 
-// GetClient get a local or remote client using a MigCluster and an existing client
-func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
-	restConfig, err := m.BuildRestConfig(c)
-	if err != nil {
-		return nil, err
+var cachedClientMap compatClientMap
+var uncachedClientMap compatClientMap
+
+// Maps MigCluster UID to stored compat.Client for that cluster.
+type compatClientMap struct {
+	cMap  map[types.UID]compat.Client
+	mutex sync.RWMutex
+}
+
+func (cm *compatClientMap) init() {
+	if cm.cMap == nil {
+		cm.cMap = make(map[types.UID]compat.Client)
 	}
-	client, err := compat.NewClient(restConfig)
+}
+
+func (cm *compatClientMap) Get(key types.UID) (compat.Client, bool) {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+	val, found := cm.cMap[key]
+	return val, found
+}
+
+func (cm *compatClientMap) Set(key types.UID, val compat.Client) {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+	cm.cMap[key] = val
+}
+
+func (cm *compatClientMap) Delete(key types.UID) {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+	delete(cm.cMap, key)
+}
+
+func init() {
+	cachedClientMap.init()
+	uncachedClientMap.init()
+}
+
+// GetClient gets a host or remote compat.Client for interacting with a MigCluster.
+// For best performance, returns the first available from this list:
+// 1) compat.Client with cache from map
+// 2) compat.Client with cache by building from manager k8s client
+// 3) compat.Client without cache from map
+// 4) compat.Client without cache by building from restConfig
+func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
+	var cachedClusterClient *k8sclient.Client
+
+	// RestConfig is used to build client from scratch, and to invalidate stored clients
+	// when credentials and coordinates of MigClusters change.
+	clusterRestConfig, err := m.BuildRestConfig(c)
 	if err != nil {
 		return nil, err
 	}
 
-	return client, nil
+	if Settings.EnableCachedClient {
+		// Get manager cached k8s client if one exists
+		if m.Spec.IsHostCluster {
+			// Host cluster always has a cached k8s client
+			cachedClusterClient = &c
+		} else {
+			// Remote cluster has a cached k8s client if remote manager has been started
+			rwm := remote.GetWatchMap()
+			remoteCluster := rwm.Get(types.NamespacedName{Namespace: m.Namespace, Name: m.Name})
+			if remoteCluster != nil {
+				cachedClientConfig := remoteCluster.RemoteManager.GetConfig()
+				cachedClient := remoteCluster.RemoteManager.GetClient()
+				if AreRestConfigsEqual(cachedClientConfig, clusterRestConfig) {
+					cachedClusterClient = &cachedClient
+				}
+			}
+		}
+		// 1) compat.Client with cache from map
+		if compatClient, ok := cachedClientMap.Get(m.UID); ok {
+			if AreRestConfigsEqual(compatClient.RestConfig(), clusterRestConfig) {
+				return compatClient, nil
+			} else {
+				// Handle change of restConfig for MigCluster
+				cachedClientMap.Delete(m.UID)
+			}
+		}
+
+		// 2) compat.Client with cache by building from manager k8s client
+		if cachedClusterClient != nil {
+			compatClient, err := compat.NewClient(clusterRestConfig, cachedClusterClient)
+			if err != nil {
+				return nil, err
+			}
+			cachedClientMap.Set(m.UID, compatClient)
+			return compatClient, nil
+		}
+	}
+
+	// 3) compat.Client without cache from map
+	if compatClient, ok := uncachedClientMap.Get(m.UID); ok {
+		if AreRestConfigsEqual(compatClient.RestConfig(), clusterRestConfig) {
+			return compatClient, nil
+		} else {
+			// Handle change of restConfig for MigCluster
+			uncachedClientMap.Delete(m.UID)
+		}
+	}
+
+	// 4) compat.Client without cache by building from restConfig
+	uncachedClusterClient, err := k8sclient.New(
+		clusterRestConfig,
+		k8sclient.Options{
+			Scheme: scheme.Scheme,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	compatClient, err := compat.NewClient(clusterRestConfig, &uncachedClusterClient)
+	if err != nil {
+		return nil, err
+	}
+
+	uncachedClientMap.Set(m.UID, compatClient)
+	return compatClient, nil
 }
 
 func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*corev1.ConfigMap, error) {
@@ -801,4 +912,24 @@ func (r *MigCluster) GetObjectReference() *kapi.ObjectReference {
 		Name:      r.Name,
 		Namespace: r.Namespace,
 	}
+}
+
+// AreRestConfigsEqual given a new rest config, checks whether cluster's config is equal to it
+func AreRestConfigsEqual(c1, c2 *rest.Config) bool {
+	if c1 == nil || c2 == nil {
+		return false
+	}
+	if c1.Host != c2.Host {
+		return false
+	}
+	if c1.BearerToken != c2.BearerToken {
+		return false
+	}
+	if c1.TLSClientConfig.Insecure != c2.TLSClientConfig.Insecure {
+		return false
+	}
+	if !bytes.Equal(c1.TLSClientConfig.CAData, c2.TLSClientConfig.CAData) {
+		return false
+	}
+	return true
 }

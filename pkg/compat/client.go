@@ -3,21 +3,29 @@ package compat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	batchv2alpha "k8s.io/api/batch/v2alpha1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	dapi "k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var Settings = &settings.Settings
 
 //
 // A smart client.
@@ -42,15 +50,7 @@ type client struct {
 
 //
 // Create a new client.
-func NewClient(restCfg *rest.Config) (Client, error) {
-	rClient, err := k8sclient.New(
-		restCfg,
-		k8sclient.Options{
-			Scheme: scheme.Scheme,
-		})
-	if err != nil {
-		return nil, err
-	}
+func NewClient(restCfg *rest.Config, rClient *k8sclient.Client) (Client, error) {
 	dClient, err := dapi.NewDiscoveryClientForConfig(restCfg)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func NewClient(restCfg *rest.Config) (Client, error) {
 
 	nClient := &client{
 		Config:             restCfg,
-		Client:             rClient,
+		Client:             *rClient,
 		DiscoveryInterface: dClient,
 		Major:              major,
 		Minor:              minor,
@@ -236,14 +236,15 @@ func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object) error {
-	obj := c.supportedVersion(in)
 	start := time.Now()
+	defer Metrics.Get(c, in, float64(time.Since(start)/nanoToMilli))
+
+	obj := c.supportedVersion(in)
+
 	err := c.Client.Get(ctx, key, obj)
 	if err != nil {
 		return err
 	}
-	elapsed := float64(time.Since(start) / nanoToMilli)
-	Metrics.Get(c, in, elapsed)
 
 	return c.upConvert(ctx, obj, in)
 }
@@ -253,17 +254,17 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.O
 // The resource will be converted to a compatible version as needed.
 func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8sclient.ListOption) error {
 	obj, err := c.downConvertList(ctx, in)
+	start := time.Now()
+	defer Metrics.List(c, in, float64(time.Since(start)/nanoToMilli))
+
 	if err != nil {
 		return err
 	}
 
-	start := time.Now()
 	err = c.Client.List(ctx, obj, opt...)
 	if err != nil {
 		return err
 	}
-	elapsed := float64(time.Since(start) / nanoToMilli)
-	Metrics.List(c, in, elapsed)
 
 	return c.upConvertList(ctx, obj, in)
 }
@@ -271,47 +272,142 @@ func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8scli
 // Create the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) Create(ctx context.Context, in k8sclient.Object, opt ...k8sclient.CreateOption) error {
+	start := time.Now()
+	defer Metrics.Create(c, in, float64(time.Since(start)/nanoToMilli))
+
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
 	}
 
-	start := time.Now()
 	err = c.Client.Create(ctx, obj, opt...)
-	elapsed := float64(time.Since(start) / nanoToMilli)
-	Metrics.Create(c, in, elapsed)
+	if err != nil {
+		return err
+	}
+	if Settings.EnableCachedClient {
+		c.waitForPopulatedCache(obj, 0)
+	}
 
-	return err
+	return nil
 }
 
 // Delete the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) Delete(ctx context.Context, in k8sclient.Object, opt ...k8sclient.DeleteOption) error {
+	start := time.Now()
+	defer Metrics.Delete(c, in, float64(time.Since(start)/nanoToMilli))
+
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
 	}
 
-	start := time.Now()
 	err = c.Client.Delete(ctx, obj, opt...)
-	elapsed := float64(time.Since(start) / nanoToMilli)
-	Metrics.Delete(c, in, elapsed)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 // Update the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) Update(ctx context.Context, in k8sclient.Object, opt ...k8sclient.UpdateOption) error {
+	start := time.Now()
+	defer Metrics.Update(c, in, float64(time.Since(start)/nanoToMilli))
+
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
 	}
 
-	start := time.Now()
 	err = c.Client.Update(ctx, obj, opt...)
-	elapsed := float64(time.Since(start) / nanoToMilli)
-	Metrics.Update(c, in, elapsed)
+	if err != nil {
+		return err
+	}
+	if Settings.EnableCachedClient {
+		expectedRV, err := getResourceVersion(obj)
+		if err != nil {
+			return err
+		}
+		c.waitForPopulatedCache(obj, expectedRV)
+	}
 
-	return err
+	return nil
+}
+
+// Wait until cache contains resource with expected resourceVersion _or_ timeout, whichever comes first.
+func (c client) waitForPopulatedCache(resource k8sclient.Object, expectedRV int) error {
+	timeout := 3 * time.Second
+	deadline := time.Now().Add(timeout)
+	pollInterval := time.Millisecond * 5
+
+	// Define a placeholder with the same structure as the original resource to be overwritten with client.Get
+	placeholder := resource.DeepCopyObject().(k8sclient.Object)
+	key, err := getNsName(placeholder)
+	if err != nil {
+		return err
+	}
+	// If no name is defined on the resource, we can't query for it in the cache
+	if key.Name == "" {
+		return nil
+	}
+	// Poll for resource in cache every 5ms until 3s deadline.
+	for time.Now().Before(deadline) {
+		// Poll the cache for the latest version of the object
+		err := c.Get(context.TODO(), key, placeholder)
+		if err != nil {
+			if k8serror.IsNotFound(err) {
+				time.Sleep(pollInterval)
+				continue
+			} else {
+				return err
+			}
+		}
+		foundRV, err := getResourceVersion(placeholder)
+		if err != nil {
+			return err
+		}
+		if foundRV < expectedRV {
+			time.Sleep(pollInterval)
+			continue
+		}
+		// Resource found in cache, success
+		return nil
+	}
+	// Resource not found in cache, stop polling for it
+	return fmt.Errorf("resource key=%v/%v kind=%v not found with "+
+		"expectedResourceVersion>=%v in cache before timeout %v",
+		key.Namespace, key.Name, resource.GetObjectKind(), expectedRV, timeout)
+}
+
+func getNsName(in k8sclient.Object) (types.NamespacedName, error) {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(in)
+	if err != nil {
+		return types.NamespacedName{}, err
+	}
+	// Some resources don't have a namespace, ignore this.
+	ns, _, _ := unstructured.NestedString(u, "metadata", "namespace")
+	// Some resources don't have a name, we can't do a lookup on these
+	name, _, err := unstructured.NestedString(u, "metadata", "name")
+	if err != nil {
+		return types.NamespacedName{}, err
+	}
+	return types.NamespacedName{Namespace: ns, Name: name}, nil
+}
+
+func getResourceVersion(in k8sclient.Object) (int, error) {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(in)
+	if err != nil {
+		return 0, err
+	}
+	resourceVersion, found, err := unstructured.NestedString(u, "metadata", "resourceVersion")
+	if err != nil || !found {
+		return 0, err
+	}
+	resourceVersionInt, err := strconv.Atoi(resourceVersion)
+	if err != nil {
+		return 0, err
+	}
+	return resourceVersionInt, nil
 }

@@ -148,7 +148,8 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 				migevent.LogAbnormalEventsForResource(
 					destClient, t.Log,
 					"Found abnormal event for Rsync transfer Pod on destination cluster",
-					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
+					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+					pod.UID, "Pod")
 
 				isUnschedulable := false
 				for _, podCond := range pod.Status.Conditions {
@@ -815,7 +816,8 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		migevent.LogAbnormalEventsForResource(
 			destClient, t.Log,
 			"Found abnormal event for Rsync Route on destination cluster",
-			types.NamespacedName{Namespace: route.Namespace, Name: route.Name}, "Route")
+			types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
+			route.UID, "Route")
 
 		admitted := false
 		message := "no status condition available for the route"

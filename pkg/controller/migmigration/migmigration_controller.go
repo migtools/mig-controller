@@ -27,12 +27,14 @@ import (
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
+	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -118,6 +120,24 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 			return []string{
 				fmt.Sprintf("%s/%s", ref.Namespace, ref.Name),
+			}
+		})
+	if err != nil {
+		return err
+	}
+
+	// Event
+	err = indexer.IndexField(
+		context.TODO(),
+		&kapi.Event{},
+		"involvedObject.uid",
+		func(rawObj k8sclient.Object) []string {
+			e, cast := rawObj.(*kapi.Event)
+			if !cast {
+				return nil
+			}
+			return []string{
+				string(e.InvolvedObject.UID),
 			}
 		})
 	if err != nil {

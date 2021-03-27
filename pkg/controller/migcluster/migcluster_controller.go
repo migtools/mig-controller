@@ -21,17 +21,23 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/konveyor/mig-controller/pkg/remote"
+	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/opentracing/opentracing-go"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -39,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
+var Settings = &settings.Settings
 var log = logging.WithName("cluster")
 
 // Add creates a new MigCluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -166,6 +173,19 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	if Settings.EnableCachedClient {
+		if !cluster.Status.HasBlockerCondition() {
+			// Remote Watch.
+			err = r.setupRemoteWatch(cluster)
+			if err != nil {
+				log.Trace(err)
+				return reconcile.Result{Requeue: true}, nil
+			}
+		} else {
+			r.shutdownRemoteWatch(cluster)
+		}
+	}
+
 	// Ready
 	cluster.Status.SetReady(
 		!cluster.Status.HasBlockerCondition(),
@@ -187,4 +207,55 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil
+}
+
+// Setup remote watch.
+func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error {
+	var err error
+	nsName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+
+	var restCfg *rest.Config
+	if cluster.Spec.IsHostCluster {
+		restCfg, err = config.GetConfig()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	} else {
+		restCfg, err = cluster.BuildRestConfig(r.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
+	if IsRemoteWatchConsistent(nsName, restCfg) {
+		return nil
+	}
+
+	r.shutdownRemoteWatch(cluster)
+
+	log.Info("Starting remote manager.", "cluster", cluster.Name)
+	StartRemoteWatch(r, remote.ManagerConfig{
+		RemoteRestConfig: restCfg,
+		ParentNsName:     nsName,
+		ParentMeta:       cluster.GetObjectMeta(),
+		ParentObject:     cluster,
+		Scheme:           r.scheme,
+	})
+	log.Info("Remote manager started.", "cluster", cluster.Name)
+
+	return nil
+}
+
+func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
+	log.Info("Stopping remote manager.", "cluster", cluster.Name)
+	nsName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Name,
+	}
+
+	StopRemoteWatch(nsName)
+	log.Info("Stopped remote manager.", "cluster", cluster.Name)
 }
