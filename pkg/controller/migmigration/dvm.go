@@ -7,6 +7,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -163,12 +164,15 @@ func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []str
 		if state == "Completed" {
 			state = ""
 		}
-		p := fmt.Sprintf("Rsync Client Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
+		p := fmt.Sprintf("[%s] %s: %s", pod.PVCReference.Name, path.Join(pod.Namespace, pod.Name), state)
 		if pod.LastObservedProgressPercent != "" {
 			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)
 		}
 		if pod.LastObservedTransferRate != "" {
 			p += fmt.Sprintf(", transfer rate %s", pod.LastObservedTransferRate)
+		}
+		if pod.TotalElapsedTime != nil {
+			p += fmt.Sprintf(" (%s)", pod.TotalElapsedTime.Duration.Round(time.Second))
 		}
 		progress = append(progress, p)
 	}

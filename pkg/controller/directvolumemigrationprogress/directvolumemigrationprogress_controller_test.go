@@ -148,18 +148,18 @@ func Test_parseLogs(t *testing.T) {
 }
 
 func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(t *testing.T) {
-	type args struct {
-		pvProgress *migapi.DirectVolumeMigrationProgress
+	type fields struct {
+		Owner *migapi.DirectVolumeMigrationProgress
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name   string
+		fields fields
+		want   string
 	}{
 		{
 			name: "given all valid distinct rsync progress percentages, should return addition of all percentages",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-4", LastObservedProgressPercent: "10%"},
 						RsyncPodStatuses: []migapi.RsyncPodStatus{
@@ -174,8 +174,8 @@ func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(
 		},
 		{
 			name: "given all valid, some indistinct rsync progress percentages, should return addition of all percentages, should not count the same pod twice",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-3", LastObservedProgressPercent: "10%"},
 						RsyncPodStatuses: []migapi.RsyncPodStatus{
@@ -190,8 +190,8 @@ func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(
 		},
 		{
 			name: "given some valid and some invalid, some distinct and some indistinct rsync progress percentages, should return addition of all percentages, should not count the same pod twice, should not include the invalid percentage",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatus: migapi.RsyncPodStatus{PodName: "pod-4", LastObservedProgressPercent: "10%"},
 						RsyncPodStatuses: []migapi.RsyncPodStatus{
@@ -208,8 +208,11 @@ func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &RsyncPodProgressTask{}
-			if got := r.getCumulativeProgressPercentage(tt.args.pvProgress); got != tt.want {
+			r := &RsyncPodProgressTask{
+				Owner: tt.fields.Owner,
+			}
+			r.updateCumulativeProgressPercentage()
+			if got := r.Owner.Status.TotalProgressPercentage; got != tt.want {
 				t.Errorf("ReconcileDirectVolumeMigrationProgress.getCumulativeProgressPercentage() = %v, want %v", got, tt.want)
 			}
 		})
@@ -217,18 +220,18 @@ func TestReconcileDirectVolumeMigrationProgress_getCumulativeProgressPercentage(
 }
 
 func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
-	type args struct {
-		pvProgress *migapi.DirectVolumeMigrationProgress
+	type fields struct {
+		Owner *migapi.DirectVolumeMigrationProgress
 	}
 	tests := []struct {
-		name string
-		args args
-		want *metav1.Duration
+		name   string
+		fields fields
+		want   *metav1.Duration
 	}{
 		{
 			name: "given empty history of Rsync pods, elapsed time should be 0",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{},
 				},
 			},
@@ -236,8 +239,8 @@ func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
 		},
 		{
 			name: "given 1 pod in the history, total elapsed time should be equal to elapsed time of that pod",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatuses: []v1alpha1.RsyncPodStatus{
 							{PodName: "pod-0", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 10}},
@@ -249,8 +252,8 @@ func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
 		},
 		{
 			name: "given multiple pods in the history and one recent pod, total elapsed time should be equal to sum of elapsed times of all pods",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatus: v1alpha1.RsyncPodStatus{
 							PodName: "pod-3", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40},
@@ -267,8 +270,8 @@ func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
 		},
 		{
 			name: "given multiple pods in the history and one recent pod, one pod present in history and recent both, total elapsed time should be equal to sum of elapsed times of all pods, same pod shouldn't be counted twice",
-			args: args{
-				pvProgress: &migapi.DirectVolumeMigrationProgress{
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigrationProgress{
 					Status: migapi.DirectVolumeMigrationProgressStatus{
 						RsyncPodStatus: v1alpha1.RsyncPodStatus{
 							PodName: "pod-2", ContainerElapsedTime: &metav1.Duration{Duration: time.Second * 40},
@@ -286,8 +289,11 @@ func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &RsyncPodProgressTask{}
-			if got := r.getCumulativeElapsedTime(tt.args.pvProgress); !reflect.DeepEqual(got, tt.want) {
+			r := &RsyncPodProgressTask{
+				Owner: tt.fields.Owner,
+			}
+			r.updateCumulativeElapsedTime()
+			if got := r.Owner.Status.RsyncElapsedTime; !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("RsyncPodProgressTask.getCumulativeElapsedTime() = %v, want %v", got, tt.want)
 			}
 		})

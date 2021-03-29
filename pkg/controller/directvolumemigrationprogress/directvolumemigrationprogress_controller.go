@@ -192,7 +192,7 @@ func (r *RsyncPodProgressTask) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		rsyncPodStatus, _, err := r.getRsyncClientContainerStatus(pod)
+		rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -208,16 +208,19 @@ func (r *RsyncPodProgressTask) Run() error {
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			// if already part of the history, skip
+			// we only add dead pods in the history
 			if pvProgress.Status.RsyncPodExistsInHistory(pod.Name) {
 				continue
 			}
-			rsyncPodStatus, terminal, err := r.getRsyncClientContainerStatus(pod)
+			rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 			if rsyncPodStatus != nil {
-				// pods in their terminal state will always go in the history
-				if terminal {
+				// dead pods go in history
+				if IsPodTerminal(rsyncPodStatus.PodPhase) {
+					// merge progress stats from previous run
+					MergeProgressStats(rsyncPodStatus, &pvProgress.Status.RsyncPodStatus)
 					pvProgress.Status.RsyncPodStatuses = append(pvProgress.Status.RsyncPodStatuses, *rsyncPodStatus)
 					// for terminal pods, indicate that we are done collecting information, can safely garbage collect
 					pod.Labels[migapi.DVMPDoneLabelKey] = migapi.True
@@ -226,59 +229,96 @@ func (r *RsyncPodProgressTask) Run() error {
 						return err
 					}
 				}
-				if mostRecentPodStatus == nil {
-					mostRecentPodStatus = rsyncPodStatus
-				} else if rsyncPodStatus.CreationTimestamp != nil &&
-					mostRecentPodStatus.CreationTimestamp != nil &&
-					!mostRecentPodStatus.CreationTimestamp.After(rsyncPodStatus.CreationTimestamp.Time) {
-					mostRecentPodStatus = rsyncPodStatus
-				} else if rsyncPodStatus.CreationTimestamp == nil {
+				// update mostRecentPodStatus if current pod is more recent
+				if mostRecentPodStatus == nil ||
+					rsyncPodStatus.CreationTimestamp != nil &&
+						mostRecentPodStatus.CreationTimestamp != nil &&
+						!mostRecentPodStatus.CreationTimestamp.After(rsyncPodStatus.CreationTimestamp.Time) {
 					mostRecentPodStatus = rsyncPodStatus
 				}
 			}
 		}
+		// update the top level status field to match the newly found latest pod status
 		if mostRecentPodStatus != nil {
-			// top level inline field will always hold most recent pod status
-			pvProgress.Status.RsyncPodStatus = *mostRecentPodStatus
+			pvProgress.Status.PodName = mostRecentPodStatus.PodName
+			pvProgress.Status.PodPhase = mostRecentPodStatus.PodPhase
+			pvProgress.Status.LogMessage = mostRecentPodStatus.LogMessage
+			pvProgress.Status.ContainerElapsedTime = mostRecentPodStatus.ContainerElapsedTime
+			pvProgress.CreationTimestamp = *mostRecentPodStatus.CreationTimestamp
+			MergeProgressStats(&pvProgress.Status.RsyncPodStatus, mostRecentPodStatus)
 		}
-		pvProgress.Status.TotalProgressPercentage = r.getCumulativeProgressPercentage(pvProgress)
-		pvProgress.Status.RsyncElapsedTime = r.getCumulativeElapsedTime(pvProgress)
+		// update total progress percentage
+		r.updateCumulativeProgressPercentage()
+		// update total elapsed time
+		r.updateCumulativeElapsedTime()
 	}
 	return nil
 }
 
-// getCumulativeProgressPercentage computes overall progress percentage of Rsync
-func (r *RsyncPodProgressTask) getCumulativeProgressPercentage(pvProgress *migapi.DirectVolumeMigrationProgress) string {
-	totalProgress := int64(0)
-	for _, podHistory := range pvProgress.Status.RsyncPodStatuses {
-		if podHistory.PodName != pvProgress.Status.PodName {
-			totalProgress += ProgressPercentageToQuantity(podHistory.LastObservedProgressPercent)
+// MergeProgressStats merges progress stats of p2 into p1 : p1 <- p2, only if p1 & p2 are for same pods
+func MergeProgressStats(p1, p2 *migapi.RsyncPodStatus) {
+	if p1 == nil || p2 == nil || p1.PodName != p2.PodName {
+		return
+	}
+	getNonEmpty := func(s1, s2 string) string {
+		if s2 == "" {
+			return s1
+		} else {
+			return s2
 		}
 	}
-	totalProgress += ProgressPercentageToQuantity(pvProgress.Status.LastObservedProgressPercent)
-	totalProgress = int64(math.Min(float64(totalProgress), float64(100)))
-	return ProgressPercentageToString(totalProgress)
+	getNonNil := func(i1, i2 *int32) *int32 {
+		if i1 == nil {
+			return i2
+		} else {
+			return i1
+		}
+	}
+	p1.ExitCode = getNonNil(p1.ExitCode, p2.ExitCode)
+	p1.LastObservedProgressPercent = MaxProgressString(p1.LastObservedProgressPercent, p2.LastObservedProgressPercent)
+	p1.LastObservedTransferRate = getNonEmpty(p1.LastObservedTransferRate, p2.LastObservedTransferRate)
 }
 
-// getCumulativeElapsedTime computes overall elapsed time of Rsync
-func (r *RsyncPodProgressTask) getCumulativeElapsedTime(pvProgress *migapi.DirectVolumeMigrationProgress) *metav1.Duration {
+func IsPodTerminal(phase kapi.PodPhase) bool {
+	if phase == kapi.PodFailed ||
+		phase == kapi.PodSucceeded {
+		return true
+	}
+	return false
+}
+
+// updateCumulativeProgressPercentage computes overall progress percentage of Rsync
+func (r *RsyncPodProgressTask) updateCumulativeProgressPercentage() {
+	totalProgress := int64(0)
+	for _, podHistory := range r.Owner.Status.RsyncPodStatuses {
+		if podHistory.PodName != r.Owner.Status.PodName {
+			totalProgress += ProgressStringToValue(podHistory.LastObservedProgressPercent)
+		}
+	}
+	totalProgress += ProgressStringToValue(r.Owner.Status.LastObservedProgressPercent)
+	totalProgress = int64(math.Min(float64(totalProgress), float64(100)))
+	r.Owner.Status.TotalProgressPercentage = ProgressValueToString(totalProgress)
+}
+
+// updateCumulativeElapsedTime computes overall elapsed time of Rsync
+func (r *RsyncPodProgressTask) updateCumulativeElapsedTime() {
 	currentTime, newTime := metav1.Now(), metav1.Now()
 	totalElapsedDuration := metav1.Duration{}
-	for _, podHistory := range pvProgress.Status.RsyncPodStatuses {
-		if podHistory.PodName != pvProgress.Status.PodName && podHistory.ContainerElapsedTime != nil {
+	for _, podHistory := range r.Owner.Status.RsyncPodStatuses {
+		if podHistory.PodName != r.Owner.Status.PodName && podHistory.ContainerElapsedTime != nil {
 			newTime.Time = newTime.Add(podHistory.ContainerElapsedTime.Duration)
 		}
 	}
-	if pvProgress.Status.ContainerElapsedTime != nil {
-		newTime.Time = newTime.Add(pvProgress.Status.ContainerElapsedTime.Duration)
+	if r.Owner.Status.ContainerElapsedTime != nil {
+		newTime.Time = newTime.Add(r.Owner.Status.ContainerElapsedTime.Duration)
 	}
 	totalElapsedDuration.Duration = newTime.Sub(currentTime.Time).Round(time.Second)
-	return &totalElapsedDuration
+	r.Owner.Status.RsyncElapsedTime = &totalElapsedDuration
 }
 
 // getRsyncClientContainerStatus returns observed status of Rsync container in the given pod
 // podLogGetterFunction is a function capable of retrieving logs from a given pod, injected to make testing easier
-func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (*migapi.RsyncPodStatus, bool, error) {
+func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (*migapi.RsyncPodStatus, error) {
 	rsyncPodStatus := migapi.RsyncPodStatus{
 		PodName:           podRef.Name,
 		CreationTimestamp: &podRef.CreationTimestamp,
@@ -294,19 +334,17 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 			rsyncPodStatus.PodPhase = kapi.PodFailed
 			rsyncPodStatus.LogMessage = podRef.Status.Message
 			rsyncPodStatus.ContainerElapsedTime = nil
-			return &rsyncPodStatus, true, nil
+			return &rsyncPodStatus, nil
 		}
-		return nil, false, fmt.Errorf("container not found")
+		return nil, fmt.Errorf("container not found")
 	}
-	isTerminal := true
 	switch {
 	case containerStatus.Ready:
-		isTerminal = false
 		rsyncPodStatus.PodPhase = kapi.PodRunning
 		numberOfLogLines := int64(5)
 		logMessage, err := r.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
 		if err != nil {
-			return &rsyncPodStatus, false, err
+			return &rsyncPodStatus, err
 		}
 		rsyncPodStatus.LogMessage = logMessage
 		percentProgress := GetProgressPercent(logMessage)
@@ -326,7 +364,6 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
 	case !containerStatus.Ready && podRef.Status.Phase == kapi.PodPending && containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == ContainerCreating:
-		isTerminal = false
 		// if pod is not in running state after 10 mins of its creation, raise a
 		if time.Now().UTC().Sub(podRef.CreationTimestamp.Time.UTC()) > TimeLimit {
 			rsyncPodStatus.PodPhase = kapi.PodPending
@@ -355,7 +392,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
 	}
-	return &rsyncPodStatus, isTerminal, nil
+	return &rsyncPodStatus, nil
 }
 
 func getPod(client compat.Client, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
@@ -416,8 +453,8 @@ func GetTransferRate(message string) string {
 	return getLastMatch(`\d+\.\w*\/s`, message)
 }
 
-// ProgressPercentageToQuantity parses string and returns percentage as a value
-func ProgressPercentageToQuantity(progressPercentage string) int64 {
+// ProgressStringToValue parses string and returns percentage as a value
+func ProgressStringToValue(progressPercentage string) int64 {
 	value := int64(0)
 	r := regexp.MustCompile(`(\d+)\%`)
 	matched := r.FindStringSubmatch(progressPercentage)
@@ -429,9 +466,16 @@ func ProgressPercentageToQuantity(progressPercentage string) int64 {
 	return value
 }
 
-// ProgressPercentageToString parses string and returns percentage as a value
-func ProgressPercentageToString(progressPercentage int64) string {
+// ProgressValueToString parses quantity and returns percentage as a string
+func ProgressValueToString(progressPercentage int64) string {
 	return fmt.Sprintf("%d%%", progressPercentage)
+}
+
+func MaxProgressString(p1 string, p2 string) string {
+	return ProgressValueToString(int64(
+		math.Max(float64(
+			ProgressStringToValue(p1)), float64(
+			ProgressStringToValue(p2)))))
 }
 
 func getLastMatch(regex string, message string) string {

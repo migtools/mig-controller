@@ -133,8 +133,10 @@ type DirectVolumeMigrationList struct {
 
 type PodProgress struct {
 	*kapi.ObjectReference       `json:",inline"`
-	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
-	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
+	PVCReference                *kapi.ObjectReference `json:"pvcRef,omitempty"`
+	LastObservedProgressPercent string                `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string                `json:"lastObservedTransferRate,omitempty"`
+	TotalElapsedTime            *metav1.Duration      `json:"totalElapsedTime,omitempty"`
 }
 
 // RsyncOperation defines observed state of an Rsync Operation
