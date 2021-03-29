@@ -64,7 +64,7 @@ const (
 	// it does not conclusively mean the destination rsyncd is unhealthy but stunnel is dropping this in between
 	DefaultStunnelTimeout = 20
 	// DefaultRsyncBackOffLimit defines default limit on number of retries on Rsync Pods
-	DefaultRsyncBackOffLimit = 10
+	DefaultRsyncBackOffLimit = 20
 	// DefaultRsyncOperationConcurrency defines number of Rsync operations that can be processed concurrently
 	DefaultRsyncOperationConcurrency = 5
 )
@@ -1891,8 +1891,14 @@ func (t *Task) getRsyncOperationsContext() (compat.Client, []rsyncClientPodRequi
 }
 
 func (t *Task) getRsyncPodBackOffLimit() int {
-	if t.Owner.Spec.BackOffLimit == 0 {
+	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
+	// when both the spec and the overridden backoff limits are not set, use default
+	if t.Owner.Spec.BackOffLimit == 0 && overriddenBackOffLimit == -1 {
 		return DefaultRsyncBackOffLimit
+	}
+	// whenever set, prefer overridden limit over the one set through Spec
+	if overriddenBackOffLimit != -1 {
+		return overriddenBackOffLimit
 	}
 	return t.Owner.Spec.BackOffLimit
 }
