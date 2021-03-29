@@ -31,14 +31,17 @@ const (
 	Succeeded                       = "Succeeded"
 	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
 	FailedCreatingRsyncPods         = "FailedCreatingRsyncPods"
+	FailedDeletingRsyncPods         = "FailedDeletingRsyncPods"
 )
 
 // Reasons
 const (
-	NotFound    = "NotFound"
-	NotSet      = "NotSet"
-	NotDistinct = "NotDistinct"
-	NotReady    = "NotReady"
+	NotFound           = "NotFound"
+	NotSet             = "NotSet"
+	NotDistinct        = "NotDistinct"
+	NotReady           = "NotReady"
+	RsyncTimeout       = "RsyncTimedOut"
+	RsyncNoRouteToHost = "RsyncNoRouteToHost"
 )
 
 // Messages

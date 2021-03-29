@@ -38,6 +38,9 @@ func (r *ReconcileDirectVolumeMigrationProgress) validate(pvProgress *migapi.Dir
 		err = liberr.Wrap(err)
 		return
 	}
+	if cluster == nil {
+		return
+	}
 	client, err = cluster.GetClient(r)
 	if err != nil {
 		err = liberr.Wrap(err)

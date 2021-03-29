@@ -711,7 +711,7 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 			},
 		},
 		{
-			name: "when given 1 existing failed Rsync pod in the source namespace and backOffLimit set to 2, 1 new pod should be created in the source namespace and status should reflect correct attemp no",
+			name: "when given 1 existing failed Rsync pod in the source namespace and backOffLimit set to 2, 1 new pod should be created in the source namespace and status should reflect correct attempt no",
 			args: args{
 				podRequirements: []rsyncClientPodRequirements{
 					getRsyncClientPodRequirements("pvc-1", "ns-1"),

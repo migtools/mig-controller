@@ -151,12 +151,12 @@ type RsyncOperation struct {
 	Failed bool `json:"failed,omitempty"`
 }
 
-func (r *RsyncOperation) Equal(other *RsyncOperation) bool {
-	if other == nil || r.PVCReference == nil || other.PVCReference == nil {
+func (x *RsyncOperation) Equal(y *RsyncOperation) bool {
+	if y == nil || x.PVCReference == nil || y.PVCReference == nil {
 		return false
 	}
-	if other.PVCReference.Name == r.PVCReference.Name &&
-		other.PVCReference.Namespace == r.PVCReference.Namespace {
+	if x.PVCReference.Name == y.PVCReference.Name &&
+		x.PVCReference.Namespace == y.PVCReference.Namespace {
 		return true
 	}
 	return false

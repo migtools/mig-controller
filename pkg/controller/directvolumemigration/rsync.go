@@ -1029,161 +1029,6 @@ func isClaimUsedByPod(claimName string, p *corev1.Pod) bool {
 	return false
 }
 
-// Create rsync client pods
-func (t *Task) createRsyncClientPods() error {
-	// Get client for destination
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	// Get transfer image for cluster
-	cluster, err := t.Owner.GetSourceCluster(t.Client)
-	if err != nil {
-		return err
-	}
-	t.Log.Info("Getting image for Rsync client Pods that will be created on source MigCluster")
-	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
-	if err != nil {
-		return err
-	}
-	t.Log.Info(fmt.Sprintf("Using image [%v] for Rsync client Pods", transferImage))
-
-	t.Log.Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
-	pvcMap, err := t.getfsGroupMapForNamespace()
-	if err != nil {
-		return err
-	}
-
-	t.Log.Info("Getting Rsync password for Rsync client Pods")
-	password, err := t.getRsyncPassword()
-	if err != nil {
-		return err
-	}
-
-	t.Log.Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
-	pvcNodeMap, err := t.getPVCNodeNameMap()
-	if err != nil {
-		return err
-	}
-	t.Log.Info("Getting limits and requests for Rsync client Pods")
-	limits, requests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
-	if err != nil {
-		return err
-	}
-
-	isPrivileged, err := isRsyncPrivileged(srcClient)
-	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
-
-	for ns, vols := range pvcMap {
-		// Get stunnel svc IP
-		svc := corev1.Service{}
-		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferSvc, Namespace: ns}
-		err := srcClient.Get(context.TODO(), key, &svc)
-		if err != nil {
-			return err
-		}
-		ip := svc.Spec.ClusterIP
-
-		trueBool := true
-		runAsUser := int64(0)
-
-		// Add PVC volume mounts
-		for _, vol := range vols {
-			volumes := []corev1.Volume{}
-			volumeMounts := []corev1.VolumeMount{}
-			containers := []corev1.Container{}
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      vol.name,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol.name),
-			})
-			volumes = append(volumes, corev1.Volume{
-				Name: vol.name,
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: vol.name,
-					},
-				},
-			})
-			rsyncCommand := []string{"rsync"}
-			rsyncCommand = append(rsyncCommand, t.getRsyncOptions()...)
-			if vol.verify {
-				rsyncCommand = append(rsyncCommand, "--checksum")
-			}
-			rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", ns, vol.name))
-			rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", ip, vol.name))
-			t.Log.Info(fmt.Sprintf("Container [%v] will use Rsync command [%s]",
-				DirectVolumeMigrationRsyncClient, strings.Join(rsyncCommand, " ")))
-			containers = append(containers, corev1.Container{
-				Name:  DirectVolumeMigrationRsyncClient,
-				Image: transferImage,
-				Env: []corev1.EnvVar{
-					{
-						Name:  "RSYNC_PASSWORD",
-						Value: password,
-					},
-				},
-				TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-				Command:                  rsyncCommand,
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          DirectVolumeMigrationRsyncClient,
-						Protocol:      corev1.ProtocolTCP,
-						ContainerPort: int32(22),
-					},
-				},
-				VolumeMounts: volumeMounts,
-				SecurityContext: &corev1.SecurityContext{
-					Privileged:             &isPrivileged,
-					RunAsUser:              &runAsUser,
-					ReadOnlyRootFilesystem: &trueBool,
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-					},
-				},
-				Resources: corev1.ResourceRequirements{
-					Limits:   limits,
-					Requests: requests,
-				},
-			})
-			clientPod := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("directvolumemigration-rsync-transfer-%s", vol.name),
-					Namespace: ns,
-					Labels: map[string]string{
-						"app":                   DirectVolumeMigrationRsyncTransfer,
-						"directvolumemigration": DirectVolumeMigrationRsyncClient,
-					},
-				},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					Volumes:       volumes,
-					Containers:    containers,
-					NodeName:      pvcNodeMap[ns+"/"+vol.name],
-					SecurityContext: &corev1.PodSecurityContext{
-						SupplementalGroups: vol.supplementalGroups,
-						FSGroup:            vol.fsGroup,
-						SELinuxOptions:     vol.seLinuxOptions,
-					},
-				},
-			}
-			t.Log.Info("Creating Rsync client Pod on source cluster.",
-				"pod", path.Join(clientPod.Namespace, clientPod.Name))
-			err = srcClient.Create(context.TODO(), &clientPod)
-			if k8serror.IsAlreadyExists(err) {
-				t.Log.Info("Rsync client pod already exists on source cluster",
-					"pod", path.Join(clientPod.Namespace, clientPod.Name))
-			} else if err != nil {
-				return err
-			}
-			t.Log.Info("Rsync client pod created",
-				"pod", path.Join(clientPod.Namespace, clientPod.Name))
-		}
-
-	}
-	return nil
-}
-
 func isRsyncPrivileged(client compat.Client) (bool, error) {
 	cm := &corev1.ConfigMap{}
 	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}, cm)
@@ -1204,6 +1049,40 @@ func isRsyncPrivileged(client compat.Client) (bool, error) {
 	return false, fmt.Errorf("configmap %s of source cluster has empty data", k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}.String())
 }
 
+// deleteInvalidPVProgressCR deletes an existing CR which doesn't have expected fields
+// used to delete CRs created pre MTCv1.4.3
+func (t *Task) deleteInvalidPVProgressCR(dvmpName string, dvmpNamespace string) error {
+	existingDvmp := migapi.DirectVolumeMigrationProgress{}
+	// Make sure existing DVMP CRs which don't have required fields are deleted
+	err := t.Client.Get(context.TODO(), types.NamespacedName{Name: dvmpName, Namespace: dvmpNamespace}, &existingDvmp)
+	if err != nil {
+		if !k8serror.IsNotFound(err) {
+			return err
+		}
+	}
+	if existingDvmp.Name != "" && existingDvmp.Namespace != "" {
+		shouldDelete := false
+		// if any of podNamespace or podSelector is missing, delete the CR
+		if existingDvmp.Spec.PodNamespace == "" || existingDvmp.Spec.PodSelector == nil {
+			shouldDelete = true
+		}
+		// if podSelector doesn't have a required label, delete the CR
+		if existingDvmp.Spec.PodSelector != nil {
+			if _, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]; !exists {
+				shouldDelete = true
+			}
+		}
+		if shouldDelete {
+			err := t.Client.Delete(context.TODO(), &existingDvmp)
+			if err != nil {
+				return err
+			}
+			t.Log.Info("Deleted DVMP as it was missing required fields", "DVMP", path.Join(dvmpNamespace, dvmpName))
+		}
+	}
+	return nil
+}
+
 // Create rsync PV progress CR on destination cluster
 func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
@@ -1222,30 +1101,10 @@ func (t *Task) createPVProgressCR() error {
 					PodSelector:  GetRsyncPodSelector(vol.Name),
 				},
 			}
-			existingDvmp := migapi.DirectVolumeMigrationProgress{}
-			shouldDelete := false
-			// Make sure existing DVMP CRs which don't have required fields are deleted
-			err := t.Client.Get(context.TODO(), types.NamespacedName{Name: dvmp.Name, Namespace: dvmp.Namespace}, &existingDvmp)
+			// make sure existing CRs that don't have required fields are deleted
+			err := t.deleteInvalidPVProgressCR(dvmp.Name, dvmp.Namespace)
 			if err != nil {
-				if !k8serror.IsNotFound(err) {
-					return err
-				}
-			}
-			if existingDvmp.Name != "" && existingDvmp.Namespace != "" {
-				if existingDvmp.Spec.PodSelector != nil {
-					if _, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]; !exists {
-						shouldDelete = true
-					}
-				} else {
-					shouldDelete = true
-				}
-				if shouldDelete {
-					err := t.Client.Delete(context.TODO(), &existingDvmp)
-					if err != nil {
-						return err
-					}
-					t.Log.Info("Deleted DVMP as it was missing required fields", "DVMP", path.Join(dvmp.Namespace, dvmp.Name))
-				}
+				return liberr.Wrap(err)
 			}
 			migapi.SetOwnerReference(t.Owner, t.Owner, &dvmp)
 			t.Log.Info("Creating DVMP on host MigCluster to track Rsync Pod completion on MigCluster",
@@ -1273,8 +1132,8 @@ func getMD5Hash(s string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// reportRsyncPodProgress reads DVMP CR present for all PVCs and generates progress information in CR status
-func (t *Task) reportRsyncPodProgress() (bool, error) {
+// hasAllProgressReportingCompleted reads DVMP CR present for all PVCs and generates progress information in CR status
+func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
@@ -1844,14 +1703,6 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	isPrivileged, _ := isRsyncPrivileged(srcClient)
 	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
 	for ns, vols := range pvcMap {
-		// Get stunnel svc IP
-		svc := corev1.Service{}
-		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferSvc, Namespace: ns}
-		err := srcClient.Get(context.TODO(), key, &svc)
-		if err != nil {
-			return req, err
-		}
-		ip := svc.Spec.ClusterIP
 		// Add PVC volume mounts
 		for _, vol := range vols {
 			rsyncOptions := t.getRsyncOptions()
@@ -1869,7 +1720,7 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 				},
 				privileged:   isPrivileged,
 				nodeName:     pvcNodeMap[ns+"/"+vol.name],
-				destIP:       ip,
+				destIP:       fmt.Sprintf("%s.%s.svc", DirectVolumeMigrationRsyncTransferSvc, ns),
 				rsyncOptions: rsyncOptions,
 			}
 			req = append(req, podRequirements)
@@ -1878,7 +1729,7 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	return req, nil
 }
 
-func (t *Task) getRsyncOperationsContext() (compat.Client, []rsyncClientPodRequirements, error) {
+func (t *Task) getRsyncOperationsRequirements() (compat.Client, []rsyncClientPodRequirements, error) {
 	srcClient, err := t.getSourceClient()
 	if err != nil {
 		return nil, nil, liberr.Wrap(err)
@@ -1893,11 +1744,11 @@ func (t *Task) getRsyncOperationsContext() (compat.Client, []rsyncClientPodRequi
 func (t *Task) getRsyncPodBackOffLimit() int {
 	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
 	// when both the spec and the overridden backoff limits are not set, use default
-	if t.Owner.Spec.BackOffLimit == 0 && overriddenBackOffLimit == -1 {
+	if t.Owner.Spec.BackOffLimit == 0 && overriddenBackOffLimit == 0 {
 		return DefaultRsyncBackOffLimit
 	}
 	// whenever set, prefer overridden limit over the one set through Spec
-	if overriddenBackOffLimit != -1 {
+	if overriddenBackOffLimit != 0 {
 		return overriddenBackOffLimit
 	}
 	return t.Owner.Spec.BackOffLimit
@@ -1908,7 +1759,7 @@ func (t *Task) getRsyncPodBackOffLimit() int {
 // returns whether or not all operations are completed, whether any of the operation is failed, and a list of failure reasons
 func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 	var failureReasons []string
-	srcClient, podRequirements, err := t.getRsyncOperationsContext()
+	srcClient, podRequirements, err := t.getRsyncOperationsRequirements()
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
@@ -1917,7 +1768,7 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
 	// report progress of pods
-	progressCompleted, err := t.reportRsyncPodProgress()
+	progressCompleted, err := t.hasAllProgressReportingCompleted()
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
@@ -1970,7 +1821,7 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
 			t.Owner.Status.SetCondition(migapi.Condition{
 				Category: Warn,
-				Type:     FailedCreatingRsyncPods,
+				Type:     FailedDeletingRsyncPods,
 				Message:  "Repeated errors occurred when attempting to delete one or more Rsync pods in the source cluster. Please check controller logs for details.",
 				Reason:   Failed,
 				Status:   True,
@@ -1994,15 +1845,16 @@ func (t *Task) reportAdvancedErrorHeuristics() ([]string, error) {
 	}
 	if isStunnelTimeout {
 		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     migapi.ReconcileFailed,
+			Type:     SourceToDestinationNetworkError,
 			Status:   True,
-			Reason:   SourceToDestinationNetworkError,
+			Reason:   RsyncTimeout,
 			Category: migapi.Critical,
 			Message: "All the rsync client pods on source are timing out at 20 seconds, " +
 				"please check your network configuration (like egressnetworkpolicy) that would block traffic from " +
 				"source namespace to destination",
 			Durable: true,
 		})
+		t.Log.Info("Timeout error observed in all Rsync Pods")
 		reasons = append(reasons, "All the source cluster Rsync Pods have timed out, look at error condition for more details")
 		return reasons, nil
 	}
@@ -2013,14 +1865,15 @@ func (t *Task) reportAdvancedErrorHeuristics() ([]string, error) {
 	}
 	if isNoRouteToHost {
 		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     migapi.ReconcileFailed,
+			Type:     SourceToDestinationNetworkError,
 			Status:   True,
-			Reason:   SourceToDestinationNetworkError,
+			Reason:   RsyncNoRouteToHost,
 			Category: migapi.Critical,
 			Message: "All Rsync client Pods on Source Cluster are failing because of \"no route to host\" error," +
 				"please check your network configuration",
 			Durable: true,
 		})
+		t.Log.Info("'No route to host' error observed in all Rsync Pods")
 		reasons = append(reasons, "All the source cluster Rsync Pods have timed out, look at error condition for more details")
 	}
 	return reasons, nil
@@ -2156,6 +2009,7 @@ func (t *Task) ensureRsyncOperations(client compat.Client, podRequirements []rsy
 			statusList.Add(rsyncClientOperationStatus{
 				failed:    lastObservedOperationStatus.Failed,
 				succeeded: lastObservedOperationStatus.Succeeded,
+				operation: lastObservedOperationStatus,
 			})
 			continue
 		}
@@ -2275,8 +2129,7 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 		// when pod doesn't exist, start fresh
 		if pod != nil {
 			operation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
-			currentStatus.failed, currentStatus.succeeded,
-				currentStatus.running, currentStatus.pending = t.analyzeRsyncPodStatus(pod)
+			currentStatus.failed, currentStatus.succeeded, currentStatus.running, currentStatus.pending = t.analyzeRsyncPodStatus(pod)
 			// when pod failed and backoff limit is not reached, create a new pod
 			if currentStatus.failed && operation.CurrentAttempt < t.getRsyncPodBackOffLimit() {
 				err := t.createNewPodForOperation(client, req, operation)

@@ -68,7 +68,7 @@ func (r *RsyncOpts) Load() error {
 	if len(rsyncExtraOpts) > 0 {
 		r.Extras = strings.Fields(rsyncExtraOpts)
 	}
-	r.BackOffLimit, err = getEnvLimit(RsyncBackOffLimit, -1)
+	r.BackOffLimit, err = getEnvLimit(RsyncBackOffLimit, 0)
 	if err != nil {
 		return err
 	}
