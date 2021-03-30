@@ -429,7 +429,8 @@ func (t *Task) createStunnelClientPods() error {
 		"transferImage", transferImage)
 
 	t.Log.Info("Getting limits and requests for Stunnel client Pods")
-	limits, requests, err := getPodResourceLists(t.Client, STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
+
+	limits, requests, err := t.getPodResourceLists(STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
 	if err != nil {
 		return err
 	}

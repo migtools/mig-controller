@@ -88,6 +88,23 @@ func (ds *DirectVolumeMigrationStatus) GetRsyncOperationStatusForPVC(pvcRef *kap
 	return newStatus
 }
 
+// AddRsyncOperation adds a new RsyncOperation to list, updates an existing one if found
+func (ds *DirectVolumeMigrationStatus) AddRsyncOperation(podStatus *RsyncOperation) {
+	if podStatus == nil {
+		return
+	}
+	for i := range ds.RsyncOperations {
+		existing := ds.RsyncOperations[i]
+		if existing.Equal(podStatus) {
+			existing.CurrentAttempt = podStatus.CurrentAttempt
+			existing.Failed = podStatus.Failed
+			existing.Succeeded = podStatus.Succeeded
+			return
+		}
+	}
+	ds.RsyncOperations = append(ds.RsyncOperations, podStatus)
+}
+
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
 // DirectVolumeMigrationStatus
 
@@ -116,8 +133,10 @@ type DirectVolumeMigrationList struct {
 
 type PodProgress struct {
 	*kapi.ObjectReference       `json:",inline"`
-	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
-	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
+	PVCReference                *kapi.ObjectReference `json:"pvcRef,omitempty"`
+	LastObservedProgressPercent string                `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string                `json:"lastObservedTransferRate,omitempty"`
+	TotalElapsedTime            *metav1.Duration      `json:"totalElapsedTime,omitempty"`
 }
 
 // RsyncOperation defines observed state of an Rsync Operation
@@ -130,6 +149,24 @@ type RsyncOperation struct {
 	Succeeded bool `json:"succeeded,omitempty"`
 	// Failed whether operation as a whole failed
 	Failed bool `json:"failed,omitempty"`
+}
+
+func (x *RsyncOperation) Equal(y *RsyncOperation) bool {
+	if y == nil || x.PVCReference == nil || y.PVCReference == nil {
+		return false
+	}
+	if x.PVCReference.Name == y.PVCReference.Name &&
+		x.PVCReference.Namespace == y.PVCReference.Namespace {
+		return true
+	}
+	return false
+}
+
+func (r *RsyncOperation) GetPVDetails() (string, string) {
+	if r.PVCReference != nil {
+		return r.PVCReference.Namespace, r.PVCReference.Name
+	}
+	return "", ""
 }
 
 func (r *RsyncOperation) String() string {

@@ -277,7 +277,7 @@ func TestReconcileMigAnalytic_Reconcile(t *testing.T) {
 					},
 				}, &testMigPlan, &testMigStorage, &testSourceMigCluster, &testTargetMigCluster, &testSourceNamespace),
 			},
-			want:      reconcile.Result{},
+			want:      reconcile.Result{RequeueAfter: time.Second * RequeueInterval},
 			wantErr:   false,
 			wantReady: true,
 		},
