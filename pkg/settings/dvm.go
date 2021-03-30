@@ -14,6 +14,7 @@ const (
 	RsyncOptHardLinks       = "RSYNC_OPT_HARDLINKS"
 	RsyncOptInfo            = "RSYNC_OPT_INFO"
 	RsyncOptExtras          = "RSYNC_OPT_EXTRAS"
+	RsyncBackOffLimit       = "RSYNC_BACKOFF_LIMIT"
 	EnablePVResizing        = "ENABLE_DVM_PV_RESIZING"
 	TCPProxyKey             = "STUNNEL_TCP_PROXY"
 	StunnelVerifyCAKey      = "STUNNEL_VERIFY_CA"
@@ -27,14 +28,16 @@ const (
 //	Delete:  whether to set --delete option or not
 //	HardLinks: whether to set --hard-links option or not
 //	Extras: arbitrary rsync options provided by the user
+//	BackOffLimit: defines number of retries set on Rsync
 type RsyncOpts struct {
-	BwLimit   int
-	Archive   bool
-	Partial   bool
-	Delete    bool
-	HardLinks bool
-	Info      string
-	Extras    []string
+	BwLimit      int
+	Archive      bool
+	Partial      bool
+	Delete       bool
+	HardLinks    bool
+	Info         string
+	Extras       []string
+	BackOffLimit int
 }
 
 // DvmOpts DVM settings
@@ -64,6 +67,10 @@ func (r *RsyncOpts) Load() error {
 	rsyncExtraOpts := os.Getenv(RsyncOptExtras)
 	if len(rsyncExtraOpts) > 0 {
 		r.Extras = strings.Fields(rsyncExtraOpts)
+	}
+	r.BackOffLimit, err = getEnvLimit(RsyncBackOffLimit, 0)
+	if err != nil {
+		return err
 	}
 	return err
 }

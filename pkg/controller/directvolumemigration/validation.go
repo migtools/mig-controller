@@ -2,13 +2,14 @@ package directvolumemigration
 
 import (
 	"context"
+	"reflect"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 )
 
 // Types
@@ -29,14 +30,18 @@ const (
 	RsyncClientPodsPending          = "RsyncClientPodsPending"
 	Succeeded                       = "Succeeded"
 	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
+	FailedCreatingRsyncPods         = "FailedCreatingRsyncPods"
+	FailedDeletingRsyncPods         = "FailedDeletingRsyncPods"
 )
 
 // Reasons
 const (
-	NotFound    = "NotFound"
-	NotSet      = "NotSet"
-	NotDistinct = "NotDistinct"
-	NotReady    = "NotReady"
+	NotFound           = "NotFound"
+	NotSet             = "NotSet"
+	NotDistinct        = "NotDistinct"
+	NotReady           = "NotReady"
+	RsyncTimeout       = "RsyncTimedOut"
+	RsyncNoRouteToHost = "RsyncNoRouteToHost"
 )
 
 // Messages

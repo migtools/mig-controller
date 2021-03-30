@@ -1,11 +1,12 @@
 package migmigration
 
 import (
+	"reflect"
+	"testing"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	v1 "k8s.io/api/core/v1"
-	"reflect"
-	"testing"
 )
 
 func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
@@ -26,7 +27,7 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 					PersistentVolumeClaims: []migapi.PVCToMigrate{
 						{
 							ObjectReference: &v1.ObjectReference{
-								Namespace: "pvc-0",
+								Namespace: "ns",
 								Name:      "foo",
 							},
 						},
@@ -44,15 +45,19 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 					Phase: dvmc.MigrationFailed,
 					FailedPods: []*migapi.PodProgress{
 						{
+							PVCReference: &v1.ObjectReference{
+								Namespace: "ns",
+								Name:      "pvc-0",
+							},
 							ObjectReference: &v1.ObjectReference{
-								Namespace: "pvc-0",
+								Namespace: "ns",
 								Name:      "foo",
 							},
 						},
 					},
 				},
 			}},
-			wantProgress:       []string{"Rsync Client Pod pvc-0/foo: Failed"},
+			wantProgress:       []string{"[pvc-0] ns/foo: Failed"},
 			wantFailureReasons: []string{"direct volume migration failed. 1 total volumes; 0 successful; 0 running; 1 failed"},
 			wantCompleted:      true,
 		},
@@ -63,7 +68,7 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 					PersistentVolumeClaims: []migapi.PVCToMigrate{
 						{
 							ObjectReference: &v1.ObjectReference{
-								Namespace: "pvc-0",
+								Namespace: "ns",
 								Name:      "foo",
 							},
 						},
@@ -82,8 +87,12 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 					Phase:     dvmc.Completed,
 					SuccessfulPods: []*migapi.PodProgress{
 						{
+							PVCReference: &v1.ObjectReference{
+								Namespace: "ns",
+								Name:      "pvc-0",
+							},
 							ObjectReference: &v1.ObjectReference{
-								Namespace: "pvc-0",
+								Namespace: "ns",
 								Name:      "foo",
 							},
 							LastObservedProgressPercent: "100%",
@@ -91,7 +100,7 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 					},
 				},
 			}},
-			wantProgress:       []string{"Rsync Client Pod pvc-0/foo:  100% completed"},
+			wantProgress:       []string{"[pvc-0] ns/foo:  100% completed"},
 			wantFailureReasons: nil,
 			wantCompleted:      true,
 		},
