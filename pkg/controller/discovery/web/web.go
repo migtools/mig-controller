@@ -162,6 +162,11 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				container: w.Container,
 			},
 		},
+		DirectImageHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
 		BackupHandler{
 			ClusterScoped: ClusterScoped{
 				BaseHandler: BaseHandler{
