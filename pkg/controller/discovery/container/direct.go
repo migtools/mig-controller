@@ -2,23 +2,24 @@ package container
 
 import (
 	"context"
+	"time"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 //
-// A collection of k8s DirectVolume resources.
-type DirectVolume struct {
+// A collection of k8s DirectVolumeMigration resources.
+type DirectVolumeMigration struct {
 	// Base
 	BaseCollection
 }
 
-func (r *DirectVolume) AddWatch(dsController controller.Controller) error {
+func (r *DirectVolumeMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &migapi.DirectVolumeMigration{},
@@ -33,7 +34,7 @@ func (r *DirectVolume) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *DirectVolume) Reconcile() error {
+func (r *DirectVolumeMigration) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -45,7 +46,7 @@ func (r *DirectVolume) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"DirectVolume (collection) reconciled.",
+		"DirectVolumeMigration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -56,7 +57,7 @@ func (r *DirectVolume) Reconcile() error {
 	return nil
 }
 
-func (r *DirectVolume) GetDiscovered() ([]model.Model, error) {
+func (r *DirectVolumeMigration) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.DirectVolumeMigrationList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -65,7 +66,7 @@ func (r *DirectVolume) GetDiscovered() ([]model.Model, error) {
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		dv := &model.DirectVolume{}
+		dv := &model.DirectVolumeMigration{}
 		dv.With(&discovered)
 		models = append(models, dv)
 	}
@@ -73,9 +74,9 @@ func (r *DirectVolume) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *DirectVolume) GetStored() ([]model.Model, error) {
+func (r *DirectVolumeMigration) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.DirectVolume{}.List(
+	list, err := model.DirectVolumeMigration{}.List(
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
@@ -93,57 +94,57 @@ func (r *DirectVolume) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *DirectVolume) Create(e event.CreateEvent) bool {
+func (r *DirectVolumeMigration) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
 	}
-	dv := model.DirectVolume{}
+	dv := model.DirectVolumeMigration{}
 	dv.With(object)
 	r.ds.Create(&dv)
 
 	return false
 }
 
-func (r *DirectVolume) Update(e event.UpdateEvent) bool {
+func (r *DirectVolumeMigration) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
 	}
-	restore := model.DirectVolume{}
+	restore := model.DirectVolumeMigration{}
 	restore.With(object)
 	r.ds.Update(&restore)
 
 	return false
 }
 
-func (r *DirectVolume) Delete(e event.DeleteEvent) bool {
+func (r *DirectVolumeMigration) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
 	}
-	dv := model.DirectVolume{}
+	dv := model.DirectVolumeMigration{}
 	dv.With(object)
 	r.ds.Delete(&dv)
 
 	return false
 }
 
-func (r *DirectVolume) Generic(e event.GenericEvent) bool {
+func (r *DirectVolumeMigration) Generic(e event.GenericEvent) bool {
 	return false
 }
 
 //
-// A collection of k8s DirectImage resources.
-type DirectImage struct {
+// A collection of k8s DirectImageMigration resources.
+type DirectImageMigration struct {
 	// Base
 	BaseCollection
 }
 
-func (r *DirectImage) AddWatch(dsController controller.Controller) error {
+func (r *DirectImageMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &migapi.DirectImageMigration{},
@@ -158,7 +159,7 @@ func (r *DirectImage) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *DirectImage) Reconcile() error {
+func (r *DirectImageMigration) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -170,7 +171,7 @@ func (r *DirectImage) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"DirectImage (collection) reconciled.",
+		"DirectImageMigration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -181,7 +182,7 @@ func (r *DirectImage) Reconcile() error {
 	return nil
 }
 
-func (r *DirectImage) GetDiscovered() ([]model.Model, error) {
+func (r *DirectImageMigration) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.DirectImageMigrationList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -190,7 +191,7 @@ func (r *DirectImage) GetDiscovered() ([]model.Model, error) {
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		dim := &model.DirectImage{}
+		dim := &model.DirectImageMigration{}
 		dim.With(&discovered)
 		models = append(models, dim)
 	}
@@ -198,9 +199,9 @@ func (r *DirectImage) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *DirectImage) GetStored() ([]model.Model, error) {
+func (r *DirectImageMigration) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.DirectImage{}.List(
+	list, err := model.DirectImageMigration{}.List(
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
@@ -218,45 +219,45 @@ func (r *DirectImage) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *DirectImage) Create(e event.CreateEvent) bool {
+func (r *DirectImageMigration) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.DirectImageMigration)
 	if !cast {
 		return false
 	}
-	dim := model.DirectImage{}
+	dim := model.DirectImageMigration{}
 	dim.With(object)
 	r.ds.Create(&dim)
 
 	return false
 }
 
-func (r *DirectImage) Update(e event.UpdateEvent) bool {
+func (r *DirectImageMigration) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*migapi.DirectImageMigration)
 	if !cast {
 		return false
 	}
-	restore := model.DirectImage{}
+	restore := model.DirectImageMigration{}
 	restore.With(object)
 	r.ds.Update(&restore)
 
 	return false
 }
 
-func (r *DirectImage) Delete(e event.DeleteEvent) bool {
+func (r *DirectImageMigration) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.DirectImageMigration)
 	if !cast {
 		return false
 	}
-	dim := model.DirectImage{}
+	dim := model.DirectImageMigration{}
 	dim.With(object)
 	r.ds.Delete(&dim)
 
 	return false
 }
 
-func (r *DirectImage) Generic(e event.GenericEvent) bool {
+func (r *DirectImageMigration) Generic(e event.GenericEvent) bool {
 	return false
 }

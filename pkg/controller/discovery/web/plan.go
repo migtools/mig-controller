@@ -452,7 +452,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 //
 // Add direct volumes
 func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode) error {
-	collection := model.DirectVolume{}
+	collection := model.DirectVolumeMigration{}
 	cLabel := t.cLabel(migration.DecodeObject())
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
@@ -471,7 +471,7 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
-			ObjectLink: DirectVolumeHandler{}.Link(m),
+			ObjectLink: DirectVolumeMigrationHandler{}.Link(m),
 			Namespace:  m.Namespace,
 			Name:       m.Name,
 		}
@@ -484,7 +484,7 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 //
 // Add direct images
 func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode) error {
-	collection := model.DirectImage{}
+	collection := model.DirectImageMigration{}
 	cLabel := t.cLabel(migration.DecodeObject())
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
@@ -503,7 +503,7 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
-			ObjectLink: DirectImageHandler{}.Link(m),
+			ObjectLink: DirectImageMigrationHandler{}.Link(m),
 			Namespace:  m.Namespace,
 			Name:       m.Name,
 		}

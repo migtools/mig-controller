@@ -2,18 +2,19 @@ package model
 
 import (
 	"encoding/json"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
 //
-// DirectVolume model.
-type DirectVolume struct {
+// DirectVolumeMigration model.
+type DirectVolumeMigration struct {
 	CR
 }
 
 //
 // Update the model `with` a DirectVolumeMigration.
-func (m *DirectVolume) With(object *migapi.DirectVolumeMigration) {
+func (m *DirectVolumeMigration) With(object *migapi.DirectVolumeMigration) {
 	m.UID = string(object.UID)
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
@@ -23,14 +24,14 @@ func (m *DirectVolume) With(object *migapi.DirectVolumeMigration) {
 
 //
 // Encode the object.
-func (m *DirectVolume) EncodeObject(dvm *migapi.DirectVolumeMigration) {
+func (m *DirectVolumeMigration) EncodeObject(dvm *migapi.DirectVolumeMigration) {
 	object, _ := json.Marshal(dvm)
 	m.Object = string(object)
 }
 
 //
 // Decode the object.
-func (m *DirectVolume) DecodeObject() *migapi.DirectVolumeMigration {
+func (m *DirectVolumeMigration) DecodeObject() *migapi.DirectVolumeMigration {
 	dvm := &migapi.DirectVolumeMigration{}
 	json.Unmarshal([]byte(m.Object), dvm)
 	return dvm
@@ -38,21 +39,21 @@ func (m *DirectVolume) DecodeObject() *migapi.DirectVolumeMigration {
 
 //
 // Count in the DB.
-func (m DirectVolume) Count(db DB, options ListOptions) (int64, error) {
+func (m DirectVolumeMigration) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
 //
 // Fetch the model from the DB.
-func (m DirectVolume) List(db DB, options ListOptions) ([]*DirectVolume, error) {
-	list := []*DirectVolume{}
+func (m DirectVolumeMigration) List(db DB, options ListOptions) ([]*DirectVolumeMigration, error) {
+	list := []*DirectVolumeMigration{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
-		list = append(list, intPtr.(*DirectVolume))
+		list = append(list, intPtr.(*DirectVolumeMigration))
 	}
 
 	return list, err
@@ -60,40 +61,40 @@ func (m DirectVolume) List(db DB, options ListOptions) ([]*DirectVolume, error) 
 
 //
 // Fetch the model from the DB.
-func (m *DirectVolume) Get(db DB) error {
+func (m *DirectVolumeMigration) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
 //
 // Insert the model into the DB.
-func (m *DirectVolume) Insert(db DB) error {
+func (m *DirectVolumeMigration) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
 //
 // Update the model in the DB.
-func (m *DirectVolume) Update(db DB) error {
+func (m *DirectVolumeMigration) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
 //
 // Delete the model in the DB.
-func (m *DirectVolume) Delete(db DB) error {
+func (m *DirectVolumeMigration) Delete(db DB) error {
 	m.SetPk()
 	return Table{db}.Delete(m)
 }
 
 //
-// DirectImage model.
-type DirectImage struct {
+// DirectImageMigration model.
+type DirectImageMigration struct {
 	CR
 }
 
 //
 // Update the model `with` a DirectImageMigration.
-func (m *DirectImage) With(object *migapi.DirectImageMigration) {
+func (m *DirectImageMigration) With(object *migapi.DirectImageMigration) {
 	m.UID = string(object.UID)
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
@@ -103,14 +104,14 @@ func (m *DirectImage) With(object *migapi.DirectImageMigration) {
 
 //
 // Encode the object.
-func (m *DirectImage) EncodeObject(dim *migapi.DirectImageMigration) {
+func (m *DirectImageMigration) EncodeObject(dim *migapi.DirectImageMigration) {
 	object, _ := json.Marshal(dim)
 	m.Object = string(object)
 }
 
 //
 // Decode the object.
-func (m *DirectImage) DecodeObject() *migapi.DirectImageMigration {
+func (m *DirectImageMigration) DecodeObject() *migapi.DirectImageMigration {
 	dim := &migapi.DirectImageMigration{}
 	json.Unmarshal([]byte(m.Object), dim)
 	return dim
@@ -118,21 +119,21 @@ func (m *DirectImage) DecodeObject() *migapi.DirectImageMigration {
 
 //
 // Count in the DB.
-func (m DirectImage) Count(db DB, options ListOptions) (int64, error) {
+func (m DirectImageMigration) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
 //
 // Fetch the model from the DB.
-func (m DirectImage) List(db DB, options ListOptions) ([]*DirectImage, error) {
-	list := []*DirectImage{}
+func (m DirectImageMigration) List(db DB, options ListOptions) ([]*DirectImageMigration, error) {
+	list := []*DirectImageMigration{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
-		list = append(list, intPtr.(*DirectImage))
+		list = append(list, intPtr.(*DirectImageMigration))
 	}
 
 	return list, err
@@ -140,27 +141,27 @@ func (m DirectImage) List(db DB, options ListOptions) ([]*DirectImage, error) {
 
 //
 // Fetch the model from the DB.
-func (m *DirectImage) Get(db DB) error {
+func (m *DirectImageMigration) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
 //
 // Insert the model into the DB.
-func (m *DirectImage) Insert(db DB) error {
+func (m *DirectImageMigration) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
 //
 // Update the model in the DB.
-func (m *DirectImage) Update(db DB) error {
+func (m *DirectImageMigration) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
 //
 // Delete the model in the DB.
-func (m *DirectImage) Delete(db DB) error {
+func (m *DirectImageMigration) Delete(db DB) error {
 	m.SetPk()
 	return Table{db}.Delete(m)
 }

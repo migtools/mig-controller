@@ -157,7 +157,12 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				container: w.Container,
 			},
 		},
-		DirectVolumeHandler{
+		DirectVolumeMigrationHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
+		DirectImageMigrationHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
 			},
