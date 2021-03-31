@@ -103,6 +103,7 @@ type MigClusterStatus struct {
 
 // MigCluster is the Schema for the migclusters API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:path=migclusters,shortName=mc
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="URL",type=string,JSONPath=".spec.url"
 // +kubebuilder:printcolumn:name="Host",type=boolean,JSONPath=".spec.isHostCluster"

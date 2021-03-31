@@ -62,6 +62,7 @@ type MigStorageStatus struct {
 
 // MigStorage is the Schema for the migstorages API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:path=migstorage,shortName=ms
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="BackupStorageProvider",type=string,JSONPath=".spec.backupStorageProvider"
 // +kubebuilder:printcolumn:name="VolumeSnapshotProvider",type=string,JSONPath=".spec.volumeSnapshotProvider"

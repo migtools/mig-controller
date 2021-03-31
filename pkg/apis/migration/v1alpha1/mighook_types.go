@@ -63,6 +63,7 @@ type MigHookStatus struct {
 
 // MigHook is the Schema for the mighooks API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:path=mighooks,shortName=mh
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Image",type=string,JSONPath=".spec.image"
 // +kubebuilder:printcolumn:name="TargetCluster",type=string,JSONPath=".spec.targetCluster"

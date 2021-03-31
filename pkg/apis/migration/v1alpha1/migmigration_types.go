@@ -116,6 +116,7 @@ type Step struct {
 
 // MigMigration is the Schema for the migmigrations API
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:path=migmigrations,shortName=mm
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Plan",type=string,JSONPath=".spec.migPlanRef.name"
 // +kubebuilder:printcolumn:name="Stage",type=string,JSONPath=".spec.stage"
