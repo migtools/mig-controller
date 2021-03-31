@@ -119,7 +119,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	}
 
 	// Set MigMigration name key on logger
-	migration, err := pvProgress.GetDVMforDVMP(r)
+	migration, err := pvProgress.GetMigrationforDVMP(r)
 	if migration != nil {
 		log.SetValues("migMigration", migration.Name)
 	}
