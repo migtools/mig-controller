@@ -290,14 +290,26 @@ func (h DirectVolumeHandler) Link(m *model.DirectVolume) string {
 		})
 }
 
+// // Build self link.
+// func (h RestoreHandler) Link(c *model.Cluster, m *model.Restore) string {
+// 	return h.BaseHandler.Link(
+// 		RestoreRoot,
+// 		Params{
+// 			NsParam:      c.Namespace,
+// 			ClusterParam: c.Name,
+// 			Ns2Param:     m.Namespace,
+// 			RestoreParam: m.Name,
+// 		})
+// }
+
 //
 // Build self link.
 func (h DirectImageHandler) Link(m *model.DirectImage) string {
 	return h.BaseHandler.Link(
 		DirectImageRoot,
 		Params{
-			NsParam:           m.Namespace,
-			DirectVolumeParam: m.Name,
+			NsParam:          m.Namespace,
+			DirectImageParam: m.Name,
 		})
 }
 
