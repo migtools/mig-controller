@@ -17,9 +17,17 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// labels
+const (
+	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
+	RsyncPodIdentityLabel = "migration.openshift.io/created-for-pvc"
 )
 
 type PVCToMigrate struct {
@@ -34,6 +42,9 @@ type DirectVolumeMigrationSpec struct {
 	SrcMigClusterRef  *kapi.ObjectReference `json:"srcMigClusterRef,omitempty"`
 	DestMigClusterRef *kapi.ObjectReference `json:"destMigClusterRef,omitempty"`
 
+	// BackOffLimit retry limit on Rsync pods
+	BackOffLimit int `json:"backOffLimit,omitempty"`
+
 	//  Holds all the PVCs that are to be migrated with direct volume migration
 	PersistentVolumeClaims []PVCToMigrate `json:"persistentVolumeClaims,omitempty"`
 
@@ -47,16 +58,51 @@ type DirectVolumeMigrationSpec struct {
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
 type DirectVolumeMigrationStatus struct {
 	Conditions       `json:","`
-	ObservedDigest   string         `json:"observedDigest"`
-	StartTimestamp   *metav1.Time   `json:"startTimestamp,omitempty"`
-	PhaseDescription string         `json:"phaseDescription"`
-	Phase            string         `json:"phase,omitempty"`
-	Itinerary        string         `json:"itinerary,omitempty"`
-	Errors           []string       `json:"errors,omitempty"`
-	SuccessfulPods   []*PodProgress `json:"successfulPods,omitempty"`
-	FailedPods       []*PodProgress `json:"failedPods,omitempty"`
-	RunningPods      []*PodProgress `json:"runningPods,omitempty"`
-	PendingPods      []*PodProgress `json:"pendingPods,omitempty"`
+	ObservedDigest   string            `json:"observedDigest"`
+	StartTimestamp   *metav1.Time      `json:"startTimestamp,omitempty"`
+	PhaseDescription string            `json:"phaseDescription"`
+	Phase            string            `json:"phase,omitempty"`
+	Itinerary        string            `json:"itinerary,omitempty"`
+	Errors           []string          `json:"errors,omitempty"`
+	SuccessfulPods   []*PodProgress    `json:"successfulPods,omitempty"`
+	FailedPods       []*PodProgress    `json:"failedPods,omitempty"`
+	RunningPods      []*PodProgress    `json:"runningPods,omitempty"`
+	PendingPods      []*PodProgress    `json:"pendingPods,omitempty"`
+	RsyncOperations  []*RsyncOperation `json:"rsyncOperations,omitempty"`
+}
+
+// GetRsyncOperationStatusForPVC returns RsyncOperation from status for matching PVC, creates new one if doesn't exist already
+func (ds *DirectVolumeMigrationStatus) GetRsyncOperationStatusForPVC(pvcRef *kapi.ObjectReference) *RsyncOperation {
+	for i := range ds.RsyncOperations {
+		rsyncOperation := ds.RsyncOperations[i]
+		if rsyncOperation.PVCReference.Namespace == pvcRef.Namespace &&
+			rsyncOperation.PVCReference.Name == pvcRef.Name {
+			return rsyncOperation
+		}
+	}
+	newStatus := &RsyncOperation{
+		PVCReference:   pvcRef,
+		CurrentAttempt: 0,
+	}
+	ds.RsyncOperations = append(ds.RsyncOperations, newStatus)
+	return newStatus
+}
+
+// AddRsyncOperation adds a new RsyncOperation to list, updates an existing one if found
+func (ds *DirectVolumeMigrationStatus) AddRsyncOperation(podStatus *RsyncOperation) {
+	if podStatus == nil {
+		return
+	}
+	for i := range ds.RsyncOperations {
+		existing := ds.RsyncOperations[i]
+		if existing.Equal(podStatus) {
+			existing.CurrentAttempt = podStatus.CurrentAttempt
+			existing.Failed = podStatus.Failed
+			existing.Succeeded = podStatus.Succeeded
+			return
+		}
+	}
+	ds.RsyncOperations = append(ds.RsyncOperations, podStatus)
 }
 
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
@@ -87,8 +133,52 @@ type DirectVolumeMigrationList struct {
 
 type PodProgress struct {
 	*kapi.ObjectReference       `json:",inline"`
-	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
-	LastObservedTransferRate    string `json:"lastObservedTransferRate,omitempty"`
+	PVCReference                *kapi.ObjectReference `json:"pvcRef,omitempty"`
+	LastObservedProgressPercent string                `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string                `json:"lastObservedTransferRate,omitempty"`
+	TotalElapsedTime            *metav1.Duration      `json:"totalElapsedTime,omitempty"`
+}
+
+// RsyncOperation defines observed state of an Rsync Operation
+type RsyncOperation struct {
+	// PVCReference pvc to which this Rsync operation corresponds to
+	PVCReference *kapi.ObjectReference `json:"pvcReference,omitempty"`
+	// CurrentAttempt current ongoing attempt of an Rsync operation
+	CurrentAttempt int `json:"currentAttempt,omitempty"`
+	// Succeeded whether operation as a whole succeded
+	Succeeded bool `json:"succeeded,omitempty"`
+	// Failed whether operation as a whole failed
+	Failed bool `json:"failed,omitempty"`
+}
+
+func (x *RsyncOperation) Equal(y *RsyncOperation) bool {
+	if y == nil || x.PVCReference == nil || y.PVCReference == nil {
+		return false
+	}
+	if x.PVCReference.Name == y.PVCReference.Name &&
+		x.PVCReference.Namespace == y.PVCReference.Namespace {
+		return true
+	}
+	return false
+}
+
+func (r *RsyncOperation) GetPVDetails() (string, string) {
+	if r.PVCReference != nil {
+		return r.PVCReference.Namespace, r.PVCReference.Name
+	}
+	return "", ""
+}
+
+func (r *RsyncOperation) String() string {
+	if r.PVCReference != nil {
+		return fmt.Sprintf("%s/%s", r.PVCReference.Namespace, r.PVCReference.Name)
+	}
+	return ""
+}
+
+// IsComplete tells whether the operation as a whole is in terminal state
+func (r *RsyncOperation) IsComplete() bool {
+	return r.Failed || r.Succeeded
 }
 
 func (r *DirectVolumeMigration) GetSourceCluster(client k8sclient.Client) (*MigCluster, error) {

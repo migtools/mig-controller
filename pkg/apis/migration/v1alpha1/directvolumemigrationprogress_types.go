@@ -27,20 +27,59 @@ import (
 
 // DirectVolumeMigrationProgressSpec defines the desired state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressSpec struct {
-	ClusterRef *kapi.ObjectReference `json:"clusterRef,omitempty"`
-	PodRef     *kapi.ObjectReference `json:"podRef,omitempty"`
+	ClusterRef   *kapi.ObjectReference `json:"clusterRef,omitempty"`
+	PodRef       *kapi.ObjectReference `json:"podRef,omitempty"`
+	PodNamespace string                `json:"podNamespace,omitempty"`
+	PodSelector  map[string]string     `json:"podSelector,omitempty"`
 }
+
+const (
+	// DVMPDoneLabelKey used to track progress of dvmp operations
+	DVMPDoneLabelKey = "migration.openshift.io/dvmp-done"
+)
 
 // DirectVolumeMigrationProgressStatus defines the observed state of DirectVolumeMigrationProgress
 type DirectVolumeMigrationProgressStatus struct {
-	Conditions                  `json:",omitempty"`
-	PodPhase                    kapi.PodPhase    `json:"phase,omitempty"`
-	ExitCode                    *int32           `json:"exitCode,omitempty"`
-	ContainerElapsedTime        *metav1.Duration `json:"containerElapsedTime,omitempty"`
-	LogMessage                  string           `json:"logMessage,omitempty"`
-	ObservedDigest              string           `json:"observedDigest,omitempty"`
-	LastObservedProgressPercent string           `json:"lastObservedProgressPercent,omitempty"`
-	LastObservedTransferRate    string           `json:"lastObservedTransferRate,omitempty"`
+	Conditions `json:",omitempty"`
+	// RsyncPodStatus observed state of most recent Rsync attempt
+	RsyncPodStatus `json:",inline"`
+	// RsyncPodStatuses history of all Rsync attempts
+	RsyncPodStatuses []RsyncPodStatus `json:"rsyncPodStatuses,omitempty"`
+	// RsyncElapsedTime total elapsed time of Rsync operation
+	RsyncElapsedTime *metav1.Duration `json:"rsyncElapsedTime,omitempty"`
+	// TotalProgressPercentage cumulative percentage of all Rsync attempts
+	TotalProgressPercentage string `json:"totalProgressPercentage,omitempty"`
+	ObservedDigest          string `json:"observedDigest,omitempty"`
+}
+
+// RsyncPodStatus defines observed state of an Rsync attempt
+type RsyncPodStatus struct {
+	// PodName name of the Rsync Pod
+	PodName string `json:"podName,omitempty"`
+	// PodPhase phase of the Rsync Pod
+	PodPhase kapi.PodPhase `json:"phase,omitempty"`
+	// ExitCode exit code of terminated Rsync Pod
+	ExitCode *int32 `json:"exitCode,omitempty"`
+	// ContainerElapsedTime total execution time of Rsync Pod
+	ContainerElapsedTime *metav1.Duration `json:"containerElapsedTime,omitempty"`
+	// LogMessage few lines of tailed log of the Rsync Pod
+	LogMessage string `json:"logMessage,omitempty"`
+	// LastObservedProgressPercent progress of Rsync in percentage
+	LastObservedProgressPercent string `json:"lastObservedProgressPercent,omitempty"`
+	// LastObservedTransferRate rate of transfer of Rsync
+	LastObservedTransferRate string `json:"lastObservedTransferRate,omitempty"`
+	// CreationTimestamp pod creation time
+	CreationTimestamp *metav1.Time `json:"creationTimestamp,omitempty"`
+}
+
+// RsyncPodExistsInHistory checks whether Rsync pod status is already part of the history
+func (ds *DirectVolumeMigrationProgressStatus) RsyncPodExistsInHistory(podName string) bool {
+	for _, podStatus := range ds.RsyncPodStatuses {
+		if podStatus.PodName == podName {
+			return true
+		}
+	}
+	return false
 }
 
 // +genclient
