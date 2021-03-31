@@ -104,6 +104,45 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 			wantFailureReasons: nil,
 			wantCompleted:      true,
 		},
+		{
+			name: "when PVCReference is not present on the PodProgress, pre-MTC-1.4.3 message should be shown",
+			args: args{dvm: &migapi.DirectVolumeMigration{
+				Spec: migapi.DirectVolumeMigrationSpec{
+					PersistentVolumeClaims: []migapi.PVCToMigrate{
+						{
+							ObjectReference: &v1.ObjectReference{
+								Namespace: "ns",
+								Name:      "foo",
+							},
+						},
+					},
+				},
+				Status: migapi.DirectVolumeMigrationStatus{
+					Conditions: migapi.Conditions{
+						List: []migapi.Condition{
+							{
+								Type:   dvmc.Succeeded,
+								Status: True,
+							},
+						},
+					},
+					Itinerary: dvmc.VolumeMigration.Name,
+					Phase:     dvmc.Completed,
+					SuccessfulPods: []*migapi.PodProgress{
+						{
+							ObjectReference: &v1.ObjectReference{
+								Namespace: "ns",
+								Name:      "foo",
+							},
+							LastObservedProgressPercent: "100%",
+						},
+					},
+				},
+			}},
+			wantProgress:       []string{"Rsync Pod ns/foo:  100% completed"},
+			wantFailureReasons: nil,
+			wantCompleted:      true,
+		},
 	}
 	for _, tt := range tests {
 		t1.Run(tt.name, func(t1 *testing.T) {
