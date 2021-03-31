@@ -164,7 +164,12 @@ func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []str
 		if state == "Completed" {
 			state = ""
 		}
-		p := fmt.Sprintf("[%s] %s: %s", pod.PVCReference.Name, path.Join(pod.Namespace, pod.Name), state)
+		p := ""
+		if pod.PVCReference != nil {
+			p = fmt.Sprintf("[%s] %s: %s", pod.PVCReference.Name, path.Join(pod.Namespace, pod.Name), state)
+		} else {
+			p = fmt.Sprintf("Rsync Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
+		}
 		if pod.LastObservedProgressPercent != "" {
 			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)
 		}
