@@ -131,6 +131,19 @@ func (r *DirectVolumeMigrationProgress) GetDVMforDVMP(client k8sclient.Client) (
 	return nil, nil
 }
 
+// Get the MigMigration that owns this DirectVolumeMigrationProgress. If not owned, return nil.
+func (r *DirectVolumeMigrationProgress) GetMigrationforDVMP(client k8sclient.Client) (*MigMigration, error) {
+	dvm, err := r.GetDVMforDVMP(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	migration, err := dvm.GetMigrationForDVM(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return migration, nil
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DirectVolumeMigrationProgressList contains a list of DirectVolumeMigrationProgress

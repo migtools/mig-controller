@@ -118,6 +118,12 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	// Set MigMigration name key on logger
+	migration, err := pvProgress.GetMigrationforDVMP(r)
+	if migration != nil {
+		log.SetValues("migMigration", migration.Name)
+	}
+
 	// Set up jaeger tracing
 	reconcileSpan, err := r.initTracer(*pvProgress)
 	if reconcileSpan != nil {

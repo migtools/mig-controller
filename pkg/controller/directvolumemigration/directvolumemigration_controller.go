@@ -94,6 +94,9 @@ type ReconcileDirectVolumeMigration struct {
 func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Reset()
 
+	// Set values
+	log.SetValues("dvm", request.Name)
+
 	// Fetch the DirectVolumeMigration instance
 	direct := &migapi.DirectVolumeMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, direct)
@@ -107,14 +110,17 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	// Set MigMigration name key on logger
+	migration, err := direct.GetMigrationForDVM(r)
+	if migration != nil {
+		log.SetValues("migMigration", migration.Name)
+	}
+
 	// Set up jaeger tracing
 	reconcileSpan := r.initTracer(direct)
 	if reconcileSpan != nil {
 		defer reconcileSpan.Finish()
 	}
-
-	// Set values
-	log.SetValues("dvm", request.Name)
 
 	// Check if completed
 	if direct.Status.Phase == Completed {
