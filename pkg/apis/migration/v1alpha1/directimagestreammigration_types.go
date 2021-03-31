@@ -97,6 +97,19 @@ func (r *DirectImageStreamMigration) GetDIMforDISM(client k8sclient.Client) (*Di
 	return nil, nil
 }
 
+// Get the Migration associated with this DirectImageStreamMigration. If not owned, return nil.
+func (r *DirectImageStreamMigration) GetMigrationForDISM(client k8sclient.Client) (*MigMigration, error) {
+	dim, err := r.GetDIMforDISM(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	migration, err := dim.GetMigrationForDIM(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return migration, nil
+}
+
 func (r *DirectImageStreamMigration) GetImageStream(c k8sclient.Client) (*imagev1.ImageStream, error) {
 	cluster, err := r.GetSourceCluster(c)
 	if err != nil {

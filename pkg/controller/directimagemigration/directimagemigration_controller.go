@@ -126,6 +126,12 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		return reconcile.Result{Requeue: true}, err
 	}
 
+	// Set MigMigration name key on logger
+	migration, err := imageMigration.GetMigrationForDIM(r)
+	if migration != nil {
+		log.SetValues("migMigration", migration.Name)
+	}
+
 	// Set up jaeger tracing
 	reconcileSpan := r.initTracer(imageMigration)
 	if reconcileSpan != nil {
