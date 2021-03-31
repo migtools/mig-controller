@@ -149,8 +149,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	// Validate
 	cluster, srcClient, err := r.validate(pvProgress)
 	if err != nil {
-		log.Info("Validation failed, requeueing")
-		log.Trace(err)
+		log.V(4).Info("Validation failed, requeueing", "error", err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

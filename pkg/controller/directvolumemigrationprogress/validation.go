@@ -34,7 +34,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) validate(pvProgress *migapi.Dir
 	cluster *migapi.MigCluster, client compat.Client, err error) {
 	cluster, err = r.validateCluster(pvProgress)
 	if err != nil {
-		log.V(4).Error(err, "Validation check for referenced MigCluster failed")
+		log.V(4).Info("Validation check for referenced MigCluster failed", "error", err)
 		err = liberr.Wrap(err)
 		return
 	}
@@ -48,7 +48,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) validate(pvProgress *migapi.Dir
 	}
 	err = r.validateSpec(client, pvProgress)
 	if err != nil {
-		log.V(4).Error(err, "Validation check for spec failed")
+		log.V(4).Info("Validation check for spec failed", "error", err)
 		err = liberr.Wrap(err)
 		return
 	}
