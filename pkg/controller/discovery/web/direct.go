@@ -12,34 +12,34 @@ import (
 
 // DirectVolume + DirectImage route root.
 const (
-	DirectVolumeParam = "directvolume"
-	DirectVolumesRoot = Root + "/directvolumes"
+	DirectVolumeParam = "directvolumemigration"
+	DirectVolumesRoot = Root + "/directvolumemigrations"
 	DirectVolumeRoot  = DirectVolumesRoot + "/:" + DirectVolumeParam
-	DirectImageParam  = "directimage"
-	DirectImagesRoot  = Root + "/directimages"
+	DirectImageParam  = "directimagemigration"
+	DirectImagesRoot  = Root + "/directimagemigrations"
 	DirectImageRoot   = DirectImagesRoot + "/:" + DirectImageParam
 )
 
 //
 // DirectVolume (route) handler.
-type DirectVolumeHandler struct {
+type DirectVolumeMigrationHandler struct {
 	// Base
 	BaseHandler
 	// DirectVolume referenced in the request.
-	directVolume model.DirectVolume
+	directVolume model.DirectVolumeMigration
 }
 
 // DirectImage (route) handler.
-type DirectImageHandler struct {
+type DirectImageMigrationHandler struct {
 	// Base
 	BaseHandler
 	// DirectImage referenced in the request.
-	directImage model.DirectImage
+	directImage model.DirectImageMigration
 }
 
 //
 // Add DV routes.
-func (h DirectVolumeHandler) AddRoutes(r *gin.Engine) {
+func (h DirectVolumeMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumesRoot, h.List)
 	r.GET(DirectVolumesRoot+"/", h.List)
 	r.GET(DirectVolumeRoot, h.Get)
@@ -47,7 +47,7 @@ func (h DirectVolumeHandler) AddRoutes(r *gin.Engine) {
 
 //
 // Add DI routes.
-func (h DirectImageHandler) AddRoutes(r *gin.Engine) {
+func (h DirectImageMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectImagesRoot, h.List)
 	r.GET(DirectImagesRoot+"/", h.List)
 	r.GET(DirectImageRoot, h.Get)
@@ -57,14 +57,14 @@ func (h DirectImageHandler) AddRoutes(r *gin.Engine) {
 // Prepare to fulfil the request.
 // Fetch the referenced dvm.
 // Perform SAR authorization.
-func (h *DirectVolumeHandler) Prepare(ctx *gin.Context) int {
+func (h *DirectVolumeMigrationHandler) Prepare(ctx *gin.Context) int {
 	status := h.BaseHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		return status
 	}
 	name := ctx.Param(DirectVolumeParam)
 	if name != "" {
-		h.directVolume = model.DirectVolume{
+		h.directVolume = model.DirectVolumeMigration{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
 				Name:      ctx.Param(DirectVolumeParam),
@@ -92,14 +92,14 @@ func (h *DirectVolumeHandler) Prepare(ctx *gin.Context) int {
 // Prepare to fulfil the request.
 // Fetch the referenced dim.
 // Perform SAR authorization.
-func (h *DirectImageHandler) Prepare(ctx *gin.Context) int {
+func (h *DirectImageMigrationHandler) Prepare(ctx *gin.Context) int {
 	status := h.BaseHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		return status
 	}
 	name := ctx.Param(DirectImageParam)
 	if name != "" {
-		h.directImage = model.DirectImage{
+		h.directImage = model.DirectImageMigration{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
 				Name:      ctx.Param(DirectImageParam),
@@ -125,7 +125,7 @@ func (h *DirectImageHandler) Prepare(ctx *gin.Context) int {
 
 // Build the appropriate SAR object.
 // The subject is the DirectVolumeMigration.
-func (h *DirectVolumeHandler) getSAR() auth.SelfSubjectAccessReview {
+func (h *DirectVolumeMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 	return auth.SelfSubjectAccessReview{
 		Spec: auth.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &auth.ResourceAttributes{
@@ -141,7 +141,7 @@ func (h *DirectVolumeHandler) getSAR() auth.SelfSubjectAccessReview {
 
 // Build the appropriate SAR object.
 // The subject is the DirectImageMigration.
-func (h *DirectImageHandler) getSAR() auth.SelfSubjectAccessReview {
+func (h *DirectImageMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 	return auth.SelfSubjectAccessReview{
 		Spec: auth.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &auth.ResourceAttributes{
@@ -157,14 +157,14 @@ func (h *DirectImageHandler) getSAR() auth.SelfSubjectAccessReview {
 
 //
 // List all of the dvms in the namespace.
-func (h DirectVolumeHandler) List(ctx *gin.Context) {
+func (h DirectVolumeMigrationHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
 	db := h.container.Db
-	collection := model.DirectVolume{}
+	collection := model.DirectVolumeMigration{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
@@ -192,14 +192,14 @@ func (h DirectVolumeHandler) List(ctx *gin.Context) {
 
 //
 // List all of the dims in the namespace.
-func (h DirectImageHandler) List(ctx *gin.Context) {
+func (h DirectImageMigrationHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
 	db := h.container.Db
-	collection := model.DirectImage{}
+	collection := model.DirectImageMigration{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
@@ -227,7 +227,7 @@ func (h DirectImageHandler) List(ctx *gin.Context) {
 
 //
 // Get a specific dvm.
-func (h DirectVolumeHandler) Get(ctx *gin.Context) {
+func (h DirectVolumeMigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -254,7 +254,7 @@ func (h DirectVolumeHandler) Get(ctx *gin.Context) {
 
 //
 // Get a specific dim.
-func (h DirectImageHandler) Get(ctx *gin.Context) {
+func (h DirectImageMigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
@@ -281,7 +281,7 @@ func (h DirectImageHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link.
-func (h DirectVolumeHandler) Link(m *model.DirectVolume) string {
+func (h DirectVolumeMigrationHandler) Link(m *model.DirectVolumeMigration) string {
 	return h.BaseHandler.Link(
 		DirectVolumeRoot,
 		Params{
@@ -292,7 +292,7 @@ func (h DirectVolumeHandler) Link(m *model.DirectVolume) string {
 
 //
 // Build self link.
-func (h DirectImageHandler) Link(m *model.DirectImage) string {
+func (h DirectImageMigrationHandler) Link(m *model.DirectImageMigration) string {
 	return h.BaseHandler.Link(
 		DirectImageRoot,
 		Params{
@@ -329,7 +329,7 @@ type DirectImage struct {
 
 //
 // Build the resource.
-func (r *DirectVolume) With(m *model.DirectVolume) {
+func (r *DirectVolume) With(m *model.DirectVolumeMigration) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.Object = m.DecodeObject()
@@ -337,7 +337,7 @@ func (r *DirectVolume) With(m *model.DirectVolume) {
 
 //
 // Build the resource.
-func (r *DirectImage) With(m *model.DirectImage) {
+func (r *DirectImage) With(m *model.DirectImageMigration) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.Object = m.DecodeObject()
