@@ -7,6 +7,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	pvdr "github.com/konveyor/mig-controller/pkg/cloudprovider"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/pods"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -147,6 +148,13 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 	}
 
 	for _, pod := range list.Items {
+		// Logs abnormal events for Restic Pods if any are found
+		migevent.LogAbnormalEventsForResource(
+			client, t.Log,
+			"Found abnormal event for Restic Pod",
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+			"pod")
+
 		if pod.DeletionTimestamp != nil {
 			t.Log.Info("Deletion timestamp found on Restic Pod, "+
 				"Pod is in the process of deleting. Requeuing and waiting for restart.",
@@ -265,6 +273,13 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 		}
 
 		for _, pod := range list.Items {
+			// Logs abnormal events for Velero Pod if any are found
+			migevent.LogAbnormalEventsForResource(
+				client, t.Log,
+				"Found abnormal event for Velero Pod",
+				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+				"pod")
+
 			if pod.DeletionTimestamp != nil {
 				t.Log.Info("Found Velero Pod with deletion timestamp."+
 					" Requeuing and waiting for Pod to finish deleting and restart.",
