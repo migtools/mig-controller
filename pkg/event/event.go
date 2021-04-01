@@ -39,7 +39,7 @@ func GetAbnormalEventsForResource(client client.Client,
 			continue
 		}
 		// Check if same event reason has already been seen, replace if timestamp is newer
-		eventFromMap, ok := uniqueEventMap[event.Message]
+		eventFromMap, ok := uniqueEventMap[event.Reason]
 		if !ok {
 			uniqueEventMap[event.Reason] = event
 			continue
