@@ -208,7 +208,7 @@ func (h *DirectVolumeMigrationProgressHandler) Prepare(ctx *gin.Context) int {
 	if status != http.StatusOK {
 		return status
 	}
-	name := ctx.Param(DirectVolumeParam)
+	name := ctx.Param(DirectVolumeProgressParam)
 	if name != "" {
 		h.directVolumeProgress = model.DirectVolumeMigrationProgress{
 			CR: model.CR{
