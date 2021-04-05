@@ -261,3 +261,253 @@ func (r *DirectImageMigration) Delete(e event.DeleteEvent) bool {
 func (r *DirectImageMigration) Generic(e event.GenericEvent) bool {
 	return false
 }
+
+//
+// A collection of k8s DirectImageStreamMigration resources.
+type DirectImageStreamMigration struct {
+	// Base
+	BaseCollection
+}
+
+func (r *DirectImageStreamMigration) AddWatch(dsController controller.Controller) error {
+	err := dsController.Watch(
+		&source.Kind{
+			Type: &migapi.DirectImageMigration{},
+		},
+		&handler.EnqueueRequestForObject{},
+		r)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *DirectImageStreamMigration) Reconcile() error {
+	mark := time.Now()
+	sr := SimpleReconciler{
+		Db: r.ds.Container.Db,
+	}
+	err := sr.Reconcile(r)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	r.hasReconciled = true
+	Log.Info(
+		"DirectImageStreamMigration (collection) reconciled.",
+		"ns",
+		r.ds.Cluster.Namespace,
+		"name",
+		r.ds.Cluster.Name,
+		"duration",
+		time.Since(mark))
+
+	return nil
+}
+
+func (r *DirectImageStreamMigration) GetDiscovered() ([]model.Model, error) {
+	models := []model.Model{}
+	onCluster := migapi.DirectImageStreamMigrationList{}
+	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	for _, discovered := range onCluster.Items {
+		dim := &model.DirectImageStreamMigration{}
+		dim.With(&discovered)
+		models = append(models, dim)
+	}
+
+	return models, nil
+}
+
+func (r *DirectImageStreamMigration) GetStored() ([]model.Model, error) {
+	models := []model.Model{}
+	list, err := model.DirectImageStreamMigration{}.List(
+		r.ds.Container.Db,
+		model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	for _, dim := range list {
+		models = append(models, dim)
+	}
+
+	return models, nil
+}
+
+//
+// Predicate methods.
+//
+
+func (r *DirectImageStreamMigration) Create(e event.CreateEvent) bool {
+	Log.Reset()
+	object, cast := e.Object.(*migapi.DirectImageStreamMigration)
+	if !cast {
+		return false
+	}
+	dim := model.DirectImageStreamMigration{}
+	dim.With(object)
+	r.ds.Create(&dim)
+
+	return false
+}
+
+func (r *DirectImageStreamMigration) Update(e event.UpdateEvent) bool {
+	Log.Reset()
+	object, cast := e.ObjectNew.(*migapi.DirectImageStreamMigration)
+	if !cast {
+		return false
+	}
+	restore := model.DirectImageStreamMigration{}
+	restore.With(object)
+	r.ds.Update(&restore)
+
+	return false
+}
+
+func (r *DirectImageStreamMigration) Delete(e event.DeleteEvent) bool {
+	Log.Reset()
+	object, cast := e.Object.(*migapi.DirectImageStreamMigration)
+	if !cast {
+		return false
+	}
+	dim := model.DirectImageStreamMigration{}
+	dim.With(object)
+	r.ds.Delete(&dim)
+
+	return false
+}
+
+func (r *DirectImageStreamMigration) Generic(e event.GenericEvent) bool {
+	return false
+}
+
+//
+// A collection of k8s DirectVolumeMigrationProgress resources.
+type DirectVolumeMigrationProgress struct {
+	// Base
+	BaseCollection
+}
+
+func (r *DirectVolumeMigrationProgress) AddWatch(dsController controller.Controller) error {
+	err := dsController.Watch(
+		&source.Kind{
+			Type: &migapi.DirectVolumeMigrationProgress{},
+		},
+		&handler.EnqueueRequestForObject{},
+		r)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *DirectVolumeMigrationProgress) Reconcile() error {
+	mark := time.Now()
+	sr := SimpleReconciler{
+		Db: r.ds.Container.Db,
+	}
+	err := sr.Reconcile(r)
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	r.hasReconciled = true
+	Log.Info(
+		"DirectVolumeMigrationProgress (collection) reconciled.",
+		"ns",
+		r.ds.Cluster.Namespace,
+		"name",
+		r.ds.Cluster.Name,
+		"duration",
+		time.Since(mark))
+
+	return nil
+}
+
+func (r *DirectVolumeMigrationProgress) GetDiscovered() ([]model.Model, error) {
+	models := []model.Model{}
+	onCluster := migapi.DirectVolumeMigrationProgressList{}
+	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	for _, discovered := range onCluster.Items {
+		dim := &model.DirectVolumeMigrationProgress{}
+		dim.With(&discovered)
+		models = append(models, dim)
+	}
+
+	return models, nil
+}
+
+func (r *DirectVolumeMigrationProgress) GetStored() ([]model.Model, error) {
+	models := []model.Model{}
+	list, err := model.DirectVolumeMigrationProgress{}.List(
+		r.ds.Container.Db,
+		model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return nil, err
+	}
+	for _, dim := range list {
+		models = append(models, dim)
+	}
+
+	return models, nil
+}
+
+//
+// Predicate methods.
+//
+
+func (r *DirectVolumeMigrationProgress) Create(e event.CreateEvent) bool {
+	Log.Reset()
+	object, cast := e.Object.(*migapi.DirectVolumeMigrationProgress)
+	if !cast {
+		return false
+	}
+	dim := model.DirectVolumeMigrationProgress{}
+	dim.With(object)
+	r.ds.Create(&dim)
+
+	return false
+}
+
+func (r *DirectVolumeMigrationProgress) Update(e event.UpdateEvent) bool {
+	Log.Reset()
+	object, cast := e.ObjectNew.(*migapi.DirectVolumeMigrationProgress)
+	if !cast {
+		return false
+	}
+	restore := model.DirectVolumeMigrationProgress{}
+	restore.With(object)
+	r.ds.Update(&restore)
+
+	return false
+}
+
+func (r *DirectVolumeMigrationProgress) Delete(e event.DeleteEvent) bool {
+	Log.Reset()
+	object, cast := e.Object.(*migapi.DirectVolumeMigrationProgress)
+	if !cast {
+		return false
+	}
+	dim := model.DirectVolumeMigrationProgress{}
+	dim.With(object)
+	r.ds.Delete(&dim)
+
+	return false
+}
+
+func (r *DirectVolumeMigrationProgress) Generic(e event.GenericEvent) bool {
+	return false
+}

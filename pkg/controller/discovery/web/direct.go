@@ -15,9 +15,18 @@ const (
 	DirectVolumeParam = "directvolumemigration"
 	DirectVolumesRoot = Root + "/directvolumemigrations"
 	DirectVolumeRoot  = DirectVolumesRoot + "/:" + DirectVolumeParam
-	DirectImageParam  = "directimagemigration"
-	DirectImagesRoot  = Root + "/directimagemigrations"
-	DirectImageRoot   = DirectImagesRoot + "/:" + DirectImageParam
+
+	DirectImageParam = "directimagemigration"
+	DirectImagesRoot = Root + "/directimagemigrations"
+	DirectImageRoot  = DirectImagesRoot + "/:" + DirectImageParam
+
+	DirectImageStreamParam = "directimagestreammigration"
+	DirectImageStreamsRoot = Root + "/directimagestreammigrations"
+	DirectImageStreamRoot  = DirectImageStreamsRoot + "/:" + DirectImageStreamParam
+
+	DirectVolumeProgressParam  = "directvolumemigrationprogress"
+	DirectVolumeProgressesRoot = Root + "/directvolumemigrationprogresses"
+	DirectVolumeProgressRoot   = DirectVolumeProgressesRoot + "/:" + DirectVolumeProgressParam
 )
 
 //
@@ -37,8 +46,24 @@ type DirectImageMigrationHandler struct {
 	directImage model.DirectImageMigration
 }
 
+// DirectImageStreamMigration (route) handler.
+type DirectImageStreamMigrationHandler struct {
+	// Base
+	BaseHandler
+	// DirectImageStreamMigration referenced in the request.
+	directImageStream model.DirectImageStreamMigration
+}
+
+// DirectVolumeMigrationProgress (route) handler.
+type DirectVolumeMigrationProgressHandler struct {
+	// Base
+	BaseHandler
+	// DirectVolumeMigrationProgress referenced in the request.
+	directVolumeProgress model.DirectVolumeMigrationProgress
+}
+
 //
-// Add DV routes.
+// Add DVM routes.
 func (h DirectVolumeMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumesRoot, h.List)
 	r.GET(DirectVolumesRoot+"/", h.List)
@@ -46,11 +71,27 @@ func (h DirectVolumeMigrationHandler) AddRoutes(r *gin.Engine) {
 }
 
 //
-// Add DI routes.
+// Add DIM routes.
 func (h DirectImageMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectImagesRoot, h.List)
 	r.GET(DirectImagesRoot+"/", h.List)
 	r.GET(DirectImageRoot, h.Get)
+}
+
+//
+// Add DISM routes.
+func (h DirectImageStreamMigrationHandler) AddRoutes(r *gin.Engine) {
+	r.GET(DirectImageStreamsRoot, h.List)
+	r.GET(DirectImageStreamsRoot+"/", h.List)
+	r.GET(DirectImageStreamRoot, h.Get)
+}
+
+//
+// Add DVMP routes.
+func (h DirectVolumeMigrationProgressHandler) AddRoutes(r *gin.Engine) {
+	r.GET(DirectVolumeProgressesRoot, h.List)
+	r.GET(DirectVolumeProgressesRoot+"/", h.List)
+	r.GET(DirectVolumeProgressRoot, h.Get)
 }
 
 //
@@ -123,6 +164,76 @@ func (h *DirectImageMigrationHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
+//
+// Prepare to fulfil the request.
+// Fetch the referenced dism.
+// Perform SAR authorization.
+func (h *DirectImageStreamMigrationHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	name := ctx.Param(DirectVolumeParam)
+	if name != "" {
+		h.directImageStream = model.DirectImageStreamMigration{
+			CR: model.CR{
+				Namespace: ctx.Param(NsParam),
+				Name:      ctx.Param(DirectVolumeParam),
+			},
+		}
+		err := h.directImageStream.Get(h.container.Db)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				Log.Trace(err)
+				return http.StatusInternalServerError
+			} else {
+				return http.StatusNotFound
+			}
+		}
+	}
+	status = h.allow(h.getSAR())
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
+//
+// Prepare to fulfil the request.
+// Fetch the referenced dvmp.
+// Perform SAR authorization.
+func (h *DirectVolumeMigrationProgressHandler) Prepare(ctx *gin.Context) int {
+	status := h.BaseHandler.Prepare(ctx)
+	if status != http.StatusOK {
+		return status
+	}
+	name := ctx.Param(DirectVolumeParam)
+	if name != "" {
+		h.directVolumeProgress = model.DirectVolumeMigrationProgress{
+			CR: model.CR{
+				Namespace: ctx.Param(NsParam),
+				Name:      ctx.Param(DirectVolumeParam),
+			},
+		}
+		err := h.directVolumeProgress.Get(h.container.Db)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				Log.Trace(err)
+				return http.StatusInternalServerError
+			} else {
+				return http.StatusNotFound
+			}
+		}
+	}
+	status = h.allow(h.getSAR())
+	if status != http.StatusOK {
+		return status
+	}
+
+	return http.StatusOK
+}
+
 // Build the appropriate SAR object.
 // The subject is the DirectVolumeMigration.
 func (h *DirectVolumeMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
@@ -149,6 +260,38 @@ func (h *DirectImageMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 				Resource:  "DirectImageMigration",
 				Namespace: h.directImage.Namespace,
 				Name:      h.directImage.Name,
+				Verb:      "get",
+			},
+		},
+	}
+}
+
+// Build the appropriate SAR object.
+// The subject is the DirectImageStreamMigration.
+func (h *DirectImageStreamMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
+	return auth.SelfSubjectAccessReview{
+		Spec: auth.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &auth.ResourceAttributes{
+				Group:     "apps",
+				Resource:  "DirectImageStreamMigration",
+				Namespace: h.directImageStream.Namespace,
+				Name:      h.directImageStream.Name,
+				Verb:      "get",
+			},
+		},
+	}
+}
+
+// Build the appropriate SAR object.
+// The subject is the DirectVolumeMigrationProgress.
+func (h *DirectVolumeMigrationProgressHandler) getSAR() auth.SelfSubjectAccessReview {
+	return auth.SelfSubjectAccessReview{
+		Spec: auth.SelfSubjectAccessReviewSpec{
+			ResourceAttributes: &auth.ResourceAttributes{
+				Group:     "apps",
+				Resource:  "DirectVolumeMigrationProgress",
+				Namespace: h.directVolumeProgress.Namespace,
+				Name:      h.directVolumeProgress.Name,
 				Verb:      "get",
 			},
 		},
@@ -226,6 +369,76 @@ func (h DirectImageMigrationHandler) List(ctx *gin.Context) {
 }
 
 //
+// List all of the disms in the namespace.
+func (h DirectImageStreamMigrationHandler) List(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.container.Db
+	collection := model.DirectImageStreamMigration{}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := DirectImageStreamList{
+		Count: count,
+	}
+	for _, m := range list {
+		r := DirectImageStream{}
+		r.With(m)
+		r.SelfLink = h.Link(m)
+		content.Items = append(content.Items, r)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// List all of the dvmps in the namespace.
+func (h DirectVolumeMigrationProgressHandler) List(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	db := h.container.Db
+	collection := model.DirectVolumeMigrationProgress{}
+	count, err := collection.Count(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	list, err := collection.List(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := DirectVolumeProgressList{
+		Count: count,
+	}
+	for _, m := range list {
+		r := DirectVolumeProgress{}
+		r.With(m)
+		r.SelfLink = h.Link(m)
+		content.Items = append(content.Items, r)
+	}
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
 // Get a specific dvm.
 func (h DirectVolumeMigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -280,6 +493,60 @@ func (h DirectImageMigrationHandler) Get(ctx *gin.Context) {
 }
 
 //
+// Get a specific dism.
+func (h DirectImageStreamMigrationHandler) Get(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	err := h.directImageStream.Get(h.container.Db)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		} else {
+			ctx.Status(http.StatusNotFound)
+			return
+		}
+	}
+	r := DirectImageStream{}
+	r.With(&h.directImageStream)
+	r.SelfLink = h.Link(&h.directImageStream)
+	content := r
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
+// Get a specific dvmp.
+func (h DirectVolumeMigrationProgressHandler) Get(ctx *gin.Context) {
+	status := h.Prepare(ctx)
+	if status != http.StatusOK {
+		ctx.Status(status)
+		return
+	}
+	err := h.directVolumeProgress.Get(h.container.Db)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			Log.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		} else {
+			ctx.Status(http.StatusNotFound)
+			return
+		}
+	}
+	r := DirectVolumeProgress{}
+	r.With(&h.directVolumeProgress)
+	r.SelfLink = h.Link(&h.directVolumeProgress)
+	content := r
+
+	ctx.JSON(http.StatusOK, content)
+}
+
+//
 // Build self link.
 func (h DirectVolumeMigrationHandler) Link(m *model.DirectVolumeMigration) string {
 	return h.BaseHandler.Link(
@@ -295,6 +562,28 @@ func (h DirectVolumeMigrationHandler) Link(m *model.DirectVolumeMigration) strin
 func (h DirectImageMigrationHandler) Link(m *model.DirectImageMigration) string {
 	return h.BaseHandler.Link(
 		DirectImageRoot,
+		Params{
+			NsParam:          m.Namespace,
+			DirectImageParam: m.Name,
+		})
+}
+
+//
+// Build self link.
+func (h DirectImageStreamMigrationHandler) Link(m *model.DirectImageStreamMigration) string {
+	return h.BaseHandler.Link(
+		DirectImageStreamRoot,
+		Params{
+			NsParam:          m.Namespace,
+			DirectImageParam: m.Name,
+		})
+}
+
+//
+// Build self link.
+func (h DirectVolumeMigrationProgressHandler) Link(m *model.DirectVolumeMigrationProgress) string {
+	return h.BaseHandler.Link(
+		DirectVolumeProgressRoot,
 		Params{
 			NsParam:          m.Namespace,
 			DirectImageParam: m.Name,
@@ -328,6 +617,32 @@ type DirectImage struct {
 }
 
 //
+// DirectImageStream REST resource.
+type DirectImageStream struct {
+	// The k8s namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// The k8s name.
+	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
+	// Raw k8s object.
+	Object *migapi.DirectImageStreamMigration `json:"object,omitempty"`
+}
+
+//
+// DirectVolumeMigrationProgress REST resource.
+type DirectVolumeProgress struct {
+	// The k8s namespace.
+	Namespace string `json:"namespace,omitempty"`
+	// The k8s name.
+	Name string `json:"name"`
+	// Self URI.
+	SelfLink string `json:"selfLink"`
+	// Raw k8s object.
+	Object *migapi.DirectVolumeMigrationProgress `json:"object,omitempty"`
+}
+
+//
 // Build the resource.
 func (r *DirectVolume) With(m *model.DirectVolumeMigration) {
 	r.Namespace = m.Namespace
@@ -338,6 +653,22 @@ func (r *DirectVolume) With(m *model.DirectVolumeMigration) {
 //
 // Build the resource.
 func (r *DirectImage) With(m *model.DirectImageMigration) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
+}
+
+//
+// Build the resource.
+func (r *DirectImageStream) With(m *model.DirectImageStreamMigration) {
+	r.Namespace = m.Namespace
+	r.Name = m.Name
+	r.Object = m.DecodeObject()
+}
+
+//
+// Build the resource.
+func (r *DirectVolumeProgress) With(m *model.DirectVolumeMigrationProgress) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.Object = m.DecodeObject()
@@ -359,4 +690,22 @@ type DirectImageList struct {
 	Count int64 `json:"count"`
 	// List of resources.
 	Items []DirectImage `json:"resources"`
+}
+
+//
+// DirectImageStream collection REST resource.
+type DirectImageStreamList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []DirectImageStream `json:"resources"`
+}
+
+//
+// DirectVolumeProgress collection REST resource.
+type DirectVolumeProgressList struct {
+	// Total number in the collection.
+	Count int64 `json:"count"`
+	// List of resources.
+	Items []DirectVolumeProgress `json:"resources"`
 }
