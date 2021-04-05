@@ -11,6 +11,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -153,6 +154,15 @@ func (t *Task) stopHookJobs() (bool, error) {
 
 func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook migapi.MigHook, client k8sclient.Client) (bool, error) {
 	runningJob, err := migHook.GetPhaseJob(client, hook.Phase, string(t.Owner.UID))
+	if runningJob != nil {
+		// Logs abnormal events for Hook Jobs if any are found
+		migevent.LogAbnormalEventsForResource(
+			client, t.Log,
+			"Found abnormal event for Hook Job",
+			types.NamespacedName{Namespace: runningJob.Namespace, Name: runningJob.Name},
+			"job")
+	}
+
 	if runningJob == nil && err == nil {
 		err = client.Create(context.TODO(), job)
 		if err != nil {

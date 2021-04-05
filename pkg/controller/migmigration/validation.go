@@ -10,9 +10,11 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	corev1 "k8s.io/api/core/v1"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -296,6 +298,15 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 		if err != nil {
 			log.Trace(err)
 			return nEnsured, "", liberr.Wrap(err)
+		}
+
+		for _, registryPod := range registryPods.Items {
+			// Logs abnormal events for Registry Pods if any are found
+			migevent.LogAbnormalEventsForResource(
+				client, log,
+				"Found abnormal event for Registry Pod",
+				types.NamespacedName{Namespace: registryPod.Namespace, Name: registryPod.Name},
+				"pod")
 		}
 
 		registryPodCount := len(registryPods.Items)

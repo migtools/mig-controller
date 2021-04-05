@@ -20,6 +20,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	routev1 "github.com/openshift/api/route/v1"
 	"golang.org/x/crypto/ssh"
@@ -139,6 +140,13 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				// Log abnormal events for Rsync transfer Pod if any are found
+				migevent.LogAbnormalEventsForResource(
+					destClient, t.Log,
+					"Found abnormal event for Rsync transfer Pod on destination cluster",
+					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+					"pod")
+
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
 						t.Log.Info("Found UNSCHEDULABLE Rsync Transfer Pod on destination cluster",
@@ -756,6 +764,13 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		if err != nil {
 			return false, messages, err
 		}
+		// Logs abnormal events related to route if any are found
+		migevent.LogAbnormalEventsForResource(
+			destClient, t.Log,
+			"Found abnormal event for Rsync Route on destination cluster",
+			types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
+			"route")
+
 		admitted := false
 		message := "no status condition available for the route"
 		// Check if we can find the admitted condition for the route

@@ -14,6 +14,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -517,6 +518,14 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 	for _, pod := range podList.Items {
 		t.Log.V(4).Info("Checking if Stage Pod is healthy.",
 			"pod", path.Join(pod.Namespace, pod.Name))
+
+		// Logs abnormal events for Stage Pods if any are found
+		migevent.LogAbnormalEventsForResource(
+			client, t.Log,
+			"Found abnormal event for Stage Pod",
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+			"pod")
+
 		initReady := true
 		for _, c := range pod.Status.InitContainerStatuses {
 			// If the init contianer is waiting, then nothing can happen.

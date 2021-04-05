@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"gopkg.in/yaml.v2"
 
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	//"k8s.io/apimachinery/pkg/types"
@@ -611,6 +613,13 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
+				// Logs abnormal events for Stunnel Pod if any are found
+				migevent.LogAbnormalEventsForResource(
+					srcClient, t.Log,
+					"Found abnormal event for Stunnel Client Pod on source cluster",
+					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+					"pod")
+
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
 						t.Log.Info("Found UNSCHEDULABLE Stunnel Client Pod "+
