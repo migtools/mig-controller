@@ -475,6 +475,11 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 			Namespace:  m.Namespace,
 			Name:       m.Name,
 		}
+		err := t.addDirectVolumeProgresses(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
@@ -507,9 +512,84 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 			Namespace:  m.Namespace,
 			Name:       m.Name,
 		}
+		err := t.addDirectImageStreams(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
+	return nil
+}
+
+//
+// Add direct volumes progress
+func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
+	collection := model.DirectVolumeMigrationProgress{}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		isOwned := false
+		for _, ref := range object.OwnerReferences {
+			if ref.Kind == migref.ToKind(directVolume) &&
+				ref.Name == directVolume.Name &&
+				m.Namespace == directVolume.Namespace {
+				isOwned = true
+				break
+			}
+		}
+		if !isOwned {
+			continue
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+	return nil
+}
+
+//
+// Add direct images
+func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration, parent *TreeNode) error {
+	collection := model.DirectImageStreamMigration{}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		isOwned := false
+		for _, ref := range object.OwnerReferences {
+			if ref.Kind == migref.ToKind(directImage) &&
+				ref.Name == directImage.Name &&
+				m.Namespace == directImage.Namespace {
+				isOwned = true
+				break
+			}
+		}
+		if !isOwned {
+			continue
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: DirectImageStreamMigrationHandler{}.Link(m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
 	return nil
 }
 

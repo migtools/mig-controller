@@ -574,8 +574,8 @@ func (h DirectImageStreamMigrationHandler) Link(m *model.DirectImageStreamMigrat
 	return h.BaseHandler.Link(
 		DirectImageStreamRoot,
 		Params{
-			NsParam:          m.Namespace,
-			DirectImageParam: m.Name,
+			NsParam:                m.Namespace,
+			DirectImageStreamParam: m.Name,
 		})
 }
 
@@ -585,8 +585,8 @@ func (h DirectVolumeMigrationProgressHandler) Link(m *model.DirectVolumeMigratio
 	return h.BaseHandler.Link(
 		DirectVolumeProgressRoot,
 		Params{
-			NsParam:          m.Namespace,
-			DirectImageParam: m.Name,
+			NsParam:                   m.Namespace,
+			DirectVolumeProgressParam: m.Name,
 		})
 }
 
