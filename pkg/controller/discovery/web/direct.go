@@ -178,7 +178,7 @@ func (h *DirectImageStreamMigrationHandler) Prepare(ctx *gin.Context) int {
 		h.directImageStream = model.DirectImageStreamMigration{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
-				Name:      ctx.Param(DirectVolumeParam),
+				Name:      ctx.Param(DirectImageStreamParam),
 			},
 		}
 		err := h.directImageStream.Get(h.container.Db)
@@ -213,7 +213,7 @@ func (h *DirectVolumeMigrationProgressHandler) Prepare(ctx *gin.Context) int {
 		h.directVolumeProgress = model.DirectVolumeMigrationProgress{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
-				Name:      ctx.Param(DirectVolumeParam),
+				Name:      ctx.Param(DirectVolumeProgressParam),
 			},
 		}
 		err := h.directVolumeProgress.Get(h.container.Db)
