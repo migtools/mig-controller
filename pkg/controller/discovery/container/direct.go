@@ -272,7 +272,7 @@ type DirectImageStreamMigration struct {
 func (r *DirectImageStreamMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
-			Type: &migapi.DirectImageMigration{},
+			Type: &migapi.DirectImageStreamMigration{},
 		},
 		&handler.EnqueueRequestForObject{},
 		r)
@@ -316,9 +316,9 @@ func (r *DirectImageStreamMigration) GetDiscovered() ([]model.Model, error) {
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		dim := &model.DirectImageStreamMigration{}
-		dim.With(&discovered)
-		models = append(models, dim)
+		dism := &model.DirectImageStreamMigration{}
+		dism.With(&discovered)
+		models = append(models, dism)
 	}
 
 	return models, nil
@@ -333,8 +333,8 @@ func (r *DirectImageStreamMigration) GetStored() ([]model.Model, error) {
 		Log.Trace(err)
 		return nil, err
 	}
-	for _, dim := range list {
-		models = append(models, dim)
+	for _, dism := range list {
+		models = append(models, dism)
 	}
 
 	return models, nil
@@ -376,9 +376,9 @@ func (r *DirectImageStreamMigration) Delete(e event.DeleteEvent) bool {
 	if !cast {
 		return false
 	}
-	dim := model.DirectImageStreamMigration{}
-	dim.With(object)
-	r.ds.Delete(&dim)
+	dism := model.DirectImageStreamMigration{}
+	dism.With(object)
+	r.ds.Delete(&dism)
 
 	return false
 }
@@ -441,9 +441,9 @@ func (r *DirectVolumeMigrationProgress) GetDiscovered() ([]model.Model, error) {
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		dim := &model.DirectVolumeMigrationProgress{}
-		dim.With(&discovered)
-		models = append(models, dim)
+		dvmp := &model.DirectVolumeMigrationProgress{}
+		dvmp.With(&discovered)
+		models = append(models, dvmp)
 	}
 
 	return models, nil
@@ -458,8 +458,8 @@ func (r *DirectVolumeMigrationProgress) GetStored() ([]model.Model, error) {
 		Log.Trace(err)
 		return nil, err
 	}
-	for _, dim := range list {
-		models = append(models, dim)
+	for _, dvmp := range list {
+		models = append(models, dvmp)
 	}
 
 	return models, nil
@@ -475,9 +475,9 @@ func (r *DirectVolumeMigrationProgress) Create(e event.CreateEvent) bool {
 	if !cast {
 		return false
 	}
-	dim := model.DirectVolumeMigrationProgress{}
-	dim.With(object)
-	r.ds.Create(&dim)
+	dvmp := model.DirectVolumeMigrationProgress{}
+	dvmp.With(object)
+	r.ds.Create(&dvmp)
 
 	return false
 }
@@ -501,9 +501,9 @@ func (r *DirectVolumeMigrationProgress) Delete(e event.DeleteEvent) bool {
 	if !cast {
 		return false
 	}
-	dim := model.DirectVolumeMigrationProgress{}
-	dim.With(object)
-	r.ds.Delete(&dim)
+	dvmp := model.DirectVolumeMigrationProgress{}
+	dvmp.With(object)
+	r.ds.Delete(&dvmp)
 
 	return false
 }
