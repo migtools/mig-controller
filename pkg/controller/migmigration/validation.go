@@ -300,13 +300,12 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 			return nEnsured, "", liberr.Wrap(err)
 		}
 
-		for _, registryPod := range registryPods.Items {
+		for _, pod := range registryPods.Items {
 			// Logs abnormal events for Registry Pods if any are found
 			migevent.LogAbnormalEventsForResource(
 				client, log,
 				"Found abnormal event for Registry Pod",
-				types.NamespacedName{Namespace: registryPod.Namespace, Name: registryPod.Name},
-				"pod")
+				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
 		}
 
 		registryPodCount := len(registryPods.Items)

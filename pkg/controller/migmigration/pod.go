@@ -152,8 +152,7 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 		migevent.LogAbnormalEventsForResource(
 			client, t.Log,
 			"Found abnormal event for Restic Pod",
-			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-			"pod")
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
 
 		if pod.DeletionTimestamp != nil {
 			t.Log.Info("Deletion timestamp found on Restic Pod, "+
@@ -277,8 +276,7 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 			migevent.LogAbnormalEventsForResource(
 				client, t.Log,
 				"Found abnormal event for Velero Pod",
-				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-				"pod")
+				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
 
 			if pod.DeletionTimestamp != nil {
 				t.Log.Info("Found Velero Pod with deletion timestamp."+

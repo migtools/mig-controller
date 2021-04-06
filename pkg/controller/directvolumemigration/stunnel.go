@@ -618,7 +618,7 @@ func (t *Task) areStunnelClientPodsRunning() (bool, error) {
 					srcClient, t.Log,
 					"Found abnormal event for Stunnel Client Pod on source cluster",
 					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-					"pod")
+					"Pod")
 
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
