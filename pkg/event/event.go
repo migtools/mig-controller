@@ -2,8 +2,8 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"path"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -15,29 +15,24 @@ import (
 // GetAbnormalEventsForResource gets unique events of non-normal type for
 // a namespaced resource. Useful for logging the most relevant events
 // related to a resource we're waiting on.
+// Make sure to pass in the kind exactly as it is capitalized on the event, e.g. "Pod"
 func GetAbnormalEventsForResource(client client.Client,
 	nsName types.NamespacedName, resourceKind string) ([]corev1.Event, error) {
 	uniqueEventMap := make(map[string]corev1.Event)
 
 	eList := corev1.EventList{}
 	options := k8sclient.InNamespace(nsName.Namespace)
-	err := client.List(context.TODO(), options, &eList)
+	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=%s,type!=Normal",
+		nsName.Name, resourceKind)
+	err := options.SetFieldSelector(fieldSelector)
+	if err != nil {
+		return nil, fmt.Errorf("field selector construction failed: fieldSelector=[%v]", fieldSelector)
+	}
+	err = client.List(context.TODO(), options, &eList)
 	if err != nil {
 		return nil, err
 	}
 	for _, event := range eList.Items {
-		// Only want events for the kind indicated
-		if strings.ToLower(event.InvolvedObject.Kind) != strings.ToLower(resourceKind) {
-			continue
-		}
-		// Only get events for the resource.name we're interested in
-		if event.InvolvedObject.Name != nsName.Name {
-			continue
-		}
-		// Only get abnormal events
-		if event.Type == "Normal" {
-			continue
-		}
 		// Check if same event reason has already been seen
 		eventFromMap, ok := uniqueEventMap[event.Reason]
 		if !ok {
