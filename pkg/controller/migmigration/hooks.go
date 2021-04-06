@@ -159,8 +159,7 @@ func (t *Task) ensureJob(job *batchv1.Job, hook migapi.MigPlanHook, migHook miga
 		migevent.LogAbnormalEventsForResource(
 			client, t.Log,
 			"Found abnormal event for Hook Job",
-			types.NamespacedName{Namespace: runningJob.Namespace, Name: runningJob.Name},
-			"job")
+			types.NamespacedName{Namespace: runningJob.Namespace, Name: runningJob.Name}, "Job")
 	}
 
 	if runningJob == nil && err == nil {
