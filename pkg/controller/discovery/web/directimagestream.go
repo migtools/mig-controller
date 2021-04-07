@@ -41,7 +41,7 @@ func (h *DirectImageStreamMigrationHandler) Prepare(ctx *gin.Context) int {
 	if status != http.StatusOK {
 		return status
 	}
-	name := ctx.Param(DirectVolumeParam)
+	name := ctx.Param(DirectImageStreamParam)
 	if name != "" {
 		h.directImageStream = model.DirectImageStreamMigration{
 			CR: model.CR{
