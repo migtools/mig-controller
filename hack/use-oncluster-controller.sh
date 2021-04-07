@@ -11,3 +11,9 @@ echo "Patching MigrationController 'spec.migration_controller: true'. The contro
 oc --namespace openshift-migration patch migrationcontroller migration-controller --type=json \
 --patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": true }]'
 echo
+
+# Patch the MigrationController CR for the UI use the in-cluster discovery service
+echo "Patching 'host' MigCluster to remove 'spec.exposedRegistryPath' This will cause mig-controller to use the registry service instead."
+oc --namespace openshift-migration patch migcluster host --type=json \
+--patch '[{ "op": "remove", "path": "/spec/exposedRegistryPath" }]'
+echo
