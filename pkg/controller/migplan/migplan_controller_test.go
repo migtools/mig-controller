@@ -366,7 +366,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				EventRecorder: tt.fields.EventRecorder,
 				scheme:        tt.fields.scheme,
 			}
-			if err := r.ensureMigAnalytics(tt.args.plan); (err != nil) != tt.wantErr {
+			if err := r.ensureMigAnalytics(context.TODO(), tt.args.plan); (err != nil) != tt.wantErr {
 				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			gotList := &migapi.MigAnalyticList{}
@@ -443,7 +443,7 @@ func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
 				EventRecorder: tt.fields.EventRecorder,
 				scheme:        tt.fields.scheme,
 			}
-			got, err := r.checkIfMigAnalyticsReady(tt.args.plan)
+			got, err := r.checkIfMigAnalyticsReady(context.TODO(), tt.args.plan)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkIfMigAnalyticsReady() error = %v, wantErr %v", err, tt.wantErr)
 				return

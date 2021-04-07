@@ -338,19 +338,14 @@ type Task struct {
 //   2. Update the phase to the next phase.
 //   3. Set the Requeue (as appropriate).
 //   4. Return.
-func (t *Task) Run() error {
+func (t *Task) Run(ctx context.Context) error {
 	// Set stage, phase, phase description, migplan name
 	t.Log = t.Log.WithValues("phase", t.Phase)
 	t.Requeue = FastReQ
 
-	// Set up Jaeger span for task.Run
-	if t.ReconcileSpan != nil {
-		phaseSpan := t.Tracer.StartSpan(
-			"migration-phase-"+t.Phase,
-			opentracing.ChildOf(t.ReconcileSpan.Context()),
-		)
-		defer phaseSpan.Finish()
-	}
+	// Jaeger span
+	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, "migration-phase-"+t.Phase)
+	defer span.Finish()
 
 	err := t.init()
 	if err != nil {

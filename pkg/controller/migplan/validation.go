@@ -15,6 +15,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
+	"github.com/opentracing/opentracing-go"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -113,76 +114,81 @@ const (
 var validAccessModes = []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany}
 
 // Validate the plan resource.
-func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
 	// Source cluster
-	err := r.validateSourceCluster(plan)
+	err := r.validateSourceCluster(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Destination cluster
-	err = r.validateDestinationCluster(plan)
+	err = r.validateDestinationCluster(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Storage
-	err = r.validateStorage(plan)
+	err = r.validateStorage(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Migrated namespaces.
-	err = r.validateNamespaces(plan)
+	err = r.validateNamespaces(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Validates pod properties (e.g. limit of number of active pods, presence of node-selectors)
 	// within each namespace.
-	err = r.validatePodProperties(plan)
+	err = r.validatePodProperties(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Required namespaces.
-	err = r.validateRequiredNamespaces(plan)
+	err = r.validateRequiredNamespaces(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Conflict
-	err = r.validateConflict(plan)
+	err = r.validateConflict(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Registry proxy secret
-	err = r.validateRegistryProxySecrets(plan)
+	err = r.validateRegistryProxySecrets(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Validate health of Pods
-	err = r.validatePodHealth(plan)
+	err = r.validatePodHealth(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Hooks
-	err = r.validateHooks(plan)
+	err = r.validateHooks(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// GVK
-	err = r.compareGVK(plan)
+	err = r.compareGVK(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Versions
-	err = r.validateOperatorVersions(plan)
+	err = r.validateOperatorVersions(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -191,7 +197,11 @@ func (r ReconcileMigPlan) validate(plan *migapi.MigPlan) error {
 }
 
 // Validate the referenced storage.
-func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateStorage")
+		defer span.Finish()
+	}
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
@@ -239,7 +249,12 @@ func (r ReconcileMigPlan) validateStorage(plan *migapi.MigPlan) error {
 }
 
 // Validate the referenced assetCollection.
-func (r ReconcileMigPlan) validateNamespaces(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateNamespaces(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateNamespaces")
+		defer span.Finish()
+	}
+
 	count := len(plan.Spec.Namespaces)
 	if count == 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -311,7 +326,11 @@ func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []
 // 1. Validate the total number of running pods (limit) across namespaces.
 // 2. Whether any pods have node-selectors or node names associated with it. If so, a warning is raised to indicate the
 // list of namespaces associated with that pod.
-func (r ReconcileMigPlan) validatePodProperties(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePodProperties")
+		defer span.Finish()
+	}
 	if plan.Status.HasAnyCondition(Suspended, NsLimitExceeded) {
 		plan.Status.StageCondition(PodLimitExceeded)
 		return nil
@@ -386,7 +405,11 @@ func (r ReconcileMigPlan) hasNodeSelectors(podList []kapi.Pod) bool {
 }
 
 // Validate the referenced source cluster.
-func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateSourceCluster(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSourceCluster")
+		defer span.Finish()
+	}
 	ref := plan.Spec.SrcMigClusterRef
 
 	// NotSet
@@ -449,7 +472,11 @@ func (r ReconcileMigPlan) validateSourceCluster(plan *migapi.MigPlan) error {
 }
 
 // Validate the referenced source cluster.
-func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateDestinationCluster(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestinationCluster")
+		defer span.Finish()
+	}
 	ref := plan.Spec.DestMigClusterRef
 
 	// NotSet
@@ -523,7 +550,12 @@ func (r ReconcileMigPlan) validateDestinationCluster(plan *migapi.MigPlan) error
 	return nil
 }
 
-func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateOperatorVersions(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateOperatorVersions")
+		defer span.Finish()
+	}
+
 	if plan.Status.HasAnyCondition(
 		InvalidDestinationClusterRef, InvalidDestinationCluster,
 		InvalidSourceClusterRef, InvalidSourceClusterRef) {
@@ -562,7 +594,11 @@ func (r ReconcileMigPlan) validateOperatorVersions(plan *migapi.MigPlan) error {
 }
 
 // Validate required namespaces.
-func (r ReconcileMigPlan) validateRequiredNamespaces(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateRequiredNamespaces(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateRequiredNamespaces")
+		defer span.Finish()
+	}
 	err := r.validateSourceNamespaces(plan)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -676,7 +712,11 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 }
 
 // Validate the plan does not conflict with another plan.
-func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateConflict(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateConflict")
+		defer span.Finish()
+	}
 	plans, err := migapi.ListPlans(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -705,7 +745,11 @@ func (r ReconcileMigPlan) validateConflict(plan *migapi.MigPlan) error {
 }
 
 // Validate PV actions.
-func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePvSelections")
+		defer span.Finish()
+	}
 	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
 
@@ -879,7 +923,11 @@ func (r ReconcileMigPlan) validatePvSelections(plan *migapi.MigPlan) error {
 }
 
 // Validate proxy secrets. Should only exist 1 or none
-func (r ReconcileMigPlan) validateRegistryProxySecrets(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateRegistryProxySecrets(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateRegistryProxySecrets")
+		defer span.Finish()
+	}
 	err := r.validateSourceRegistryProxySecret(plan)
 	if err != nil {
 		return err
@@ -1028,7 +1076,12 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 }
 
 // Validate the pods to verify if they are healthy before migration
-func (r ReconcileMigPlan) validatePodHealth(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validatePodHealth(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePodHealth")
+		defer span.Finish()
+	}
+
 	if plan.Status.HasAnyCondition(Suspended) {
 		plan.Status.StageCondition(SourcePodsNotHealthy)
 		return nil
@@ -1093,7 +1146,12 @@ func (r ReconcileMigPlan) validatePodHealth(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r ReconcileMigPlan) validateHooks(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) validateHooks(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateHooks")
+		defer span.Finish()
+	}
+
 	var preBackupCount, postBackupCount, preRestoreCount, postRestoreCount int = 0, 0, 0, 0
 
 	for _, hook := range plan.Spec.Hooks {

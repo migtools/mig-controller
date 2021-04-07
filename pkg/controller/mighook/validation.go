@@ -1,10 +1,12 @@
 package mighook
 
 import (
+	"context"
 	"encoding/base64"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/opentracing/opentracing-go"
 )
 
 // Types
@@ -38,27 +40,37 @@ const (
 )
 
 // Validate the hook resource.
-func (r ReconcileMigHook) validate(hook *migapi.MigHook) error {
-	err := r.validateImage(hook)
+func (r ReconcileMigHook) validate(ctx context.Context, hook *migapi.MigHook) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+
+	err := r.validateImage(ctx, hook)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateTargetCluster(hook)
+	err = r.validateTargetCluster(ctx, hook)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validatePlaybookData(hook)
+	err = r.validatePlaybookData(ctx, hook)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateCustom(hook)
+	err = r.validateCustom(ctx, hook)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	return nil
 }
 
-func (r ReconcileMigHook) validateImage(hook *migapi.MigHook) error {
+func (r ReconcileMigHook) validateImage(ctx context.Context, hook *migapi.MigHook) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateImage")
+		defer span.Finish()
+	}
 	match := ReferenceRegexp.MatchString(hook.Spec.Image)
 
 	if !match {
@@ -73,7 +85,12 @@ func (r ReconcileMigHook) validateImage(hook *migapi.MigHook) error {
 	return nil
 }
 
-func (r ReconcileMigHook) validateTargetCluster(hook *migapi.MigHook) error {
+func (r ReconcileMigHook) validateTargetCluster(ctx context.Context, hook *migapi.MigHook) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateTargetCluster")
+		defer span.Finish()
+	}
+
 	if hook.Spec.TargetCluster != "source" && hook.Spec.TargetCluster != "destination" {
 		hook.Status.SetCondition(migapi.Condition{
 			Type:     InvalidTargetCluster,
@@ -86,7 +103,11 @@ func (r ReconcileMigHook) validateTargetCluster(hook *migapi.MigHook) error {
 	return nil
 }
 
-func (r ReconcileMigHook) validatePlaybookData(hook *migapi.MigHook) error {
+func (r ReconcileMigHook) validatePlaybookData(ctx context.Context, hook *migapi.MigHook) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePlaybookData")
+		defer span.Finish()
+	}
 	if _, err := base64.StdEncoding.DecodeString(hook.Spec.Playbook); err != nil {
 		hook.Status.SetCondition(migapi.Condition{
 			Type:     InvalidPlaybookData,
@@ -99,7 +120,11 @@ func (r ReconcileMigHook) validatePlaybookData(hook *migapi.MigHook) error {
 	return nil
 }
 
-func (r ReconcileMigHook) validateCustom(hook *migapi.MigHook) error {
+func (r ReconcileMigHook) validateCustom(ctx context.Context, hook *migapi.MigHook) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateCustom")
+		defer span.Finish()
+	}
 	if hook.Spec.Custom && hook.Spec.Playbook != "" {
 		hook.Status.SetCondition(migapi.Condition{
 			Type:     InvalidCustomHook,

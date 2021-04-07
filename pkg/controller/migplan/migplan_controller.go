@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	"github.com/opentracing/opentracing-go"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
@@ -175,9 +176,11 @@ type ReconcileMigPlan struct {
 	record.EventRecorder
 
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	var err error
 	log.Reset()
 	log.SetValues("migPlan", request.Name)
@@ -191,6 +194,13 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
+	}
+
+	// Get jaeger span for reconcile, add to ctx
+	reconcileSpan := r.initTracer(plan)
+	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
+		defer reconcileSpan.Finish()
 	}
 
 	// Report reconcile error.
@@ -211,7 +221,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}()
 
 	// Plan closed.
-	closed, err := r.handleClosed(plan)
+	closed, err := r.handleClosed(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -224,7 +234,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	plan.Status.BeginStagingConditions()
 
 	// Plan Suspended
-	err = r.planSuspended(plan)
+	err = r.planSuspended(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -232,7 +242,7 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// If intelligent pv resizing is enabled, Check if migAnalytics exists
 	if Settings.EnableIntelligentPVResize {
-		err = r.ensureMigAnalytics(plan)
+		err = r.ensureMigAnalytics(ctx, plan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
@@ -247,14 +257,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validations.
-	err = r.validate(plan)
+	err = r.validate(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// PV discovery
-	err = r.updatePvs(plan)
+	err = r.updatePvs(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -269,14 +279,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	// Validate PV actions.
-	err = r.validatePvSelections(plan)
+	err = r.validatePvSelections(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Storage
-	err = r.ensureStorage(plan)
+	err = r.ensureStorage(ctx, plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -284,14 +294,14 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// If intelligent pv resizing is enabled, Wait for the migAnalytics to be ready
 	if Settings.EnableIntelligentPVResize {
-		migAnalytic, err := r.checkIfMigAnalyticsReady(plan)
+		migAnalytic, err := r.checkIfMigAnalyticsReady(ctx, plan)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 		if migAnalytic != nil {
 			// Process PV Capacity and generate conditions
-			r.processProposedPVCapacities(plan, migAnalytic)
+			r.processProposedPVCapacities(ctx, plan, migAnalytic)
 		}
 		if migAnalytic == nil && !plan.Status.HasCondition(PvUsageAnalysisFailed) {
 			return reconcile.Result{Requeue: true}, nil
@@ -329,7 +339,12 @@ func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Resul
 
 // Detect that a plan is been closed and ensure all its referenced
 // resources have been cleaned up.
-func (r *ReconcileMigPlan) handleClosed(plan *migapi.MigPlan) (bool, error) {
+func (r *ReconcileMigPlan) handleClosed(ctx context.Context, plan *migapi.MigPlan) (bool, error) {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "handleClosed")
+		defer span.Finish()
+	}
+
 	closed := plan.Spec.Closed
 	if !closed || plan.Status.HasCondition(Closed) {
 		return closed, nil
@@ -382,7 +397,11 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 // A plan is considered`suspended` when a migration is running or the final migration has
 // completed successfully. While suspended, reconcile is limited to basic validation
 // and PV discovery and ensuring resources is not performed.
-func (r *ReconcileMigPlan) planSuspended(plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) planSuspended(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "planSuspended")
+		defer span.Finish()
+	}
 	suspended := false
 
 	migrations, err := plan.ListMigrations(r)
@@ -485,7 +504,11 @@ func (r ReconcileMigPlan) deleteImageRegistryDeploymentForClient(client k8sclien
 	return nil
 }
 
-func (r *ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) ensureMigAnalytics(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "ensureMigAnalytics")
+		defer span.Finish()
+	}
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
@@ -525,7 +548,11 @@ func (r *ReconcileMigPlan) ensureMigAnalytics(plan *migapi.MigPlan) error {
 	return nil
 }
 
-func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(ctx context.Context, plan *migapi.MigPlan) (*migapi.MigAnalytic, error) {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "checkIfMigAnalyticsReady")
+		defer span.Finish()
+	}
 	migAnalytics := &migapi.MigAnalyticList{}
 	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
 	if err != nil {
@@ -556,7 +583,11 @@ func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(plan *migapi.MigPlan) (*miga
 }
 
 // processProposedPVCapacities reads miganalytic status to find proposed capacities of volumes
-func (r *ReconcileMigPlan) processProposedPVCapacities(plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan *migapi.MigPlan, analytic *migapi.MigAnalytic) {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "processProposedPVCapacities")
+		defer span.Finish()
+	}
 	pvResizingRequiredVolumes := []string{}
 	plan.Spec.PersistentVolumes.BeginPvStaging()
 	for i := range plan.Spec.PersistentVolumes.List {

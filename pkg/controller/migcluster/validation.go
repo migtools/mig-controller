@@ -15,6 +15,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 )
 
 // Types
@@ -56,39 +57,45 @@ const (
 
 // Validate the asset collection resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) validate(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+
 	// General settings
-	err := r.validateURL(cluster)
+	err := r.validateURL(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// SA secret
-	err = r.validateSaSecret(cluster)
+	err = r.validateSaSecret(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Test Connection
-	err = r.testConnection(cluster)
+	err = r.testConnection(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Token privileges
-	err = r.validateSaTokenPrivileges(cluster)
+	err = r.validateSaTokenPrivileges(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// Exposed registry route
-	err = r.validateRegistryRoute(cluster)
+	err = r.validateRegistryRoute(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	// cluster version
-	err = r.validateOperatorVersionMatchesHost(cluster)
+	err = r.validateOperatorVersionMatchesHost(ctx, cluster)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -96,7 +103,12 @@ func (r ReconcileMigCluster) validate(cluster *migapi.MigCluster) error {
 	return nil
 }
 
-func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) validateURL(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateURL")
+		defer span.Finish()
+	}
+
 	// Not needed.
 	if cluster.Spec.IsHostCluster {
 		return nil
@@ -136,7 +148,12 @@ func (r ReconcileMigCluster) validateURL(cluster *migapi.MigCluster) error {
 	return nil
 }
 
-func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) validateSaSecret(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSaSecret")
+		defer span.Finish()
+	}
+
 	ref := cluster.Spec.ServiceAccountSecretRef
 
 	// Not needed.
@@ -206,7 +223,12 @@ func (r ReconcileMigCluster) validateSaSecret(cluster *migapi.MigCluster) error 
 }
 
 // Test the connection.
-func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) testConnection(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "testConnection")
+		defer span.Finish()
+	}
+
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
@@ -238,7 +260,11 @@ func (r ReconcileMigCluster) testConnection(cluster *migapi.MigCluster) error {
 }
 
 // Validate the Exposed registry route
-func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) validateRegistryRoute(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateRegistryRoute")
+		defer span.Finish()
+	}
 
 	if cluster.Status.HasCriticalCondition() {
 		return nil
@@ -300,7 +326,12 @@ func (r ReconcileMigCluster) validateRegistryRoute(cluster *migapi.MigCluster) e
 	return nil
 }
 
-func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigCluster) error {
+func (r *ReconcileMigCluster) validateSaTokenPrivileges(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSaTokenPrivileges")
+		defer span.Finish()
+	}
+
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}
@@ -359,7 +390,12 @@ func (r *ReconcileMigCluster) validateSaTokenPrivileges(cluster *migapi.MigClust
 }
 
 // validate operator version.
-func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(cluster *migapi.MigCluster) error {
+func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(ctx context.Context, cluster *migapi.MigCluster) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateOperatorVersionMatchesHost")
+		defer span.Finish()
+	}
+
 	if cluster.Spec.IsHostCluster {
 		return nil
 	}

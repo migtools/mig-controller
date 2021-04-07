@@ -7,6 +7,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,23 +75,33 @@ const (
 )
 
 // Validate the direct resource
-func (r ReconcileDirectVolumeMigration) validate(direct *migapi.DirectVolumeMigration) error {
-	err := r.validateSrcCluster(direct)
+func (r ReconcileDirectVolumeMigration) validate(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+	err := r.validateSrcCluster(ctx, direct)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateDestCluster(direct)
+	err = r.validateDestCluster(ctx, direct)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validatePVCs(direct)
+	err = r.validatePVCs(ctx, direct)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validateSrcCluster(direct *migapi.DirectVolumeMigration) error {
+func (r ReconcileDirectVolumeMigration) validateSrcCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSrcCluster")
+		defer span.Finish()
+	}
+
 	ref := direct.Spec.SrcMigClusterRef
 
 	// Not Set
@@ -135,7 +146,12 @@ func (r ReconcileDirectVolumeMigration) validateSrcCluster(direct *migapi.Direct
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validateDestCluster(direct *migapi.DirectVolumeMigration) error {
+func (r ReconcileDirectVolumeMigration) validateDestCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestCluster")
+		defer span.Finish()
+	}
+
 	ref := direct.Spec.DestMigClusterRef
 
 	if !migref.RefSet(ref) {
@@ -198,7 +214,12 @@ func (r ReconcileDirectVolumeMigration) validateStorageClassMappings(direct *mig
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validatePVCs(direct *migapi.DirectVolumeMigration) error {
+func (r ReconcileDirectVolumeMigration) validatePVCs(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePVCs")
+		defer span.Finish()
+	}
+
 	allPVCs := direct.Spec.PersistentVolumeClaims
 
 	// Check if PVCs were set

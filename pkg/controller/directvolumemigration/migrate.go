@@ -1,20 +1,20 @@
 package directvolumemigration
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
-	"github.com/opentracing/opentracing-go"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
+func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *migapi.DirectVolumeMigration) (time.Duration, error) {
 
 	migration, planResources, err := r.getDVMMigrationAndPlanResources(direct)
 	if err != nil {
@@ -40,10 +40,9 @@ func (r *ReconcileDirectVolumeMigration) migrate(direct *migapi.DirectVolumeMigr
 		PlanResources:    planResources,
 		MigrationUID:     string(migration.UID),
 
-		Tracer:        r.tracer,
-		ReconcileSpan: reconcileSpan,
+		Tracer: r.tracer,
 	}
-	err = task.Run()
+	err = task.Run(ctx)
 	if err != nil {
 		if k8serrors.IsConflict(errorutil.Unwrap(err)) {
 			log.V(4).Info("Conflict error during task.Run, requeueing.")

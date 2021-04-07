@@ -111,6 +111,7 @@ type ReconcileDirectImageMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagemigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagemigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	// Fetch the DirectImageMigration instance
 	log.Reset()
 	log.SetValues("dim", request.Name)
@@ -132,9 +133,10 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 		log.SetValues("migMigration", migration.Name)
 	}
 
-	// Set up jaeger tracing
+	// Set up jaeger tracing, add to ctx
 	reconcileSpan := r.initTracer(imageMigration)
 	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
 		defer reconcileSpan.Finish()
 	}
 
@@ -147,7 +149,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 	imageMigration.Status.BeginStagingConditions()
 
 	// Validation
-	err = r.validate(imageMigration)
+	err = r.validate(ctx, imageMigration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -157,7 +159,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 	requeueAfter := time.Duration(PollReQ)
 
 	if !imageMigration.Status.HasBlockerCondition() {
-		requeueAfter, err = r.migrate(imageMigration, reconcileSpan)
+		requeueAfter, err = r.migrate(ctx, imageMigration)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil

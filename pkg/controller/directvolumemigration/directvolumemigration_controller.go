@@ -92,6 +92,7 @@ type ReconcileDirectVolumeMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	log.Reset()
 
 	// Set values
@@ -116,9 +117,10 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 		log.SetValues("migMigration", migration.Name)
 	}
 
-	// Set up jaeger tracing
+	// Set up jaeger tracing, add to ctx
 	reconcileSpan := r.initTracer(direct)
 	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
 		defer reconcileSpan.Finish()
 	}
 
@@ -131,7 +133,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	direct.Status.BeginStagingConditions()
 
 	// Validation
-	err = r.validate(direct)
+	err = r.validate(ctx, direct)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -141,7 +143,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	requeueAfter := time.Duration(PollReQ)
 
 	if !direct.Status.HasBlockerCondition() {
-		requeueAfter, err = r.migrate(direct, reconcileSpan)
+		requeueAfter, err = r.migrate(ctx, direct)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil

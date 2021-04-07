@@ -17,18 +17,18 @@ limitations under the License.
 package directimagemigration
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/errorutil"
-	"github.com/opentracing/opentracing-go"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *ReconcileDirectImageMigration) migrate(imageMigration *migapi.DirectImageMigration, reconcileSpan opentracing.Span) (time.Duration, error) {
+func (r *ReconcileDirectImageMigration) migrate(ctx context.Context, imageMigration *migapi.DirectImageMigration) (time.Duration, error) {
 	// Started
 	if imageMigration.Status.StartTimestamp == nil {
 		log.Info("Marking DirectImageMigration as started.")
@@ -42,10 +42,9 @@ func (r *ReconcileDirectImageMigration) migrate(imageMigration *migapi.DirectIma
 		Owner:  imageMigration,
 		Phase:  imageMigration.Status.Phase,
 
-		Tracer:        r.tracer,
-		ReconcileSpan: reconcileSpan,
+		Tracer: r.tracer,
 	}
-	err := task.Run()
+	err := task.Run(ctx)
 	if err != nil {
 		if errors.IsConflict(errorutil.Unwrap(err)) {
 			log.V(4).Info("Conflict error during task.Run, requeueing.")

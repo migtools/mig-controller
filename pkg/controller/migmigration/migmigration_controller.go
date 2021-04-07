@@ -145,6 +145,7 @@ type ReconcileMigMigration struct {
 
 // Reconcile performs Migrations based on the data in MigMigration
 func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	var err error
 	log.Reset()
 	// Set values.
@@ -162,10 +163,10 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
-
-	// Get jaeger spans for migration and reconcile
+	// Get jaeger spans for migration and reconcile, add to ctx
 	_, reconcileSpan := r.initTracer(migration)
 	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
 		defer reconcileSpan.Finish()
 	}
 
@@ -214,7 +215,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 	migration.Status.BeginStagingConditions()
 
 	// Validate
-	err = r.validate(migration)
+	err = r.validate(ctx, migration)
 	if err != nil {
 		log.Info("Validation failed, requeueing")
 		log.Trace(err)
@@ -238,7 +239,7 @@ func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.
 
 	// Migrate
 	if !migration.Status.HasBlockerCondition() {
-		requeueAfter, err = r.migrate(migration, reconcileSpan)
+		requeueAfter, err = r.migrate(ctx, migration)
 		if err != nil {
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, nil

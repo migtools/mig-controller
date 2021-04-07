@@ -32,6 +32,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/openshift/api/image/docker10"
 	"github.com/openshift/library-go/pkg/image/reference"
+	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -108,6 +109,7 @@ type ReconcileMigAnalytic struct {
 	record.EventRecorder
 
 	scheme *runtime.Scheme
+	tracer opentracing.Tracer
 }
 
 // MigAnalyticPersistentVolumeDetails defines extended properties of a volume discovered by MigAnalytic
@@ -122,6 +124,7 @@ type MigAnalyticPersistentVolumeDetails struct {
 }
 
 func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	ctx := context.Background()
 	var err error
 	log.Reset()
 	log.SetValues("migAnalytic", request.Name)
@@ -136,6 +139,13 @@ func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.R
 		}
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// Get jaeger span for reconcile, add to ctx
+	reconcileSpan := r.initTracer(analytic)
+	if reconcileSpan != nil {
+		ctx = opentracing.ContextWithSpan(ctx, reconcileSpan)
+		defer reconcileSpan.Finish()
 	}
 
 	// Exit early if the MigAnalytic already has a ready condition

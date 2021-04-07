@@ -17,6 +17,7 @@ limitations under the License.
 package directimagemigration
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -130,7 +131,7 @@ func (t *Task) init() error {
 	return nil
 }
 
-func (t *Task) Run() error {
+func (t *Task) Run(ctx context.Context) error {
 	t.Log = t.Log.WithValues("Phase", t.Phase)
 
 	// Init
@@ -143,12 +144,9 @@ func (t *Task) Run() error {
 	t.logRunHeader()
 
 	// Set up Jaeger span for task.Run
-	if t.ReconcileSpan != nil {
-		phaseSpan := t.Tracer.StartSpan(
-			"dim-phase-"+t.Phase,
-			opentracing.ChildOf(t.ReconcileSpan.Context()),
-		)
-		defer phaseSpan.Finish()
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, "dim-phase-"+t.Phase)
+		defer span.Finish()
 	}
 
 	// Run the current phase.

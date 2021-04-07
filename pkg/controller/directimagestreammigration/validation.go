@@ -25,6 +25,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,20 +46,26 @@ const (
 )
 
 // Validate the image migration resource
-func (r ReconcileDirectImageStreamMigration) validate(imageStreamMigration *migapi.DirectImageStreamMigration) error {
-	err := r.validateSrcCluster(imageStreamMigration)
+func (r ReconcileDirectImageStreamMigration) validate(ctx context.Context,
+	imageStreamMigration *migapi.DirectImageStreamMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+	err := r.validateSrcCluster(ctx, imageStreamMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateDestCluster(imageStreamMigration)
+	err = r.validateDestCluster(ctx, imageStreamMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateImageStream(imageStreamMigration)
+	err = r.validateImageStream(ctx, imageStreamMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateDestNamespace(imageStreamMigration)
+	err = r.validateDestNamespace(ctx, imageStreamMigration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -66,7 +73,11 @@ func (r ReconcileDirectImageStreamMigration) validate(imageStreamMigration *miga
 	return nil
 }
 
-func (r ReconcileDirectImageStreamMigration) validateSrcCluster(imageStreamMigration *migapi.DirectImageStreamMigration) error {
+func (r ReconcileDirectImageStreamMigration) validateSrcCluster(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSrcCluster")
+		defer span.Finish()
+	}
 	ref := imageStreamMigration.Spec.SrcMigClusterRef
 
 	// Not Set
@@ -124,7 +135,11 @@ func (r ReconcileDirectImageStreamMigration) validateSrcCluster(imageStreamMigra
 	return nil
 }
 
-func (r ReconcileDirectImageStreamMigration) validateDestCluster(imageStreamMigration *migapi.DirectImageStreamMigration) error {
+func (r ReconcileDirectImageStreamMigration) validateDestCluster(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestCluster")
+		defer span.Finish()
+	}
 	ref := imageStreamMigration.Spec.DestMigClusterRef
 
 	if !migref.RefSet(ref) {
@@ -193,7 +208,11 @@ func (r ReconcileDirectImageStreamMigration) validateDestCluster(imageStreamMigr
 	return nil
 }
 
-func (r ReconcileDirectImageStreamMigration) validateImageStream(imageStreamMigration *migapi.DirectImageStreamMigration) error {
+func (r ReconcileDirectImageStreamMigration) validateImageStream(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateImageStream")
+		defer span.Finish()
+	}
 	ref := imageStreamMigration.Spec.ImageStreamRef
 
 	if !migref.RefSet(ref) {
@@ -241,7 +260,11 @@ func (r ReconcileDirectImageStreamMigration) validateImageStream(imageStreamMigr
 
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
-func (r ReconcileDirectImageStreamMigration) validateDestNamespace(imageStreamMigration *migapi.DirectImageStreamMigration) error {
+func (r ReconcileDirectImageStreamMigration) validateDestNamespace(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestNamespace")
+		defer span.Finish()
+	}
 	cluster, err := imageStreamMigration.GetDestinationCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)

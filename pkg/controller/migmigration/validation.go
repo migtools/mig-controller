@@ -12,6 +12,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/compat"
 	migevent "github.com/konveyor/mig-controller/pkg/event"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	"github.com/opentracing/opentracing-go"
 	corev1 "k8s.io/api/core/v1"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,23 +69,29 @@ const (
 
 // Validate the plan resource.
 // Returns error and the total error conditions set.
-func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
+func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.MigMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		var span opentracing.Span
+		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
+		defer span.Finish()
+	}
+
 	// Plan
-	plan, err := r.validatePlan(migration)
+	plan, err := r.validatePlan(ctx, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation check for attached plan failed")
 		err = liberr.Wrap(err)
 	}
 
 	// Final migration.
-	err = r.validateFinalMigration(plan, migration)
+	err = r.validateFinalMigration(ctx, plan, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation check for existing final migration failed")
 		err = liberr.Wrap(err)
 	}
 
 	// Validate registries running.
-	err = r.validateRegistriesRunning(migration)
+	err = r.validateRegistriesRunning(ctx, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation of running registries failed")
 		err = liberr.Wrap(err)
@@ -94,7 +101,12 @@ func (r ReconcileMigMigration) validate(migration *migapi.MigMigration) error {
 }
 
 // Validate the referenced plan.
-func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*migapi.MigPlan, error) {
+func (r ReconcileMigMigration) validatePlan(ctx context.Context, migration *migapi.MigMigration) (*migapi.MigPlan, error) {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePlan")
+		defer span.Finish()
+	}
+
 	log.V(4).Info("Validating plan spec references")
 	ref := migration.Spec.MigPlanRef
 
@@ -163,7 +175,12 @@ func (r ReconcileMigMigration) validatePlan(migration *migapi.MigMigration) (*mi
 //     A final migration has started or has completed.
 //   When validating `final` migrations:
 //     A final migratoin has successfully completed.
-func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+func (r ReconcileMigMigration) validateFinalMigration(ctx context.Context, plan *migapi.MigPlan,
+	migration *migapi.MigMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateFinalMigration")
+		defer span.Finish()
+	}
 	if plan == nil {
 		return nil
 	}
@@ -223,7 +240,12 @@ func (r ReconcileMigMigration) validateFinalMigration(plan *migapi.MigPlan, migr
 	return nil
 }
 
-func (r ReconcileMigMigration) validateRegistriesRunning(migration *migapi.MigMigration) error {
+func (r ReconcileMigMigration) validateRegistriesRunning(ctx context.Context, migration *migapi.MigMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateRegistriesRunning")
+		defer span.Finish()
+	}
+
 	// Run validation for registry health if registries have been created or are unhealthy.
 	// Validation starts running after phase 'WaitForRegistriesReady' sets 'RegistriesHealthy'.
 	if migration.Status.HasAnyCondition(RegistriesHealthy, RegistriesUnhealthy) {

@@ -6,6 +6,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/opentracing/opentracing-go"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,7 +17,11 @@ import (
 // Create the velero BackupStorageLocation(s) and VolumeSnapshotLocation(s)
 // have been created on both the source and destination clusters associated
 // with the migration plan.
-func (r ReconcileMigPlan) ensureStorage(plan *migapi.MigPlan) error {
+func (r ReconcileMigPlan) ensureStorage(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "ensureStorage")
+		defer span.Finish()
+	}
 	var client k8sclient.Client
 	nEnsured := 0
 
