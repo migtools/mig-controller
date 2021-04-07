@@ -37,17 +37,11 @@ tilt:
 
 # Patch MigrationController CR to use local mig-controller + discovery service
 use-local-controller:
-	oc --namespace openshift-migration patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "add", "path": "/spec/discovery_api_url", "value": "http://localhost:8080" }]'
-	oc --namespace openshift-migration patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": false }]'
+	hack/use-local-controller.sh
 
 # Patch MigrationController CR to use on-cluster mig-controller + discovery service
 use-oncluster-controller:
-	oc --namespace openshift-migration patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "replace", "path": "/spec/migration_controller", "value": true }]'
-	oc --namespace openshift-migration patch migrationcontroller migration-controller --type=json \
-	--patch '[{ "op": "remove", "path": "/spec/discovery_api_url" }]'
+	hack/use-oncluster-controller.sh
 
 # Install CRDs into a cluster
 install: manifests
