@@ -200,7 +200,7 @@ var FinalItinerary = Itinerary{
 		{Name: WaitForVeleroReady, Step: StepPrepare},
 		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: PreBackupHooks, Step: StepBackup},
+		{Name: PreBackupHooks, Step: PreBackupHooks, all: HasPreBackupHooks},
 		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage | EnableImage},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
@@ -225,8 +225,8 @@ var FinalItinerary = Itinerary{
 		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
 		{Name: EnsureAnnotationsDeleted, Step: StepRestore, all: HasStageBackup},
 		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
-		{Name: PostBackupHooks, Step: StepRestore},
-		{Name: PreRestoreHooks, Step: StepRestore},
+		{Name: PostBackupHooks, Step: PostBackupHooks, all: HasPostBackupHooks},
+		{Name: PreRestoreHooks, Step: PreRestoreHooks, all: HasPreRestoreHooks},
 		{Name: EnsureFinalRestore, Step: StepRestore},
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
@@ -1344,6 +1344,18 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 		}
 	}
 
+	if phase.all&HasPreBackupHooks != 0 && !t.hasPreBackupHooks() {
+		return false, nil
+	}
+
+	if phase.all&HasPostBackupHooks != 0 && !t.hasPostBackupHooks() {
+		return false, nil
+	}
+
+	if phase.all&HasPreRestoreHooks != 0 && !t.hasPreRestoreHooks() {
+		return false, nil
+	}
+
 	if phase.all&HasPostRestoreHooks != 0 && !t.hasPostRestoreHooks() {
 		return false, nil
 	}
@@ -1689,6 +1701,39 @@ func (t *Task) logRunHeader() {
 		_, n, total := t.Itinerary.progressReport(t.Phase)
 		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 	}
+}
+
+func (t *Task) hasPreBackupHooks() bool {
+	var anyPreBackupHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PreBackup" {
+			anyPreBackupHooks = true
+		}
+	}
+	return anyPreBackupHooks
+}
+
+func (t *Task) hasPostBackupHooks() bool {
+	var anyPostBackupHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PostBackup" {
+			anyPostBackupHooks = true
+		}
+	}
+	return anyPostBackupHooks
+}
+
+func (t *Task) hasPreRestoreHooks() bool {
+	var anyPreRestoreHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PreRestore" {
+			anyPreRestoreHooks = true
+		}
+	}
+	return anyPreRestoreHooks
 }
 func (t *Task) hasPostRestoreHooks() bool {
 	var anyPostRestoreHooks bool
