@@ -585,47 +585,29 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 
 // Add direct volume pods
 func (t *PlanTree) addDirectVolumePods(directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
+	// Source cluster pods
+	err := t.addDirectVolumePodsForCluster(t.cluster.source, directVolume, parent)
+	if err != nil {
+		return err
+	}
+	// Destination cluster pods
+	err = t.addDirectVolumePodsForCluster(t.cluster.destination, directVolume, parent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Add direct volume pods
+func (t *PlanTree) addDirectVolumePodsForCluster(cluster model.Cluster, directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
 	cLabel := t.cLabel(directVolume.DecodeObject())
 
-	// Source cluster pods
-	cluster := t.cluster.source
 	collection := model.Pod{
 		Base: model.Base{
 			Cluster: cluster.PK,
 		},
 	}
 	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-		cLabel.Name: cLabel.Value,
-	}})
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
-	for _, m := range list {
-		object := m.DecodeObject()
-		if v, found := object.Labels[cLabel.Name]; found {
-			if v != cLabel.Value {
-				continue
-			}
-		}
-		parent.Children = append(
-			parent.Children,
-			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PodHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
-			})
-	}
-
-	// Destination cluster pods
-	cluster = t.cluster.destination
-	collection = model.Pod{
-		Base: model.Base{
-			Cluster: cluster.PK,
-		},
-	}
-	list, err = collection.List(t.db, model.ListOptions{Labels: model.Labels{
 		cLabel.Name: cLabel.Value,
 	}})
 	if err != nil {
