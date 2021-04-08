@@ -100,18 +100,22 @@ const (
 
 // Flags
 const (
-	Quiesce        = 0x001 // Only when QuiescePods (true).
-	HasStagePods   = 0x002 // Only when stage pods created.
-	HasPVs         = 0x004 // Only when PVs migrated.
-	HasVerify      = 0x008 // Only when the plan has enabled verification
-	HasISs         = 0x010 // Only when ISs migrated
-	DirectImage    = 0x020 // Only when using direct image migration
-	IndirectImage  = 0x040 // Only when using indirect image migration
-	DirectVolume   = 0x080 // Only when using direct volume migration
-	IndirectVolume = 0x100 // Only when using indirect volume migration
-	HasStageBackup = 0x200 // True when stage backup is needed
-	EnableImage    = 0x400 // True when disable_image_migration is unset
-	EnableVolume   = 0x800 // True when disable_volume is unset
+	Quiesce             = 0x001  // Only when QuiescePods (true).
+	HasStagePods        = 0x002  // Only when stage pods created.
+	HasPVs              = 0x004  // Only when PVs migrated.
+	HasVerify           = 0x008  // Only when the plan has enabled verification
+	HasISs              = 0x010  // Only when ISs migrated
+	DirectImage         = 0x020  // Only when using direct image migration
+	IndirectImage       = 0x040  // Only when using indirect image migration
+	DirectVolume        = 0x080  // Only when using direct volume migration
+	IndirectVolume      = 0x100  // Only when using indirect volume migration
+	HasStageBackup      = 0x200  // True when stage backup is needed
+	EnableImage         = 0x400  // True when disable_image_migration is unset
+	EnableVolume        = 0x800  // True when disable_volume is unset
+	HasPreBackupHooks   = 0x1000 // True when prebackup hooks exist
+	HasPostBackupHooks  = 0x2000 // True when postbackup hooks exist
+	HasPreRestoreHooks  = 0x4000 // True when postbackup hooks exist
+	HasPostRestoreHooks = 0x8000 // True when postbackup hooks exist
 )
 
 // Migration steps
@@ -226,7 +230,7 @@ var FinalItinerary = Itinerary{
 		{Name: EnsureFinalRestore, Step: StepRestore},
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
-		{Name: PostRestoreHooks, Step: StepRestore},
+		{Name: PostRestoreHooks, Step: PostRestoreHooks, all: HasPostRestoreHooks},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: Verification, Step: StepCleanup, all: HasVerify},
 		{Name: Completed, Step: StepCleanup},
@@ -1340,7 +1344,12 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 		}
 	}
 
+	if phase.all&HasPostRestoreHooks != 0 && !t.hasPostRestoreHooks() {
+		return false, nil
+	}
+
 	return true, nil
+
 }
 
 // Evaluate `any` flags.
@@ -1680,4 +1689,14 @@ func (t *Task) logRunHeader() {
 		_, n, total := t.Itinerary.progressReport(t.Phase)
 		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 	}
+}
+func (t *Task) hasPostRestoreHooks() bool {
+	var anyPostRestoreHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PostRestore" {
+			anyPostRestoreHooks = true
+		}
+	}
+	return anyPostRestoreHooks
 }
