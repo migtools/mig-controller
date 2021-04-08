@@ -2,7 +2,6 @@ package directvolumemigration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -20,16 +19,16 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
-	if migration == nil {
-		return 0, liberr.Wrap(errors.New("did not find expected owning migmigration object for dvm"))
-	}
 
 	// Started
 	if direct.Status.StartTimestamp == nil {
 		log.Info("Marking DirectVolumeMigration as started.")
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
-
+	migrationUID := ""
+	if migration != nil {
+		migrationUID = string(migration.UID)
+	}
 	// Run
 	task := Task{
 		Log:              log,
@@ -38,9 +37,8 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 		Phase:            direct.Status.Phase,
 		PhaseDescription: direct.Status.PhaseDescription,
 		PlanResources:    planResources,
-		MigrationUID:     string(migration.UID),
-
-		Tracer: r.tracer,
+		MigrationUID:     migrationUID,
+		Tracer:           r.tracer,
 	}
 	err = task.Run(ctx)
 	if err != nil {

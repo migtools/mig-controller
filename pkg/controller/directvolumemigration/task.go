@@ -64,8 +64,9 @@ const (
 	DirectVolumeMigrationRsync              = "rsync"
 	DirectVolumeMigrationRsyncClient        = "rsync-client"
 	DirectVolumeMigrationStunnel            = "stunnel"
-	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"      // (migplan UID)
-	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"               // (migplan UID)
+	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration"          // (migmigration UID)
+	MigratedByDirectVolumeMigration         = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
 )
 
 // Flags

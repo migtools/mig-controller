@@ -72,9 +72,11 @@ func (t *Task) createDestinationPVCs() error {
 			pvcLabels = make(map[string]string)
 		}
 
-		if t.MigrationUID != "" && t.PlanResources.MigPlan != nil {
+		if t.MigrationUID != "" && t.PlanResources != nil && t.PlanResources.MigPlan != nil {
 			pvcLabels[MigratedByMigrationLabel] = t.MigrationUID
 			pvcLabels[MigratedByPlanLabel] = string(t.PlanResources.MigPlan.UID)
+		} else if t.Owner.UID != "" {
+			pvcLabels[MigratedByDirectVolumeMigration] = string(t.Owner.UID)
 		}
 
 		// Create pvc on destination with same metadata + spec

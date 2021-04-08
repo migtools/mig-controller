@@ -103,6 +103,9 @@ func (r *DirectImageStreamMigration) GetMigrationForDISM(client k8sclient.Client
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	if dim == nil {
+		return nil, nil
+	}
 	migration, err := dim.GetMigrationForDIM(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
