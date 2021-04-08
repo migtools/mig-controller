@@ -148,7 +148,7 @@ echo "Logger, PhaseName, ElapsedSeconds, PercentOfTotal" > phase_timing.csv; tot
 
 We can take this CSV and plug it into a spreadsheet app to get color formatting and sort by longest phases.
 
-![Phase Performance Table](./docs/images/phase-perf-table.png)
+![Phase Performance Table](./docs/images/phase_perf_table.png)
 
 
 ---
