@@ -247,11 +247,11 @@ func (t *Task) createRsyncConfig() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationRsyncConfig,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 		}
+		configMap.Labels = t.Owner.GetCorrelationLabels()
+		configMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		err = yaml.Unmarshal(tpl.Bytes(), &configMap)
 		if err != nil {
 			return err
@@ -287,14 +287,14 @@ func (t *Task) createRsyncConfig() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationRsyncCreds,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 			Data: map[string][]byte{
 				"RSYNC_PASSWORD": []byte(password),
 			},
 		}
+		srcSecret.Labels = t.Owner.GetCorrelationLabels()
+		srcSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		t.Log.Info("Creating Rsync Password Secret on source cluster",
 			"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
 		err = srcClient.Create(context.TODO(), &srcSecret)
@@ -307,14 +307,14 @@ func (t *Task) createRsyncConfig() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationRsyncCreds,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 			Data: map[string][]byte{
 				"credentials": []byte("root:" + password),
 			},
 		}
+		destSecret.Labels = t.Owner.GetCorrelationLabels()
+		destSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		t.Log.Info("Creating Rsync Password Secret on destination cluster",
 			"secret", path.Join(destSecret.Namespace, destSecret.Name))
 		err = destClient.Create(context.TODO(), &destSecret)
@@ -350,9 +350,6 @@ func (t *Task) createRsyncTransferRoute() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DirectVolumeMigrationRsyncTransferSvc,
 				Namespace: ns,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -367,6 +364,9 @@ func (t *Task) createRsyncTransferRoute() error {
 				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
+		svc.Labels = t.Owner.GetCorrelationLabels()
+		svc.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		t.Log.Info("Creating Rsync Transfer Service for Stunnel connection "+
 			"on destination MigCluster ",
 			"service", path.Join(svc.Namespace, svc.Name))
@@ -381,9 +381,6 @@ func (t *Task) createRsyncTransferRoute() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DirectVolumeMigrationRsyncTransferRoute,
 				Namespace: ns,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 			Spec: routev1.RouteSpec{
 				To: routev1.RouteTargetReference{
@@ -398,6 +395,9 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 		}
+		route.Labels = t.Owner.GetCorrelationLabels()
+		route.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		// Get cluster subdomain if it exists
 		cluster, err := t.Owner.GetDestinationCluster(t.Client)
 		if err != nil {
@@ -811,15 +811,16 @@ func (t *Task) createRsyncPassword() (string, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
 			Name:      DirectVolumeMigrationRsyncPass,
-			Labels: map[string]string{
-				"app": DirectVolumeMigrationRsyncTransfer,
-			},
 		},
 		StringData: map[string]string{
 			corev1.BasicAuthPasswordKey: string(password),
 		},
 		Type: corev1.SecretTypeBasicAuth,
 	}
+	// Correlation labels for discovery service tree view
+	secret.Labels = t.Owner.GetCorrelationLabels()
+	secret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 	t.Log.Info("Creating Rsync Password Secret on host cluster",
 		"secret", path.Join(secret.Namespace, secret.Name))
 	err := t.Client.Create(context.TODO(), &secret)

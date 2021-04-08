@@ -480,6 +480,31 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 			Log.Trace(err)
 			return err
 		}
+		// err := t.addDirectVolumeSecrets(m, &node)
+		// if err != nil {
+		// 	Log.Trace(err)
+		// 	return err
+		// }
+		// err := t.addDirectVolumeConfigMaps(m, &node)
+		// if err != nil {
+		// 	Log.Trace(err)
+		// 	return err
+		// }
+		err = t.addDirectVolumePods(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		// err := t.addDirectVolumeServices(m, &node)
+		// if err != nil {
+		// 	Log.Trace(err)
+		// 	return err
+		// }
+		// err := t.addDirectVolumeRoutes(m, &node)
+		// if err != nil {
+		// 	Log.Trace(err)
+		// 	return err
+		// }
 		parent.Children = append(parent.Children, node)
 	}
 
@@ -551,6 +576,74 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 			TreeNode{
 				Kind:       migref.ToKind(m),
 				ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+	return nil
+}
+
+// Add direct volume pods
+func (t *PlanTree) addDirectVolumePods(directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
+	cLabel := t.cLabel(directVolume.DecodeObject())
+
+	// Source cluster pods
+	cluster := t.cluster.source
+	collection := model.Pod{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		cLabel.Name: cLabel.Value,
+	}})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: PodHandler{}.Link(&cluster, m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+
+	// Destination cluster pods
+	cluster = t.cluster.destination
+	collection = model.Pod{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err = collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		cLabel.Name: cLabel.Value,
+	}})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if v, found := object.Labels[cLabel.Name]; found {
+			if v != cLabel.Value {
+				continue
+			}
+		}
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: PodHandler{}.Link(&cluster, m),
 				Namespace:  m.Namespace,
 				Name:       m.Name,
 			})

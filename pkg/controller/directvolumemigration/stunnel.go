@@ -237,11 +237,11 @@ func (t *Task) createStunnelConfig() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationStunnelConfig,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 		}
+		clientConfigMap.Labels = t.Owner.GetCorrelationLabels()
+		clientConfigMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		err = yaml.Unmarshal(clientTpl.Bytes(), &clientConfigMap)
 		if err != nil {
 			return err
@@ -251,11 +251,11 @@ func (t *Task) createStunnelConfig() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationStunnelConfig,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 		}
+		destConfigMap.Labels = t.Owner.GetCorrelationLabels()
+		destConfigMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		err = yaml.Unmarshal(destTpl.Bytes(), &destConfigMap)
 		if err != nil {
 			return err
@@ -453,9 +453,6 @@ func (t *Task) createStunnelClientPods() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DirectVolumeMigrationRsyncTransferSvc,
 				Namespace: ns,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -470,6 +467,9 @@ func (t *Task) createStunnelClientPods() error {
 				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
+		svc.Labels = t.Owner.GetCorrelationLabels()
+		svc.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+
 		volumes := []corev1.Volume{
 			{
 				Name: "stunnel-conf",
