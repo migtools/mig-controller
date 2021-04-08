@@ -107,11 +107,7 @@ oc apply -f migsamples
 # Option 2: Create resources individually
 cd migsamples
 
-# Source cluster definition 
-# Note: no coordinates/auth needed when MigCluster has 'isHostCluster: true'
-oc apply -f mig-cluster-local.yaml
-
-# Destination cluster definition, coordinates, auth details
+# Remote cluster definition, coordinates, auth details
 oc apply -f sa-secret-remote.yaml
 oc apply -f mig-cluster-remote.yaml
 
