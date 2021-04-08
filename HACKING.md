@@ -1,5 +1,9 @@
 # Hacking on mig-controller
 
+## Design patterns, conventions, and practices
+
+See [devguide.md](https://github.com/konveyor/mig-controller/blob/master/docs/devguide.md)
+
 ## Building and running mig-controller with `make run`
 
 __1. Install prerequisites__
@@ -111,6 +115,109 @@ You can invoke CI via webhook with an appropriate pull request comment command. 
 | `\test-with-operator <PR_number>` | Run  OCP 3 => 4 migration using a specified PR from mig-operator  |
 
 ---
-## Design patterns, conventions, and practices
 
-See [devguide.md](https://github.com/konveyor/mig-controller/blob/master/docs/devguide.md)
+## Generating a phase performance profile
+
+To understand phase performance and identify areas of the controller with greatest potential for improvement, mig-controller logs a "Phase completed" message at the end of each phase indicating elapsed seconds since the phase began.
+
+```json
+# Phase completion log
+{"[...]", "migMigration": "my-migration", "msg":"Phase completed","Phase": "StartRefresh", "phaseElapsed":0.522302}
+```
+
+We can choose a particular MigMigration name to profile, and turn the series of phase completion messages into a performance report CSV.
+
+### Obtaining logs for analysis
+
+First, we need to grab the logs needed for analysis.
+```sh
+# Option 1) Get logs from mig-controller running in-cluster
+oc get logs openshift-migration migration-controller-[...] > controller.log
+
+# Option 2) Run mig-controller locally and output logs to file
+make run-fast 2>&1 | tee controller.log
+```
+
+### Parsing logs for phase elapsed times
+
+Once we have the logs, we can use this this one-liner to generate a CSV of phase timing information.
+```
+# Dependencies: jq, grep
+echo "Logger, PhaseName, ElapsedSeconds, PercentOfTotal" > phase_timing.csv; total_time=$(cat controller.log | grep '\"Phase\ completed\"' | jq '([inputs | .phaseElapsed] | add)'); cat controller.log | grep '\"Phase\ completed\"' | jq -r --arg total_time "$total_time" '"\(.logger), \(.phase), \(.phaseElapsed), \(.phaseElapsed / ($total_time|tonumber))"' >> phase_timing.csv
+```
+
+We can take this CSV and plug it into a spreadsheet app to get color formatting and sort by longest phases.
+
+![Phase Performance Table](./images/phase-perf-table.png)
+
+---
+
+## Using Jaeger to analyze mig-controller performance and interactions
+
+Since mig-controller is composed of ~10 sub-controllers and also relies on Velero, it's useful to get a high-level view of interaction between all of the controllers. Jaeger tracing provides this view.
+
+### Starting a Jaeger collector
+
+Currently, we have support for running a Jaeger collector and mig-controller locally. The Jaeger collector will connect with mig-controller and pull traces from it.
+
+```
+docker kill jaeger &> /dev/null; \
+docker rm jaeger &> /dev/null; \
+docker run -d --name jaeger \
+  -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
+  -p 5775:5775/udp \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  -p 14250:14250 \
+  -p 9411:9411 \
+  jaegertracing/all-in-one:1.22
+```
+
+After you've started the collector, navigate to the Web UI at http://localhost:16686
+
+### Starting mig-controller with Jaeger tracing enabled
+
+To run mig-controller with Jaeger tracing enabled, set the env var `JAEGER_ENABLE=true`.
+
+```sh
+JAEGER_ENABLED=true make run-fast
+```
+
+### Using Jaeger
+
+After navigating to http://localhost:16686 you'll see a screen that looks something like this.
+
+![Jaeger](./images/jaeger_guide/jaeger_overall.png)
+
+*Note*: If you don't see any traces visible yet, that means you need to run a migration. After you've started a migration, refresh the page.
+
+Click on one of the individual traces to view the details for it.
+
+![Jaeger](./images/jaeger_guide/jaeger_trace_select.png)
+
+You'll see a view like this.
+
+![Jaeger](./images/jaeger_guide/jaeger_trace_fullview.png)
+
+This view shows
+ - Individual controller reconciles associated with a particular migration
+ - Phase execution (r.migrate) as a child of the overall reconcile
+
+ You can click and drag on the timeline to zoom in on an area of the trace you're interested in.
+
+ ![Jaeger](./images/jaeger_guide/jaeger_trace_zoomview.png)
+
+If you want to view numerical statistics for the trace, head to the top-right of this screen to the "Trace Timeline" button. Click "Trace Statistics"
+
+![Jaeger](./images/jaeger_guide/jaeger_trace_opts.png)
+
+Here you can view statistics grouped either by Service or Operation name. The operation name view is useful for understanding which phases have the longest active running time. You can turn on *color highlighting* with the checkbox in the top-right corner to emphasize phases that spent the most time running.
+
+![Jaeger](./images/jaeger_guide/jaeger_span_stats.png)
+
+You can also view a graph for a trace.
+
+![Jaeger](./images/jaeger_guide/jaeger_trace_graph.png)
