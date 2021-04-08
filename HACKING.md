@@ -148,7 +148,8 @@ echo "Logger, PhaseName, ElapsedSeconds, PercentOfTotal" > phase_timing.csv; tot
 
 We can take this CSV and plug it into a spreadsheet app to get color formatting and sort by longest phases.
 
-![Phase Performance Table](./images/phase-perf-table.png)
+<img src="./docs/images/phase_perf_table.png" width="700">
+
 
 ---
 
@@ -190,17 +191,17 @@ JAEGER_ENABLED=true make run-fast
 
 After navigating to http://localhost:16686 you'll see a screen that looks something like this.
 
-![Jaeger](./images/jaeger_guide/jaeger_overall.png)
+<img src="./docs/images/jaeger_guide/jaeger_overall.png" width="700">
 
 *Note*: If you don't see any traces visible yet, that means you need to run a migration. After you've started a migration, refresh the page.
 
 Click on one of the individual traces to view the details for it.
 
-![Jaeger](./images/jaeger_guide/jaeger_trace_select.png)
+<img src="./docs/images/jaeger_guide/jaeger_trace_select.png" width="700">
 
 You'll see a view like this.
 
-![Jaeger](./images/jaeger_guide/jaeger_trace_fullview.png)
+<img src="./docs/images/jaeger_guide/jaeger_trace_fullview.png" width="700">
 
 This view shows
  - Individual controller reconciles associated with a particular migration
@@ -208,16 +209,16 @@ This view shows
 
  You can click and drag on the timeline to zoom in on an area of the trace you're interested in.
 
- ![Jaeger](./images/jaeger_guide/jaeger_trace_zoomview.png)
+ <img src="./docs/images/jaeger_guide/jaeger_trace_zoomview.png" width="700">
 
 If you want to view numerical statistics for the trace, head to the top-right of this screen to the "Trace Timeline" button. Click "Trace Statistics"
 
-![Jaeger](./images/jaeger_guide/jaeger_trace_opts.png)
+ <img src="./docs/images/jaeger_guide/jaeger_trace_opts.png" width="700">
 
 Here you can view statistics grouped either by Service or Operation name. The operation name view is useful for understanding which phases have the longest active running time. You can turn on *color highlighting* with the checkbox in the top-right corner to emphasize phases that spent the most time running.
 
-![Jaeger](./images/jaeger_guide/jaeger_span_stats.png)
+ <img src="./docs/images/jaeger_guide/jaeger_span_stats.png" width="700">
 
 You can also view a graph for a trace.
 
-![Jaeger](./images/jaeger_guide/jaeger_trace_graph.png)
+ <img src="./docs/images/jaeger_guide/jaeger_trace_graph.png" width="700">
