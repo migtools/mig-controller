@@ -166,6 +166,7 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 		&container.PodVolumeRestore{},
 		&container.Namespace{},
 		&container.Service{},
+		&container.Route{},
 		&container.PVC{},
 		&container.Pod{},
 		&container.PV{},

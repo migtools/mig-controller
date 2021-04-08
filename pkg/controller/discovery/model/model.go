@@ -59,6 +59,7 @@ func Create() (*sql.DB, error) {
 		&PodVolumeBackup{},
 		&PodVolumeRestore{},
 		&Namespace{},
+		&Route{},
 		&Service{},
 		&Pod{},
 		&PV{},

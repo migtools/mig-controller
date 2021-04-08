@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/core/v1"
+	v1 "github.com/openshift/api/route/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -13,16 +13,16 @@ import (
 )
 
 //
-// A collection of k8s Pod resources.
-type Pod struct {
+// A collection of k8s Route resources.
+type Route struct {
 	// Base
 	BaseCollection
 }
 
-func (r *Pod) AddWatch(dsController controller.Controller) error {
+func (r *Route) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
-			Type: &v1.Pod{},
+			Type: &v1.Route{},
 		},
 		&handler.EnqueueRequestForObject{},
 		r)
@@ -34,7 +34,7 @@ func (r *Pod) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *Pod) Reconcile() error {
+func (r *Route) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{Db: r.ds.Container.Db}
 	err := sr.Reconcile(r)
@@ -44,7 +44,7 @@ func (r *Pod) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"Pod (collection) reconciled.",
+		"Route (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -55,16 +55,16 @@ func (r *Pod) Reconcile() error {
 	return nil
 }
 
-func (r *Pod) GetDiscovered() ([]model.Model, error) {
+func (r *Route) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
-	onCluster := v1.PodList{}
+	onCluster := v1.RouteList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		ns := &model.Pod{
+		ns := &model.Route{
 			Base: model.Base{
 				Cluster: r.ds.Cluster.PK,
 			},
@@ -76,9 +76,9 @@ func (r *Pod) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *Pod) GetStored() ([]model.Model, error) {
+func (r *Route) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.Pod{
+	list, err := model.Route{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -89,8 +89,8 @@ func (r *Pod) GetStored() ([]model.Model, error) {
 		Log.Trace(err)
 		return nil, err
 	}
-	for _, pod := range list {
-		models = append(models, pod)
+	for _, route := range list {
+		models = append(models, route)
 	}
 
 	return models, nil
@@ -100,57 +100,57 @@ func (r *Pod) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *Pod) Create(e event.CreateEvent) bool {
+func (r *Route) Create(e event.CreateEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.Pod)
+	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	route := model.Route{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Create(&pod)
+	route.With(object)
+	r.ds.Create(&route)
 
 	return false
 }
 
-func (r *Pod) Update(e event.UpdateEvent) bool {
+func (r *Route) Update(e event.UpdateEvent) bool {
 	Log.Reset()
-	object, cast := e.ObjectNew.(*v1.Pod)
+	object, cast := e.ObjectNew.(*v1.Route)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	route := model.Route{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Update(&pod)
+	route.With(object)
+	r.ds.Update(&route)
 
 	return false
 }
 
-func (r *Pod) Delete(e event.DeleteEvent) bool {
+func (r *Route) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.Pod)
+	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	route := model.Route{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Delete(&pod)
+	route.With(object)
+	r.ds.Delete(&route)
 
 	return false
 }
 
-func (r *Pod) Generic(e event.GenericEvent) bool {
+func (r *Route) Generic(e event.GenericEvent) bool {
 	return false
 }
