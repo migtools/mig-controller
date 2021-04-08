@@ -344,8 +344,10 @@ func (t *Task) Run(ctx context.Context) error {
 	t.Requeue = FastReQ
 
 	// Jaeger span
-	span, ctx := opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, "migration-phase-"+t.Phase)
-	defer span.Finish()
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, "migration-phase-"+t.Phase)
+		defer span.Finish()
+	}
 
 	err := t.init()
 	if err != nil {
