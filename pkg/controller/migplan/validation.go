@@ -1139,7 +1139,7 @@ func (r ReconcileMigPlan) validatePodHealth(ctx context.Context, plan *migapi.Mi
 			Status:   True,
 			Reason:   NotHealthy,
 			Category: Warn,
-			Message:  "Source namespace(s) contain unhealthy pods. See: `unhealthyNamespaces` for details.",
+			Message:  "Source namespace(s) contain unhealthy pods. See: `Status.namespaces` for details.",
 		})
 	}
 
