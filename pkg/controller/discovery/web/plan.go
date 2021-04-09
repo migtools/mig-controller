@@ -612,14 +612,37 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 		if !isOwned {
 			continue
 		}
-		parent.Children = append(
-			parent.Children,
-			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
-			})
+
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		// Add linked PVCs
+		err := t.addDirectVolumeProgressPVCs(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		// Add linked Pods
+		err = t.addDirectVolumeProgressPods(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
+		// parent.Children = append(
+		// 	parent.Children,
+		// 	TreeNode{
+		// 		Kind:       migref.ToKind(m),
+		// 		ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
+		// 		Namespace:  m.Namespace,
+		// 		Name:       m.Name,
+		// 	})
 	}
 	return nil
 }
@@ -670,6 +693,116 @@ func (t *PlanTree) addDirectVolumePodsForCluster(cluster model.Cluster, directVo
 				Namespace:  m.Namespace,
 				Name:       m.Name,
 			})
+	}
+	return nil
+}
+
+// Add direct volume progress pods
+func (t *PlanTree) addDirectVolumeProgressPods(directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
+	// Source cluster pods
+	err := t.addDirectVolumeProgressPodsForCluster(t.cluster.source, directVolumeProgress, parent)
+	if err != nil {
+		return err
+	}
+	// Destination cluster pods
+	err = t.addDirectVolumeProgressPodsForCluster(t.cluster.destination, directVolumeProgress, parent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Add direct volume progress pods
+func (t *PlanTree) addDirectVolumeProgressPVCs(directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
+	// Source cluster PVC
+	err := t.addDirectVolumeProgressPVCForCluster(t.cluster.source, directVolumeProgress, parent)
+	if err != nil {
+		return err
+	}
+	// Destination cluster PVC
+	err = t.addDirectVolumeProgressPVCForCluster(t.cluster.destination, directVolumeProgress, parent)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Add direct volume pods for a specific cluster
+func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
+	directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
+
+	podSelector := directVolumeProgress.DecodeObject().Spec.PodSelector
+	if podSelector == nil {
+		return nil
+	}
+	collection := model.Pod{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{Labels: podSelector})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		parent.Children = append(
+			parent.Children,
+			TreeNode{
+				Kind:       migref.ToKind(m),
+				ObjectLink: PodHandler{}.Link(&cluster, m),
+				Namespace:  m.Namespace,
+				Name:       m.Name,
+			})
+	}
+	return nil
+}
+
+// Add direct volume PVC for a specific cluster
+func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
+	directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
+
+	dvmpObject := directVolumeProgress.DecodeObject()
+	podSelector := dvmpObject.Spec.PodSelector
+	if podSelector == nil {
+		return nil
+	}
+
+	pvcNamespace := dvmpObject.Spec.PodNamespace
+	pvcName, ok := podSelector["migration.openshift.io/created-for-pvc"]
+	if !ok {
+		return nil
+	}
+
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Name != pvcName || object.Namespace != pvcNamespace {
+			continue
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvcHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err := t.addPVForPVC(cluster, m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
 	}
 	return nil
 }
