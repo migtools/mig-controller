@@ -635,14 +635,6 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 		}
 
 		parent.Children = append(parent.Children, node)
-		// parent.Children = append(
-		// 	parent.Children,
-		// 	TreeNode{
-		// 		Kind:       migref.ToKind(m),
-		// 		ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
-		// 		Namespace:  m.Namespace,
-		// 		Name:       m.Name,
-		// 	})
 	}
 	return nil
 }
