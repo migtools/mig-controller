@@ -448,6 +448,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 			Log.Trace(err)
 			return err
 		}
+
 		parent.Children = append(parent.Children, node)
 	}
 
@@ -786,14 +787,19 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 		if !isOwned {
 			continue
 		}
-		parent.Children = append(
-			parent.Children,
-			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PvBackupHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
-			})
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvBackupHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addPVCsForPVB(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
 	}
 
 	return nil
@@ -827,13 +833,145 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 		if !isOwned {
 			continue
 		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvRestoreHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addPVCsForPVR(restore, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add PVCs related to velero restore.
+func (t *PlanTree) addPVCsForPVR(restore *model.Restore, parent *TreeNode) error {
+	cluster := t.cluster.destination
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+	// 	"velero.io/restore-name": restore.Name,
+	// }})
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		restoreName, ok := object.Labels["velero.io/restore-name"]
+		if !ok {
+			continue
+		}
+		if restoreName != restore.Name {
+			continue
+		}
+
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvcHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+		err = t.addPVForPVC(cluster, m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add PVCs related to velero restore.
+func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) error {
+	cluster := t.cluster.source
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+	// 	"velero.io/restore-name": restore.Name,
+	// }})
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	pvcUID, ok := pvb.DecodeObject().Labels["velero.io/pvc-uid"]
+	if !ok {
+		return nil
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if string(object.UID) != pvcUID {
+			continue
+		}
+
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvcHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addPVForPVC(cluster, m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+// Add PV bound to PVC.
+func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *TreeNode) error {
+	collection := model.PV{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+	// 	"velero.io/restore-name": restore.Name,
+	// }})
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+
+	pvcName := pvc.DecodeObject().Spec.VolumeName
+
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Name != pvcName {
+			continue
+		}
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
 				Kind:       migref.ToKind(m),
-				ObjectLink: PvRestoreHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				ObjectLink: PvHandler{}.Link(&cluster, m),
+				// Namespace:  m.Namespace,
+				Name: m.Name,
 			})
 	}
 

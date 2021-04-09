@@ -71,6 +71,11 @@ func (t *Task) createDestinationPVCs() error {
 		if pvcLabels == nil {
 			pvcLabels = make(map[string]string)
 		}
+		// Merge DVM correlation labels into PVC labels for debug view
+		corrLabels := t.Owner.GetCorrelationLabels()
+		for k, v := range corrLabels {
+			pvcLabels[k] = v
+		}
 
 		if t.MigrationUID != "" && t.PlanResources.MigPlan != nil {
 			pvcLabels[MigratedByMigrationLabel] = t.MigrationUID
