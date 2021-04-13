@@ -398,20 +398,22 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 // Returns true if custom nodeselectors found on any Pod.
 func (r ReconcileMigPlan) hasCustomNodeSelectors(podList []kapi.Pod) bool {
 	// Known default node selector values. Ignore these if we spot them on Pods
-	defaultNodeSelectors := map[string]string{
-		"node-role.kubernetes.io/compute": "true",
+	defaultNodeSelectors := []string{
+		"node-role.kubernetes.io/compute",
 	}
 	for _, pod := range podList {
-		// Return true if pod has node selectors not in the default list
-		if pod.Spec.NodeSelector != nil {
-			for defaultSelector, _ := range defaultNodeSelectors {
-				if _, found := pod.Spec.NodeSelector[defaultSelector]; !found {
+		if pod.Spec.NodeSelector == nil {
+			continue
+		}
+		for nodeSelector := range pod.Spec.NodeSelector {
+			for _, defaultSelector := range defaultNodeSelectors {
+				// Return true if node selector on Pod is not one of the defaults
+				if nodeSelector != defaultSelector {
 					return true
 				}
 			}
 		}
 	}
-
 	return false
 }
 
