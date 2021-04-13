@@ -415,6 +415,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector: map[string]string{
+					"node-role.kubernetes.io/compute":  "true",
 					"my-custom-role.foobar.io/compute": "true",
 				},
 			},
