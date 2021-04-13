@@ -411,7 +411,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 	podsWithCustomNodeSelectors := []corev1.Pod{
 		corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-without-custom-nodeselector",
+				Name: "pod-with-custom-nodeselector",
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector: map[string]string{
