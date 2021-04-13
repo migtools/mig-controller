@@ -379,16 +379,19 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 	}
 
 	if len(nsWithNodeSelectors) > 0 {
-		msgFormat := "Found Pods with `Spec.NodeSelector` or `Spec.NodeName` set in namespaces: [%s]. " +
-			"These fields will be cleared on Pods restored into the target cluster."
+		msgFormat := "Found Pods with non-default `Spec.NodeSelector` set in namespaces: [%s]. " +
+			"This field will be cleared on Pods restored into the target cluster."
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsHaveNodeSelectors,
 			Status:   True,
 			Reason:   NodeSelectorsDetected,
 			Category: Warn,
+			Durable:  true,
 			Message: fmt.Sprintf(msgFormat,
 				strings.Join(nsWithNodeSelectors, ", ")),
 		})
+	} else {
+		plan.Status.DeleteCondition(NsHaveNodeSelectors)
 	}
 
 	return nil
