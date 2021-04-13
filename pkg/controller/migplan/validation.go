@@ -394,7 +394,8 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 	return nil
 }
 
-// Checks the list of Pods for any non-default nodeselectors. Returns list of custom nodeselectors.
+// Checks the list of Pods for any non-default nodeselectors.
+// Returns true if custom nodeselectors found on any Pod.
 func (r ReconcileMigPlan) hasCustomNodeSelectors(podList []kapi.Pod) bool {
 	// Known default node selector values. Ignore these if we spot them on Pods
 	defaultNodeSelectors := map[string]string{
