@@ -391,8 +391,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 	podsWithoutCustomNodeSelectors := []corev1.Pod{
 		corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-without-custom-nodeselector",
-				Namespace: "mssql-persistent",
+				Name: "pod-without-custom-nodeselector",
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector: map[string]string{
@@ -402,8 +401,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 		},
 		corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-2-without-custom-nodeselector",
-				Namespace: "mssql-persistent",
+				Name: "pod-2-without-custom-nodeselector",
 			},
 		},
 	}
@@ -413,8 +411,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 	podsWithCustomNodeSelectors := []corev1.Pod{
 		corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-without-custom-nodeselector",
-				Namespace: "mssql-persistent",
+				Name: "pod-without-custom-nodeselector",
 			},
 			Spec: corev1.PodSpec{
 				NodeSelector: map[string]string{
@@ -424,8 +421,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 		},
 		corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-2-without-custom-nodeselector",
-				Namespace: "mssql-persistent",
+				Name: "pod-2-without-custom-nodeselector",
 			},
 		},
 	}
@@ -460,7 +456,7 @@ func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
 			r := ReconcileMigPlan{}
 			got := r.hasCustomNodeSelectors(tt.args.sourceClusterPodsToMigrate)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("test.name=[%v]: hasCustomNodeSelectors() got = %v, want %v", tt.name, got, tt.want)
+				t.Errorf("hasCustomNodeSelectors() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
