@@ -364,7 +364,7 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 			return liberr.Wrap(err)
 		}
 		count += len(list.Items)
-		if r.hasNodeSelectors(list.Items) {
+		if r.hasCustomNodeSelectors(list.Items) {
 			nsWithNodeSelectors = append(nsWithNodeSelectors, name)
 		}
 	}
@@ -394,10 +394,20 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 	return nil
 }
 
-func (r ReconcileMigPlan) hasNodeSelectors(podList []kapi.Pod) bool {
+// Checks the list of Pods for any non-default nodeselectors. Returns list of custom nodeselectors.
+func (r ReconcileMigPlan) hasCustomNodeSelectors(podList []kapi.Pod) bool {
+	// Known default node selector values. Ignore these if we spot them on Pods
+	defaultNodeSelectors := map[string]string{
+		"node-role.kubernetes.io/compute": "true",
+	}
 	for _, pod := range podList {
-		if len(pod.Spec.NodeSelector) > 0 || len(pod.Spec.NodeName) > 0 {
-			return true
+		// Return true if pod has node selectors not in the default list
+		if pod.Spec.NodeSelector != nil {
+			for defaultSelector, _ := range defaultNodeSelectors {
+				if _, found := pod.Spec.NodeSelector[defaultSelector]; !found {
+					return true
+				}
+			}
 		}
 	}
 
