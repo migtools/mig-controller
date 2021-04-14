@@ -4,6 +4,7 @@ import (
 	"context"
 	"path"
 
+	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,14 @@ func (t *Task) createDestinationPVCs() error {
 		return err
 	}
 
+	migration, err := t.Owner.GetMigrationForDVM(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	migrationUID := ""
+	if migration != nil {
+		migrationUID = string(migration.UID)
+	}
 	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
 		// Get pvc definition from source cluster
 
@@ -72,8 +81,8 @@ func (t *Task) createDestinationPVCs() error {
 			pvcLabels = make(map[string]string)
 		}
 
-		if t.MigrationUID != "" && t.PlanResources != nil && t.PlanResources.MigPlan != nil {
-			pvcLabels[MigratedByMigrationLabel] = t.MigrationUID
+		if migrationUID != "" && t.PlanResources != nil && t.PlanResources.MigPlan != nil {
+			pvcLabels[MigratedByMigrationLabel] = migrationUID
 			pvcLabels[MigratedByPlanLabel] = string(t.PlanResources.MigPlan.UID)
 		} else if t.Owner.UID != "" {
 			pvcLabels[MigratedByDirectVolumeMigration] = string(t.Owner.UID)
