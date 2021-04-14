@@ -1022,6 +1022,98 @@ func (t *PlanTree) addPVCsForPVR(restore *model.Restore, parent *TreeNode) error
 }
 
 //
+// Add PVCs moved by a velero backup.
+func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) error {
+	cluster := t.cluster.source
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+	// 	"velero.io/restore-name": restore.Name,
+	// }})
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	expectedBackupName := backup.DecodeObject().Name
+	for _, m := range list {
+		object := m.DecodeObject()
+		backupName, exists := object.Labels["migration.openshift.io/migrated-by-backup"]
+		if !exists {
+			continue
+		}
+		if backupName != expectedBackupName {
+			continue
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvcHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addPVForPVC(cluster, m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add PVCs moved by a velero restore.
+func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) error {
+	cluster := t.cluster.destination
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+	// 	"velero.io/restore-name": restore.Name,
+	// }})
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	expectedBackupName := restore.DecodeObject().Spec.BackupName
+	for _, m := range list {
+		object := m.DecodeObject()
+		backupName, exists := object.Labels["migration.openshift.io/migrated-by-backup"]
+		if !exists {
+			continue
+		}
+		if backupName != expectedBackupName {
+			continue
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PvcHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+
+		err = t.addPVForPVC(cluster, m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) error {
 	cluster := t.cluster.source
