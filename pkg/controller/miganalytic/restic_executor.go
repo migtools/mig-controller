@@ -62,6 +62,10 @@ func (r *ResticDFCommandExecutor) DF(podRef *corev1.Pod, persistentVolumes []Mig
 		RestCfg: restCfg,
 		Args:    cmdString,
 	}
+	log.Info("Executing df command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
+		"pod", path.Join(podRef.Namespace, podRef.Name),
+		"command", cmdString)
+
 	err := podCommand.Run()
 	if err != nil {
 		log.Error(err, "Failed running df command inside Restic Pod",
@@ -152,6 +156,14 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 			pvcDFInfo.Name = pvc.Name
 			pvcDFInfo.Namespace = pvc.Namespace
 			gatheredData = append(gatheredData, pvcDFInfo)
+			log.Info("Got DF command output from Restic Pod",
+				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
+				"resticPodUID", pvc.PodUID,
+				"pvcStorageClass", pvc.StorageClass,
+				"pvcRequestedCapacity", pvc.RequestedCapacity,
+				"pvcProvisionedCapacity", pvc.ProvisionedCapacity,
+				"usagePercentage", pvcDFInfo.UsagePercentage,
+				"totalSize", pvcDFInfo.TotalSize)
 		}
 	}
 	return gatheredData, nil
