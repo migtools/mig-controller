@@ -137,6 +137,9 @@ func (r *DirectVolumeMigrationProgress) GetMigrationforDVMP(client k8sclient.Cli
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	if dvm == nil {
+		return nil, nil
+	}
 	migration, err := dvm.GetMigrationForDVM(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
