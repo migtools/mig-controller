@@ -402,9 +402,63 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 			Log.Trace(err)
 			return err
 		}
+		// Add move and snapshot PVCs if this is a stage backup
+		_, found := object.Labels["migration-stage-backup"]
+		if found {
+			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
+			if err != nil {
+				Log.Trace(err)
+				return err
+			}
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
+	return nil
+}
+
+// Add PVCs that will be moved or snapshotted
+func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, parent *TreeNode) error {
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	// Get list of PVC names that will be moved / snapshotted from MigPlan
+	plan := t.plan.DecodeObject()
+	pvcsToInclude := []migapi.PVC{}
+	for _, pv := range plan.Spec.PersistentVolumes.List {
+		// Add to list if not using file copy|skip method
+		if pv.Selection.Action != migapi.PvCopyAction && pv.Selection.Action != migapi.PvSkipAction {
+			pvcsToInclude = append(pvcsToInclude, pv.PVC)
+		}
+	}
+
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		for _, pvc := range pvcsToInclude {
+			if pvc.Name == object.Name && pvc.Namespace == object.Namespace {
+				node := TreeNode{
+					Kind:       migref.ToKind(m),
+					ObjectLink: PvcHandler{}.Link(&cluster, m),
+					Namespace:  m.Namespace,
+					Name:       m.Name,
+				}
+				err := t.addPVForPVC(cluster, m, &node)
+				if err != nil {
+					Log.Trace(err)
+					return err
+				}
+				parent.Children = append(parent.Children, node)
+				break
+			}
+		}
+	}
 	return nil
 }
 
@@ -448,7 +502,15 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 			Log.Trace(err)
 			return err
 		}
-
+		// Add move and snapshot PVCs if this is a stage restore
+		_, found := object.Labels["migration-stage-restore"]
+		if found {
+			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
+			if err != nil {
+				Log.Trace(err)
+				return err
+			}
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
