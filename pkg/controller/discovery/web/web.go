@@ -152,6 +152,11 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				container: w.Container,
 			},
 		},
+		HookHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
 		MigrationHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,

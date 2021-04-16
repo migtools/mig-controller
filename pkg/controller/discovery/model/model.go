@@ -54,6 +54,7 @@ func Create() (*sql.DB, error) {
 		&DirectImageMigration{},
 		&DirectVolumeMigrationProgress{},
 		&DirectImageStreamMigration{},
+		&Hook{},
 		&Backup{},
 		&Restore{},
 		&PodVolumeBackup{},
