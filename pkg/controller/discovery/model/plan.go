@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
@@ -98,6 +99,7 @@ func (m *Migration) With(object *migapi.MigMigration) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 

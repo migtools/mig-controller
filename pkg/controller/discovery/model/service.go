@@ -2,7 +2,8 @@ package model
 
 import (
 	"encoding/json"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 //
@@ -18,6 +19,7 @@ func (m *Service) With(object *v1.Service) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 

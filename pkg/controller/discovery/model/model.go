@@ -267,6 +267,8 @@ type CR struct {
 	Name string `sql:"const,unique(b),key"`
 	// The raw json-encoded k8s resource.
 	Object string `sql:""`
+	// Labels.
+	labels Labels
 }
 
 //
@@ -299,5 +301,5 @@ func (m *CR) Meta() *Meta {
 //
 // Get associated labels.
 func (m *CR) Labels() Labels {
-	return Labels{}
+	return m.labels
 }

@@ -312,8 +312,13 @@ func (t *PlanTree) getRoot() *TreeNode {
 //
 // Add related migrations.
 func (t *PlanTree) addMigrations(parent *TreeNode) error {
+	planObject := t.plan.DecodeObject()
 	collection := model.Migration{}
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			"migration.openshift.io/migplan-name": planObject.Name,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
