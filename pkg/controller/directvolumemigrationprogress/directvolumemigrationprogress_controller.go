@@ -49,8 +49,6 @@ import (
 
 var log = logging.WithName("pvmigrationprogress")
 
-var TimeLimit = 10 * time.Minute
-
 const (
 	// CreatingContainer initial container state
 	ContainerCreating = "ContainerCreating"
@@ -327,6 +325,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 	rsyncPodStatus := migapi.RsyncPodStatus{
 		PodName:           podRef.Name,
 		CreationTimestamp: &podRef.CreationTimestamp,
+		PodPhase:          podRef.Status.Phase,
 	}
 	var containerStatus *kapi.ContainerStatus
 	for _, c := range podRef.Status.ContainerStatuses {
@@ -369,12 +368,8 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
 	case !containerStatus.Ready && podRef.Status.Phase == kapi.PodPending && containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == ContainerCreating:
-		// if pod is not in running state after 10 mins of its creation, raise a
-		if time.Now().UTC().Sub(podRef.CreationTimestamp.Time.UTC()) > TimeLimit {
-			rsyncPodStatus.PodPhase = kapi.PodPending
-			rsyncPodStatus.LogMessage = fmt.Sprintf("Pod %s/%s is stuck in Pending state for more than 10 mins", podRef.Namespace, podRef.Name)
-			rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: time.Now().Sub(podRef.CreationTimestamp.Time).Round(time.Second)}
-		}
+		rsyncPodStatus.PodPhase = kapi.PodPending
+		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: time.Now().Sub(podRef.CreationTimestamp.Time).Round(time.Second)}
 	case podRef.Status.Phase == kapi.PodFailed:
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		rsyncPodStatus.PodPhase = kapi.PodFailed

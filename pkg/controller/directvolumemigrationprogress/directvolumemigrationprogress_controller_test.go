@@ -299,3 +299,40 @@ func TestRsyncPodProgressTask_getCumulativeElapsedTime(t *testing.T) {
 		})
 	}
 }
+
+func Test_getLastMatch(t *testing.T) {
+	matcherRegex := `\d+\%`
+	type args struct {
+		regex   string
+		message string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "when no percentage value is present, should not return anything",
+			args: args{
+				regex:   matcherRegex,
+				message: "",
+			},
+			want: "",
+		},
+		{
+			name: "when multiple percentage values are present, should return the last match",
+			args: args{
+				regex:   matcherRegex,
+				message: "50%\n70%\n80%\n90%",
+			},
+			want: "90%",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getLastMatch(tt.args.regex, tt.args.message); got != tt.want {
+				t.Errorf("getLastMatch() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

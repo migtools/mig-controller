@@ -68,6 +68,8 @@ const (
 	DefaultRsyncBackOffLimit = 20
 	// DefaultRsyncOperationConcurrency defines number of Rsync operations that can be processed concurrently
 	DefaultRsyncOperationConcurrency = 5
+	// PendingPodWarningTimeLimit time threshold for Rsync Pods in Pending state to show warning
+	PendingPodWarningTimeLimit = 10 * time.Minute
 )
 
 // labels
@@ -1145,13 +1147,14 @@ func getMD5Hash(s string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// hasAllProgressReportingCompleted reads DVMP CR present for all PVCs and generates progress information in CR status
+// hasAllProgressReportingCompleted reads DVMP CR and status of Rsync Operations present for all PVCs and generates progress information in CR status
+// returns True when progress reporting for all Rsync Pods is complete
 func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
 	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
-	var pendingPods []string
+	var pendingSinceTimeLimitPods []string
 	pvcMap := t.getPVCNamespaceMap()
 	for ns, vols := range pvcMap {
 		for _, vol := range vols {
@@ -1187,19 +1190,24 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
 			case operation.Failed:
 				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, podProgress)
-			case dvmp.Status.PodPhase == corev1.PodSucceeded, operation.Succeeded:
+			case dvmp.Status.PodPhase == corev1.PodSucceeded:
 				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, podProgress)
-			case dvmp.Status.PodPhase == corev1.PodPending:
+			case dvmp.Status.PodPhase == corev1.PodPending, !operation.Failed:
 				t.Owner.Status.PendingPods = append(t.Owner.Status.PendingPods, podProgress)
-				pendingPods = append(pendingPods, fmt.Sprintf("%s/%s", podProgress.Namespace, podProgress.Name))
+				if dvmp.Status.CreationTimestamp != nil {
+					if time.Now().UTC().Sub(dvmp.Status.CreationTimestamp.Time.UTC()) > PendingPodWarningTimeLimit {
+						pendingSinceTimeLimitPods = append(pendingSinceTimeLimitPods, fmt.Sprintf("%s/%s", podProgress.Namespace, podProgress.Name))
+					}
+				}
 			}
 		}
 	}
 
+	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
 	isAnyRunning := len(t.Owner.Status.RunningPods) > 0
-	if isAnyPending {
-		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
+	if len(pendingSinceTimeLimitPods) > 0 {
+		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingSinceTimeLimitPods[:], ", "))
 		t.Log.Info(pendingMessage)
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     RsyncClientPodsPending,
@@ -1209,7 +1217,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 			Message:  pendingMessage,
 		})
 	}
-	return !isAnyRunning && !isAnyPending, nil
+	return !isAnyRunning && !isAnyPending && isCompleted, nil
 }
 
 func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
