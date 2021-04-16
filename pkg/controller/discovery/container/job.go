@@ -5,23 +5,24 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	batchv1 "k8s.io/api/batch/v1"
 )
 
-// A collection of k8s PVC resources.
-type PVC struct {
+// A collection of k8s Job resources.
+type Job struct {
 	// Base
 	BaseCollection
 }
 
-func (r *PVC) AddWatch(dsController controller.Controller) error {
+func (r *Job) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
-			Type: &v1.PersistentVolumeClaim{},
+			Type: &batchv1.Job{},
 		},
 		&handler.EnqueueRequestForObject{},
 		r)
@@ -33,7 +34,7 @@ func (r *PVC) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *PVC) Reconcile() error {
+func (r *Job) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -45,7 +46,7 @@ func (r *PVC) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"PVC (collection) reconciled.",
+		"Job (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -56,16 +57,16 @@ func (r *PVC) Reconcile() error {
 	return nil
 }
 
-func (r *PVC) GetDiscovered() ([]model.Model, error) {
+func (r *Job) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
-	onCluster := v1.PersistentVolumeClaimList{}
+	onCluster := batchv1.JobList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		pvc := &model.PVC{
+		pvc := &model.Job{
 			Base: model.Base{
 				Cluster: r.ds.Cluster.PK,
 			},
@@ -77,9 +78,9 @@ func (r *PVC) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *PVC) GetStored() ([]model.Model, error) {
+func (r *Job) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.PVC{
+	list, err := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -101,13 +102,13 @@ func (r *PVC) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *PVC) Create(e event.CreateEvent) bool {
+func (r *Job) Create(e event.CreateEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.PersistentVolumeClaim)
+	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pvc := model.PVC{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -118,13 +119,13 @@ func (r *PVC) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *PVC) Update(e event.UpdateEvent) bool {
+func (r *Job) Update(e event.UpdateEvent) bool {
 	Log.Reset()
-	object, cast := e.ObjectNew.(*v1.PersistentVolumeClaim)
+	object, cast := e.ObjectNew.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pvc := model.PVC{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -135,13 +136,13 @@ func (r *PVC) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *PVC) Delete(e event.DeleteEvent) bool {
+func (r *Job) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.PersistentVolumeClaim)
+	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pvc := model.PVC{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -152,6 +153,6 @@ func (r *PVC) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *PVC) Generic(e event.GenericEvent) bool {
+func (r *Job) Generic(e event.GenericEvent) bool {
 	return false
 }

@@ -170,6 +170,7 @@ func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Res
 		&container.Route{},
 		&container.PVC{},
 		&container.Pod{},
+		&container.Job{},
 		&container.PV{},
 		&container.StorageClass{},
 	)
