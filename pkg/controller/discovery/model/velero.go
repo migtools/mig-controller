@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -18,6 +19,7 @@ func (m *Backup) With(object *velero.Backup) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 
@@ -98,6 +100,7 @@ func (m *Restore) With(object *velero.Restore) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 
@@ -178,6 +181,7 @@ func (m *PodVolumeBackup) With(object *velero.PodVolumeBackup) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 
@@ -258,6 +262,7 @@ func (m *PodVolumeRestore) With(object *velero.PodVolumeRestore) {
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 

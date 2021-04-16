@@ -387,7 +387,11 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		},
 	}
 	cLabel := t.cLabel(migration.DecodeObject())
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -397,11 +401,11 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		if object.Labels == nil {
 			continue
 		}
-		if v, found := object.Labels[cLabel.Name]; found {
-			if v != cLabel.Value {
-				continue
-			}
-		}
+		// if v, found := object.Labels[cLabel.Name]; found {
+		// 	if v != cLabel.Value {
+		// 		continue
+		// 	}
+		// }
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: BackupHandler{}.Link(&cluster, m),
