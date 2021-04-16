@@ -33,8 +33,6 @@ var phaseDescriptions = map[string]string{
 	CreateRsyncTransferPods:              "Creating Rsync daemon pods on the target cluster",
 	WaitForRsyncTransferPodsRunning:      "Waiting for the Rsync daemon pod to run",
 	EnsureRsyncRouteAdmitted:             "Waiting for Rsync route to be admitted.",
-	CreateStunnelClientPods:              "Creating Stunnel client pods on the source cluster",
-	WaitForStunnelClientPodsRunning:      "Waiting for the Stunnel client pods to run",
 	CreateRsyncClientPods:                "Creating Rsync client pods",
 	WaitForRsyncClientPodsCompleted:      "Waiting for the Rsync client pods to be completed",
 	DeleteRsyncResources:                 "Deleting Rsync resources created by this migration",

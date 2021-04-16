@@ -9,7 +9,6 @@ import (
 	"text/template"
 
 	liberr "github.com/konveyor/controller/pkg/error"
-	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"gopkg.in/yaml.v2"
 
@@ -24,14 +23,9 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	//"k8s.io/apimachinery/pkg/types"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type stunnelConfig struct {
@@ -60,13 +54,13 @@ metadata:
     purpose: stunnel
 data:
   stunnel.conf: |
-    foreground = yes
     pid =
     sslVersion = TLSv1.2
     client = yes
     syslog = no
+    output = /dev/stdout
     [rsync]
-    accept = {{ .StunnelPort }}
+    accept = localhost:2222
     CAFile = /etc/stunnel/certs/ca.crt
     cert = /etc/stunnel/certs/tls.crt
 {{ if not (eq .ProxyHost "") }}
@@ -407,236 +401,4 @@ func (t *Task) setupCerts() error {
 		}
 	}
 	return nil
-}
-
-// Create stunnel client pods + svc
-func (t *Task) createStunnelClientPods() error {
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return err
-	}
-
-	// Get transfer image for source cluster
-	cluster, err := t.Owner.GetSourceCluster(t.Client)
-	if err != nil {
-		return err
-	}
-
-	t.Log.Info("Getting image for Stunnel client Pods that will be created on source MigCluster")
-	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
-	if err != nil {
-		return err
-	}
-	t.Log.Info("Found transfer image for Stunnel client Pods",
-		"transferImage", transferImage)
-
-	t.Log.Info("Getting limits and requests for Stunnel client Pods")
-
-	limits, requests, err := t.getPodResourceLists(STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
-	if err != nil {
-		return err
-	}
-	pvcMap := t.getPVCNamespaceMap()
-
-	dvmLabels := t.buildDVMLabels()
-	dvmLabels["purpose"] = DirectVolumeMigrationStunnel
-
-	isRsyncPrivileged, err := isRsyncPrivileged(srcClient)
-	if err != nil {
-		return err
-	}
-	t.Log.Info(fmt.Sprintf("Stunnel client pods will be created with privileged=[%v]",
-		isRsyncPrivileged))
-
-	for ns, _ := range pvcMap {
-		svc := corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DirectVolumeMigrationRsyncTransferSvc,
-				Namespace: ns,
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:       "stunnel",
-						Protocol:   corev1.ProtocolTCP,
-						Port:       int32(2222),
-						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
-					},
-				},
-				Selector: dvmLabels,
-				Type:     corev1.ServiceTypeClusterIP,
-			},
-		}
-		svc.Labels = t.Owner.GetCorrelationLabels()
-		svc.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		volumes := []corev1.Volume{
-			{
-				Name: "stunnel-conf",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: DirectVolumeMigrationStunnelConfig,
-						},
-					},
-				},
-			},
-			{
-				Name: "stunnel-certs",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: DirectVolumeMigrationStunnelCerts,
-						Items: []corev1.KeyToPath{
-							{
-								Key:  "tls.crt",
-								Path: "tls.crt",
-							},
-							{
-								Key:  "ca.crt",
-								Path: "ca.crt",
-							},
-							{
-								Key:  "tls.key",
-								Path: "tls.key",
-							},
-						},
-					},
-				},
-			},
-		}
-		trueBool := true
-		runAsUser := int64(0)
-		containers := []corev1.Container{}
-
-		containers = append(containers, corev1.Container{
-			Name:    "stunnel",
-			Image:   transferImage,
-			Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          "stunnel",
-					Protocol:      corev1.ProtocolTCP,
-					ContainerPort: int32(2222),
-				},
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "stunnel-conf",
-					MountPath: "/etc/stunnel/stunnel.conf",
-					SubPath:   "stunnel.conf",
-				},
-				{
-					Name:      "stunnel-certs",
-					MountPath: "/etc/stunnel/certs",
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				Privileged:             &isRsyncPrivileged,
-				RunAsUser:              &runAsUser,
-				ReadOnlyRootFilesystem: &trueBool,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-				},
-			},
-			Resources: corev1.ResourceRequirements{
-				Limits:   limits,
-				Requests: requests,
-			},
-		})
-
-		dvmLabels := t.buildDVMLabels()
-		dvmLabels["purpose"] = DirectVolumeMigrationStunnel
-
-		clientPod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DirectVolumeMigrationStunnelTransfer,
-				Namespace: ns,
-				Labels:    dvmLabels,
-			},
-			Spec: corev1.PodSpec{
-				Volumes:    volumes,
-				Containers: containers,
-			},
-		}
-		t.Log.Info("Creating Stunnel client Service on source cluster",
-			"service", path.Join(svc.Namespace, svc.Name))
-		err := srcClient.Create(context.TODO(), &svc)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Stunnel client Service already exists on source cluster",
-				"service", path.Join(svc.Namespace, svc.Name))
-		} else if err != nil {
-			return err
-		}
-		t.Log.Info("Creating Stunnel client Pod on source cluster",
-			"pod", path.Join(clientPod.Namespace, clientPod.Name))
-		err = srcClient.Create(context.TODO(), &clientPod)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Stunnel client Pod already exists on source cluster",
-				"pod", path.Join(clientPod.Namespace, clientPod.Name))
-		} else if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// check if stunnel client pods are running
-func (t *Task) areStunnelClientPodsRunning() (bool, error) {
-	// Get client for destination
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return false, err
-	}
-
-	pvcMap := t.getPVCNamespaceMap()
-
-	dvmLabels := t.buildDVMLabels()
-	dvmLabels["purpose"] = DirectVolumeMigrationStunnel
-	selector := labels.SelectorFromSet(dvmLabels)
-
-	for ns, _ := range pvcMap {
-		pods := corev1.PodList{}
-		err = srcClient.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&pods)
-		if err != nil {
-			return false, err
-		}
-		if len(pods.Items) != 1 {
-			t.Log.Info("Found unexpected number of Stunnel Pods on source cluster.",
-				"expectedStunnelPods", 1, "foundStunnelPods", len(pods.Items))
-			return false, nil
-		}
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodRunning {
-				// Logs abnormal events for Stunnel Pod if any are found
-				migevent.LogAbnormalEventsForResource(
-					srcClient, t.Log,
-					"Found abnormal event for Stunnel Client Pod on source cluster",
-					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
-					"Pod")
-
-				for _, podCond := range pod.Status.Conditions {
-					if podCond.Reason == corev1.PodReasonUnschedulable {
-						t.Log.Info("Found UNSCHEDULABLE Stunnel Client Pod "+
-							"on source cluster. See message.",
-							"pod", path.Join(pod.Namespace, pod.Name),
-							"podPhase", pod.Status.Phase,
-							"podConditionMessage", podCond.Message)
-						return false, nil
-					}
-				}
-				t.Log.Info("Stunnel Client Pod is not yet running on source cluster.",
-					"pod", path.Join(pod.Namespace, pod.Name),
-					"podPhase", pod.Status.Phase)
-				return false, nil
-			}
-		}
-	}
-
-	return true, nil
 }
