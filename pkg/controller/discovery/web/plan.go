@@ -591,21 +591,16 @@ func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *
 func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode) error {
 	collection := model.DirectVolumeMigration{}
 	cLabel := t.cLabel(migration.DecodeObject())
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		if object.Labels == nil {
-			continue
-		}
-		if v, found := object.Labels[cLabel.Name]; found {
-			if v != cLabel.Value {
-				continue
-			}
-		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: DirectVolumeMigrationHandler{}.Link(m),
@@ -759,21 +754,16 @@ func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, p
 func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode) error {
 	collection := model.DirectImageMigration{}
 	cLabel := t.cLabel(migration.DecodeObject())
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		if object.Labels == nil {
-			continue
-		}
-		if v, found := object.Labels[cLabel.Name]; found {
-			if v != cLabel.Value {
-				continue
-			}
-		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: DirectImageMigrationHandler{}.Link(m),
@@ -795,26 +785,17 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 // Add direct volumes progress
 func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
 	collection := model.DirectVolumeMigrationProgress{}
-	list, err := collection.List(t.db, model.ListOptions{})
+	cLabel := t.cLabel(directVolume.DecodeObject())
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		isOwned := false
-		for _, ref := range object.OwnerReferences {
-			if ref.Kind == migref.ToKind(directVolume) &&
-				ref.Name == directVolume.Name &&
-				m.Namespace == directVolume.Namespace {
-				isOwned = true
-				break
-			}
-		}
-		if !isOwned {
-			continue
-		}
-
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
@@ -955,7 +936,6 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 // Add direct volume PVC for a specific cluster
 func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 	directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
-
 	dvmpObject := directVolumeProgress.DecodeObject()
 	podSelector := dvmpObject.Spec.PodSelector
 	if podSelector == nil {
@@ -971,6 +951,7 @@ func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 	collection := model.PVC{
 		Base: model.Base{
 			Cluster: cluster.PK,
+			Name:    pvcName,
 		},
 	}
 	list, err := collection.List(t.db, model.ListOptions{})
@@ -1054,8 +1035,13 @@ func (t *PlanTree) addDirectVolumeRoutesForCluster(cluster model.Cluster, direct
 //
 // Add direct images
 func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration, parent *TreeNode) error {
+	cLabel := t.cLabel(directImage.DecodeObject())
 	collection := model.DirectImageStreamMigration{}
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -1095,7 +1081,11 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 			Cluster: cluster.PK,
 		},
 	}
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			"velero.io/backup-uid": string(backup.DecodeObject().UID),
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -1141,7 +1131,11 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 			Cluster: cluster.PK,
 		},
 	}
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			"velero.io/restore-uid": restore.UID,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
@@ -1182,29 +1176,23 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVR(restore *model.Restore, parent *TreeNode) error {
 	cluster := t.cluster.destination
+	restoreObject := restore.DecodeObject()
 	collection := model.PVC{
 		Base: model.Base{
-			Cluster: cluster.PK,
+			Cluster:   cluster.PK,
+			Namespace: restoreObject.Namespace,
 		},
 	}
-	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-	// 	"velero.io/restore-name": restore.Name,
-	// }})
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			"velero.io/restore-name": restoreObject.Name,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		restoreName, ok := object.Labels["velero.io/restore-name"]
-		if !ok {
-			continue
-		}
-		if restoreName != restore.Name {
-			continue
-		}
-
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: PvcHandler{}.Link(&cluster, m),
@@ -1232,24 +1220,14 @@ func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) erro
 			Cluster: cluster.PK,
 		},
 	}
-	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-	// 	"velero.io/restore-name": restore.Name,
-	// }})
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		"migration.openshift.io/migrated-by-backup": backup.DecodeObject().Name,
+	}})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	expectedBackupName := backup.DecodeObject().Name
 	for _, m := range list {
-		object := m.DecodeObject()
-		backupName, exists := object.Labels["migration.openshift.io/migrated-by-backup"]
-		if !exists {
-			continue
-		}
-		if backupName != expectedBackupName {
-			continue
-		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: PvcHandler{}.Link(&cluster, m),
@@ -1278,24 +1256,14 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 			Cluster: cluster.PK,
 		},
 	}
-	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-	// 	"velero.io/restore-name": restore.Name,
-	// }})
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		"migration.openshift.io/migrated-by-backup": restore.DecodeObject().Spec.BackupName,
+	}})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-	expectedBackupName := restore.DecodeObject().Spec.BackupName
 	for _, m := range list {
-		object := m.DecodeObject()
-		backupName, exists := object.Labels["migration.openshift.io/migrated-by-backup"]
-		if !exists {
-			continue
-		}
-		if backupName != expectedBackupName {
-			continue
-		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: PvcHandler{}.Link(&cluster, m),
@@ -1319,29 +1287,22 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) error {
 	cluster := t.cluster.source
-	collection := model.PVC{
-		Base: model.Base{
-			Cluster: cluster.PK,
-		},
-	}
-	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-	// 	"velero.io/restore-name": restore.Name,
-	// }})
-	list, err := collection.List(t.db, model.ListOptions{})
-	if err != nil {
-		Log.Trace(err)
-		return err
-	}
 	pvcUID, ok := pvb.DecodeObject().Labels["velero.io/pvc-uid"]
 	if !ok {
 		return nil
 	}
+	collection := model.PVC{
+		Base: model.Base{
+			Cluster: cluster.PK,
+			UID:     pvcUID,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{}})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		if string(object.UID) != pvcUID {
-			continue
-		}
-
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
 			ObjectLink: PvcHandler{}.Link(&cluster, m),
@@ -1366,31 +1327,21 @@ func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *Tr
 	collection := model.PV{
 		Base: model.Base{
 			Cluster: cluster.PK,
+			Name:    pvc.DecodeObject().Spec.VolumeName,
 		},
 	}
-	// list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-	// 	"velero.io/restore-name": restore.Name,
-	// }})
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
-
-	pvcName := pvc.DecodeObject().Spec.VolumeName
-
 	for _, m := range list {
-		object := m.DecodeObject()
-		if object.Name != pvcName {
-			continue
-		}
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
 				Kind:       migref.ToKind(m),
 				ObjectLink: PvHandler{}.Link(&cluster, m),
-				// Namespace:  m.Namespace,
-				Name: m.Name,
+				Name:       m.Name,
 			})
 	}
 
