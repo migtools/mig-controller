@@ -439,6 +439,7 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, paren
 		}
 	}
 
+	// Search for PVCs in all namespaces that are part of MigPlan.
 	for _, pvcNamespace := range planObject.Spec.Namespaces {
 		collection := model.PVC{
 			Base: model.Base{
@@ -490,7 +491,11 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		},
 	}
 	cLabel := t.cLabel(migration.DecodeObject())
-	list, err := collection.List(t.db, model.ListOptions{})
+	list, err := collection.List(t.db, model.ListOptions{
+		Labels: model.Labels{
+			cLabel.Name: cLabel.Value,
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err
