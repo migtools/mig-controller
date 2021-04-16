@@ -11,7 +11,7 @@ ci: all
 all: test manager
 
 # Run tests
-test: generate fmt vet manifests
+test:
 	go test -tags "${BUILDTAGS}" ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
