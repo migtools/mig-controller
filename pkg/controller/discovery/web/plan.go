@@ -360,6 +360,12 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 			Log.Trace(err)
 			return err
 		}
+
+		err = t.addHooks(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
 		parent.Children = append(parent.Children, node)
 	}
 
@@ -604,6 +610,81 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 			return err
 		}
 		err = t.addDirectVolumeRoutes(m, &node)
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add mighooks
+func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error {
+	migrationObject := migration.DecodeObject()
+	// Skip adding hooks if this is a stage migration
+	if migrationObject.Spec.Stage == true {
+		return nil
+	}
+	// Decode plan to look at attached hooks
+	planObject := t.plan.DecodeObject()
+
+	collection := model.Hook{}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+
+		for _, hookRef := range planObject.Spec.Hooks {
+			if hookRef.Reference == nil {
+				continue
+			}
+			if object.Name == hookRef.Reference.Name && object.Namespace == hookRef.Reference.Namespace {
+				node := TreeNode{
+					Kind:       migref.ToKind(m),
+					ObjectLink: HookHandler{}.Link(m),
+					Namespace:  m.Namespace,
+					Name:       m.Name,
+				}
+				// err := t.addHookJobs(m, &node)
+				// if err != nil {
+				// 	Log.Trace(err)
+				// 	return err
+				// }
+				parent.Children = append(parent.Children, node)
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+//
+// Add jobs associated with hooks
+func (t *PlanTree) addHookJobs(hook *model.Hook, parent *TreeNode) error {
+	collection := model.DirectImageMigration{}
+	list, err := collection.List(t.db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		object := m.DecodeObject()
+		if object.Labels == nil {
+			continue
+		}
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: DirectImageMigrationHandler{}.Link(m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
+		}
+		err := t.addDirectImageStreams(m, &node)
 		if err != nil {
 			Log.Trace(err)
 			return err
