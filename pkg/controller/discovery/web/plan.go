@@ -651,11 +651,11 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 					Namespace:  m.Namespace,
 					Name:       m.Name,
 				}
-				// err := t.addHookJobs(m, &node)
-				// if err != nil {
-				// 	Log.Trace(err)
-				// 	return err
-				// }
+				err := t.addHookJobsForCluster(m, migration, &node)
+				if err != nil {
+					Log.Trace(err)
+					return err
+				}
 				parent.Children = append(parent.Children, node)
 				continue
 			}
@@ -666,28 +666,74 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 
 //
 // Add jobs associated with hooks
-func (t *PlanTree) addHookJobs(hook *model.Hook, parent *TreeNode) error {
-	collection := model.DirectImageMigration{}
-	list, err := collection.List(t.db, model.ListOptions{})
+func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migration, parent *TreeNode) error {
+	hookObject := hook.DecodeObject()
+	migrationObject := migration.DecodeObject()
+
+	var cluster model.Cluster
+	switch hookObject.Spec.TargetCluster {
+	case "source":
+		cluster = t.cluster.source
+	case "destination":
+		cluster = t.cluster.destination
+	default:
+		return nil
+	}
+
+	collection := model.Job{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		"mighook": string(hookObject.UID),
+		"owner":   string(migrationObject.UID),
+	}})
 	if err != nil {
 		Log.Trace(err)
 		return err
 	}
 	for _, m := range list {
-		object := m.DecodeObject()
-		if object.Labels == nil {
-			continue
-		}
 		node := TreeNode{
 			Kind:       migref.ToKind(m),
-			ObjectLink: DirectImageMigrationHandler{}.Link(m),
+			ObjectLink: JobHandler{}.Link(&cluster, m),
 			Namespace:  m.Namespace,
 			Name:       m.Name,
 		}
-		err := t.addDirectImageStreams(m, &node)
+		err := t.addJobPodsForCluster(cluster, m, &node)
 		if err != nil {
 			Log.Trace(err)
 			return err
+		}
+		parent.Children = append(parent.Children, node)
+	}
+
+	return nil
+}
+
+//
+// Add pods associated with job
+func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, parent *TreeNode) error {
+	jobObject := job.DecodeObject()
+
+	collection := model.Pod{
+		Base: model.Base{
+			Cluster: cluster.PK,
+		},
+	}
+	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
+		"job-name": string(jobObject.Name),
+	}})
+	if err != nil {
+		Log.Trace(err)
+		return err
+	}
+	for _, m := range list {
+		node := TreeNode{
+			Kind:       migref.ToKind(m),
+			ObjectLink: PodHandler{}.Link(&cluster, m),
+			Namespace:  m.Namespace,
+			Name:       m.Name,
 		}
 		parent.Children = append(parent.Children, node)
 	}
