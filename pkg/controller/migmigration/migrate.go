@@ -138,9 +138,9 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 func (r *ReconcileMigMigration) getAnnotations(migration *migapi.MigMigration) map[string]string {
 	annotations := make(map[string]string)
 	if migration.Spec.Stage {
-		annotations[StageOrFinalMigrationAnnotation] = StageMigration
+		annotations[migapi.StageOrFinalMigrationAnnotation] = migapi.StageMigration
 	} else {
-		annotations[StageOrFinalMigrationAnnotation] = FinalMigration
+		annotations[migapi.StageOrFinalMigrationAnnotation] = migapi.FinalMigration
 	}
 	return annotations
 }

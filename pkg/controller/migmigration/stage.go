@@ -816,7 +816,7 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 
 // Label applied to all stage pods for easy cleanup
 func (t *Task) stagePodCleanupLabel() map[string]string {
-	return map[string]string{StagePodLabel: migapi.True}
+	return map[string]string{migapi.StagePodLabel: migapi.True}
 }
 
 // Build map of all stage pod labels
@@ -833,7 +833,7 @@ func (t *Task) stagePodLabels() map[string]string {
 		labels[labelName] = labelValue
 	}
 
-	labels[IncludedInStageBackupLabel] = t.UID()
+	labels[migapi.IncludedInStageBackupLabel] = t.UID()
 
 	// merge label indicating this is a stage pod for later cleanup purposes
 	stagePodCleanupLabel := t.stagePodCleanupLabel()

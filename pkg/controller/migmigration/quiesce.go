@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -134,12 +135,12 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 			if dc.Spec.Replicas == 0 {
 				continue
 			}
-			dc.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
+			dc.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
 			t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig. "+
 				"Changing .Spec.Replicas from [%v->0]. "+
 				"Annotating with [%v: %v]",
 				dc.Spec.Replicas,
-				ReplicasAnnotation, dc.Spec.Replicas),
+				migapi.ReplicasAnnotation, dc.Spec.Replicas),
 				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
 			dc.Spec.Replicas = 0
 			err = client.Update(context.TODO(), &dc)
@@ -168,7 +169,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if dc.Annotations == nil {
 				continue
 			}
-			replicas, exist := dc.Annotations[ReplicasAnnotation]
+			replicas, exist := dc.Annotations[migapi.ReplicasAnnotation]
 			if !exist {
 				continue
 			}
@@ -176,7 +177,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			delete(dc.Annotations, ReplicasAnnotation)
+			delete(dc.Annotations, migapi.ReplicasAnnotation)
 			currentReplicas := dc.Spec.Replicas
 			// Only set replica count if currently 0
 			if dc.Spec.Replicas == 0 {
@@ -186,7 +187,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 				"Changing .Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
 				currentReplicas, number,
-				ReplicasAnnotation),
+				migapi.ReplicasAnnotation),
 				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
@@ -222,9 +223,9 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 				"Changing spec.Replicas from [%v->0]. "+
 				"Annotating with [%v: %v]",
 				deployment.Spec.Replicas,
-				ReplicasAnnotation, deployment.Spec.Replicas),
+				migapi.ReplicasAnnotation, deployment.Spec.Replicas),
 				"deployment", path.Join(deployment.Namespace, deployment.Name))
-			deployment.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
+			deployment.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
 			deployment.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
@@ -252,7 +253,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			if deployment.Annotations == nil {
 				deployment.Annotations = make(map[string]string)
 			}
-			replicas, exist := deployment.Annotations[ReplicasAnnotation]
+			replicas, exist := deployment.Annotations[migapi.ReplicasAnnotation]
 			if !exist {
 				continue
 			}
@@ -260,7 +261,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			delete(deployment.Annotations, ReplicasAnnotation)
+			delete(deployment.Annotations, migapi.ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			currentReplicas := deployment.Spec.Replicas
 			// Only change replica count if currently == 0
@@ -271,7 +272,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
 				currentReplicas, restoredReplicas,
-				ReplicasAnnotation),
+				migapi.ReplicasAnnotation),
 				"deployment", path.Join(deployment.Namespace, deployment.Name))
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
@@ -301,7 +302,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Annotating with [%v: %v]",
 				set.Spec.Replicas, zero,
-				ReplicasAnnotation, set.Spec.Replicas),
+				migapi.ReplicasAnnotation, set.Spec.Replicas),
 				"statefulSet", path.Join(set.Namespace, set.Name))
 			if set.Annotations == nil {
 				set.Annotations = make(map[string]string)
@@ -309,7 +310,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 			if *set.Spec.Replicas == zero {
 				continue
 			}
-			set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
+			set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
 			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -336,7 +337,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			if set.Annotations == nil {
 				continue
 			}
-			replicas, exist := set.Annotations[ReplicasAnnotation]
+			replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
 			if !exist {
 				continue
 			}
@@ -344,14 +345,14 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			delete(set.Annotations, ReplicasAnnotation)
+			delete(set.Annotations, migapi.ReplicasAnnotation)
 			restoredReplicas := int32(number)
 
 			t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v].",
 				set.Spec.Replicas, replicas,
-				ReplicasAnnotation),
+				migapi.ReplicasAnnotation),
 				"statefulSet", path.Join(set.Namespace, set.Name))
 
 			// Only change replica count if currently == 0
@@ -392,12 +393,12 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 			if *set.Spec.Replicas == zero {
 				continue
 			}
-			set.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
+			set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
 			t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Setting Annotation [%v: %v]",
 				set.Spec.Replicas, zero,
-				ReplicasAnnotation, set.Spec.Replicas),
+				migapi.ReplicasAnnotation, set.Spec.Replicas),
 				"replicaSet", path.Join(set.Namespace, set.Name))
 			set.Spec.Replicas = &zero
 			err = client.Update(context.TODO(), &set)
@@ -430,7 +431,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 			if set.Annotations == nil {
 				continue
 			}
-			replicas, exist := set.Annotations[ReplicasAnnotation]
+			replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
 			if !exist {
 				continue
 			}
@@ -438,7 +439,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			delete(set.Annotations, ReplicasAnnotation)
+			delete(set.Annotations, migapi.ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			// Only change replica count if currently == 0
 			if *set.Spec.Replicas == 0 {
@@ -447,7 +448,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 			t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet. "+
 				"Changing Spec.Replicas from [%v->%v]. "+
 				"Removing Annotation [%v]",
-				0, restoredReplicas, ReplicasAnnotation),
+				0, restoredReplicas, migapi.ReplicasAnnotation),
 				"replicaSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -476,19 +477,19 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 			}
 			if set.Spec.Template.Spec.NodeSelector == nil {
 				set.Spec.Template.Spec.NodeSelector = map[string]string{}
-			} else if _, exist := set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector]; exist {
+			} else if _, exist := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]; exist {
 				continue
 			}
 			selector, err := json.Marshal(set.Spec.Template.Spec.NodeSelector)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			set.Annotations[NodeSelectorAnnotation] = string(selector)
-			set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector] = "true"
+			set.Annotations[migapi.NodeSelectorAnnotation] = string(selector)
+			set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector] = "true"
 			t.Log.Info(fmt.Sprintf("Quiescing DaemonSet. "+
 				"Changing [Spec.Template.Spec.NodeSelector=%v:true]. "+
 				"Setting annotation [%v: %v]",
-				QuiesceNodeSelector, NodeSelectorAnnotation, string(selector)),
+				migapi.QuiesceNodeSelector, migapi.NodeSelectorAnnotation, string(selector)),
 				"daemonSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -515,7 +516,7 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 			if set.Annotations == nil {
 				continue
 			}
-			selector, exist := set.Annotations[NodeSelectorAnnotation]
+			selector, exist := set.Annotations[migapi.NodeSelectorAnnotation]
 			if !exist {
 				continue
 			}
@@ -525,16 +526,16 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 				return liberr.Wrap(err)
 			}
 			// Only change node selector if set to our quiesce nodeselector
-			_, isQuiesced := set.Spec.Template.Spec.NodeSelector[QuiesceNodeSelector]
+			_, isQuiesced := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]
 			if !isQuiesced {
 				continue
 			}
-			delete(set.Annotations, NodeSelectorAnnotation)
+			delete(set.Annotations, migapi.NodeSelectorAnnotation)
 			set.Spec.Template.Spec.NodeSelector = nodeSelector
 			t.Log.Info(fmt.Sprintf("Unquiescing DaemonSet. "+
 				"Setting [Spec.Template.Spec.NodeSelector=%v]. "+
 				"Removing Annotation [%v].",
-				nodeSelector, NodeSelectorAnnotation),
+				nodeSelector, migapi.NodeSelectorAnnotation),
 				"daemonSet", path.Join(set.Namespace, set.Name))
 			err = client.Update(context.TODO(), &set)
 			if err != nil {
@@ -561,12 +562,12 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 			if r.Spec.Suspend == pointer.BoolPtr(true) {
 				continue
 			}
-			r.Annotations[SuspendAnnotation] = "true"
+			r.Annotations[migapi.SuspendAnnotation] = "true"
 			r.Spec.Suspend = pointer.BoolPtr(true)
 			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 				"Setting [Spec.Suspend=true]. "+
 				"Setting Annotation [%v]: true",
-				SuspendAnnotation),
+				migapi.SuspendAnnotation),
 				"job", path.Join(r.Namespace, r.Name))
 			err = client.Update(context.TODO(), &r)
 			if err != nil {
@@ -592,10 +593,10 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) e
 				continue
 			}
 			// Only unsuspend if our suspend annotation is present
-			if _, exist := r.Annotations[SuspendAnnotation]; !exist {
+			if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
 				continue
 			}
-			delete(r.Annotations, SuspendAnnotation)
+			delete(r.Annotations, migapi.SuspendAnnotation)
 			r.Spec.Suspend = pointer.BoolPtr(false)
 			t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
 				"cronJob", path.Join(r.Namespace, r.Name))
@@ -629,12 +630,12 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 			if job.Spec.Parallelism == &zero {
 				continue
 			}
-			job.Annotations[ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
+			job.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
 			job.Spec.Parallelism = &zero
 			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 				"Setting [Spec.Parallelism=0]. "+
 				"Annotating with [%v: %v]",
-				ReplicasAnnotation, job.Spec.Parallelism),
+				migapi.ReplicasAnnotation, job.Spec.Parallelism),
 				"job", path.Join(job.Namespace, job.Name))
 			err = client.Update(context.TODO(), &job)
 			if err != nil {
@@ -662,7 +663,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			if job.Annotations == nil {
 				continue
 			}
-			replicas, exist := job.Annotations[ReplicasAnnotation]
+			replicas, exist := job.Annotations[migapi.ReplicasAnnotation]
 			if !exist {
 				continue
 			}
@@ -670,7 +671,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			delete(job.Annotations, ReplicasAnnotation)
+			delete(job.Annotations, migapi.ReplicasAnnotation)
 			parallelReplicas := int32(number)
 			// Only change parallelism if currently == 0
 			if *job.Spec.Parallelism == 0 {
@@ -679,7 +680,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			t.Log.Info(fmt.Sprintf("Unquiescing Job. "+
 				"Setting [Spec.Parallelism=%v]"+
 				"Removing Annotation [%v]",
-				parallelReplicas, ReplicasAnnotation),
+				parallelReplicas, migapi.ReplicasAnnotation),
 				"job", path.Join(job.Namespace, job.Name))
 			err = client.Update(context.TODO(), &job)
 			if err != nil {

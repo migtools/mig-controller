@@ -48,11 +48,11 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	newRestore.Labels[FinalRestoreLabel] = t.UID()
-	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
-	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
-	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
-	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+	newRestore.Labels[migapi.FinalRestoreLabel] = t.UID()
+	newRestore.Labels[migapi.MigMigrationDebugLabel] = t.Owner.Name
+	newRestore.Labels[migapi.MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[migapi.MigMigrationLabel] = string(t.Owner.UID)
+	newRestore.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 
 	t.Log.Info("Creating Velero Final Restore on target cluster.",
 		"restore", path.Join(newRestore.Namespace, newRestore.Name))
@@ -66,7 +66,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 // Get the final restore on the destination cluster.
 func (t *Task) getFinalRestore() (*velero.Restore, error) {
 	labels := t.Owner.GetCorrelationLabels()
-	labels[FinalRestoreLabel] = t.UID()
+	labels[migapi.FinalRestoreLabel] = t.UID()
 	return t.getRestore(labels)
 }
 
@@ -97,16 +97,16 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	newRestore.Labels[StageRestoreLabel] = t.UID()
-	newRestore.Labels[MigMigrationDebugLabel] = t.Owner.Name
-	newRestore.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
-	newRestore.Labels[MigMigrationLabel] = string(t.Owner.UID)
-	newRestore.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+	newRestore.Labels[migapi.StageRestoreLabel] = t.UID()
+	newRestore.Labels[migapi.MigMigrationDebugLabel] = t.Owner.Name
+	newRestore.Labels[migapi.MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newRestore.Labels[migapi.MigMigrationLabel] = string(t.Owner.UID)
+	newRestore.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	stagePodImage, err := t.getStagePodImage(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	newRestore.Annotations[StagePodImageAnnotation] = stagePodImage
+	newRestore.Annotations[migapi.StagePodImageAnnotation] = stagePodImage
 	err = client.Create(context.TODO(), newRestore)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -117,7 +117,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 // Get the stage restore on the destination cluster.
 func (t *Task) getStageRestore() (*velero.Restore, error) {
 	labels := t.Owner.GetCorrelationLabels()
-	labels[StageRestoreLabel] = t.UID()
+	labels[migapi.StageRestoreLabel] = t.UID()
 	return t.getRestore(labels)
 }
 
@@ -647,7 +647,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
+		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 
 	for _, gvr := range GVRs {
@@ -657,7 +657,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 				"with migrated-by label."),
 				"namespace", ns,
 				"gvk", gvkCombined,
-				"label", fmt.Sprintf("%v:%v", MigPlanLabel, string(t.PlanResources.MigPlan.UID)))
+				"label", fmt.Sprintf("%v:%v", migapi.MigPlanLabel, string(t.PlanResources.MigPlan.UID)))
 			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
@@ -700,7 +700,7 @@ func (t *Task) deleteMovedNfsPVs() error {
 
 	// Only delete PVs with matching 'migrated-by-migplan' label.
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
+		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	})
 	list := corev1.PersistentVolumeList{}
 	err = dstClient.List(context.TODO(), listOptions, &list)
@@ -742,7 +742,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	}
 
 	listOptions := k8sclient.MatchingLabels(map[string]string{
-		MigPlanLabel: string(t.PlanResources.MigPlan.UID),
+		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	}).AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {

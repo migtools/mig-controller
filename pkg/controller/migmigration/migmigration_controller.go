@@ -377,13 +377,13 @@ func (r *ReconcileMigMigration) ensureDebugLabels(migration *migapi.MigMigration
 	if migration.Labels == nil {
 		migration.Labels = make(map[string]string)
 	} else {
-		if value, exists := migration.Labels[MigPlanDebugLabel]; exists {
+		if value, exists := migration.Labels[migapi.MigPlanDebugLabel]; exists {
 			if value == migration.Spec.MigPlanRef.Name {
 				return nil
 			}
 		}
 	}
-	migration.Labels[MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
+	migration.Labels[migapi.MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
 	err := r.Update(context.TODO(), migration)
 	if err != nil {
 		return liberr.Wrap(err)

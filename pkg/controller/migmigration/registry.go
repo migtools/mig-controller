@@ -63,7 +63,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		}
 	}
 	if t.quiesce() {
-		annotations[QuiesceAnnotation] = "true"
+		annotations[migapi.QuiesceAnnotation] = "true"
 	}
 	return annotations, nil
 }
