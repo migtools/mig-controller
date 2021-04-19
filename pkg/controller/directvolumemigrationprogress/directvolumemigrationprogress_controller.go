@@ -365,6 +365,14 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		// pod has a failure, report last failure reason
 		rsyncPodStatus.PodPhase = kapi.PodFailed
 		rsyncPodStatus.LogMessage = containerStatus.LastTerminationState.Terminated.Message
+		percentProgress := GetProgressPercent(containerStatus.LastTerminationState.Terminated.Message)
+		if percentProgress != "" {
+			rsyncPodStatus.LastObservedProgressPercent = percentProgress
+		}
+		transferRate := GetTransferRate(containerStatus.LastTerminationState.Terminated.Message)
+		if transferRate != "" {
+			rsyncPodStatus.LastObservedTransferRate = transferRate
+		}
 		exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.LastTerminationState.Terminated.FinishedAt.Sub(containerStatus.LastTerminationState.Terminated.StartedAt.Time).Round(time.Second)}
@@ -379,6 +387,14 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		// Its possible for the succeeded pod to not have containerStatuses at all
 		rsyncPodStatus.PodPhase = kapi.PodFailed
 		rsyncPodStatus.LogMessage = containerStatus.State.Terminated.Message
+		percentProgress := GetProgressPercent(containerStatus.State.Terminated.Message)
+		if percentProgress != "" {
+			rsyncPodStatus.LastObservedProgressPercent = percentProgress
+		}
+		transferRate := GetTransferRate(containerStatus.State.Terminated.Message)
+		if transferRate != "" {
+			rsyncPodStatus.LastObservedTransferRate = transferRate
+		}
 		exitCode := containerStatus.State.Terminated.ExitCode
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
