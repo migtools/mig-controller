@@ -60,8 +60,12 @@ const (
 	// to allow migplan restored resources rollback
 	// The value is Task.PlanResources.MigPlan.UID
 	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
+	// Identifies associated Backup name
+	MigBackupLabel = "migration.openshift.io/migrated-by-backup" // (backup name)
 	// Identifies Pod as a stage pod to allow
 	// for cleanup at migration start and rollback
 	// The value is always "true" if set.
 	StagePodLabel = "migration.openshift.io/is-stage-pod"
+	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
+	RsyncPodIdentityLabel = "migration.openshift.io/created-for-pvc"
 )

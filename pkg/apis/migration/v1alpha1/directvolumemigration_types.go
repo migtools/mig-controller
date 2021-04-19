@@ -24,12 +24,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// labels
-const (
-	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
-	RsyncPodIdentityLabel = "migration.openshift.io/created-for-pvc"
-)
-
 type PVCToMigrate struct {
 	*kapi.ObjectReference `json:",inline"`
 	TargetStorageClass    string                            `json:"targetStorageClass"`

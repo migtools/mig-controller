@@ -10,6 +10,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	auth "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
 )
@@ -316,7 +317,7 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 	collection := model.Migration{}
 	list, err := collection.List(t.db, model.ListOptions{
 		Labels: model.Labels{
-			"migration.openshift.io/migplan-name": planObject.Name,
+			migapi.MigPlanDebugLabel: planObject.Name,
 		},
 	})
 	if err != nil {
@@ -365,7 +366,6 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 			Log.Trace(err)
 			return err
 		}
-
 		err = t.addHooks(m, &node)
 		if err != nil {
 			Log.Trace(err)
@@ -413,7 +413,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 			return err
 		}
 		// Add move and snapshot PVCs if this is a stage backup
-		_, found := object.Labels["migration-stage-backup"]
+		_, found := object.Labels[migapi.StageBackupLabel]
 		if found {
 			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
@@ -522,7 +522,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 			return err
 		}
 		// Add move and snapshot PVCs if this is a stage restore
-		_, found := object.Labels["migration-stage-restore"]
+		_, found := object.Labels[migapi.StageRestoreLabel]
 		if found {
 			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
@@ -943,7 +943,7 @@ func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 	}
 
 	pvcNamespace := dvmpObject.Spec.PodNamespace
-	pvcName, ok := podSelector["migration.openshift.io/created-for-pvc"]
+	pvcName, ok := podSelector[migapi.RsyncPodIdentityLabel]
 	if !ok {
 		return nil
 	}
@@ -1083,7 +1083,7 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 	}
 	list, err := collection.List(t.db, model.ListOptions{
 		Labels: model.Labels{
-			"velero.io/backup-uid": string(backup.DecodeObject().UID),
+			velerov1.BackupUIDLabel: string(backup.DecodeObject().UID),
 		},
 	})
 	if err != nil {
@@ -1133,7 +1133,7 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 	}
 	list, err := collection.List(t.db, model.ListOptions{
 		Labels: model.Labels{
-			"velero.io/restore-uid": restore.UID,
+			velerov1.RestoreUIDLabel: restore.UID,
 		},
 	})
 	if err != nil {
@@ -1185,7 +1185,7 @@ func (t *PlanTree) addPVCsForPVR(restore *model.Restore, parent *TreeNode) error
 	}
 	list, err := collection.List(t.db, model.ListOptions{
 		Labels: model.Labels{
-			"velero.io/restore-name": restoreObject.Name,
+			velerov1.RestoreNameLabel: restoreObject.Name,
 		},
 	})
 	if err != nil {
@@ -1257,7 +1257,7 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 		},
 	}
 	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{
-		"migration.openshift.io/migrated-by-backup": restore.DecodeObject().Spec.BackupName,
+		migapi.MigBackupLabel: restore.DecodeObject().Spec.BackupName,
 	}})
 	if err != nil {
 		Log.Trace(err)
@@ -1287,7 +1287,7 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) error {
 	cluster := t.cluster.source
-	pvcUID, ok := pvb.DecodeObject().Labels["velero.io/pvc-uid"]
+	pvcUID, ok := pvb.DecodeObject().Labels[velerov1.PVCUIDLabel]
 	if !ok {
 		return nil
 	}
