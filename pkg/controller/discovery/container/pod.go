@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -22,7 +22,7 @@ type Pod struct {
 func (r *Pod) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
-			Type: &v1.Pod{},
+			Type: &corev1.Pod{},
 		},
 		&handler.EnqueueRequestForObject{},
 		r)
@@ -57,7 +57,7 @@ func (r *Pod) Reconcile() error {
 
 func (r *Pod) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
-	onCluster := v1.PodList{}
+	onCluster := corev1.PodList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
@@ -102,7 +102,7 @@ func (r *Pod) GetStored() ([]model.Model, error) {
 
 func (r *Pod) Create(e event.CreateEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.Pod)
+	object, cast := e.Object.(*corev1.Pod)
 	if !cast {
 		return false
 	}
@@ -119,7 +119,7 @@ func (r *Pod) Create(e event.CreateEvent) bool {
 
 func (r *Pod) Update(e event.UpdateEvent) bool {
 	Log.Reset()
-	object, cast := e.ObjectNew.(*v1.Pod)
+	object, cast := e.ObjectNew.(*corev1.Pod)
 	if !cast {
 		return false
 	}
@@ -136,7 +136,7 @@ func (r *Pod) Update(e event.UpdateEvent) bool {
 
 func (r *Pod) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*v1.Pod)
+	object, cast := e.Object.(*corev1.Pod)
 	if !cast {
 		return false
 	}
