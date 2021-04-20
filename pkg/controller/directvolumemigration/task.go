@@ -572,8 +572,8 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 
 // Get DVM labels for the migration
 func (t *Task) buildDVMLabels() map[string]string {
-	dvmLabels := make(map[string]string)
 
+	dvmLabels := t.Owner.GetCorrelationLabels()
 	dvmLabels["app"] = DirectVolumeMigrationRsyncTransfer
 	dvmLabels["owner"] = DirectVolumeMigration
 	dvmLabels[migapi.PartOfLabel] = migapi.Application

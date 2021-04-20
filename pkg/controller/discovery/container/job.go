@@ -5,24 +5,24 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	batchv1 "k8s.io/api/batch/v1"
 )
 
-//
-// A collection of k8s Pod resources.
-type Pod struct {
+// A collection of k8s Job resources.
+type Job struct {
 	// Base
 	BaseCollection
 }
 
-func (r *Pod) AddWatch(dsController controller.Controller) error {
+func (r *Job) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
-			Type: &corev1.Pod{},
+			Type: &batchv1.Job{},
 		},
 		&handler.EnqueueRequestForObject{},
 		r)
@@ -34,9 +34,11 @@ func (r *Pod) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *Pod) Reconcile() error {
+func (r *Job) Reconcile() error {
 	mark := time.Now()
-	sr := SimpleReconciler{Db: r.ds.Container.Db}
+	sr := SimpleReconciler{
+		Db: r.ds.Container.Db,
+	}
 	err := sr.Reconcile(r)
 	if err != nil {
 		Log.Trace(err)
@@ -44,7 +46,7 @@ func (r *Pod) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"Pod (collection) reconciled.",
+		"Job (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -55,30 +57,30 @@ func (r *Pod) Reconcile() error {
 	return nil
 }
 
-func (r *Pod) GetDiscovered() ([]model.Model, error) {
+func (r *Job) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
-	onCluster := corev1.PodList{}
+	onCluster := batchv1.JobList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		ns := &model.Pod{
+		pvc := &model.Job{
 			Base: model.Base{
 				Cluster: r.ds.Cluster.PK,
 			},
 		}
-		ns.With(&discovered)
-		models = append(models, ns)
+		pvc.With(&discovered)
+		models = append(models, pvc)
 	}
 
 	return models, nil
 }
 
-func (r *Pod) GetStored() ([]model.Model, error) {
+func (r *Job) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.Pod{
+	list, err := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -89,8 +91,8 @@ func (r *Pod) GetStored() ([]model.Model, error) {
 		Log.Trace(err)
 		return nil, err
 	}
-	for _, pod := range list {
-		models = append(models, pod)
+	for _, pvc := range list {
+		models = append(models, pvc)
 	}
 
 	return models, nil
@@ -100,57 +102,57 @@ func (r *Pod) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *Pod) Create(e event.CreateEvent) bool {
+func (r *Job) Create(e event.CreateEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*corev1.Pod)
+	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Create(&pod)
+	pvc.With(object)
+	r.ds.Create(&pvc)
 
 	return false
 }
 
-func (r *Pod) Update(e event.UpdateEvent) bool {
+func (r *Job) Update(e event.UpdateEvent) bool {
 	Log.Reset()
-	object, cast := e.ObjectNew.(*corev1.Pod)
+	object, cast := e.ObjectNew.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Update(&pod)
+	pvc.With(object)
+	r.ds.Update(&pvc)
 
 	return false
 }
 
-func (r *Pod) Delete(e event.DeleteEvent) bool {
+func (r *Job) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
-	object, cast := e.Object.(*corev1.Pod)
+	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
 	}
-	pod := model.Pod{
+	pvc := model.Job{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pod.With(object)
-	r.ds.Delete(&pod)
+	pvc.With(object)
+	r.ds.Delete(&pvc)
 
 	return false
 }
 
-func (r *Pod) Generic(e event.GenericEvent) bool {
+func (r *Job) Generic(e event.GenericEvent) bool {
 	return false
 }

@@ -317,19 +317,27 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 }
 
 // Build a Registry Deployment.
-func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name, dirName, registryImage string) *appsv1.Deployment {
-	labels := r.GetCorrelationLabels()
-	labels[MigrationRegistryLabel] = True
-	labels["app"] = name
-	labels["migplan"] = string(r.UID)
+func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name,
+	dirName, registryImage string, mCorrelationLabels map[string]string) *appsv1.Deployment {
+	// Merge correlation labels for plan and migration
+	combinedLabels := r.GetCorrelationLabels()
+	if mCorrelationLabels != nil {
+		for k, v := range mCorrelationLabels {
+			combinedLabels[k] = v
+		}
+	}
+	combinedLabels[MigrationRegistryLabel] = True
+	combinedLabels["app"] = name
+	combinedLabels["migplan"] = string(r.UID)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
+			Labels:    combinedLabels,
 			Name:      name,
 			Namespace: VeleroNamespace,
 		},
 	}
-	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage)
+	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage, mCorrelationLabels)
 	return deployment
 }
 
@@ -365,7 +373,8 @@ func (r *MigPlan) GetProxySecret(client k8sclient.Client) (*kapi.Secret, error) 
 }
 
 // Update a Registry Deployment as desired for the specified cluster.
-func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment, proxySecret *kapi.Secret, name, dirName, registryImage string) {
+func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment,
+	proxySecret *kapi.Secret, name, dirName, registryImage string, mCorrelationLabels map[string]string) {
 
 	envFrom := []kapi.EnvFromSource{}
 	// If Proxy secret exists, set env from it
@@ -380,23 +389,26 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		envFrom = append(envFrom, source)
 	}
 
+	// Merge migration correlation labels with Pod labels
+	podLabels := map[string]string{
+		"app":                  name,
+		"deployment":           name,
+		"migplan":              string(r.UID),
+		MigrationRegistryLabel: True,
+	}
+	if mCorrelationLabels != nil {
+		for k, v := range mCorrelationLabels {
+			podLabels[k] = v
+		}
+	}
+
 	deployment.Spec = appsv1.DeploymentSpec{
 		Replicas: pointer.Int32Ptr(1),
-		Selector: metav1.SetAsLabelSelector(map[string]string{
-			"app":                  name,
-			"deployment":           name,
-			"migplan":              string(r.UID),
-			MigrationRegistryLabel: True,
-		}),
+		Selector: metav1.SetAsLabelSelector(podLabels),
 		Template: kapi.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: metav1.Time{},
-				Labels: map[string]string{
-					"app":                  name,
-					"deployment":           name,
-					"migplan":              string(r.UID),
-					MigrationRegistryLabel: True,
-				},
+				Labels:            podLabels,
 			},
 			Spec: kapi.PodSpec{
 				Containers: []kapi.Container{

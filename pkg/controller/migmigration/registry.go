@@ -63,7 +63,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		}
 	}
 	if t.quiesce() {
-		annotations[QuiesceAnnotation] = "true"
+		annotations[migapi.QuiesceAnnotation] = "true"
 	}
 	return annotations, nil
 }
@@ -255,7 +255,7 @@ func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Se
 	}
 
 	// Construct Registry DC
-	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage)
+	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels())
 	foundDeployment, err := plan.GetRegistryDeployment(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -270,7 +270,7 @@ func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Se
 	if plan.EqualsRegistryDeployment(newDeployment, foundDeployment) {
 		return nil
 	}
-	plan.UpdateRegistryDeployment(storage, foundDeployment, proxySecret, name, dirName, registryImage)
+	plan.UpdateRegistryDeployment(storage, foundDeployment, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels())
 	err = client.Update(context.TODO(), foundDeployment)
 	if err != nil {
 		return liberr.Wrap(err)

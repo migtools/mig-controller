@@ -3,58 +3,59 @@ package model
 import (
 	"encoding/json"
 
-	v1 "k8s.io/api/core/v1"
+	v1 "github.com/openshift/api/route/v1"
 )
 
 //
-// PVC model.
-type PVC struct {
+// Route model
+type Route struct {
 	Base
 }
 
 //
-// Update the model `with` a k8s PVC.
-func (m *PVC) With(object *v1.PersistentVolumeClaim) {
+// Update the model `with` a k8s Route.
+func (m *Route) With(object *v1.Route) {
 	m.UID = string(object.UID)
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
 	m.labels = object.Labels
 	m.EncodeObject(object)
+
 }
 
 //
 // Encode the object.
-func (m *PVC) EncodeObject(pvc *v1.PersistentVolumeClaim) {
-	object, _ := json.Marshal(pvc)
+func (m *Route) EncodeObject(pod *v1.Route) {
+	object, _ := json.Marshal(pod)
 	m.Object = string(object)
 }
 
 //
-// Encode the object.
-func (m *PVC) DecodeObject() *v1.PersistentVolumeClaim {
-	pvc := &v1.PersistentVolumeClaim{}
-	json.Unmarshal([]byte(m.Object), pvc)
-	return pvc
+// Decode the object.
+func (m *Route) DecodeObject() *v1.Route {
+	pod := &v1.Route{}
+	json.Unmarshal([]byte(m.Object), pod)
+	return pod
 }
 
 //
 // Count in the DB.
-func (m PVC) Count(db DB, options ListOptions) (int64, error) {
+func (m Route) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
 //
-// Fetch the from in the DB.
-func (m PVC) List(db DB, options ListOptions) ([]*PVC, error) {
-	list := []*PVC{}
+// Fetch the model from in the DB.
+func (m Route) List(db DB, options ListOptions) ([]*Route, error) {
+	list := []*Route{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
-		list = append(list, intPtr.(*PVC))
+		list = append(list, intPtr.(*Route))
 	}
 
 	return list, nil
@@ -62,27 +63,27 @@ func (m PVC) List(db DB, options ListOptions) ([]*PVC, error) {
 
 //
 // Fetch the model from the DB.
-func (m *PVC) Get(db DB) error {
+func (m *Route) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
 //
 // Insert the model into the DB.
-func (m *PVC) Insert(db DB) error {
+func (m *Route) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
 //
 // Update the model in the DB.
-func (m *PVC) Update(db DB) error {
+func (m *Route) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
 //
 // Delete the model in the DB.
-func (m *PVC) Delete(db DB) error {
+func (m *Route) Delete(db DB) error {
 	m.SetPk()
 	return Table{db}.Delete(m)
 }

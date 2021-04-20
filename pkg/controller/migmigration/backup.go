@@ -43,20 +43,20 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 		return nil, liberr.Wrap(err)
 	}
 
-	newBackup.Labels[InitialBackupLabel] = t.UID()
-	newBackup.Labels[MigMigrationDebugLabel] = t.Owner.Name
-	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
-	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
-	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+	newBackup.Labels[migapi.InitialBackupLabel] = t.UID()
+	newBackup.Labels[migapi.MigMigrationDebugLabel] = t.Owner.Name
+	newBackup.Labels[migapi.MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newBackup.Labels[migapi.MigMigrationLabel] = string(t.Owner.UID)
+	newBackup.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
-	delete(newBackup.Annotations, QuiesceAnnotation)
+	delete(newBackup.Annotations, migapi.QuiesceAnnotation)
 
 	if Settings.DisImgCopy {
 		if newBackup.Annotations == nil {
 			newBackup.Annotations = map[string]string{}
 		}
-		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
+		newBackup.Annotations[migapi.DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
 	}
 
 	err = client.Create(context.TODO(), newBackup)
@@ -85,7 +85,7 @@ func toSet(strSlice []string) mapset.Set {
 // Get the initial backup on the source cluster.
 func (t *Task) getInitialBackup() (*velero.Backup, error) {
 	labels := t.Owner.GetCorrelationLabels()
-	labels[InitialBackupLabel] = t.UID()
+	labels[migapi.InitialBackupLabel] = t.UID()
 	return t.getBackup(labels)
 }
 
@@ -111,14 +111,14 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	}
 	labelSelector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			IncludedInStageBackupLabel: t.UID(),
+			migapi.IncludedInStageBackupLabel: t.UID(),
 		},
 	}
-	newBackup.Labels[StageBackupLabel] = t.UID()
-	newBackup.Labels[MigMigrationDebugLabel] = t.Owner.Name
-	newBackup.Labels[MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
-	newBackup.Labels[MigMigrationLabel] = string(t.Owner.UID)
-	newBackup.Labels[MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+	newBackup.Labels[migapi.StageBackupLabel] = t.UID()
+	newBackup.Labels[migapi.MigMigrationDebugLabel] = t.Owner.Name
+	newBackup.Labels[migapi.MigPlanDebugLabel] = t.Owner.Spec.MigPlanRef.Name
+	newBackup.Labels[migapi.MigMigrationLabel] = string(t.Owner.UID)
+	newBackup.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	var includedResources mapset.Set
 
 	if t.indirectImageMigration() || Settings.DisImgCopy {
@@ -133,7 +133,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		if newBackup.Annotations == nil {
 			newBackup.Annotations = map[string]string{}
 		}
-		newBackup.Annotations[DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
+		newBackup.Annotations[migapi.DisableImageCopy] = strconv.FormatBool(Settings.DisImgCopy)
 	}
 	t.Log.Info("Creating Stage Velero Backup on source cluster.",
 		"backup", path.Join(newBackup.Namespace, newBackup.Name))
@@ -147,7 +147,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 // Get the stage backup on the source cluster.
 func (t *Task) getStageBackup() (*velero.Backup, error) {
 	labels := t.Owner.GetCorrelationLabels()
-	labels[StageBackupLabel] = t.UID()
+	labels[migapi.StageBackupLabel] = t.UID()
 	return t.getBackup(labels)
 }
 

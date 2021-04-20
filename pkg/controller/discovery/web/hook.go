@@ -10,48 +10,46 @@ import (
 	auth "k8s.io/api/authorization/v1"
 )
 
-// Migration route root.
 const (
-	MigrationParam = "migration"
-	MigrationsRoot = Root + "/migrations"
-	MigrationRoot  = MigrationsRoot + "/:" + MigrationParam
+	HookParam = "hook"
+	HooksRoot = Root + "/hooks"
+	HookRoot  = HooksRoot + "/:" + HookParam
 )
 
-//
-// Migration (route) handler.
-type MigrationHandler struct {
+// Hook (route) handler.
+type HookHandler struct {
 	// Base
 	BaseHandler
-	// Migration referenced in the request.
-	migration model.Migration
+	// Hook referenced in the request.
+	hook model.Hook
 }
 
 //
-// Add routes.
-func (h MigrationHandler) AddRoutes(r *gin.Engine) {
-	r.GET(MigrationsRoot, h.List)
-	r.GET(MigrationsRoot+"/", h.List)
-	r.GET(MigrationRoot, h.Get)
+// Add DIM routes.
+func (h HookHandler) AddRoutes(r *gin.Engine) {
+	r.GET(HooksRoot, h.List)
+	r.GET(HooksRoot+"/", h.List)
+	r.GET(HookRoot, h.Get)
 }
 
 //
 // Prepare to fulfil the request.
-// Fetch the referenced migration.
+// Fetch the referenced hook.
 // Perform SAR authorization.
-func (h *MigrationHandler) Prepare(ctx *gin.Context) int {
+func (h *HookHandler) Prepare(ctx *gin.Context) int {
 	status := h.BaseHandler.Prepare(ctx)
 	if status != http.StatusOK {
 		return status
 	}
-	name := ctx.Param(MigrationParam)
+	name := ctx.Param(HookParam)
 	if name != "" {
-		h.migration = model.Migration{
+		h.hook = model.Hook{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
-				Name:      ctx.Param(MigrationParam),
+				Name:      ctx.Param(HookParam),
 			},
 		}
-		err := h.migration.Get(h.container.Db)
+		err := h.hook.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
 				Log.Trace(err)
@@ -70,15 +68,15 @@ func (h *MigrationHandler) Prepare(ctx *gin.Context) int {
 }
 
 // Build the appropriate SAR object.
-// The subject is the MigMigration.
-func (h *MigrationHandler) getSAR() auth.SelfSubjectAccessReview {
+// The subject is the Hook.
+func (h *HookHandler) getSAR() auth.SelfSubjectAccessReview {
 	return auth.SelfSubjectAccessReview{
 		Spec: auth.SelfSubjectAccessReviewSpec{
 			ResourceAttributes: &auth.ResourceAttributes{
 				Group:     "apps",
-				Resource:  "MigMigration",
-				Namespace: h.migration.Namespace,
-				Name:      h.migration.Name,
+				Resource:  "Hook",
+				Namespace: h.hook.Namespace,
+				Name:      h.hook.Name,
 				Verb:      "get",
 			},
 		},
@@ -86,15 +84,15 @@ func (h *MigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 }
 
 //
-// List all of the migrations in the namespace.
-func (h MigrationHandler) List(ctx *gin.Context) {
+// List all of the dims in the namespace.
+func (h HookHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
 	db := h.container.Db
-	collection := model.Migration{}
+	collection := model.Hook{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
 		Log.Trace(err)
@@ -107,11 +105,11 @@ func (h MigrationHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := MigrationList{
+	content := HookList{
 		Count: count,
 	}
 	for _, m := range list {
-		r := Migration{}
+		r := Hook{}
 		r.With(m)
 		r.SelfLink = h.Link(m)
 		content.Items = append(content.Items, r)
@@ -121,14 +119,14 @@ func (h MigrationHandler) List(ctx *gin.Context) {
 }
 
 //
-// Get a specific migration.
-func (h MigrationHandler) Get(ctx *gin.Context) {
+// Get a specific dim.
+func (h HookHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	err := h.migration.Get(h.container.Db)
+	err := h.hook.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			Log.Trace(err)
@@ -139,9 +137,9 @@ func (h MigrationHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	r := Migration{}
-	r.With(&h.migration)
-	r.SelfLink = h.Link(&h.migration)
+	r := Hook{}
+	r.With(&h.hook)
+	r.SelfLink = h.Link(&h.hook)
 	content := r
 
 	ctx.JSON(http.StatusOK, content)
@@ -149,18 +147,18 @@ func (h MigrationHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link.
-func (h MigrationHandler) Link(m *model.Migration) string {
+func (h HookHandler) Link(m *model.Hook) string {
 	return h.BaseHandler.Link(
-		MigrationRoot,
+		HookRoot,
 		Params{
-			NsParam:        m.Namespace,
-			MigrationParam: m.Name,
+			NsParam:   m.Namespace,
+			HookParam: m.Name,
 		})
 }
 
 //
-// Migration REST resource.
-type Migration struct {
+// Hook REST resource.
+type Hook struct {
 	// The k8s namespace.
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
@@ -168,22 +166,22 @@ type Migration struct {
 	// Self URI.
 	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
-	Object *migapi.MigMigration `json:"object,omitempty"`
+	Object *migapi.MigHook `json:"object,omitempty"`
 }
 
 //
 // Build the resource.
-func (r *Migration) With(m *model.Migration) {
+func (r *Hook) With(m *model.Hook) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.Object = m.DecodeObject()
 }
 
 //
-// Migration collection REST resource.
-type MigrationList struct {
+// Hook collection REST resource.
+type HookList struct {
 	// Total number in the collection.
 	Count int64 `json:"count"`
 	// List of resources.
-	Items []Migration `json:"resources"`
+	Items []Hook `json:"resources"`
 }

@@ -41,7 +41,7 @@ func (t *Task) createDirectVolumeMigration() error {
 func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 	// Set correlation labels
 	labels := t.Owner.GetCorrelationLabels()
-	labels[DirectVolumeMigrationLabel] = t.UID()
+	labels[migapi.DirectVolumeMigrationLabel] = t.UID()
 	pvcList := t.getDirectVolumeClaimList()
 	if pvcList == nil {
 		return nil
@@ -66,7 +66,7 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error) {
 	// Get correlation labels
 	labels := t.Owner.GetCorrelationLabels()
-	labels[DirectVolumeMigrationLabel] = t.UID()
+	labels[migapi.DirectVolumeMigrationLabel] = t.UID()
 	// Get DVM with label
 	list := migapi.DirectVolumeMigrationList{}
 	err := t.Client.List(

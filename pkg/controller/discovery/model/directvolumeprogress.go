@@ -19,6 +19,7 @@ func (m *DirectVolumeMigrationProgress) With(object *migapi.DirectVolumeMigratio
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
 	m.Name = object.Name
+	m.labels = object.Labels
 	m.EncodeObject(object)
 }
 

@@ -140,6 +140,13 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				},
 			},
 		},
+		JobHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
 		ServiceHandler{
 			ClusterScoped: ClusterScoped{
 				BaseHandler: BaseHandler{
@@ -147,7 +154,19 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				},
 			},
 		},
+		RouteHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
 		PlanHandler{
+			BaseHandler: BaseHandler{
+				container: w.Container,
+			},
+		},
+		HookHandler{
 			BaseHandler: BaseHandler{
 				container: w.Container,
 			},

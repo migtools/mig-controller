@@ -15,76 +15,6 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Velero Plugin Annotations
-const (
-	StageOrFinalMigrationAnnotation = "migration.openshift.io/migmigration-type" // (stage|final)
-	StageMigration                  = "stage"
-	FinalMigration                  = "final"
-	PvActionAnnotation              = "openshift.io/migrate-type"          // (move|copy)
-	PvStorageClassAnnotation        = "openshift.io/target-storage-class"  // storageClassName
-	PvAccessModeAnnotation          = "openshift.io/target-access-mode"    // accessMode
-	PvCopyMethodAnnotation          = "migration.openshift.io/copy-method" // (snapshot|filesystem)
-	QuiesceAnnotation               = "openshift.io/migrate-quiesce-pods"  // (true|false)
-	QuiesceNodeSelector             = "migration.openshift.io/quiesceDaemonSet"
-	SuspendAnnotation               = "migration.openshift.io/preQuiesceSuspend"
-	ReplicasAnnotation              = "migration.openshift.io/preQuiesceReplicas"
-	NodeSelectorAnnotation          = "migration.openshift.io/preQuiesceNodeSelector"
-	StagePodImageAnnotation         = "migration.openshift.io/stage-pod-image"
-)
-
-// Restic Annotations
-const (
-	ResticPvBackupAnnotation = "backup.velero.io/backup-volumes" // comma-separated list of volume names
-	ResticPvVerifyAnnotation = "backup.velero.io/verify-volumes" // comma-separated list of volume names
-)
-
-// Disables the internal image copy
-const (
-	DisableImageCopy = "migration.openshift.io/disable-image-copy"
-)
-
-// Labels.
-const (
-	// Resources included in the stage backup.
-	// Referenced by the Backup.LabelSelector. The value is the Task.UID().
-	IncludedInStageBackupLabel = "migration-included-stage-backup"
-	// Designated as an `initial` Backup.
-	// The value is the Task.UID().
-	InitialBackupLabel = "migration-initial-backup"
-	// Designated as an `stage` Backup.
-	// The value is the Task.UID().
-	StageBackupLabel = "migration-stage-backup"
-	// Designated as an `stage` Restore.
-	// The value is the Task.UID().
-	StageRestoreLabel = "migration-stage-restore"
-	// Designated as a `final` Restore.
-	// The value is the Task.UID().
-	FinalRestoreLabel = "migration-final-restore"
-	// Identifies associated directvolumemigration resource
-	// The value is the Task.UID()
-	DirectVolumeMigrationLabel = "migration-direct-volume"
-	// Identifies the resource as migrated by us
-	// for easy search or application rollback.
-	// The value is the Task.UID().
-	MigMigrationLabel = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
-	// Identifies associated migmigration
-	// to assist manual debugging
-	// The value is Task.Owner.Name
-	MigMigrationDebugLabel = "migration.openshift.io/migmigration-name"
-	// Identifies associated migplan
-	// to assist manual debugging
-	// The value is Task.Owner.Spec.migPlanRef.Name
-	MigPlanDebugLabel = "migration.openshift.io/migplan-name"
-	// Identifies associated migplan
-	// to allow migplan restored resources rollback
-	// The value is Task.PlanResources.MigPlan.UID
-	MigPlanLabel = "migration.openshift.io/migrated-by-migplan" // (migplan UID)
-	// Identifies Pod as a stage pod to allow
-	// for cleanup at migration start and rollback
-	// The value is always "true" if set.
-	StagePodLabel = "migration.openshift.io/is-stage-pod"
-)
-
 // Bucket limit for number of items annotated in one Reconcile
 const AnnotationsPerReconcile = 50
 
@@ -209,10 +139,10 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 		if namespace.Labels == nil {
 			namespace.Labels = make(map[string]string)
 		}
-		if namespace.GetLabels()[IncludedInStageBackupLabel] == t.UID() {
+		if namespace.GetLabels()[migapi.IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
-		namespace.Labels[IncludedInStageBackupLabel] = t.UID()
+		namespace.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 		log.Info("Adding migration annotations/labels to source cluster namespace.",
 			"namespace", namespace.Name)
 		err = client.Update(context.TODO(), &namespace)
@@ -255,15 +185,15 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 			pod.Annotations = make(map[string]string)
 		}
 
-		if _, exist := pod.Annotations[ResticPvBackupAnnotation]; exist {
-			if _, exist := pod.Annotations[ResticPvVerifyAnnotation]; exist {
+		if _, exist := pod.Annotations[migapi.ResticPvBackupAnnotation]; exist {
+			if _, exist := pod.Annotations[migapi.ResticPvVerifyAnnotation]; exist {
 				continue
 			}
 			continue
 		}
 
-		pod.Annotations[ResticPvBackupAnnotation] = strings.Join(volumes, ",")
-		pod.Annotations[ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
+		pod.Annotations[migapi.ResticPvBackupAnnotation] = strings.Join(volumes, ",")
+		pod.Annotations[migapi.ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
 
 		// Update
 		log.Info("Adding annotations/labels to source cluster Pod.",
@@ -313,22 +243,22 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		if pvResource.Annotations == nil {
 			pvResource.Annotations = make(map[string]string)
 		}
-		if pvResource.Labels[IncludedInStageBackupLabel] == t.UID() {
+		if pvResource.Labels[migapi.IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
 		// PV action (move|copy) needed by the velero plugin.
-		pvResource.Annotations[PvActionAnnotation] = pv.Selection.Action
+		pvResource.Annotations[migapi.PvActionAnnotation] = pv.Selection.Action
 		// PV storageClass annotation needed by the velero plugin.
-		pvResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+		pvResource.Annotations[migapi.PvStorageClassAnnotation] = pv.Selection.StorageClass
 		if pv.Selection.Action == migapi.PvCopyAction {
 			// PV copyMethod annotation needed by the velero plugin.
-			pvResource.Annotations[PvCopyMethodAnnotation] = pv.Selection.CopyMethod
+			pvResource.Annotations[migapi.PvCopyMethodAnnotation] = pv.Selection.CopyMethod
 		}
 		// Add label used by stage backup label selector.
 		if pvResource.Labels == nil {
 			pvResource.Labels = make(map[string]string)
 		}
-		pvResource.Labels[IncludedInStageBackupLabel] = t.UID()
+		pvResource.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 
 		// Update
 		log.Info("Adding annotations/labels to source cluster PersistentVolume.",
@@ -353,23 +283,23 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			pvcResource.Annotations = make(map[string]string)
 		}
 		// PV action (move|copy) needed by the velero plugin.
-		pvcResource.Annotations[PvActionAnnotation] = pv.Selection.Action
+		pvcResource.Annotations[migapi.PvActionAnnotation] = pv.Selection.Action
 		// Add label used by stage backup label selector.
 		if pvcResource.Labels == nil {
 			pvcResource.Labels = make(map[string]string)
 		}
-		if pvcResource.Labels[IncludedInStageBackupLabel] == t.UID() {
+		if pvcResource.Labels[migapi.IncludedInStageBackupLabel] == t.UID() {
 			continue
 		}
-		pvcResource.Labels[IncludedInStageBackupLabel] = t.UID()
+		pvcResource.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 		if pv.Selection.Action == migapi.PvCopyAction {
 			// PV storageClass annotation needed by the velero plugin.
-			pvcResource.Annotations[PvStorageClassAnnotation] = pv.Selection.StorageClass
+			pvcResource.Annotations[migapi.PvStorageClassAnnotation] = pv.Selection.StorageClass
 			// PV copyMethod annotation needed by the velero plugin.
-			pvcResource.Annotations[PvCopyMethodAnnotation] = pv.Selection.CopyMethod
+			pvcResource.Annotations[migapi.PvCopyMethodAnnotation] = pv.Selection.CopyMethod
 			// PV accessMode annotation needed by the velero plugin, if present on the PV.
 			if pv.Selection.AccessMode != "" {
-				pvcResource.Annotations[PvAccessModeAnnotation] = string(pv.Selection.AccessMode)
+				pvcResource.Annotations[migapi.PvAccessModeAnnotation] = string(pv.Selection.AccessMode)
 			}
 		}
 		// Update
@@ -411,10 +341,10 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 			if sa.Labels == nil {
 				sa.Labels = make(map[string]string)
 			}
-			if sa.Labels[IncludedInStageBackupLabel] == t.UID() {
+			if sa.Labels[migapi.IncludedInStageBackupLabel] == t.UID() {
 				continue
 			}
-			sa.Labels[IncludedInStageBackupLabel] = t.UID()
+			sa.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 			err = client.Update(context.TODO(), &sa)
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)
@@ -446,10 +376,10 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 			if is.Labels == nil {
 				is.Labels = map[string]string{}
 			}
-			if is.Labels[IncludedInStageBackupLabel] == t.UID() {
+			if is.Labels[migapi.IncludedInStageBackupLabel] == t.UID() {
 				continue
 			}
-			is.Labels[IncludedInStageBackupLabel] = t.UID()
+			is.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 
 			log.Info("Adding labels to source cluster ImageStream.",
 				"imageStream", path.Join(is.Namespace, is.Name))
@@ -520,18 +450,18 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 			}
 			needsUpdate := false
 			if pod.Annotations != nil {
-				if _, found := pod.Annotations[ResticPvBackupAnnotation]; found {
-					delete(pod.Annotations, ResticPvBackupAnnotation)
+				if _, found := pod.Annotations[migapi.ResticPvBackupAnnotation]; found {
+					delete(pod.Annotations, migapi.ResticPvBackupAnnotation)
 					needsUpdate = true
 				}
-				if _, found := pod.Annotations[ResticPvVerifyAnnotation]; found {
-					delete(pod.Annotations, ResticPvVerifyAnnotation)
+				if _, found := pod.Annotations[migapi.ResticPvVerifyAnnotation]; found {
+					delete(pod.Annotations, migapi.ResticPvVerifyAnnotation)
 					needsUpdate = true
 				}
 			}
 			if pod.Labels != nil {
-				if _, found := pod.Labels[IncludedInStageBackupLabel]; found {
-					delete(pod.Labels, IncludedInStageBackupLabel)
+				if _, found := pod.Labels[migapi.IncludedInStageBackupLabel]; found {
+					delete(pod.Labels, migapi.IncludedInStageBackupLabel)
 					needsUpdate = true
 				}
 			}
@@ -568,7 +498,7 @@ func (t *Task) deleteNamespaceLabels(client k8sclient.Client, namespaceList []st
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		delete(namespace.Labels, IncludedInStageBackupLabel)
+		delete(namespace.Labels, migapi.IncludedInStageBackupLabel)
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -592,22 +522,22 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 			}
 			needsUpdate := false
 			if pvc.Annotations != nil {
-				if _, found := pvc.Annotations[PvActionAnnotation]; found {
-					delete(pvc.Annotations, PvActionAnnotation)
+				if _, found := pvc.Annotations[migapi.PvActionAnnotation]; found {
+					delete(pvc.Annotations, migapi.PvActionAnnotation)
 					needsUpdate = true
 				}
-				if _, found := pvc.Annotations[PvStorageClassAnnotation]; found {
-					delete(pvc.Annotations, PvStorageClassAnnotation)
+				if _, found := pvc.Annotations[migapi.PvStorageClassAnnotation]; found {
+					delete(pvc.Annotations, migapi.PvStorageClassAnnotation)
 					needsUpdate = true
 				}
-				if _, found := pvc.Annotations[PvAccessModeAnnotation]; found {
-					delete(pvc.Annotations, PvAccessModeAnnotation)
+				if _, found := pvc.Annotations[migapi.PvAccessModeAnnotation]; found {
+					delete(pvc.Annotations, migapi.PvAccessModeAnnotation)
 					needsUpdate = true
 				}
 			}
 			if pvc.Labels != nil {
-				if _, found := pvc.Labels[IncludedInStageBackupLabel]; found {
-					delete(pvc.Labels, IncludedInStageBackupLabel)
+				if _, found := pvc.Labels[migapi.IncludedInStageBackupLabel]; found {
+					delete(pvc.Labels, migapi.IncludedInStageBackupLabel)
 					needsUpdate = true
 				}
 			}
@@ -629,7 +559,7 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 // Delete PV stage annotations and labels.
 func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 	labels := map[string]string{
-		IncludedInStageBackupLabel: t.UID(),
+		migapi.IncludedInStageBackupLabel: t.UID(),
 	}
 	options := k8sclient.MatchingLabels(labels)
 	pvList := corev1.PersistentVolumeList{}
@@ -638,9 +568,9 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 		return liberr.Wrap(err)
 	}
 	for _, pv := range pvList.Items {
-		delete(pv.Labels, IncludedInStageBackupLabel)
-		delete(pv.Annotations, PvActionAnnotation)
-		delete(pv.Annotations, PvStorageClassAnnotation)
+		delete(pv.Labels, migapi.IncludedInStageBackupLabel)
+		delete(pv.Annotations, migapi.PvActionAnnotation)
+		delete(pv.Annotations, migapi.PvStorageClassAnnotation)
 		err = client.Update(context.TODO(), &pv)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -655,7 +585,7 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 // Delete service account labels.
 func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 	labels := map[string]string{
-		IncludedInStageBackupLabel: t.UID(),
+		migapi.IncludedInStageBackupLabel: t.UID(),
 	}
 	options := k8sclient.MatchingLabels(labels)
 	pvList := corev1.ServiceAccountList{}
@@ -664,7 +594,7 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 		return liberr.Wrap(err)
 	}
 	for _, sa := range pvList.Items {
-		delete(sa.Labels, IncludedInStageBackupLabel)
+		delete(sa.Labels, migapi.IncludedInStageBackupLabel)
 		err = client.Update(context.TODO(), &sa)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -678,7 +608,7 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 // Delete ImageStream labels
 func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []string) error {
 	labels := map[string]string{
-		IncludedInStageBackupLabel: t.UID(),
+		migapi.IncludedInStageBackupLabel: t.UID(),
 	}
 	options := k8sclient.MatchingLabels(labels)
 	imageStreamList := imagev1.ImageStreamList{}
@@ -687,7 +617,7 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 		return liberr.Wrap(err)
 	}
 	for _, is := range imageStreamList.Items {
-		delete(is.Labels, IncludedInStageBackupLabel)
+		delete(is.Labels, migapi.IncludedInStageBackupLabel)
 		err = client.Update(context.Background(), &is)
 		if err != nil {
 			return liberr.Wrap(err)
