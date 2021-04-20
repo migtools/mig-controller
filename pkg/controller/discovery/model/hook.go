@@ -33,9 +33,9 @@ func (m *Hook) EncodeObject(dim *migapi.MigHook) {
 //
 // Decode the object.
 func (m *Hook) DecodeObject() *migapi.MigHook {
-	dim := &migapi.MigHook{}
-	json.Unmarshal([]byte(m.Object), dim)
-	return dim
+	hook := &migapi.MigHook{}
+	json.Unmarshal([]byte(m.Object), hook)
+	return hook
 }
 
 //

@@ -13,13 +13,13 @@ import (
 )
 
 //
-// A collection of k8s MigHook resources.
-type MigHook struct {
+// A collection of k8s Hook resources.
+type Hook struct {
 	// Base
 	BaseCollection
 }
 
-func (r *MigHook) AddWatch(dsController controller.Controller) error {
+func (r *Hook) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
 		&source.Kind{
 			Type: &migapi.MigHook{},
@@ -34,7 +34,7 @@ func (r *MigHook) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *MigHook) Reconcile() error {
+func (r *Hook) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -46,7 +46,7 @@ func (r *MigHook) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"MigHook (collection) reconciled.",
+		"Hook (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -57,7 +57,7 @@ func (r *MigHook) Reconcile() error {
 	return nil
 }
 
-func (r *MigHook) GetDiscovered() ([]model.Model, error) {
+func (r *Hook) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.MigHookList{}
 	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
@@ -74,7 +74,7 @@ func (r *MigHook) GetDiscovered() ([]model.Model, error) {
 	return models, nil
 }
 
-func (r *MigHook) GetStored() ([]model.Model, error) {
+func (r *Hook) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
 	list, err := model.Hook{}.List(
 		r.ds.Container.Db,
@@ -94,7 +94,7 @@ func (r *MigHook) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *MigHook) Create(e event.CreateEvent) bool {
+func (r *Hook) Create(e event.CreateEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.MigHook)
 	if !cast {
@@ -107,7 +107,7 @@ func (r *MigHook) Create(e event.CreateEvent) bool {
 	return false
 }
 
-func (r *MigHook) Update(e event.UpdateEvent) bool {
+func (r *Hook) Update(e event.UpdateEvent) bool {
 	Log.Reset()
 	object, cast := e.ObjectNew.(*migapi.MigHook)
 	if !cast {
@@ -120,7 +120,7 @@ func (r *MigHook) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (r *MigHook) Delete(e event.DeleteEvent) bool {
+func (r *Hook) Delete(e event.DeleteEvent) bool {
 	Log.Reset()
 	object, cast := e.Object.(*migapi.MigHook)
 	if !cast {
@@ -133,6 +133,6 @@ func (r *MigHook) Delete(e event.DeleteEvent) bool {
 	return false
 }
 
-func (r *MigHook) Generic(e event.GenericEvent) bool {
+func (r *Hook) Generic(e event.GenericEvent) bool {
 	return false
 }
