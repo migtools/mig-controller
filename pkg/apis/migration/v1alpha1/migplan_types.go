@@ -321,8 +321,10 @@ func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi
 	dirName, registryImage string, mCorrelationLabels map[string]string) *appsv1.Deployment {
 	// Merge correlation labels for plan and migration
 	combinedLabels := r.GetCorrelationLabels()
-	for k, v := range mCorrelationLabels {
-		combinedLabels[k] = v
+	if mCorrelationLabels != nil {
+		for k, v := range mCorrelationLabels {
+			combinedLabels[k] = v
+		}
 	}
 	combinedLabels[MigrationRegistryLabel] = True
 	combinedLabels["app"] = name
@@ -394,8 +396,10 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 		"migplan":              string(r.UID),
 		MigrationRegistryLabel: True,
 	}
-	for k, v := range mCorrelationLabels {
-		podLabels[k] = v
+	if mCorrelationLabels != nil {
+		for k, v := range mCorrelationLabels {
+			podLabels[k] = v
+		}
 	}
 
 	deployment.Spec = appsv1.DeploymentSpec{
