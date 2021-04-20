@@ -364,7 +364,7 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 			return liberr.Wrap(err)
 		}
 		count += len(list.Items)
-		if r.hasNodeSelectors(list.Items) {
+		if r.hasCustomNodeSelectors(list.Items) {
 			nsWithNodeSelectors = append(nsWithNodeSelectors, name)
 		}
 	}
@@ -379,28 +379,44 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 	}
 
 	if len(nsWithNodeSelectors) > 0 {
-		msgFormat := "Found Pods with `Spec.NodeSelector` or `Spec.NodeName` set in namespaces: [%s]. " +
-			"These fields will be cleared on Pods restored into the target cluster."
+		msgFormat := "Found Pods with non-default `Spec.NodeSelector` set in namespaces: [%s]. " +
+			"This field will be cleared on Pods restored into the target cluster."
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     NsHaveNodeSelectors,
 			Status:   True,
 			Reason:   NodeSelectorsDetected,
 			Category: Warn,
+			Durable:  true,
 			Message: fmt.Sprintf(msgFormat,
 				strings.Join(nsWithNodeSelectors, ", ")),
 		})
+	} else {
+		plan.Status.DeleteCondition(NsHaveNodeSelectors)
 	}
 
 	return nil
 }
 
-func (r ReconcileMigPlan) hasNodeSelectors(podList []kapi.Pod) bool {
+// Checks the list of Pods for any non-default nodeselectors.
+// Returns true if custom nodeselectors found on any Pod.
+func (r ReconcileMigPlan) hasCustomNodeSelectors(podList []kapi.Pod) bool {
+	// Known default node selector values. Ignore these if we spot them on Pods
+	defaultNodeSelectors := []string{
+		"node-role.kubernetes.io/compute",
+	}
 	for _, pod := range podList {
-		if len(pod.Spec.NodeSelector) > 0 || len(pod.Spec.NodeName) > 0 {
-			return true
+		if pod.Spec.NodeSelector == nil {
+			continue
+		}
+		for nodeSelector := range pod.Spec.NodeSelector {
+			for _, defaultSelector := range defaultNodeSelectors {
+				// Return true if node selector on Pod is not one of the defaults
+				if nodeSelector != defaultSelector {
+					return true
+				}
+			}
 		}
 	}
-
 	return false
 }
 

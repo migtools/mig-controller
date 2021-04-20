@@ -385,7 +385,85 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 	}
 }
 
-func TestReconcileMigPlan_waitForMigAnalyticsReady(t *testing.T) {
+func TestReconcileMigPlan_hasCustomNodeSelectors(t *testing.T) {
+	// Test data for verifying hasCustomNodeSelectors will return FALSE given a
+	// list of Pods without any custom nodeselectors.
+	podsWithoutCustomNodeSelectors := []corev1.Pod{
+		corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-without-custom-nodeselector",
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector: map[string]string{
+					"node-role.kubernetes.io/compute": "true",
+				},
+			},
+		},
+		corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-2-without-custom-nodeselector",
+			},
+		},
+	}
+
+	// Test data for verifying hasCustomNodeSelectors will return TRUE given a
+	// list of Pods WITH custom node selectors
+	podsWithCustomNodeSelectors := []corev1.Pod{
+		corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-with-custom-nodeselector",
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector: map[string]string{
+					"node-role.kubernetes.io/compute":  "true",
+					"my-custom-role.foobar.io/compute": "true",
+				},
+			},
+		},
+		corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-2-without-custom-nodeselector",
+			},
+		},
+	}
+	type args struct {
+		plan                       *migapi.MigPlan
+		sourceClusterPodsToMigrate []corev1.Pod
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "Test that 'hasCustomNodeSelectors' returns FALSE given a list of Pods WITHOUT custom nodeselectors",
+			args: args{
+				plan:                       migPlan,
+				sourceClusterPodsToMigrate: podsWithoutCustomNodeSelectors,
+			},
+			want: false,
+		},
+		{
+			name: "Test that 'hasCustomNodeSelectors' returns TRUE given a list of Pods WITH custom nodeselectors",
+			args: args{
+				plan:                       migPlan,
+				sourceClusterPodsToMigrate: podsWithCustomNodeSelectors,
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := ReconcileMigPlan{}
+			got := r.hasCustomNodeSelectors(tt.args.sourceClusterPodsToMigrate)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("hasCustomNodeSelectors() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test(t *testing.T) {
 	type fields struct {
 		Client        client.Client
 		EventRecorder record.EventRecorder
