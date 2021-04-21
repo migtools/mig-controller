@@ -66,6 +66,7 @@ func Create() (*sql.DB, error) {
 		&PV{},
 		&PVC{},
 		&Job{},
+		&Event{},
 		&StorageClass{},
 	}
 	for _, m := range models {
