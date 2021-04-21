@@ -1697,33 +1697,33 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.Info("Getting image for Rsync client Pods that will be created on source MigCluster")
+	t.Log.V(4).Info("Getting image for Rsync client Pods that will be created on source MigCluster")
 	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
+	t.Log.V(4).Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
 	pvcMap, err := t.getfsGroupMapForNamespace()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.Info("Getting Rsync password for Rsync client Pods")
+	t.Log.V(4).Info("Getting Rsync password for Rsync client Pods")
 	password, err := t.getRsyncPassword()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
+	t.Log.V(4).Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
 	pvcNodeMap, err := t.getPVCNodeNameMap()
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.Info("Getting limits and requests for Rsync client Pods")
+	t.Log.V(4).Info("Getting limits and requests for Rsync client Pods")
 	limits, requests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
 	isPrivileged, _ := isRsyncPrivileged(srcClient)
-	t.Log.Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
+	t.Log.V(4).Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
 	for ns, vols := range pvcMap {
 		// Add PVC volume mounts
 		for _, vol := range vols {
@@ -2139,7 +2139,7 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 		currentStatus := rsyncClientOperationStatus{
 			operation: &operation,
 		}
-		t.Log.Info("reconciling Rsync operation for pvc", "pvc", operation)
+		t.Log.Info("Reconciling Rsync operation for PVC", "pvc", operation)
 		pod, err := t.getLatestPodForOperation(client, operation)
 		if err != nil {
 			currentStatus.AddError(err)
@@ -2162,7 +2162,7 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 				operation.CurrentAttempt += 1
 				// indicate that the operation is not yet completely failed, we will retry
 				currentStatus.pending = true
-				t.Log.Info("previous attempt of Rsync failed, created a new Rsync Pod", "pvc", operation, "attempt", operation.CurrentAttempt)
+				t.Log.Info("Previous attempt of Rsync failed, created a new Rsync Pod", "pvc", operation, "attempt", operation.CurrentAttempt)
 			} else {
 				operation.Failed = currentStatus.failed
 				operation.Succeeded = currentStatus.succeeded
@@ -2170,6 +2170,11 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 					t.Log.Info(
 						fmt.Sprintf("Rsync operation completed after %d attempts", operation.CurrentAttempt),
 						"pvc", operation, "failed", operation.Failed, "succeded", operation.Succeeded)
+				} else {
+					t.Log.Info("Rsync operation is still running. Waiting for completion",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"pvc", operation,
+					)
 				}
 			}
 		} else {
@@ -2183,7 +2188,7 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 				// indicate that pod is being created in this round of reconcile, need to come back
 				currentStatus.pending = true
 			}
-			t.Log.Info("started a new Rsync operation", "pvc", operation, "attempt", operation.CurrentAttempt)
+			t.Log.Info("Started a new Rsync operation", "pvc", operation, "attempt", operation.CurrentAttempt)
 		}
 		outputChan <- currentStatus
 		<-rateLimiter
