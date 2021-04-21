@@ -388,7 +388,7 @@ func (r *ReconcileMigAnalytic) getNodeToPVCMapForNS(ns *migapi.MigAnalyticNamesp
 		return nil, liberr.Wrap(err)
 	}
 	for _, pod := range podList.Items {
-		if pod.Status.Phase == migapi.Running {
+		if pod.Status.Phase == corev1.PodRunning {
 			for _, vol := range pod.Spec.Volumes {
 				if vol.PersistentVolumeClaim != nil {
 					pvcObject := corev1.PersistentVolumeClaim{}
