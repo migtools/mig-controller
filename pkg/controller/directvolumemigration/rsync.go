@@ -1763,17 +1763,17 @@ func (t *Task) getRsyncOperationsRequirements() (compat.Client, []rsyncClientPod
 	return srcClient, podRequirements, nil
 }
 
-func (t *Task) getRsyncPodBackOffLimit() int {
+func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
 	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
 	// when both the spec and the overridden backoff limits are not set, use default
-	if t.Owner.Spec.BackOffLimit == 0 && overriddenBackOffLimit == 0 {
+	if dvm.Spec.BackOffLimit == 0 && overriddenBackOffLimit == 0 {
 		return DefaultRsyncBackOffLimit
 	}
 	// whenever set, prefer overridden limit over the one set through Spec
 	if overriddenBackOffLimit != 0 {
 		return overriddenBackOffLimit
 	}
-	return t.Owner.Spec.BackOffLimit
+	return dvm.Spec.BackOffLimit
 }
 
 // runRsyncOperations creates pod requirements for Rsync pods for all PVCs present in the spec
@@ -2153,7 +2153,7 @@ func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClie
 			operation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
 			currentStatus.failed, currentStatus.succeeded, currentStatus.running, currentStatus.pending = t.analyzeRsyncPodStatus(pod)
 			// when pod failed and backoff limit is not reached, create a new pod
-			if currentStatus.failed && operation.CurrentAttempt < t.getRsyncPodBackOffLimit() {
+			if currentStatus.failed && operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
 				err := t.createNewPodForOperation(client, req, operation)
 				if err != nil {
 					currentStatus.AddError(err)

@@ -113,12 +113,10 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	default:
 		progress = append(progress, volumeProgress)
 	}
-	progress = append(progress, t.getDVMPodProgress(dvm.Status.RunningPods, "Running")...)
-	progress = append(progress, t.getDVMPodProgress(dvm.Status.SuccessfulPods, "Completed")...)
-	progress = append(progress, t.getDVMPodProgress(dvm.Status.FailedPods, "Failed")...)
+	progress = append(progress, t.getDVMPodProgress(*dvm)...)
 
 	// sort the progress report so we dont have flapping for the same progress info
-	sort.Sort(sort.StringSlice(progress))
+	sort.Strings(progress)
 	return completed, failureReasons, progress
 }
 
@@ -158,28 +156,43 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 	})
 }
 
-func (t *Task) getDVMPodProgress(pods []*migapi.PodProgress, state string) []string {
+func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 	progress := []string{}
-	for _, pod := range pods {
-		if state == "Completed" {
-			state = ""
+	progressIterator := map[string][]*migapi.PodProgress{
+		"Running":   dvm.Status.RunningPods,
+		"Completed": dvm.Status.SuccessfulPods,
+		"Failed":    dvm.Status.FailedPods,
+	}
+	for state, pods := range progressIterator {
+		for _, pod := range pods {
+			p := ""
+			if pod.PVCReference != nil {
+				operation := dvm.Status.GetRsyncOperationStatusForPVC(pod.PVCReference)
+				p = fmt.Sprintf(
+					"[%s] %s: %s",
+					pod.PVCReference.Name,
+					path.Join(pod.Namespace, pod.Name),
+					state)
+				if operation.CurrentAttempt > 1 {
+					p += fmt.Sprintf(
+						" - Attempt %d of %d",
+						operation.CurrentAttempt,
+						dvmc.GetRsyncPodBackOffLimit(dvm))
+				}
+			} else {
+				p = fmt.Sprintf("Rsync Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
+			}
+			if pod.LastObservedProgressPercent != "" {
+				p += fmt.Sprintf(" %s", pod.LastObservedProgressPercent)
+			}
+			if pod.LastObservedTransferRate != "" {
+				p += fmt.Sprintf(" (Transfer rate %s)", pod.LastObservedTransferRate)
+			}
+			if pod.TotalElapsedTime != nil {
+				p += fmt.Sprintf(" (%s)", pod.TotalElapsedTime.Duration.Round(time.Second))
+			}
+			progress = append(progress, p)
 		}
-		p := ""
-		if pod.PVCReference != nil {
-			p = fmt.Sprintf("[%s] %s: %s", pod.PVCReference.Name, path.Join(pod.Namespace, pod.Name), state)
-		} else {
-			p = fmt.Sprintf("Rsync Pod %s: %s", path.Join(pod.Namespace, pod.Name), state)
-		}
-		if pod.LastObservedProgressPercent != "" {
-			p += fmt.Sprintf(" %s completed", pod.LastObservedProgressPercent)
-		}
-		if pod.LastObservedTransferRate != "" {
-			p += fmt.Sprintf(", transfer rate %s", pod.LastObservedTransferRate)
-		}
-		if pod.TotalElapsedTime != nil {
-			p += fmt.Sprintf(" (%s)", pod.TotalElapsedTime.Duration.Round(time.Second))
-		}
-		progress = append(progress, p)
 	}
 	return progress
 }
