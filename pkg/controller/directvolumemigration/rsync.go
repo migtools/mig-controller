@@ -197,7 +197,11 @@ func (t *Task) createRsyncConfig() error {
 	for ns, vols := range pvcMap {
 		pvcList := []pvc{}
 		for _, vol := range vols {
-			pvcList = append(pvcList, pvc{Name: vol.Name})
+			dnsSafeName, err := getDNSSafeName(vol.Name)
+			if err != nil {
+				return err
+			}
+			pvcList = append(pvcList, pvc{Name: dnsSafeName})
 		}
 		// Generate template
 		rsyncConf := rsyncConfig{
@@ -515,15 +519,19 @@ func (t *Task) createRsyncTransferPods() error {
 
 		// Add PVC volume mounts
 		for _, vol := range vols {
+			dnsSafeName, err := getDNSSafeName(vol.Name)
+			if err != nil {
+				return err
+			}
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      vol.Name,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol.Name),
+				Name:      dnsSafeName,
+				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, dnsSafeName),
 			})
 			volumes = append(volumes, corev1.Volume{
 				Name: vol.Name,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: vol.Name,
+						ClaimName: dnsSafeName,
 					},
 				},
 			})
