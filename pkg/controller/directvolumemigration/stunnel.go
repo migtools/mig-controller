@@ -60,7 +60,7 @@ data:
     syslog = no
     output = /dev/stdout
     [rsync]
-    accept = localhost:2222
+    accept = localhost:{{ .StunnelPort }}
     CAFile = /etc/stunnel/certs/ca.crt
     cert = /etc/stunnel/certs/tls.crt
 {{ if not (eq .ProxyHost "") }}

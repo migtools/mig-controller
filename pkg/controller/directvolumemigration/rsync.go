@@ -1624,8 +1624,10 @@ type rsyncClientPodRequirements struct {
 	password string
 	// privileged whether Rsync Pod will run privileged
 	privileged bool
-	// resourceReq resource requirements for the Pod
-	resourceReq corev1.ResourceRequirements
+	// rsyncResourceReq resource requirements for the rsync container
+	rsyncResourceReq corev1.ResourceRequirements
+	// stunnelResourceReq resource requirements for the stunnel container
+	stunnelResourceReq corev1.ResourceRequirements
 	// nodeName node on which Rsync Pod will be launched
 	nodeName string
 	// destIP destination IP address for Stunnel route
@@ -1650,7 +1652,7 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	// shared volumeMount for inter-process communication between rsync and stunnel
 	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
 		Name:      "rsync-stunnel-ipc",
-		MountPath: "/usr/share/rsync-data",
+		MountPath: "/usr/share/rsync-stunnel-mgmt",
 	})
 
 	stunnelVolumeMounts := []corev1.VolumeMount{
@@ -1665,7 +1667,7 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 		},
 		{
 			Name:      "rsync-stunnel-ipc",
-			MountPath: "/rsync-data",
+			MountPath: "/usr/share/rsync-stunnel-mgmt",
 		},
 	}
 
@@ -1728,11 +1730,11 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
 
 	rsyncCommandStr := strings.Join(rsyncCommand, " ")
-	log.Info(fmt.Sprintf("Rsync command executes: %s", rsyncCommandStr))
+	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" exit $rc; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; if [ $? -eq 0 ]; then %s; rc=$?; break; fi; done;", rsyncCommandStr)
 	rsyncContainerCommand := []string{
 		"/bin/bash",
 		"-c",
-		"trap \"touch /usr/share/rsync-data/rsync-client-container-done\" exit $rc; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; if [ $? -eq 0 ]; then " + rsyncCommandStr + "; rc=$?; break; fi; done;",
+		rsyncCommandBashScript,
 	}
 
 	stunnelContainerCommand := []string{
@@ -1740,7 +1742,7 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 		"-c",
 		`/bin/stunnel /etc/stunnel/stunnel.conf
          while true
-         do test -f /rsync-data/rsync-client-container-done
+         do test -f /usr/share/rsync-stunnel-mgmt/rsync-client-container-done
          if [ $? -eq 0 ]
          then
          break
@@ -1778,8 +1780,11 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 			Privileged:             &isPrivileged,
 			RunAsUser:              &runAsUser,
 			ReadOnlyRootFilesystem: &trueBool,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+			},
 		},
-		Resources: req.resourceReq,
+		Resources: req.rsyncResourceReq,
 	})
 
 	// append stunnel container
@@ -1800,8 +1805,11 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 			Privileged:             &isPrivileged,
 			RunAsUser:              &runAsUser,
 			ReadOnlyRootFilesystem: &trueBool,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+			},
 		},
-		Resources: req.resourceReq,
+		Resources: req.stunnelResourceReq,
 	})
 
 	clientPod := corev1.Pod{
@@ -1851,8 +1859,13 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.V(4).Info("Getting limits and requests for Rsync client Pods")
-	limits, requests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	t.Log.V(4).Info("Getting limits and requests for Rsync client container")
+	rsyncLimits, rsyncRequests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	if err != nil {
+		return req, liberr.Wrap(err)
+	}
+	t.Log.V(4).Info("Getting limits and requests for Stunnel client container")
+	stunnelLimits, stunnelRequests, err := t.getPodResourceLists(STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
@@ -1870,9 +1883,13 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 				namespace: ns,
 				image:     transferImage,
 				password:  password,
-				resourceReq: corev1.ResourceRequirements{
-					Limits:   limits,
-					Requests: requests,
+				rsyncResourceReq: corev1.ResourceRequirements{
+					Limits:   rsyncLimits,
+					Requests: rsyncRequests,
+				},
+				stunnelResourceReq: corev1.ResourceRequirements{
+					Limits:   stunnelLimits,
+					Requests: stunnelRequests,
 				},
 				privileged:   isPrivileged,
 				nodeName:     pvcNodeMap[ns+"/"+vol.name],
