@@ -17,14 +17,14 @@ limitations under the License.
 package miganalytic
 
 import (
-	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func getTestPersistentVolume(name string, ns string, podUID string, volName string, requested string, provisioned string) MigAnalyticPersistentVolumeDetails {
@@ -327,6 +327,44 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 			}
 			if gotReason != tt.wantReason {
 				t.Errorf("calculateProposedVolumeSize() gotReason = %v, want %v", gotReason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestPersistentVolumeAdjuster_getVolumeUsagePercentageThreshold(t *testing.T) {
+	tests := []struct {
+		name      string
+		threshold int
+		want      int
+	}{
+		{
+			name:      "When a negative value is set, should return default value",
+			threshold: -1,
+			want:      DEFAULT_PV_USAGE_THRESHOLD,
+		},
+		{
+			name:      "When a 0 value is set, should return default value",
+			threshold: 0,
+			want:      DEFAULT_PV_USAGE_THRESHOLD,
+		},
+		{
+			name:      "When a greather than 100 value is set, should return default value",
+			threshold: 101,
+			want:      DEFAULT_PV_USAGE_THRESHOLD,
+		},
+		{
+			name:      "When a valid value between 0 and 100 is set, should return the set value",
+			threshold: 5,
+			want:      5,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Settings.PVResizingVolumeUsageThreshold = tt.threshold
+			pva := &PersistentVolumeAdjuster{}
+			if got := pva.getVolumeUsagePercentageThreshold(); got != tt.want {
+				t.Errorf("PersistentVolumeAdjuster.getVolumeUsagePercentageThreshold() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -9,15 +9,16 @@ import (
 
 // Environment variables.
 const (
-	NsLimit                   = "NAMESPACE_LIMIT"
-	PodLimit                  = "POD_LIMIT"
-	PvLimit                   = "PV_LIMIT"
-	ExcludedResources         = "EXCLUDED_RESOURCES"
-	ISResource                = "imagestreams"
-	PVResource                = "persistentvolumes"
-	PVCResource               = "persistentvolumeclaims"
-	EnableIntelligentPVResize = "ENABLE_INTELLIGENT_PV_RESIZE"
-	PvMoveStorageClasses      = "PV_MOVE_STORAGECLASSES"
+	NsLimit                        = "NAMESPACE_LIMIT"
+	PodLimit                       = "POD_LIMIT"
+	PvLimit                        = "PV_LIMIT"
+	ExcludedResources              = "EXCLUDED_RESOURCES"
+	ISResource                     = "imagestreams"
+	PVResource                     = "persistentvolumes"
+	PVCResource                    = "persistentvolumeclaims"
+	EnableIntelligentPVResize      = "ENABLE_INTELLIGENT_PV_RESIZE"
+	PvMoveStorageClasses           = "PV_MOVE_STORAGECLASSES"
+	PVResizingVolumeUsageThreshold = "PV_RESIZING_USAGE_THRESHOLD"
 )
 
 // Included resource defaults
@@ -48,13 +49,16 @@ var MoveStorageClasses = mapset.NewSetFromSlice([]interface{}{})
 //   PodLimit: Maximum number of Pods across namespaces.
 //   PvLimit: Maximum number PVs on a Plan.
 //   ExcludedResources: Resources excluded from a Plan.
+//   EnableIntelligentPVResize: Enable/Disable PV resizing at plan level
+//   PVResizingVolumeUsageThreshold: Usage percentage threshold for pv resizing
 type Plan struct {
-	NsLimit                   int
-	PodLimit                  int
-	PvLimit                   int
-	EnableIntelligentPVResize bool
-	ExcludedResources         []string
-	MoveStorageClasses        []string
+	NsLimit                        int
+	PodLimit                       int
+	PvLimit                        int
+	EnableIntelligentPVResize      bool
+	PVResizingVolumeUsageThreshold int
+	ExcludedResources              []string
+	MoveStorageClasses             []string
 }
 
 // Load settings.
@@ -73,6 +77,10 @@ func (r *Plan) Load() error {
 		return err
 	}
 	r.EnableIntelligentPVResize = getEnvBool(EnableIntelligentPVResize, false)
+	r.PVResizingVolumeUsageThreshold, err = getEnvLimit(PVResizingVolumeUsageThreshold, -1)
+	if err != nil {
+		return err
+	}
 	excludedResources := os.Getenv(ExcludedResources)
 	if len(excludedResources) > 0 {
 		r.ExcludedResources = strings.Split(excludedResources, ",")

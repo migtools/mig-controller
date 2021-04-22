@@ -30,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const DEFAULT_PV_USAGE_THRESHOLD = 3
+
 // DFCommandExecutor defines an executor responsible for running DF
 type DFCommandExecutor interface {
 	Execute(map[string][]MigAnalyticPersistentVolumeDetails) ([]DFOutput, error)
@@ -273,7 +275,9 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 	defer proposedSize.String()
 
 	volumeSizeWithThreshold := actualCapacity
-	volumeSizeWithThreshold.Set(int64(actualCapacity.Value() * (usagePercentage + 3) / 100))
+	volumeSizeWithThreshold.Set(
+		int64(actualCapacity.Value() *
+			(usagePercentage + int64(pva.getVolumeUsagePercentageThreshold())) / 100))
 
 	maxSize := requestedCapacity
 	reason = VolumeAdjustmentNoOp
@@ -291,4 +295,12 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 	proposedSize = maxSize
 
 	return proposedSize, reason
+}
+
+// getVolumeUsagePercentageThreshold returns configured threshold for pv usage
+func (pva *PersistentVolumeAdjuster) getVolumeUsagePercentageThreshold() int {
+	if Settings != nil && Settings.PVResizingVolumeUsageThreshold > 0 && Settings.PVResizingVolumeUsageThreshold < 100 {
+		return Settings.PVResizingVolumeUsageThreshold
+	}
+	return DEFAULT_PV_USAGE_THRESHOLD
 }
