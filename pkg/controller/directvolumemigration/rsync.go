@@ -14,6 +14,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode/utf8"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
@@ -927,8 +928,12 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 		for _, pod := range podList.Items {
 			for _, vol := range pod.Spec.Volumes {
 				if vol.PersistentVolumeClaim != nil {
+					dnsSafeName, err := getDNSSafeName(vol.PersistentVolumeClaim.ClaimName)
+					if err != nil {
+						return nil, err
+					}
 					pvcSecurityContextMapForNamespace[vol.PersistentVolumeClaim.ClaimName] = PVCWithSecurityContext{
-						name:               vol.PersistentVolumeClaim.ClaimName,
+						name:               dnsSafeName,
 						fsGroup:            pod.Spec.SecurityContext.FSGroup,
 						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
 						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
@@ -955,6 +960,19 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 		}
 	}
 	return pvcSecurityContextMap, nil
+}
+
+func getDNSSafeName(name string) (string, error) {
+	// TODO: this will probably introduce some non-trivial memory consumption.
+	//   investigate if we can make a thread safe global variable and use it.
+	re, err := regexp.Compile(`(\.+|\%+|\/+)`)
+	if err != nil {
+		return "", err
+	}
+	if utf8.RuneCountInString(name) > 63 {
+		return re.ReplaceAllString(name[:63], "-"), nil
+	}
+	return re.ReplaceAllString(name, "-"), nil
 }
 
 func isClaimUsedByPod(claimName string, p *corev1.Pod) bool {
@@ -1222,7 +1240,7 @@ func (t *Task) haveRsyncClientPodsCompletedOrFailed() (bool, bool, error) {
 	hasAnyFailed := len(t.Owner.Status.FailedPods) > 0
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
 	if isAnyPending {
-		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins",strings.Join(pendingPods[:], ", "))
+		pendingMessage := fmt.Sprintf("Pods %s are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     RsyncClientPodsPending,
 			Status:   migapi.True,
