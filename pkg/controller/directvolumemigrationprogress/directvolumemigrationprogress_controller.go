@@ -60,6 +60,10 @@ const (
 	RsyncContainerName          = "rsync-client"
 )
 
+type GetPodLogger interface {
+	getPodLogs(pod *kapi.Pod, containerName string, tailLines *int64, previous bool) (string, error)
+}
+
 // Add creates a new DirectVolumeMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -196,7 +200,10 @@ func (r *RsyncPodProgressTask) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		rsyncPodStatus := r.getRsyncClientContainerStatus(pod)
+		rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod, r)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 		if rsyncPodStatus != nil {
 			pvProgress.Status.RsyncPodStatus = *rsyncPodStatus
 		}
@@ -213,7 +220,7 @@ func (r *RsyncPodProgressTask) Run() error {
 			if pvProgress.Status.RsyncPodExistsInHistory(pod.Name) {
 				continue
 			}
-			rsyncPodStatus := r.getRsyncClientContainerStatus(pod)
+			rsyncPodStatus := r.getRsyncClientContainerStatus(pod,r)
 			if rsyncPodStatus != nil {
 				// dead pods go in history
 				if IsPodTerminal(rsyncPodStatus.PodPhase) {
@@ -356,7 +363,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) *
 	case containerStatus.Ready:
 		rsyncPodStatus.PodPhase = kapi.PodRunning
 		numberOfLogLines := int64(5)
-		logMessage, err := r.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
+		logMessage, err := p.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
 		if err != nil {
 			log.Info("Failed to get logs from Rsync Pod on source cluster",
 				"pod", path.Join(podRef.Namespace, podRef.Name))
