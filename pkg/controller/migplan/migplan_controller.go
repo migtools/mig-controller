@@ -588,10 +588,14 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "processProposedPVCapacities")
 		defer span.Finish()
 	}
+	// list of volume names for which MigAnalytic proposed a new volume size
 	pvResizingRequiredVolumes := []string{}
+	// list of volume names for which MigAnalytic information was not found
+	pvResizingInformationMissingVolumes := []string{}
 	plan.Spec.PersistentVolumes.BeginPvStaging()
 	for i := range plan.Spec.PersistentVolumes.List {
 		planVol := &plan.Spec.PersistentVolumes.List[i]
+		found := false
 		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
 			if planVol.PVC.Namespace == analyticNS.Namespace {
 				for _, analyticNSVol := range analyticNS.PersistentVolumes {
@@ -604,27 +608,31 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.Name)
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
+						found = true
 					}
 				}
 			}
 		}
+		if !found {
+			pvResizingInformationMissingVolumes = append(pvResizingInformationMissingVolumes, planVol.Name)
+		}
 		plan.Spec.AddPv(*planVol)
 	}
 	plan.Spec.PersistentVolumes.EndPvStaging()
-	r.generatePVResizeConditions(pvResizingRequiredVolumes, plan, analytic)
+	r.generatePVResizeConditions(pvResizingRequiredVolumes, pvResizingInformationMissingVolumes, plan, analytic)
 }
 
 // generatePVResizeConditions generates conditions for PV resizing
-func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes []string, plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
-	if migAnalytic.Status.HasCondition(miganalytic.ExtendedPVAnalysisFailed) {
+func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes []string, pvResizingMissingVolumes []string, plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
+	if cond := migAnalytic.Status.FindCondition(miganalytic.ExtendedPVAnalysisFailed); cond != nil {
 		plan.Status.SetCondition(migapi.Condition{
 			Category: Warn,
 			Status:   True,
-			Type:     miganalytic.ExtendedPVAnalysisFailed,
-			Reason:   miganalytic.FailedRunningDf,
+			Type:     cond.Type,
+			Reason:   cond.Reason,
 			Message: fmt.Sprintf(
-				"Failed gathering extended PV usage information for some or all PVs, please see MigAnalytic %s/%s for details",
-				migAnalytic.Namespace, migAnalytic.Name),
+				"%s, please see MigAnalytic %s/%s for details",
+				cond.Message, migAnalytic.Namespace, migAnalytic.Name),
 		})
 	}
 	// remove pv analysis related conditions as we are here processing pvs
@@ -637,7 +645,7 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 				Category: Warn,
 				Reason:   NotDone,
 				Message: fmt.Sprintf(
-					"Migrating data of following volumes may result in a failure either due to mismatch in their requested and actual capacities or disk usage being close to 100%% :  [%s]",
+					"Migrating data of following volumes may result in a failure either due to mismatch in their requested and actual capacities or disk usage being close to 100%%:  [%s]",
 					strings.Join(pvResizingRequiredVolumes, ",")),
 				Durable: true,
 			})
@@ -648,12 +656,26 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 				Category: Warn,
 				Reason:   Done,
 				Message: fmt.Sprintf(
-					"Capacity of the following volumes will be automatically adjusted to avoid disk capacity issues in the target cluster  :  [%s]",
+					"Capacity of the following volumes will be automatically adjusted to avoid disk capacity issues in the target cluster:  [%s]",
 					strings.Join(pvResizingRequiredVolumes, ",")),
 				Durable: true,
 			})
 		}
 	} else {
 		plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+	}
+	// PV analysis did not fail, but the pv resizing information couldn't be found for some volumes
+	// this indicates that MigAnalytic skipped these volumes for some other reason
+	if len(pvResizingMissingVolumes) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvUsageAnalysisFailed,
+			Status:   True,
+			Category: Warn,
+			Reason:   NotDone,
+			Message: fmt.Sprintf(
+				"Failed to compute PV resizing data for the following volumes. Please ensure that the volumes are attached to one or more running Pods: [%s]",
+				strings.Join(pvResizingMissingVolumes, ","),
+			),
+		})
 	}
 }
