@@ -1324,10 +1324,15 @@ func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) e
 
 // Add PV bound to PVC.
 func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *TreeNode) error {
+	pvcObject := pvc.DecodeObject()
+	if pvcObject.Spec.VolumeName == "" {
+		return nil
+	}
+
 	collection := model.PV{
 		Base: model.Base{
 			Cluster: cluster.PK,
-			Name:    pvc.DecodeObject().Spec.VolumeName,
+			Name:    pvcObject.Spec.VolumeName,
 		},
 	}
 	list, err := collection.List(t.db, model.ListOptions{})
