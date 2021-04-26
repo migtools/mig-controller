@@ -204,7 +204,6 @@ var FinalItinerary = Itinerary{
 		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage | EnableImage},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
-		{Name: EnsureInitialBackupReplicated, Step: StepBackup},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromOrphanedPVCs, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -227,6 +226,7 @@ var FinalItinerary = Itinerary{
 		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
 		{Name: PostBackupHooks, Step: PostBackupHooks, all: HasPostBackupHooks},
 		{Name: PreRestoreHooks, Step: PreRestoreHooks, all: HasPreRestoreHooks},
+		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
 		{Name: EnsureFinalRestore, Step: StepRestore},
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
@@ -1707,7 +1707,7 @@ func (t *Task) hasPreBackupHooks() bool {
 	var anyPreBackupHooks bool
 
 	for i := range t.PlanResources.MigPlan.Spec.Hooks {
-		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PreBackup" {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PreBackupHookPhase {
 			anyPreBackupHooks = true
 		}
 	}
@@ -1718,7 +1718,7 @@ func (t *Task) hasPostBackupHooks() bool {
 	var anyPostBackupHooks bool
 
 	for i := range t.PlanResources.MigPlan.Spec.Hooks {
-		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PostBackup" {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PostBackupHookPhase {
 			anyPostBackupHooks = true
 		}
 	}
@@ -1729,7 +1729,7 @@ func (t *Task) hasPreRestoreHooks() bool {
 	var anyPreRestoreHooks bool
 
 	for i := range t.PlanResources.MigPlan.Spec.Hooks {
-		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PreRestore" {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PreRestoreHookPhase {
 			anyPreRestoreHooks = true
 		}
 	}
@@ -1739,7 +1739,7 @@ func (t *Task) hasPostRestoreHooks() bool {
 	var anyPostRestoreHooks bool
 
 	for i := range t.PlanResources.MigPlan.Spec.Hooks {
-		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == "PostRestore" {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PostRestoreHookPhase {
 			anyPostRestoreHooks = true
 		}
 	}
