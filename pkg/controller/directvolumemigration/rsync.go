@@ -1185,21 +1185,21 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 				TotalElapsedTime:            dvmp.Status.RsyncElapsedTime,
 			}
 			switch {
-			case dvmp.Status.PodPhase == corev1.PodRunning ||
-				// when last pod failed, but whole operation is not failed, show as running until next pod is created to avoid flicker
-				(dvmp.Status.PodPhase == corev1.PodFailed && !operation.Failed):
+			case dvmp.Status.PodPhase == corev1.PodRunning:
 				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
 			case operation.Failed:
 				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, podProgress)
 			case dvmp.Status.PodPhase == corev1.PodSucceeded:
 				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, podProgress)
-			case dvmp.Status.PodPhase == corev1.PodPending, !operation.Failed:
+			case dvmp.Status.PodPhase == corev1.PodPending:
 				t.Owner.Status.PendingPods = append(t.Owner.Status.PendingPods, podProgress)
 				if dvmp.Status.CreationTimestamp != nil {
 					if time.Now().UTC().Sub(dvmp.Status.CreationTimestamp.Time.UTC()) > PendingPodWarningTimeLimit {
 						pendingSinceTimeLimitPods = append(pendingSinceTimeLimitPods, fmt.Sprintf("%s/%s", podProgress.Namespace, podProgress.Name))
 					}
 				}
+			case !operation.Failed:
+				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
 			}
 		}
 	}

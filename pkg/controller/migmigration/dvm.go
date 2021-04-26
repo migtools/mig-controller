@@ -159,6 +159,7 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 	progress := []string{}
 	progressIterator := map[string][]*migapi.PodProgress{
+		"Pending":   dvm.Status.PendingPods,
 		"Running":   dvm.Status.RunningPods,
 		"Completed": dvm.Status.SuccessfulPods,
 		"Failed":    dvm.Status.FailedPods,
