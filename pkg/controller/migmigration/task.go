@@ -100,18 +100,22 @@ const (
 
 // Flags
 const (
-	Quiesce        = 0x001 // Only when QuiescePods (true).
-	HasStagePods   = 0x002 // Only when stage pods created.
-	HasPVs         = 0x004 // Only when PVs migrated.
-	HasVerify      = 0x008 // Only when the plan has enabled verification
-	HasISs         = 0x010 // Only when ISs migrated
-	DirectImage    = 0x020 // Only when using direct image migration
-	IndirectImage  = 0x040 // Only when using indirect image migration
-	DirectVolume   = 0x080 // Only when using direct volume migration
-	IndirectVolume = 0x100 // Only when using indirect volume migration
-	HasStageBackup = 0x200 // True when stage backup is needed
-	EnableImage    = 0x400 // True when disable_image_migration is unset
-	EnableVolume   = 0x800 // True when disable_volume is unset
+	Quiesce             = 0x001  // Only when QuiescePods (true).
+	HasStagePods        = 0x002  // Only when stage pods created.
+	HasPVs              = 0x004  // Only when PVs migrated.
+	HasVerify           = 0x008  // Only when the plan has enabled verification
+	HasISs              = 0x010  // Only when ISs migrated
+	DirectImage         = 0x020  // Only when using direct image migration
+	IndirectImage       = 0x040  // Only when using indirect image migration
+	DirectVolume        = 0x080  // Only when using direct volume migration
+	IndirectVolume      = 0x100  // Only when using indirect volume migration
+	HasStageBackup      = 0x200  // True when stage backup is needed
+	EnableImage         = 0x400  // True when disable_image_migration is unset
+	EnableVolume        = 0x800  // True when disable_volume is unset
+	HasPreBackupHooks   = 0x1000 // True when prebackup hooks exist
+	HasPostBackupHooks  = 0x2000 // True when postbackup hooks exist
+	HasPreRestoreHooks  = 0x4000 // True when postbackup hooks exist
+	HasPostRestoreHooks = 0x8000 // True when postbackup hooks exist
 )
 
 // Migration steps
@@ -196,7 +200,7 @@ var FinalItinerary = Itinerary{
 		{Name: WaitForVeleroReady, Step: StepPrepare},
 		{Name: WaitForRegistriesReady, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
 		{Name: EnsureCloudSecretPropagated, Step: StepPrepare},
-		{Name: PreBackupHooks, Step: StepBackup},
+		{Name: PreBackupHooks, Step: PreBackupHooks, all: HasPreBackupHooks},
 		{Name: CreateDirectImageMigration, Step: StepBackup, all: DirectImage | EnableImage},
 		{Name: EnsureInitialBackup, Step: StepBackup},
 		{Name: InitialBackupCreated, Step: StepBackup},
@@ -217,16 +221,16 @@ var FinalItinerary = Itinerary{
 		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: EnsureStagePodsDeleted, Step: StepStageRestore, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepStageRestore, all: HasStagePods},
+		{Name: EnsureAnnotationsDeleted, Step: StepStageRestore, all: HasStageBackup},
 		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage | EnableImage},
 		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
-		{Name: EnsureAnnotationsDeleted, Step: StepRestore, all: HasStageBackup},
+		{Name: PostBackupHooks, Step: PostBackupHooks, all: HasPostBackupHooks},
+		{Name: PreRestoreHooks, Step: PreRestoreHooks, all: HasPreRestoreHooks},
 		{Name: EnsureInitialBackupReplicated, Step: StepRestore},
-		{Name: PostBackupHooks, Step: StepRestore},
-		{Name: PreRestoreHooks, Step: StepRestore},
 		{Name: EnsureFinalRestore, Step: StepRestore},
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
-		{Name: PostRestoreHooks, Step: StepRestore},
+		{Name: PostRestoreHooks, Step: PostRestoreHooks, all: HasPostRestoreHooks},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: Verification, Step: StepCleanup, all: HasVerify},
 		{Name: Completed, Step: StepCleanup},
@@ -1340,7 +1344,24 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 		}
 	}
 
+	if phase.all&HasPreBackupHooks != 0 && !t.hasPreBackupHooks() {
+		return false, nil
+	}
+
+	if phase.all&HasPostBackupHooks != 0 && !t.hasPostBackupHooks() {
+		return false, nil
+	}
+
+	if phase.all&HasPreRestoreHooks != 0 && !t.hasPreRestoreHooks() {
+		return false, nil
+	}
+
+	if phase.all&HasPostRestoreHooks != 0 && !t.hasPostRestoreHooks() {
+		return false, nil
+	}
+
 	return true, nil
+
 }
 
 // Evaluate `any` flags.
@@ -1680,4 +1701,47 @@ func (t *Task) logRunHeader() {
 		_, n, total := t.Itinerary.progressReport(t.Phase)
 		t.Log.Info(fmt.Sprintf("[RUN] (Step %v/%v) %v", n, total, t.getPhaseDescription(t.Phase)))
 	}
+}
+
+func (t *Task) hasPreBackupHooks() bool {
+	var anyPreBackupHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PreBackupHookPhase {
+			anyPreBackupHooks = true
+		}
+	}
+	return anyPreBackupHooks
+}
+
+func (t *Task) hasPostBackupHooks() bool {
+	var anyPostBackupHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PostBackupHookPhase {
+			anyPostBackupHooks = true
+		}
+	}
+	return anyPostBackupHooks
+}
+
+func (t *Task) hasPreRestoreHooks() bool {
+	var anyPreRestoreHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PreRestoreHookPhase {
+			anyPreRestoreHooks = true
+		}
+	}
+	return anyPreRestoreHooks
+}
+func (t *Task) hasPostRestoreHooks() bool {
+	var anyPostRestoreHooks bool
+
+	for i := range t.PlanResources.MigPlan.Spec.Hooks {
+		if t.PlanResources.MigPlan.Spec.Hooks[i].Phase == migapi.PostRestoreHookPhase {
+			anyPostRestoreHooks = true
+		}
+	}
+	return anyPostRestoreHooks
 }
