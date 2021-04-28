@@ -124,7 +124,8 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	selector := labels.SelectorFromSet(dvmLabels)
 
-	for ns, _ := range pvcMap {
+	for bothNs, _ := range pvcMap {
+		ns := getDestNs(bothNs)
 		pods := corev1.PodList{}
 		err = destClient.List(
 			context.TODO(),
@@ -231,9 +232,11 @@ func (t *Task) createRsyncConfig() error {
 	// Create rsync secret (which contains user/pass for rsync transfer pod) in
 	// each namespace being migrated
 	// Needs to go in every namespace where a PVC is being migrated
-	pvcMap := t.getPVCNamespaceMap()
+	bothPvcMap := t.getPVCNamespaceMap()
+	for bothNs, vols := range bothPvcMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
 
-	for ns, vols := range pvcMap {
 		pvcList := []pvc{}
 		for _, vol := range vols {
 			dnsSafeName, err := getDNSSafeName(vol.Name)
@@ -245,7 +248,7 @@ func (t *Task) createRsyncConfig() error {
 		// Generate template
 		rsyncConf := rsyncConfig{
 			SshUser:   "root",
-			Namespace: ns,
+			Namespace: destNs,
 			PVCList:   pvcList,
 			Password:  password,
 		}
@@ -261,7 +264,7 @@ func (t *Task) createRsyncConfig() error {
 
 		configMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: destNs,
 				Name:      DirectVolumeMigrationRsyncConfig,
 			},
 		}
@@ -301,7 +304,7 @@ func (t *Task) createRsyncConfig() error {
 		// mount as environment variables into rsync client pod
 		srcSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: srcNs,
 				Name:      DirectVolumeMigrationRsyncCreds,
 			},
 			Data: map[string][]byte{
@@ -321,7 +324,7 @@ func (t *Task) createRsyncConfig() error {
 		}
 		destSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: destNs,
 				Name:      DirectVolumeMigrationRsyncCreds,
 			},
 			Data: map[string][]byte{
@@ -361,7 +364,8 @@ func (t *Task) createRsyncTransferRoute() error {
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 
-	for ns, _ := range pvcMap {
+	for bothNs, _ := range pvcMap {
+		ns := getDestNs(bothNs)
 		svc := corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      DirectVolumeMigrationRsyncTransferSvc,
@@ -511,7 +515,8 @@ func (t *Task) createRsyncTransferPods() error {
 		isRsyncPrivileged))
 	// Loop through namespaces and create transfer pod
 	pvcMap := t.getPVCNamespaceMap()
-	for ns, vols := range pvcMap {
+	for bothNs, vols := range pvcMap {
+		ns := getDestNs(bothNs)
 		volumeMounts := []corev1.VolumeMount{}
 		volumes := []corev1.Volume{
 			{
@@ -738,17 +743,39 @@ type pvcMapElement struct {
 	Verify bool
 }
 
+// With namespace mapping, the destination cluster namespace may be different than that in the source cluster.
+// This function maps PVCs to the appropriate src:dest namespace pairs.
 func (t *Task) getPVCNamespaceMap() map[string][]pvcMapElement {
 	nsMap := map[string][]pvcMapElement{}
 	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
-		if vols, exists := nsMap[pvc.Namespace]; exists {
+		srcNs := pvc.Namespace
+		destNs := srcNs
+		if pvc.TargetNamespace != "" {
+			destNs = pvc.TargetNamespace
+		}
+		bothNs := srcNs + ":" + destNs
+		if vols, exists := nsMap[bothNs]; exists {
 			vols = append(vols, pvcMapElement{Name: pvc.Name, Verify: pvc.Verify})
-			nsMap[pvc.Namespace] = vols
+			nsMap[bothNs] = vols
 		} else {
-			nsMap[pvc.Namespace] = []pvcMapElement{{Name: pvc.Name, Verify: pvc.Verify}}
+			nsMap[bothNs] = []pvcMapElement{{Name: pvc.Name, Verify: pvc.Verify}}
 		}
 	}
 	return nsMap
+}
+
+func getSourceNs(bothNs string) string {
+	nsNames := strings.Split(bothNs, ":")
+	return nsNames[0]
+}
+
+func getDestNs(bothNs string) string {
+	nsNames := strings.Split(bothNs, ":")
+	if len(nsNames) > 1 {
+		return nsNames[1]
+	} else {
+		return nsNames[1]
+	}
 }
 
 func (t *Task) getRsyncRoute(namespace string) (string, error) {
@@ -775,7 +802,8 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		return false, messages, err
 	}
 	nsMap := t.getPVCNamespaceMap()
-	for namespace, _ := range nsMap {
+	for bothNs, _ := range nsMap {
+		namespace := getDestNs(bothNs)
 		route := routev1.Route{}
 
 		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
@@ -902,7 +930,8 @@ func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 		return nil, err
 	}
 
-	for ns, _ := range pvcMap {
+	for bothNs, _ := range pvcMap {
+		ns := getSourceNs(bothNs)
 
 		nsPodList := corev1.PodList{}
 		err = srcClient.List(context.TODO(), k8sclient.InNamespace(ns), &nsPodList)
@@ -1008,7 +1037,8 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 	for ns, _ := range pvcMap {
 		pvcSecurityContextMap[ns] = []PVCWithSecurityContext{}
 	}
-	for ns, pvcs := range pvcMap {
+	for bothNs, pvcs := range pvcMap {
+		ns := getSourceNs(bothNs)
 		srcClient, err := t.getSourceClient()
 		if err != nil {
 			return nil, err
@@ -1132,7 +1162,8 @@ func (t *Task) deleteInvalidPVProgressCR(dvmpName string, dvmpNamespace string) 
 func (t *Task) createPVProgressCR() error {
 	pvcMap := t.getPVCNamespaceMap()
 	labels := t.Owner.GetCorrelationLabels()
-	for ns, vols := range pvcMap {
+	for bothNs, vols := range pvcMap {
+		ns := getSourceNs(bothNs)
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1186,7 +1217,8 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
 	var pendingSinceTimeLimitPods []string
 	pvcMap := t.getPVCNamespaceMap()
-	for ns, vols := range pvcMap {
+	for bothNs, vols := range pvcMap {
+		ns := getSourceNs(bothNs)
 		for _, vol := range vols {
 			operation := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
 				Namespace: ns,
@@ -1251,7 +1283,8 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 }
 
 func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
-	for ns, vols := range t.getPVCNamespaceMap() {
+	for bothNs, vols := range t.getPVCNamespaceMap() {
+		ns := getSourceNs(bothNs)
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{}
 			err := t.Client.Get(context.TODO(), types.NamespacedName{
@@ -1273,7 +1306,8 @@ func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
 }
 
 func (t *Task) isAllRsyncClientPodsNoRouteToHost() (bool, error) {
-	for ns, vols := range t.getPVCNamespaceMap() {
+	for bothNs, vols := range t.getPVCNamespaceMap() {
+		ns := getSourceNs(bothNs)
 		for _, vol := range vols {
 			dvmp := migapi.DirectVolumeMigrationProgress{}
 			err := t.Client.Get(context.TODO(), types.NamespacedName{
@@ -1310,15 +1344,10 @@ func (t *Task) deleteRsyncResources() error {
 	t.Log.Info("Checking for stale Rsync resources on source MigCluster",
 		"migCluster",
 		path.Join(t.Owner.Spec.SrcMigClusterRef.Namespace, t.Owner.Spec.SrcMigClusterRef.Name))
-	err = t.findAndDeleteResources(srcClient)
-	if err != nil {
-		return err
-	}
-
 	t.Log.Info("Checking for stale Rsync resources on destination MigCluster",
 		"migCluster",
 		path.Join(t.Owner.Spec.DestMigClusterRef.Namespace, t.Owner.Spec.DestMigClusterRef.Name))
-	err = t.findAndDeleteResources(destClient)
+	err = t.findAndDeleteResources(srcClient, destClient, t.getPVCNamespaceMap())
 	if err != nil {
 		return err
 	}
@@ -1351,16 +1380,8 @@ func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
 	if err != nil {
 		return err, false
 	}
-	t.Log.Info("Checking if Rsync resource deletion has completed on source MigCluster")
-	err, deleted := t.areRsyncResourcesDeleted(srcClient)
-	if err != nil {
-		return err, false
-	}
-	if !deleted {
-		return nil, false
-	}
-	t.Log.Info("Checking if Rsync resource deletion has completed on destination MigCluster")
-	err, deleted = t.areRsyncResourcesDeleted(destClient)
+	t.Log.Info("Checking if Rsync resource deletion has completed on source and destination MigClusters")
+	err, deleted := t.areRsyncResourcesDeleted(srcClient, destClient, t.getPVCNamespaceMap())
 	if err != nil {
 		return err, false
 	}
@@ -1370,230 +1391,264 @@ func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
 	return nil, true
 }
 
-func (t *Task) areRsyncResourcesDeleted(client compat.Client) (error, bool) {
+func (t *Task) areRsyncResourcesDeleted(srcClient, destClient compat.Client, pvcMap map[string][]pvcMapElement) (error, bool) {
 	selector := labels.SelectorFromSet(map[string]string{
 		"app": DirectVolumeMigrationRsyncTransfer,
 	})
-	pvcMap := t.getPVCNamespaceMap()
-	for ns, _ := range pvcMap {
-		t.Log.Info("Searching namespace for leftover Rsync Pods, ConfigMaps, "+
+	for bothNs, _ := range pvcMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		t.Log.Info("Searching source namespace for leftover Rsync Pods, ConfigMaps, "+
 			"Services, Secrets, Routes with label.",
-			"searchNamespace", ns,
+			"searchNamespace", srcNs,
 			"labelSelector", selector)
-		podList := corev1.PodList{}
-		cmList := corev1.ConfigMapList{}
-		svcList := corev1.ServiceList{}
-		secretList := corev1.SecretList{}
-		routeList := routev1.RouteList{}
-
-		// Get Pod list
-		err := client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&podList)
+		err, areDeleted := t.areRsyncNsResourcesDeleted(srcClient, srcNs, selector)
 		if err != nil {
 			return err, false
 		}
-		if len(podList.Items) > 0 {
-			t.Log.Info("Found stale Rsync Pod.",
-				"pod", path.Join(podList.Items[0].Namespace, podList.Items[0].Name),
-				"podPhase", podList.Items[0].Status.Phase)
+		if !areDeleted {
 			return nil, false
 		}
-		// Get Secret list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&secretList)
+		t.Log.Info("Searching destination namespace for leftover Rsync Pods, ConfigMaps, "+
+			"Services, Secrets, Routes with label.",
+			"searchNamespace", destNs,
+			"labelSelector", selector)
+		err, areDeleted = t.areRsyncNsResourcesDeleted(destClient, destNs, selector)
 		if err != nil {
 			return err, false
 		}
-		if len(secretList.Items) > 0 {
-			t.Log.Info("Found stale Rsync Secret.",
-				"secret", path.Join(secretList.Items[0].Namespace, secretList.Items[0].Name))
-			return nil, false
-		}
-		// Get configmap list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&cmList)
-		if err != nil {
-			return err, false
-		}
-		if len(cmList.Items) > 0 {
-			t.Log.Info("Found stale Rsync ConfigMap.",
-				"configMap", path.Join(cmList.Items[0].Namespace, cmList.Items[0].Name))
-			return nil, false
-		}
-		// Get svc list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&svcList)
-		if err != nil {
-			return err, false
-		}
-		if len(svcList.Items) > 0 {
-			t.Log.Info("Found stale Rsync Service.",
-				"service", path.Join(svcList.Items[0].Namespace, svcList.Items[0].Name))
-			return nil, false
-		}
-
-		// Get route list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&routeList)
-		if err != nil {
-			return err, false
-		}
-		if len(routeList.Items) > 0 {
-			t.Log.Info("Found stale Rsync Route.",
-				"route", path.Join(routeList.Items[0].Namespace, routeList.Items[0].Name))
+		if !areDeleted {
 			return nil, false
 		}
 	}
 	return nil, true
-
 }
 
-func (t *Task) findAndDeleteResources(client compat.Client) error {
+func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selector labels.Selector) (error, bool) {
+	podList := corev1.PodList{}
+	cmList := corev1.ConfigMapList{}
+	svcList := corev1.ServiceList{}
+	secretList := corev1.SecretList{}
+	routeList := routev1.RouteList{}
+
+	// Get Pod list
+	err := client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&podList)
+	if err != nil {
+		return err, false
+	}
+	if len(podList.Items) > 0 {
+		t.Log.Info("Found stale Rsync Pod.",
+			"pod", path.Join(podList.Items[0].Namespace, podList.Items[0].Name),
+			"podPhase", podList.Items[0].Status.Phase)
+		return nil, false
+	}
+	// Get Secret list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&secretList)
+	if err != nil {
+		return err, false
+	}
+	if len(secretList.Items) > 0 {
+		t.Log.Info("Found stale Rsync Secret.",
+			"secret", path.Join(secretList.Items[0].Namespace, secretList.Items[0].Name))
+		return nil, false
+	}
+	// Get configmap list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&cmList)
+	if err != nil {
+		return err, false
+	}
+	if len(cmList.Items) > 0 {
+		t.Log.Info("Found stale Rsync ConfigMap.",
+			"configMap", path.Join(cmList.Items[0].Namespace, cmList.Items[0].Name))
+		return nil, false
+	}
+	// Get svc list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&svcList)
+	if err != nil {
+		return err, false
+	}
+	if len(svcList.Items) > 0 {
+		t.Log.Info("Found stale Rsync Service.",
+			"service", path.Join(svcList.Items[0].Namespace, svcList.Items[0].Name))
+		return nil, false
+	}
+
+	// Get route list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&routeList)
+	if err != nil {
+		return err, false
+	}
+	if len(routeList.Items) > 0 {
+		t.Log.Info("Found stale Rsync Route.",
+			"route", path.Join(routeList.Items[0].Namespace, routeList.Items[0].Name))
+		return nil, false
+	}
+	return nil, true
+}
+
+func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMap map[string][]pvcMapElement) error {
 	// Find all resources with the app label
 	// TODO: This label set should include a DVM run-specific UID.
 	selector := labels.SelectorFromSet(map[string]string{
 		"app": DirectVolumeMigrationRsyncTransfer,
 	})
-	pvcMap := t.getPVCNamespaceMap()
-	for ns, _ := range pvcMap {
-		podList := corev1.PodList{}
-		cmList := corev1.ConfigMapList{}
-		svcList := corev1.ServiceList{}
-		secretList := corev1.SecretList{}
-		routeList := routev1.RouteList{}
-
-		// Get Pod list
-		err := client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&podList)
+	for bothNs, _ := range pvcMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		err := t.findAndDeleteNsResources(srcClient, srcNs, selector)
 		if err != nil {
 			return err
 		}
-		// Get Secret list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&secretList)
+		err = t.findAndDeleteNsResources(destClient, destNs, selector)
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selector labels.Selector) error {
+	podList := corev1.PodList{}
+	cmList := corev1.ConfigMapList{}
+	svcList := corev1.ServiceList{}
+	secretList := corev1.SecretList{}
+	routeList := routev1.RouteList{}
 
-		// Get configmap list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&cmList)
-		if err != nil {
+	// Get Pod list
+	err := client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&podList)
+	if err != nil {
+		return err
+	}
+	// Get Secret list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&secretList)
+	if err != nil {
+		return err
+	}
+
+	// Get configmap list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&cmList)
+	if err != nil {
+		return err
+	}
+
+	// Get svc list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&svcList)
+	if err != nil {
+		return err
+	}
+
+	// Get route list
+	err = client.List(
+		context.TODO(),
+		&k8sclient.ListOptions{
+			Namespace:     ns,
+			LabelSelector: selector,
+		},
+		&routeList)
+	if err != nil {
+		return err
+	}
+
+	// Delete pods
+	for _, pod := range podList.Items {
+		t.Log.Info("Deleting stale DVM Pod",
+			"pod", path.Join(pod.Namespace, pod.Name))
+		err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil && !k8serror.IsNotFound(err) {
 			return err
 		}
+	}
 
-		// Get svc list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&svcList)
-		if err != nil {
+	// Delete secrets
+	for _, secret := range secretList.Items {
+		t.Log.Info("Deleting stale DVM Secret",
+			"secret", path.Join(secret.Namespace, secret.Name))
+		err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil && !k8serror.IsNotFound(err) {
 			return err
 		}
+	}
 
-		// Get route list
-		err = client.List(
-			context.TODO(),
-			&k8sclient.ListOptions{
-				Namespace:     ns,
-				LabelSelector: selector,
-			},
-			&routeList)
-		if err != nil {
+	// Delete routes
+	for _, route := range routeList.Items {
+		t.Log.Info("Deleting stale DVM Route",
+			"route", path.Join(route.Namespace, route.Name))
+		err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil && !k8serror.IsNotFound(err) {
 			return err
 		}
+	}
 
-		// Delete pods
-		for _, pod := range podList.Items {
-			t.Log.Info("Deleting stale DVM Pod",
-				"pod", path.Join(pod.Namespace, pod.Name))
-			err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-			if err != nil && !k8serror.IsNotFound(err) {
-				return err
-			}
+	// Delete svcs
+	for _, svc := range svcList.Items {
+		t.Log.Info("Deleting stale DVM Service",
+			"service", path.Join(svc.Namespace, svc.Name))
+		err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
 		}
+	}
 
-		// Delete secrets
-		for _, secret := range secretList.Items {
-			t.Log.Info("Deleting stale DVM Secret",
-				"secret", path.Join(secret.Namespace, secret.Name))
-			err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-			if err != nil && !k8serror.IsNotFound(err) {
-				return err
-			}
-		}
-
-		// Delete routes
-		for _, route := range routeList.Items {
-			t.Log.Info("Deleting stale DVM Route",
-				"route", path.Join(route.Namespace, route.Name))
-			err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-			if err != nil && !k8serror.IsNotFound(err) {
-				return err
-			}
-		}
-
-		// Delete svcs
-		for _, svc := range svcList.Items {
-			t.Log.Info("Deleting stale DVM Service",
-				"service", path.Join(svc.Namespace, svc.Name))
-			err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-			if err != nil && !k8serror.IsNotFound(err) {
-				return err
-			}
-		}
-
-		// Delete configmaps
-		for _, cm := range cmList.Items {
-			t.Log.Info("Deleting stale DVM ConfigMap",
-				"configMap", path.Join(cm.Namespace, cm.Name))
-			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
-			if err != nil && !k8serror.IsNotFound(err) {
-				return err
-			}
+	// Delete configmaps
+	for _, cm := range cmList.Items {
+		t.Log.Info("Deleting stale DVM ConfigMap",
+			"configMap", path.Join(cm.Namespace, cm.Name))
+		err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+		if err != nil && !k8serror.IsNotFound(err) {
+			return err
 		}
 	}
 	return nil
@@ -1602,7 +1657,8 @@ func (t *Task) findAndDeleteResources(client compat.Client) error {
 func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 	pvcMap := t.getPVCNamespaceMap()
 
-	for ns, vols := range pvcMap {
+	for bothNs, vols := range pvcMap {
+		ns := getSourceNs(bothNs)
 		for _, vol := range vols {
 			dvmpName := getMD5Hash(t.Owner.Name + vol.Name + ns)
 			t.Log.Info("Deleting stale DVMP CR.",
