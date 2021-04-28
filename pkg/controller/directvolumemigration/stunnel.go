@@ -179,16 +179,18 @@ func (t *Task) createStunnelConfig() error {
 	// DESTINATION
 	// Create 1 rsync transfer+stunnel pod per namespace
 	// Create 1 stunnel svc
-	pvcMap := t.getPVCNamespaceMap()
+	bothPvcMap := t.getPVCNamespaceMap()
 
-	for ns, _ := range pvcMap {
+	for bothNs, _ := range bothPvcMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
 		// Declare config
-		rsyncRoute, err := t.getRsyncRoute(ns)
+		rsyncRoute, err := t.getRsyncRoute(destNs)
 		if err != nil {
 			return err
 		}
 		srcStunnelConf := stunnelConfig{
-			Namespace:          ns,
+			Namespace:          srcNs,
 			StunnelPort:        2222,
 			RsyncPort:          22,
 			RsyncRoute:         rsyncRoute,
@@ -198,7 +200,7 @@ func (t *Task) createStunnelConfig() error {
 		}
 
 		destStunnelConf := stunnelConfig{
-			Namespace:   ns,
+			Namespace:   destNs,
 			StunnelPort: 2222,
 			RsyncPort:   22,
 			RsyncRoute:  rsyncRoute,
@@ -229,7 +231,7 @@ func (t *Task) createStunnelConfig() error {
 		// Generate configmaps
 		clientConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: srcNs,
 				Name:      DirectVolumeMigrationStunnelConfig,
 			},
 		}
@@ -243,7 +245,7 @@ func (t *Task) createStunnelConfig() error {
 
 		destConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: destNs,
 				Name:      DirectVolumeMigrationStunnelConfig,
 			},
 		}
@@ -364,11 +366,13 @@ func (t *Task) setupCerts() error {
 	// tls.crt (right now equal to ca.crt)
 	// tls.key
 
-	pvcMap := t.getPVCNamespaceMap()
-	for ns, _ := range pvcMap {
+	bothPvcMap := t.getPVCNamespaceMap()
+	for bothNs, _ := range bothPvcMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
 		srcSecret := corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns,
+				Namespace: srcNs,
 				Name:      DirectVolumeMigrationStunnelCerts,
 				Labels: map[string]string{
 					"app": DirectVolumeMigrationRsyncTransfer,
@@ -380,7 +384,20 @@ func (t *Task) setupCerts() error {
 				"tls.key": caPrivKeyPEM.Bytes(),
 			},
 		}
-		destSecret := srcSecret
+		destSecret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: destNs,
+				Name:      DirectVolumeMigrationStunnelCerts,
+				Labels: map[string]string{
+					"app": DirectVolumeMigrationRsyncTransfer,
+				},
+			},
+			Data: map[string][]byte{
+				"tls.crt": caPEM.Bytes(),
+				"ca.crt":  caPEM.Bytes(),
+				"tls.key": caPrivKeyPEM.Bytes(),
+			},
+		}
 		t.Log.Info("Creating Stunnel CA Bundle and Cert/Key Secret on source cluster",
 			"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
 		err = srcClient.Create(context.TODO(), &srcSecret)

@@ -651,6 +651,21 @@ func (r *MigPlan) GetDestinationNamespaces() []string {
 	return includedNamespaces
 }
 
+// GetNamespaceMapping gets a map of src to dest namespaces
+func (r *MigPlan) GetNamespaceMapping() map[string]string {
+	nsMapping := make(map[string]string)
+	for _, namespace := range r.Spec.Namespaces {
+		namespaces := strings.Split(namespace, ":")
+		if len(namespaces) > 1 {
+			nsMapping[namespaces[0]] = namespaces[1]
+		} else {
+			nsMapping[namespaces[0]] = namespaces[0]
+		}
+	}
+
+	return nsMapping
+}
+
 // Get whether the plan conflicts with another.
 // Plans conflict when:
 //   - Have any of the clusters in common.

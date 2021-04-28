@@ -199,6 +199,7 @@ func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 }
 
 func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
+	nsMapping := t.PlanResources.MigPlan.GetNamespaceMapping()
 	pvcList := []migapi.PVCToMigrate{}
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
 		if pv.Selection.Action != migapi.PvCopyAction || pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
@@ -217,6 +218,7 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 			},
 			TargetStorageClass: pv.Selection.StorageClass,
 			TargetAccessModes:  accessModes,
+			TargetNamespace:    nsMapping[pv.PVC.Namespace],
 			Verify:             pv.Selection.Verify,
 		})
 	}

@@ -93,17 +93,22 @@ func (t *Task) createDestinationPVCs() error {
 			pvcLabels[MigratedByDirectVolumeMigration] = string(t.Owner.UID)
 		}
 
+		destNs := pvc.Namespace
+		if pvc.TargetNamespace != "" {
+			destNs = pvc.TargetNamespace
+		}
 		// Create pvc on destination with same metadata + spec
 		destPVC := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pvc.Name,
-				Namespace: pvc.Namespace,
+				Namespace: destNs,
 				Labels:    pvcLabels,
 			},
 			Spec: newSpec,
 		}
 		t.Log.Info("Creating PVC on destination MigCluster",
 			"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
+			"destPersistentVolumeClaim", path.Join(destNs, pvc.Name),
 			"pvcStorageClassName", destPVC.Spec.StorageClassName,
 			"pvcAccessModes", destPVC.Spec.AccessModes,
 			"pvcRequests", destPVC.Spec.Resources.Requests)
