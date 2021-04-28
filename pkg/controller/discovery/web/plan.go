@@ -628,10 +628,11 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: DirectVolumeMigrationHandler{}.Link(m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  DirectVolumeMigrationHandler{}.Link(m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: clusterTypeHost,
 		}
 		err := t.addDirectVolumeProgresses(m, &node)
 		if err != nil {
