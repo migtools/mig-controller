@@ -208,14 +208,22 @@ func (h PlanHandler) Link(m *model.Plan) string {
 		})
 }
 
+// Cluster types
+const (
+	clusterTypeHost   = "host"
+	clusterTypeSource = "source"
+	clusterTypeTarget = "target"
+)
+
 //
 // Tree node.
 type TreeNode struct {
-	Kind       string     `json:"kind"`
-	Namespace  string     `json:"namespace"`
-	Name       string     `json:"name"`
-	Children   []TreeNode `json:"children,omitempty"`
-	ObjectLink string     `json:"objectLink"`
+	Kind        string     `json:"kind"`
+	Namespace   string     `json:"namespace"`
+	Name        string     `json:"name"`
+	ClusterType string     `json:"clusterType"`
+	Children    []TreeNode `json:"children,omitempty"`
+	ObjectLink  string     `json:"objectLink"`
 }
 
 //
@@ -301,13 +309,26 @@ func (t *PlanTree) setCluster() error {
 // Build root node.
 func (t *PlanTree) getRoot() *TreeNode {
 	root := &TreeNode{
-		Kind:       migref.ToKind(t.plan),
-		ObjectLink: PlanHandler{}.Link(t.plan),
-		Namespace:  t.plan.Namespace,
-		Name:       t.plan.Name,
+		Kind:        migref.ToKind(t.plan),
+		ObjectLink:  PlanHandler{}.Link(t.plan),
+		Namespace:   t.plan.Namespace,
+		Name:        t.plan.Name,
+		ClusterType: clusterTypeHost,
 	}
 
 	return root
+}
+
+// Get the clusterType string for a model.Cluster
+func (t *PlanTree) clusterType(cluster *model.Cluster) string {
+	switch cluster.Name {
+	case t.cluster.source.Name:
+		return clusterTypeSource
+	case t.cluster.destination.Name:
+		return clusterTypeTarget
+	default:
+		return clusterTypeHost
+	}
 }
 
 //
@@ -335,10 +356,11 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 			continue
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: MigrationHandler{}.Link(m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  MigrationHandler{}.Link(m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: clusterTypeHost,
 		}
 
 		err = t.addBackups(m, &node)
@@ -402,10 +424,11 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 			continue
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: BackupHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  BackupHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 		err := t.addPvBackups(m, &node)
 		if err != nil {
@@ -457,10 +480,11 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, paren
 			for _, pvc := range pvcsToInclude {
 				if pvc.Name == object.Name && pvc.Namespace == object.Namespace {
 					node := TreeNode{
-						Kind:       migref.ToKind(m),
-						ObjectLink: PvcHandler{}.Link(&cluster, m),
-						Namespace:  m.Namespace,
-						Name:       m.Name,
+						Kind:        migref.ToKind(m),
+						ObjectLink:  PvcHandler{}.Link(&cluster, m),
+						Namespace:   m.Namespace,
+						Name:        m.Name,
+						ClusterType: t.clusterType(&cluster),
 					}
 					err := t.addPVForPVC(cluster, m, &node)
 					if err != nil {
@@ -511,10 +535,11 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 			}
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: RestoreHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  RestoreHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 		err := t.addPvRestores(m, &node)
 		if err != nil {
@@ -577,10 +602,11 @@ func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PodHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  PodHandler{}.Link(&cluster, m),
+				Namespace:   m.Namespace,
+				Name:        m.Name,
+				ClusterType: t.clusterType(&cluster),
 			})
 	}
 	return nil
@@ -654,10 +680,11 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 			}
 			if object.Name == hookRef.Reference.Name && object.Namespace == hookRef.Reference.Namespace {
 				node := TreeNode{
-					Kind:       migref.ToKind(m),
-					ObjectLink: HookHandler{}.Link(m),
-					Namespace:  m.Namespace,
-					Name:       m.Name,
+					Kind:        migref.ToKind(m),
+					ObjectLink:  HookHandler{}.Link(m),
+					Namespace:   m.Namespace,
+					Name:        m.Name,
+					ClusterType: clusterTypeHost,
 				}
 				err := t.addHookJobsForCluster(m, migration, &node)
 				if err != nil {
@@ -703,10 +730,11 @@ func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migr
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: JobHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  JobHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 		err := t.addJobPodsForCluster(cluster, m, &node)
 		if err != nil {
@@ -738,10 +766,11 @@ func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, p
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PodHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PodHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 		parent.Children = append(parent.Children, node)
 	}
@@ -765,10 +794,11 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: DirectImageMigrationHandler{}.Link(m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  DirectImageMigrationHandler{}.Link(m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: clusterTypeHost,
 		}
 		err := t.addDirectImageStreams(m, &node)
 		if err != nil {
@@ -797,10 +827,11 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: DirectVolumeMigrationProgressHandler{}.Link(m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  DirectVolumeMigrationProgressHandler{}.Link(m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: clusterTypeHost,
 		}
 
 		// Add linked PVCs
@@ -863,10 +894,11 @@ func (t *PlanTree) addDirectVolumePodsForCluster(cluster model.Cluster, directVo
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PodHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  PodHandler{}.Link(&cluster, m),
+				Namespace:   m.Namespace,
+				Name:        m.Name,
+				ClusterType: t.clusterType(&cluster),
 			})
 	}
 	return nil
@@ -924,10 +956,11 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PodHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  PodHandler{}.Link(&cluster, m),
+				Namespace:   m.Namespace,
+				Name:        m.Name,
+				ClusterType: t.clusterType(&cluster),
 			})
 	}
 	return nil
@@ -965,10 +998,11 @@ func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 			continue
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvcHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvcHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err := t.addPVForPVC(cluster, m, &node)
@@ -1023,10 +1057,11 @@ func (t *PlanTree) addDirectVolumeRoutesForCluster(cluster model.Cluster, direct
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: RouteHandler{}.Link(&cluster, m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  RouteHandler{}.Link(&cluster, m),
+				Namespace:   m.Namespace,
+				Name:        m.Name,
+				ClusterType: t.clusterType(&cluster),
 			})
 	}
 	return nil
@@ -1063,10 +1098,11 @@ func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: DirectImageStreamMigrationHandler{}.Link(m),
-				Namespace:  m.Namespace,
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  DirectImageStreamMigrationHandler{}.Link(m),
+				Namespace:   m.Namespace,
+				Name:        m.Name,
+				ClusterType: clusterTypeHost,
 			})
 	}
 	return nil
@@ -1105,10 +1141,11 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 			continue
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvBackupHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvBackupHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err = t.addPVCsForPVB(m, &node)
@@ -1155,10 +1192,11 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 			continue
 		}
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvRestoreHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvRestoreHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err = t.addPVCsForPVR(restore, &node)
@@ -1194,10 +1232,11 @@ func (t *PlanTree) addPVCsForPVR(restore *model.Restore, parent *TreeNode) error
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvcHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvcHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 		err = t.addPVForPVC(cluster, m, &node)
 		if err != nil {
@@ -1229,10 +1268,11 @@ func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) erro
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvcHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvcHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err = t.addPVForPVC(cluster, m, &node)
@@ -1265,10 +1305,11 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvcHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvcHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err = t.addPVForPVC(cluster, m, &node)
@@ -1304,10 +1345,11 @@ func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) e
 	}
 	for _, m := range list {
 		node := TreeNode{
-			Kind:       migref.ToKind(m),
-			ObjectLink: PvcHandler{}.Link(&cluster, m),
-			Namespace:  m.Namespace,
-			Name:       m.Name,
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PvcHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
 		}
 
 		err = t.addPVForPVC(cluster, m, &node)
@@ -1344,9 +1386,10 @@ func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *Tr
 		parent.Children = append(
 			parent.Children,
 			TreeNode{
-				Kind:       migref.ToKind(m),
-				ObjectLink: PvHandler{}.Link(&cluster, m),
-				Name:       m.Name,
+				Kind:        migref.ToKind(m),
+				ObjectLink:  PvHandler{}.Link(&cluster, m),
+				Name:        m.Name,
+				ClusterType: t.clusterType(&cluster),
 			})
 	}
 
