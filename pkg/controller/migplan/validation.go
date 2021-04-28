@@ -47,6 +47,8 @@ const (
 	NsLimitExceeded                            = "NamespaceLimitExceeded"
 	NsLengthExceeded                           = "NamespaceLengthExceeded"
 	NsHaveNodeSelectors                        = "NamespacesHaveNodeSelectors"
+	DuplicateNsOnSourceCluster                 = "DuplicateNamespaceOnSourceCluster"
+	DuplicateNsOnDestinationCluster            = "DuplicateNamespaceOnDestinationCluster"
 	PodLimitExceeded                           = "PodLimitExceeded"
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
@@ -102,6 +104,7 @@ const (
 	Conflict              = "Conflict"
 	NotHealthy            = "NotHealthy"
 	NodeSelectorsDetected = "NodeSelectorsDetected"
+	DuplicateNs           = "DuplicateNamespaces"
 )
 
 // Statuses
@@ -630,14 +633,24 @@ func (r ReconcileMigPlan) validateRequiredNamespaces(ctx context.Context, plan *
 // Validate required namespaces on the source cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{migapi.VeleroNamespace}
 	if plan.Status.HasAnyCondition(Suspended, NsLimitExceeded) {
 		plan.Status.StageCondition(NsNotFoundOnSourceCluster)
 		return nil
 	}
-	for _, ns := range plan.Spec.Namespaces {
-		namespaces = append(namespaces, ns)
+	namespaces := plan.GetSourceNamespaces()
+	duplicates := listDuplicateNamespaces(namespaces)
+	if len(duplicates) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     DuplicateNsOnSourceCluster,
+			Status:   True,
+			Reason:   DuplicateNs,
+			Category: Critical,
+			Message:  "Duplicate source cluster namespaces [] in migplan.",
+			Items:    duplicates,
+		})
+		return nil
 	}
+	namespaces = append(namespaces, migapi.VeleroNamespace)
 	cluster, err := plan.GetSourceCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -652,8 +665,6 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 	ns := kapi.Namespace{}
 	notFound := make([]string, 0)
 	for _, name := range namespaces {
-		namespaceMapping := strings.Split(name, ":")
-		name = namespaceMapping[0]
 		key := types.NamespacedName{Name: name}
 		err := client.Get(context.TODO(), key, &ns)
 		if err == nil {
@@ -683,10 +694,25 @@ func (r ReconcileMigPlan) validateSourceNamespaces(plan *migapi.MigPlan) error {
 // Validate required namespaces on the destination cluster.
 // Returns error and the total error conditions set.
 func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) error {
-	namespaces := []string{migapi.VeleroNamespace}
 	if plan.Status.HasAnyCondition(Suspended) {
 		return nil
 	}
+
+	namespaces := plan.GetDestinationNamespaces()
+	duplicates := listDuplicateNamespaces(namespaces)
+	if len(duplicates) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     DuplicateNsOnDestinationCluster,
+			Status:   True,
+			Reason:   DuplicateNs,
+			Category: Critical,
+			Message:  "Duplicate destination cluster namespaces [] in migplan.",
+			Items:    duplicates,
+		})
+		return nil
+	}
+
+	namespaces = []string{migapi.VeleroNamespace}
 	cluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -725,6 +751,19 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 	}
 
 	return nil
+}
+
+func listDuplicateNamespaces(nsList []string) []string {
+	found := make(map[string]bool)
+	duplicates := []string{}
+	for _, name := range nsList {
+		if _, value := found[name]; !value {
+			found[name] = true
+		} else {
+			duplicates = append(duplicates, name)
+		}
+	}
+	return duplicates
 }
 
 // Validate the plan does not conflict with another plan.
