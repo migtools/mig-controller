@@ -109,10 +109,24 @@ func (t *Task) ensureMigRegistries() (int, error) {
 			return nEnsured, liberr.Wrap(err)
 		}
 
+		t.Log.Info("Retrieving registry liveness timeout value from MigCluster configmaps",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
+		registryLivenessTimeout, err := cluster.GetRegistryLivenessTimeout(client)
+		if err != nil {
+			return nEnsured, liberr.Wrap(err)
+		}
+
+		t.Log.Info("Retrieving registry readiness timeout value from MigCluster configmaps",
+			"migCluster", path.Join(cluster.Namespace, cluster.Name))
+		registryReadinessTimeout, err := cluster.GetRegistryReadinessTimeout(client)
+		if err != nil {
+			return nEnsured, liberr.Wrap(err)
+		}
+
 		// Migration Registry DeploymentConfig
 		t.Log.Info("Creating migration registry deployment for MigCluster",
 			"migCluster", path.Join(cluster.Namespace, cluster.Name))
-		err = t.ensureRegistryDeployment(client, secret, registryImage)
+		err = t.ensureRegistryDeployment(client, secret, registryImage, registryLivenessTimeout, registryReadinessTimeout)
 		if err != nil {
 			return nEnsured, liberr.Wrap(err)
 		}
@@ -235,7 +249,7 @@ func (t *Task) deleteImageRegistryDeploymentForClient(client k8sclient.Client, p
 }
 
 // Ensure the deployment for the migration registry on the specified cluster has been created
-func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Secret, registryImage string) error {
+func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Secret, registryImage string, livenessTimeout int32, readinessTimeout int32) error {
 	plan := t.PlanResources.MigPlan
 	if plan == nil {
 		return nil
@@ -255,7 +269,7 @@ func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Se
 	}
 
 	// Construct Registry DC
-	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels())
+	newDeployment := plan.BuildRegistryDeployment(storage, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels(), livenessTimeout, readinessTimeout)
 	foundDeployment, err := plan.GetRegistryDeployment(client)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -270,7 +284,7 @@ func (t *Task) ensureRegistryDeployment(client k8sclient.Client, secret *kapi.Se
 	if plan.EqualsRegistryDeployment(newDeployment, foundDeployment) {
 		return nil
 	}
-	plan.UpdateRegistryDeployment(storage, foundDeployment, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels())
+	plan.UpdateRegistryDeployment(storage, foundDeployment, proxySecret, name, dirName, registryImage, t.Owner.GetCorrelationLabels(), livenessTimeout, readinessTimeout)
 	err = client.Update(context.TODO(), foundDeployment)
 	if err != nil {
 		return liberr.Wrap(err)

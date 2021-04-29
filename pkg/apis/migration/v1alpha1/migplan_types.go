@@ -47,6 +47,12 @@ const (
 	ClosedIndexField = "closed"
 )
 
+// Registry deployment constants
+const (
+	MigRegistryDefaultLivenessTimeout  = 3
+	MigRegistryDefaultReadinessTimeout = 3
+)
+
 // MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
 	Reference *kapi.ObjectReference `json:"reference"`
@@ -318,7 +324,7 @@ func (r *MigPlan) EqualsRegistrySecret(a, b *kapi.Secret) bool {
 
 // Build a Registry Deployment.
 func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi.Secret, name,
-	dirName, registryImage string, mCorrelationLabels map[string]string) *appsv1.Deployment {
+	dirName, registryImage string, mCorrelationLabels map[string]string, livenessTimeout int32, readinessTimeout int32) *appsv1.Deployment {
 	// Merge correlation labels for plan and migration
 	combinedLabels := r.GetCorrelationLabels()
 	if mCorrelationLabels != nil {
@@ -337,7 +343,7 @@ func (r *MigPlan) BuildRegistryDeployment(storage *MigStorage, proxySecret *kapi
 			Namespace: VeleroNamespace,
 		},
 	}
-	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage, mCorrelationLabels)
+	r.UpdateRegistryDeployment(storage, deployment, proxySecret, name, dirName, registryImage, mCorrelationLabels, livenessTimeout, readinessTimeout)
 	return deployment
 }
 
@@ -374,7 +380,7 @@ func (r *MigPlan) GetProxySecret(client k8sclient.Client) (*kapi.Secret, error) 
 
 // Update a Registry Deployment as desired for the specified cluster.
 func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *appsv1.Deployment,
-	proxySecret *kapi.Secret, name, dirName, registryImage string, mCorrelationLabels map[string]string) {
+	proxySecret *kapi.Secret, name, dirName, registryImage string, mCorrelationLabels map[string]string, livenessTimeout int32, readinessTimeout int32) {
 
 	envFrom := []kapi.EnvFromSource{}
 	// If Proxy secret exists, set env from it
@@ -431,7 +437,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 								},
 							},
 							PeriodSeconds:       5,
-							TimeoutSeconds:      3,
+							TimeoutSeconds:      livenessTimeout,
 							InitialDelaySeconds: 15,
 						},
 						ReadinessProbe: &kapi.Probe{
@@ -442,7 +448,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 								},
 							},
 							PeriodSeconds:       5,
-							TimeoutSeconds:      3,
+							TimeoutSeconds:      readinessTimeout,
 							InitialDelaySeconds: 15,
 						},
 						Resources: kapi.ResourceRequirements{},

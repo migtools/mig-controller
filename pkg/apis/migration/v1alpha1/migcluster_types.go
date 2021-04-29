@@ -53,12 +53,19 @@ const (
 
 // migration-cluster-config configmap
 const (
-	ClusterConfigMapName  = "migration-cluster-config"
-	RegistryImageKey      = "REGISTRY_IMAGE"
-	StagePodImageKey      = "STAGE_IMAGE"
-	RsyncTransferImageKey = "RSYNC_TRANSFER_IMAGE"
-	ClusterSubdomainKey   = "CLUSTER_SUBDOMAIN"
-	OperatorVersionKey    = "OPERATOR_VERSION"
+	ClusterConfigMapName          = "migration-cluster-config"
+	RegistryImageKey              = "REGISTRY_IMAGE"
+	StagePodImageKey              = "STAGE_IMAGE"
+	RsyncTransferImageKey         = "RSYNC_TRANSFER_IMAGE"
+	ClusterSubdomainKey           = "CLUSTER_SUBDOMAIN"
+	OperatorVersionKey            = "OPERATOR_VERSION"
+	RegistryReadinessProbeTimeout = "REGISTRY_READINESS_TIMEOUT"
+	RegistryLivenessProbeTimeout  = "REGISTRY_LIVENESS_TIMEOUT"
+)
+
+// constants
+const (
+	RegistryDefaultProbeTimeout = 3
 )
 
 // MigClusterSpec defines the desired state of MigCluster
@@ -184,6 +191,52 @@ func (m *MigCluster) GetRegistryImage(c k8sclient.Client) (string, error) {
 		return "", liberr.Wrap(errors.Errorf("configmap key not found: %v", RegistryImageKey))
 	}
 	return registryImage, nil
+}
+
+// GetRegistryLivenessTimeout returns liveness timeout value for migration registry
+func (m *MigCluster) GetRegistryLivenessTimeout(c k8sclient.Client) (int32, error) {
+	clusterConfig, err := m.GetClusterConfigMap(c)
+	if err != nil {
+		return -1, liberr.Wrap(err)
+	}
+	registryLivenessTimeout, found := clusterConfig.Data[RegistryLivenessProbeTimeout]
+	// When registry timeout value is not found in the configmap, the user didn't intend to use a custom timeout
+	// therefore, we return the default value in this case
+	if !found {
+		return RegistryDefaultProbeTimeout, nil
+	}
+	// When registry timeout is defined, but it is not a valid +ve integer, it indicates the intention of the user to set
+	// the value but has a mistake, therefore, we do not use the default value and return an error instead
+	if val, err := strconv.ParseInt(registryLivenessTimeout, 10, 32); err != nil {
+		return -1, liberr.Wrap(err)
+	} else if val < 1 {
+		return -1, fmt.Errorf("non-positive value set for Migration Registry liveness timeout")
+	} else {
+		return int32(val), nil
+	}
+}
+
+// GetRegistryReadinessTimeout returns readiness timeout value for migration registry
+func (m *MigCluster) GetRegistryReadinessTimeout(c k8sclient.Client) (int32, error) {
+	clusterConfig, err := m.GetClusterConfigMap(c)
+	if err != nil {
+		return -1, liberr.Wrap(err)
+	}
+	registryReadinessTimeout, found := clusterConfig.Data[RegistryReadinessProbeTimeout]
+	// When registry timeout value is not found in the configmap, the user didn't intend to use a custom timeout
+	// therefore, we return the default value in this case
+	if !found {
+		return RegistryDefaultProbeTimeout, nil
+	}
+	// When registry timeout is defined, but it is not a valid +ve integer, it indicates the intention of the user to set
+	// the value but has a mistake, therefore, we do not use the default value and return an error instead
+	if val, err := strconv.ParseInt(registryReadinessTimeout, 10, 32); err != nil {
+		return -1, liberr.Wrap(err)
+	} else if val < 1 {
+		return -1, fmt.Errorf("non-positive value set for Migration Registry readiness timeout")
+	} else {
+		return int32(val), nil
+	}
 }
 
 // GetRsyncTransferImage gets a MigCluster specific rsync transfer image from ConfigMap
