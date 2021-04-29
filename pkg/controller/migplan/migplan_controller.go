@@ -30,8 +30,6 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	miganalytic "github.com/konveyor/mig-controller/pkg/controller/miganalytic"
-	migctl "github.com/konveyor/mig-controller/pkg/controller/migmigration"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	kapi "k8s.io/api/core/v1"
@@ -418,17 +416,17 @@ func (r *ReconcileMigPlan) planSuspended(ctx context.Context, plan *migapi.MigPl
 
 	for _, m := range migrations {
 		// If a migration is running, plan should be suspended
-		if m.Status.HasCondition(migctl.Running) {
+		if m.Status.HasCondition(migapi.Running) {
 			suspended = true
 			break
 		}
 		// If the newest final migration is successful, suspend plan
-		if m.Status.HasCondition(migctl.Succeeded) && !m.Spec.Stage && !m.Spec.Rollback {
+		if m.Status.HasCondition(migapi.Succeeded) && !m.Spec.Stage && !m.Spec.Rollback {
 			suspended = true
 			break
 		}
 		// If the newest migration is a successful rollback, unsuspend plan
-		if m.Status.HasCondition(migctl.Succeeded) && m.Spec.Rollback {
+		if m.Status.HasCondition(migapi.Succeeded) && m.Spec.Rollback {
 			suspended = false
 			break
 		}
@@ -564,7 +562,7 @@ func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(ctx context.Context, plan *m
 			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
 				return migAnalytic, nil
 			}
-			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(miganalytic.ExtendedPVAnalysisStarted)
+			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(migapi.ExtendedPVAnalysisStarted)
 			if pvAnalysisStartedCondition != nil {
 				if time.Now().Sub(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
 					plan.Status.SetCondition(migapi.Condition{
@@ -604,7 +602,7 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
 							planVol.CapacityConfirmed = false
 						}
-						if analyticNSVol.Comment != miganalytic.VolumeAdjustmentNoOp {
+						if analyticNSVol.Comment != migapi.VolumeAdjustmentNoOp {
 							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.Name)
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
@@ -624,7 +622,7 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 
 // generatePVResizeConditions generates conditions for PV resizing
 func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes []string, pvResizingMissingVolumes []string, plan *migapi.MigPlan, migAnalytic *migapi.MigAnalytic) {
-	if cond := migAnalytic.Status.FindCondition(miganalytic.ExtendedPVAnalysisFailed); cond != nil {
+	if cond := migAnalytic.Status.FindCondition(migapi.ExtendedPVAnalysisFailed); cond != nil {
 		plan.Status.SetCondition(migapi.Condition{
 			Category: Warn,
 			Status:   True,

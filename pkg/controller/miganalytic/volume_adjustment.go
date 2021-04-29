@@ -45,17 +45,6 @@ type PersistentVolumeAdjuster struct {
 	StatusRefCache map[string]*migapi.MigAnalyticNamespace
 }
 
-// VolumeAdjuster conditions
-const (
-	ExtendedPVAnalysisFailed  = "ExtendedPVAnalysisFailed"
-	ExtendedPVAnalysisStarted = "ExtendedPVAnalysisStarted"
-)
-
-// VolumeAdjuster reasons
-const (
-	FailedRunningDf = "FailedRunningDf"
-)
-
 // DFBaseUnit defines supported sizes for df command
 type DFBaseUnit string
 
@@ -65,13 +54,6 @@ const (
 	DecimalSIMega = DFBaseUnit("MB")
 	BinarySIMega  = DFBaseUnit("M")
 	BinarySIGiga  = DFBaseUnit("G")
-)
-
-// Proposed volume size computation reasons
-const (
-	VolumeAdjustmentNoOp             = "No change in original PV capacity is needed."
-	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%, an extra headroom is added to avoid disk capacity issue in the target cluster."
-	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values is used to avoid disk capacity issue in the target cluster."
 )
 
 // DFCommand represent a df command
@@ -206,8 +188,8 @@ func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*
 		pva.Owner.Status.Conditions.SetCondition(migapi.Condition{
 			Category: migapi.Warn,
 			Status:   True,
-			Type:     ExtendedPVAnalysisFailed,
-			Reason:   FailedRunningDf,
+			Type:     migapi.ExtendedPVAnalysisFailed,
+			Reason:   migapi.FailedRunningDf,
 			Message:  msg,
 		})
 	}
@@ -248,7 +230,7 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 		statusFieldUpdate := migapi.MigAnalyticPersistentVolumeClaim{
 			Name:              originalData.Name,
 			RequestedCapacity: originalData.RequestedCapacity,
-			Comment:           VolumeAdjustmentNoOp,
+			Comment:           migapi.VolumeAdjustmentNoOp,
 		}
 		if pvDfOutput.IsError {
 			erroredPVs = append(erroredPVs, &pvDfOutputs[i])
@@ -280,16 +262,16 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 			(usagePercentage + int64(pva.getVolumeUsagePercentageThreshold())) / 100))
 
 	maxSize := requestedCapacity
-	reason = VolumeAdjustmentNoOp
+	reason = migapi.VolumeAdjustmentNoOp
 
 	if actualCapacity.Cmp(maxSize) == 1 {
 		maxSize = actualCapacity
-		reason = VolumeAdjustmentCapacityMismatch
+		reason = migapi.VolumeAdjustmentCapacityMismatch
 	}
 
 	if volumeSizeWithThreshold.Cmp(maxSize) == 1 {
 		maxSize = volumeSizeWithThreshold
-		reason = VolumeAdjustmentUsageExceeded
+		reason = migapi.VolumeAdjustmentUsageExceeded
 	}
 
 	proposedSize = maxSize

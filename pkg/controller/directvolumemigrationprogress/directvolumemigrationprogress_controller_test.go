@@ -367,10 +367,10 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 		p      GetPodLogger
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *migapi.RsyncPodStatus
+		name   string
+		fields fields
+		args   args
+		want   *migapi.RsyncPodStatus
 	}{
 		{
 			name: "Given a ready and running Pod.",

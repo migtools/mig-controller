@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/konveyor/controller/pkg/logging"
-	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	"github.com/konveyor/mig-controller/pkg/gvk"
@@ -48,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	imagev1 "github.com/openshift/api/image/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -310,7 +310,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 
 		if analytic.Spec.AnalyzeExtendedPVCapacity {
 			analytic.Status.SetCondition(migapi.Condition{
-				Type:     ExtendedPVAnalysisStarted,
+				Type:     migapi.ExtendedPVAnalysisStarted,
 				Category: migapi.Advisory,
 				Status:   True,
 				Message:  "Started collecting detailed PV information",
@@ -349,7 +349,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		analytic.Status.DeleteCondition(ExtendedPVAnalysisStarted)
+		analytic.Status.DeleteCondition(migapi.ExtendedPVAnalysisStarted)
 		err = r.Update(context.TODO(), analytic)
 		if err != nil {
 			return liberr.Wrap(err)

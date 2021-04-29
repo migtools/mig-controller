@@ -27,10 +27,7 @@ const (
 	PlanClosed                         = "PlanClosed"
 	HasFinalMigration                  = "HasFinalMigration"
 	Postponed                          = "Postponed"
-	Running                            = "Running"
-	Succeeded                          = "Succeeded"
 	SucceededWithWarnings              = "SucceededWithWarnings"
-	Failed                             = "Failed"
 	ResticErrors                       = "ResticErrors"
 	ResticVerifyErrors                 = "ResticVerifyErrors"
 	VeleroInitialBackupPartiallyFailed = "VeleroInitialBackupPartiallyFailed"
@@ -204,21 +201,21 @@ func (r ReconcileMigMigration) validateFinalMigration(ctx context.Context, plan 
 		}
 
 		// If newest migration is a successful rollback, allow further migrations
-		if m.Spec.Rollback && m.Status.HasCondition(Succeeded) {
+		if m.Spec.Rollback && m.Status.HasCondition(migapi.Succeeded) {
 			hasCondition = false
 			break
 		}
 
 		// Stage
 		if migration.Spec.Stage {
-			if m.Status.HasAnyCondition(Running, Succeeded, Failed) {
+			if m.Status.HasAnyCondition(migapi.Running, migapi.Succeeded, migapi.Failed) {
 				hasCondition = true
 				break
 			}
 		}
 		// Final
 		if !migration.Spec.Stage {
-			if m.Status.HasCondition(Succeeded) {
+			if m.Status.HasCondition(migapi.Succeeded) {
 				hasCondition = true
 				break
 			}
