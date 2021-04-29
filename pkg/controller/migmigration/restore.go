@@ -44,7 +44,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
-	newRestore, err := t.buildRestore(client, backup.Name)
+	newRestore, err := t.buildRestore(client, backup.Name, "final")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -93,7 +93,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
-	newRestore, err := t.buildRestore(client, backup.Name)
+	newRestore, err := t.buildRestore(client, backup.Name, "stage")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -376,15 +376,20 @@ func (t *Task) setFinalRestorePartialFailureWarning(restore *velero.Restore) {
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore(client k8sclient.Client, backupName string) (*velero.Restore, error) {
+func (t *Task) buildRestore(client k8sclient.Client, backupName string, restoreTypePrefix string) (*velero.Restore, error) {
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
+	// Construct a restore name like "stage-$migrationname-" or "final-$migrationname-".
+	// Truncate the name to 57 chars to leave room for 5 char generateName suffix. Limit is 63 chars.
+	truncatedGenerateName := fmt.Sprintf("%.57s", fmt.Sprintf("%s-%s-", restoreTypePrefix, t.Owner.GetName()))
+
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
-			GenerateName: t.Owner.GetName() + "-",
+			GenerateName: truncatedGenerateName,
 			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
 		},

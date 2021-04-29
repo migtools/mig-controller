@@ -38,7 +38,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	newBackup, err := t.buildBackup(client)
+	newBackup, err := t.buildBackup(client, "initial")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -105,7 +105,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 		return nil, liberr.Wrap(err)
 	}
 	t.Log.Info("Building Stage Velero Backup resource definition")
-	newBackup, err := t.buildBackup(client)
+	newBackup, err := t.buildBackup(client, "stage")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -442,7 +442,7 @@ func (t *Task) getVSL() (*velero.VolumeSnapshotLocation, error) {
 }
 
 // Build a Backups as desired for the source cluster.
-func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
+func (t *Task) buildBackup(client k8sclient.Client, backupTypePrefix string) (*velero.Backup, error) {
 	var includeClusterResources *bool = nil
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
@@ -456,10 +456,15 @@ func (t *Task) buildBackup(client k8sclient.Client) (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
+	// Construct a bakcup name like "initial-$migrationname-" or "stage-$migrationname-".
+	// Truncate the name to 57 chars to leave room for 5 char generateName suffix. Limit is 63 chars.
+	truncatedGenerateName := fmt.Sprintf("%.57s", fmt.Sprintf("%s-%s-", backupTypePrefix, t.Owner.GetName()))
+
 	backup := &velero.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
-			GenerateName: t.Owner.GetName() + "-",
+			GenerateName: truncatedGenerateName,
 			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
 		},
