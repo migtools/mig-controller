@@ -70,6 +70,7 @@ var PhaseDescriptions = map[string]string{
 	Verification:                           "Verifying health of migrated Pods.",
 	Rollback:                               "Starting rollback",
 	CreateDirectImageMigration:             "Creating Direct Image Migration",
+	CreateDirectVolumeMigration:            "Creating Direct Volume Migration",
 	WaitForDirectImageMigrationToComplete:  "Waiting for Direct Image Migration to complete.",
 	WaitForDirectVolumeMigrationToComplete: "Waiting for Direct Volume Migration to complete.",
 	EnsureStagePodsDeleted:                 "Deleting any leftover stage Pods.",

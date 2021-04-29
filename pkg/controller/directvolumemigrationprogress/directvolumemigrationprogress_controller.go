@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -195,10 +196,7 @@ func (r *RsyncPodProgressTask) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+		rsyncPodStatus := r.getRsyncClientContainerStatus(pod)
 		if rsyncPodStatus != nil {
 			pvProgress.Status.RsyncPodStatus = *rsyncPodStatus
 		}
@@ -215,22 +213,17 @@ func (r *RsyncPodProgressTask) Run() error {
 			if pvProgress.Status.RsyncPodExistsInHistory(pod.Name) {
 				continue
 			}
-			rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
+			rsyncPodStatus := r.getRsyncClientContainerStatus(pod)
 			if rsyncPodStatus != nil {
 				// dead pods go in history
 				if IsPodTerminal(rsyncPodStatus.PodPhase) {
+					err := r.addDVMPDoneLabel(pod)
+					if err != nil {
+						continue
+					}
 					// merge progress stats from previous run
 					MergeProgressStats(rsyncPodStatus, &pvProgress.Status.RsyncPodStatus)
 					pvProgress.Status.RsyncPodStatuses = append(pvProgress.Status.RsyncPodStatuses, *rsyncPodStatus)
-					// for terminal pods, indicate that we are done collecting information, can safely garbage collect
-					pod.Labels[migapi.DVMPDoneLabelKey] = migapi.True
-					err := r.SrcClient.Update(context.TODO(), pod)
-					if err != nil {
-						return err
-					}
 				}
 				// update mostRecentPodStatus if current pod is more recent
 				if mostRecentPodStatus == nil ||
@@ -254,6 +247,26 @@ func (r *RsyncPodProgressTask) Run() error {
 		r.updateCumulativeProgressPercentage()
 		// update total elapsed time
 		r.updateCumulativeElapsedTime()
+	}
+	return nil
+}
+
+func (r *RsyncPodProgressTask) addDVMPDoneLabel(pod *kapi.Pod) error {
+	podRef := &kapi.Pod{}
+	err := r.SrcClient.Get(context.TODO(),
+		types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, podRef)
+	if err != nil {
+		log.Info("Failed to find Pod before adding DVMP label",
+			"pod", path.Join(pod.Namespace, pod.Name))
+		return err
+	}
+	// for terminal pods, indicate that we are done collecting information, can safely garbage collect
+	podRef.Labels[migapi.DVMPDoneLabelKey] = migapi.True
+	err = r.SrcClient.Update(context.TODO(), podRef)
+	if err != nil {
+		log.Info("Failed to add DVMP label on the Pod",
+			"pod", path.Join(pod.Namespace, pod.Name))
+		return err
 	}
 	return nil
 }
@@ -321,11 +334,12 @@ func (r *RsyncPodProgressTask) updateCumulativeElapsedTime() {
 
 // getRsyncClientContainerStatus returns observed status of Rsync container in the given pod
 // podLogGetterFunction is a function capable of retrieving logs from a given pod, injected to make testing easier
-func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (*migapi.RsyncPodStatus, error) {
+func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) *migapi.RsyncPodStatus {
 	rsyncPodStatus := migapi.RsyncPodStatus{
 		PodName:           podRef.Name,
 		CreationTimestamp: &podRef.CreationTimestamp,
 		PodPhase:          podRef.Status.Phase,
+		LogMessage:        podRef.Status.Message,
 	}
 	var containerStatus *kapi.ContainerStatus
 	for _, c := range podRef.Status.ContainerStatuses {
@@ -334,13 +348,9 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		}
 	}
 	if containerStatus == nil {
-		if podRef.Status.Phase == kapi.PodFailed {
-			rsyncPodStatus.PodPhase = kapi.PodFailed
-			rsyncPodStatus.LogMessage = podRef.Status.Message
-			rsyncPodStatus.ContainerElapsedTime = nil
-			return &rsyncPodStatus, nil
-		}
-		return nil, fmt.Errorf("container not found")
+		log.Info("Failed to find container in Rsync Pod on source cluster",
+			"container", RsyncContainerName, "pod", path.Join(podRef.Namespace, podRef.Name))
+		return &rsyncPodStatus
 	}
 	switch {
 	case containerStatus.Ready:
@@ -348,7 +358,9 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		numberOfLogLines := int64(5)
 		logMessage, err := r.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
 		if err != nil {
-			return &rsyncPodStatus, err
+			log.Info("Failed to get logs from Rsync Pod on source cluster",
+				"pod", path.Join(podRef.Namespace, podRef.Name))
+			return &rsyncPodStatus
 		}
 		rsyncPodStatus.LogMessage = logMessage
 		percentProgress := GetProgressPercent(logMessage)
@@ -408,7 +420,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) (
 		rsyncPodStatus.ExitCode = &exitCode
 		rsyncPodStatus.ContainerElapsedTime = &metav1.Duration{Duration: containerStatus.State.Terminated.FinishedAt.Sub(containerStatus.State.Terminated.StartedAt.Time).Round(time.Second)}
 	}
-	return &rsyncPodStatus, nil
+	return &rsyncPodStatus
 }
 
 func getPod(client compat.Client, podReference *kapi.ObjectReference) (*kapi.Pod, error) {
