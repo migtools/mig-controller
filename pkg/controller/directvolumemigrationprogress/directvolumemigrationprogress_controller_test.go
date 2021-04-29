@@ -371,7 +371,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 		fields  fields
 		args    args
 		want    *migapi.RsyncPodStatus
-		wantErr bool
 	}{
 		{
 			name: "Given a ready and running Pod.",
@@ -452,7 +451,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "66.13MB/s",
 				ExitCode:                    nil,
 			},
-			wantErr: false,
 		},
 		{
 			name: "Given a non ready Pod but rsync container is terminated successfully.",
@@ -535,7 +533,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "",
 				ExitCode:                    &zero,
 			},
-			wantErr: false,
 		},
 		{
 			name: "Given a succeeded Pod.",
@@ -621,7 +618,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "",
 				ExitCode:                    &zero,
 			},
-			wantErr: false,
 		},
 		{
 			name: "Given a failed reference Pod.",
@@ -704,7 +700,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "",
 				ExitCode:                    &one,
 			},
-			wantErr: false,
 		},
 		{
 			name: "Given a non ready and failed rsync container.",
@@ -788,7 +783,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "",
 				ExitCode:                    &one,
 			},
-			wantErr: false,
 		},
 		{
 			name: "Given a non ready rsync container and refPod in pending state.",
@@ -871,7 +865,6 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				LastObservedTransferRate:    "",
 				ExitCode:                    nil,
 			},
-			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -882,11 +875,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 				SrcClient: tt.fields.SrcClient,
 				Owner:     tt.fields.Owner,
 			}
-			got, err := r.getRsyncClientContainerStatus(tt.args.podRef, tt.args.p)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getRsyncClientContainerStatus() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := r.getRsyncClientContainerStatus(tt.args.podRef, tt.args.p)
 			if !isRsyncStatusEqual(got, tt.want) {
 				t.Errorf("getRsyncClientContainerStatus() got = %v, want %v", got, tt.want)
 			}

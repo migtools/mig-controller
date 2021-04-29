@@ -200,10 +200,8 @@ func (r *RsyncPodProgressTask) Run() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		rsyncPodStatus, err := r.getRsyncClientContainerStatus(pod, r)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
+		rsyncPodStatus := r.getRsyncClientContainerStatus(pod, r)
+
 		if rsyncPodStatus != nil {
 			pvProgress.Status.RsyncPodStatus = *rsyncPodStatus
 		}
@@ -341,7 +339,7 @@ func (r *RsyncPodProgressTask) updateCumulativeElapsedTime() {
 
 // getRsyncClientContainerStatus returns observed status of Rsync container in the given pod
 // podLogGetterFunction is a function capable of retrieving logs from a given pod, injected to make testing easier
-func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) *migapi.RsyncPodStatus {
+func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p GetPodLogger) *migapi.RsyncPodStatus {
 	rsyncPodStatus := migapi.RsyncPodStatus{
 		PodName:           podRef.Name,
 		CreationTimestamp: &podRef.CreationTimestamp,
