@@ -459,7 +459,7 @@ func (t *Task) buildBackup(client k8sclient.Client, backupTypePrefix string) (*v
 
 	// Construct a bakcup name like "$migrationname-initial-" or "$migrationname-stage-".
 	// Truncate the name to 57 chars to leave room for 5 char generateName suffix. Limit is 63 chars.
-	truncatedGenerateName := fmt.Sprintf("%.57s", fmt.Sprintf("%s-%s-", t.Owner.GetName(), backupTypePrefix))
+	truncatedGenerateName := fmt.Sprintf("%.57s-", fmt.Sprintf("%s-%s", t.Owner.GetName(), backupTypePrefix))
 
 	backup := &velero.Backup{
 		ObjectMeta: metav1.ObjectMeta{
