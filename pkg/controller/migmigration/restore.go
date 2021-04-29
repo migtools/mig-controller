@@ -382,9 +382,9 @@ func (t *Task) buildRestore(client k8sclient.Client, backupName string, restoreT
 		return nil, liberr.Wrap(err)
 	}
 
-	// Construct a restore name like "stage-$migrationname-" or "final-$migrationname-".
+	// Construct a restore name like "$migrationname-54823-stage" or "$migrationname-54823-final".
 	// Truncate the name to 57 chars to leave room for 5 char generateName suffix. Limit is 63 chars.
-	truncatedGenerateName := fmt.Sprintf("%.57s", fmt.Sprintf("%s-%s-", restoreTypePrefix, t.Owner.GetName()))
+	truncatedGenerateName := fmt.Sprintf("%.57s", fmt.Sprintf("%s-%s-", t.Owner.GetName(), restoreTypePrefix))
 
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
