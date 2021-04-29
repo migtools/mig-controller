@@ -673,7 +673,7 @@ func (r ReconcileMigPlan) generatePVResizeConditions(pvResizingRequiredVolumes [
 			Category: Warn,
 			Reason:   NotDone,
 			Message: fmt.Sprintf(
-				"Failed to compute PV resizing data for the following volumes. Please ensure that the volumes are attached to one or more running Pods: [%s]",
+				"Failed to compute PV resizing data for the following volumes. PV resizing will be disabled for these volumes and the migration may fail if the volumes are full or their requested and actual capacities differ in the source cluster. Please ensure that the volumes are attached to one or more running Pods for PV resizing to work correctly: [%s]",
 				strings.Join(pvResizingMissingVolumes, ","),
 			),
 		})
