@@ -374,7 +374,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Given a ready and running Pod, appropriate container status is returned",
+			name: "Given a ready and running Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -455,7 +455,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Given a non ready Pod but rsync container is terminated successfully, appropriate container status is returned",
+			name: "Given a non ready Pod but rsync container is terminated successfully.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -538,7 +538,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Given a succeeded Pod, appropriate container status is returned",
+			name: "Given a succeeded Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -585,10 +585,12 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 						Phase: kapi.PodSucceeded,
 						ContainerStatuses: []kapi.ContainerStatus{
 							{
-								Name: "stunnel",
-								State: kapi.ContainerState{
-									Running: &kapi.ContainerStateRunning{
-										StartedAt: metav1.Time{},
+								Name:  "stunnel",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   0,
 									},
 								},
 							},
@@ -622,7 +624,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Given a failed reference Pod, appropriate container status is returned",
+			name: "Given a failed reference Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -705,7 +707,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Given a non ready and failed rsync container, appropriate container status is returned",
+			name: "Given a non ready and failed rsync container.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -751,10 +753,12 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 					Status: kapi.PodStatus{
 						ContainerStatuses: []kapi.ContainerStatus{
 							{
-								Name: "stunnel",
-								State: kapi.ContainerState{
-									Running: &kapi.ContainerStateRunning{
-										StartedAt: metav1.Time{},
+								Name:  "stunnel",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   1,
 									},
 								},
 							},
@@ -787,7 +791,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Given a non ready rsync container and refPod in pending state, appropriate container status is returned",
+			name: "Given a non ready rsync container and refPod in pending state.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
 				SrcClient: fakecompat.NewFakeClient(),
@@ -834,10 +838,11 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 						Phase: kapi.PodPending,
 						ContainerStatuses: []kapi.ContainerStatus{
 							{
-								Name: "stunnel",
+								Name:  "stunnel",
+								Ready: false,
 								State: kapi.ContainerState{
-									Running: &kapi.ContainerStateRunning{
-										StartedAt: metav1.Time{},
+									Waiting: &kapi.ContainerStateWaiting{
+										Reason: ContainerCreating,
 									},
 								},
 							},
