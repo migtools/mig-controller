@@ -256,16 +256,16 @@ func (r *RsyncPodProgressTask) addDVMPDoneLabel(pod *kapi.Pod) error {
 	err := r.SrcClient.Get(context.TODO(),
 		types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, podRef)
 	if err != nil {
-		log.Error(err,
-			"failed to find Pod before adding DVMP label", "pod", path.Join(pod.Namespace, pod.Name))
+		log.Info("Failed to find Pod before adding DVMP label",
+			"pod", path.Join(pod.Namespace, pod.Name))
 		return err
 	}
 	// for terminal pods, indicate that we are done collecting information, can safely garbage collect
 	podRef.Labels[migapi.DVMPDoneLabelKey] = migapi.True
 	err = r.SrcClient.Update(context.TODO(), podRef)
 	if err != nil {
-		log.Error(err,
-			"failed to add DVMP label on the Pod", "pod", path.Join(pod.Namespace, pod.Name))
+		log.Info("Failed to add DVMP label on the Pod",
+			"pod", path.Join(pod.Namespace, pod.Name))
 		return err
 	}
 	return nil
@@ -348,8 +348,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) *
 		}
 	}
 	if containerStatus == nil {
-		log.Error(fmt.Errorf("container not found"),
-			"failed to find container in Rsync Pod on source cluster",
+		log.Info("Failed to find container in Rsync Pod on source cluster",
 			"container", RsyncContainerName, "pod", path.Join(podRef.Namespace, podRef.Name))
 		return &rsyncPodStatus
 	}
@@ -359,7 +358,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod) *
 		numberOfLogLines := int64(5)
 		logMessage, err := r.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
 		if err != nil {
-			log.Error(err, "failed to get logs from Rsync Pod on source cluster",
+			log.Info("Failed to get logs from Rsync Pod on source cluster",
 				"pod", path.Join(podRef.Namespace, podRef.Name))
 			return &rsyncPodStatus
 		}
