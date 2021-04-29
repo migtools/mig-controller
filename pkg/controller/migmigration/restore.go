@@ -383,7 +383,7 @@ func (t *Task) buildRestore(client k8sclient.Client, backupName string, restoreT
 	}
 
 	// Construct a name like "$migrationname-54823-stage" or "$migrationname-54823-final".
-	// This will produce a 63 character string max. Note that generateName gracefully handles strings >63 char.
+	// This will produce a 57 character string max. Note that generateName gracefully handles strings >63 char.
 	fmtString := fmt.Sprintf("%%.%ds", 55-len(restoreTypePrefix))
 	migrationNameTruncated := fmt.Sprintf(fmtString, t.Owner.GetName())
 	truncatedGenerateName := fmt.Sprintf("%s-%s-", migrationNameTruncated, restoreTypePrefix)
