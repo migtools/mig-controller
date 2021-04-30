@@ -16,6 +16,7 @@ import (
 	"sync"
 	"text/template"
 	"time"
+	"unicode/utf8"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -224,7 +225,11 @@ func (t *Task) createRsyncConfig() error {
 	for ns, vols := range pvcMap {
 		pvcList := []pvc{}
 		for _, vol := range vols {
-			pvcList = append(pvcList, pvc{Name: vol.Name})
+			dnsSafeName, err := getDNSSafeName(vol.Name)
+			if err != nil {
+				return err
+			}
+			pvcList = append(pvcList, pvc{Name: dnsSafeName})
 		}
 		// Generate template
 		rsyncConf := rsyncConfig{
@@ -561,12 +566,16 @@ func (t *Task) createRsyncTransferPods() error {
 
 		// Add PVC volume mounts
 		for _, vol := range vols {
+			dnsSafeName, err := getDNSSafeName(vol.Name)
+			if err != nil {
+				return err
+			}
 			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      vol.Name,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, vol.Name),
+				Name:      dnsSafeName,
+				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, dnsSafeName),
 			})
 			volumes = append(volumes, corev1.Volume{
-				Name: vol.Name,
+				Name: dnsSafeName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: vol.Name,
@@ -960,6 +969,7 @@ func (t *Task) getRsyncOptions() []string {
 
 type PVCWithSecurityContext struct {
 	name               string
+	dnsSafeName        string
 	fsGroup            *int64
 	supplementalGroups []int64
 	seLinuxOptions     *corev1.SELinuxOptions
@@ -1003,8 +1013,13 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 		for _, pod := range podList.Items {
 			for _, vol := range pod.Spec.Volumes {
 				if vol.PersistentVolumeClaim != nil {
+					dnsSafeName, err := getDNSSafeName(vol.PersistentVolumeClaim.ClaimName)
+					if err != nil {
+						return nil, err
+					}
 					pvcSecurityContextMapForNamespace[vol.PersistentVolumeClaim.ClaimName] = PVCWithSecurityContext{
 						name:               vol.PersistentVolumeClaim.ClaimName,
+						dnsSafeName:        dnsSafeName,
 						fsGroup:            pod.Spec.SecurityContext.FSGroup,
 						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
 						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
@@ -1020,9 +1035,14 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
 				continue
 			}
+			dnsSafeName, err := getDNSSafeName(claim.Name)
+			if err != nil {
+				return nil, err
+			}
 			// pvc not used by any pod
 			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
 				name:               claim.Name,
+				dnsSafeName:        dnsSafeName,
 				fsGroup:            nil,
 				supplementalGroups: nil,
 				seLinuxOptions:     nil,
@@ -1614,11 +1634,11 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	volumeMounts := []corev1.VolumeMount{}
 	containers := []corev1.Container{}
 	volumeMounts = append(volumeMounts, corev1.VolumeMount{
-		Name:      req.pvInfo.name,
-		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.name),
+		Name:      req.pvInfo.dnsSafeName,
+		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.dnsSafeName),
 	})
 	volumes = append(volumes, corev1.Volume{
-		Name: req.pvInfo.name,
+		Name: req.pvInfo.dnsSafeName,
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: req.pvInfo.name,
@@ -1627,8 +1647,8 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	})
 	rsyncCommand := []string{"rsync"}
 	rsyncCommand = append(rsyncCommand, req.rsyncOptions...)
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.name))
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.dnsSafeName))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.dnsSafeName))
 	labels := map[string]string{
 		"app":                   DirectVolumeMigrationRsyncTransfer,
 		"directvolumemigration": DirectVolumeMigrationRsyncClient,
@@ -2279,4 +2299,17 @@ func Union(m1 map[string]string, m2 map[string]string) map[string]string {
 		m3[k] = v
 	}
 	return m3
+}
+
+func getDNSSafeName(name string) (string, error) {
+	// TODO: this will probably introduce some non-trivial memory consumption.
+	//   investigate if we can make a thread safe global variable and use it.
+	re, err := regexp.Compile(`(\.+|\%+|\/+)`)
+	if err != nil {
+		return "", err
+	}
+	if utf8.RuneCountInString(name) > 63 {
+		return re.ReplaceAllString(name[:63], "-"), nil
+	}
+	return re.ReplaceAllString(name, "-"), nil
 }
