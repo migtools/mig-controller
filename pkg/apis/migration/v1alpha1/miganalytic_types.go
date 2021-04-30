@@ -36,7 +36,7 @@ const (
 
 // Proposed volume size computation reasons
 const (
-	VolumeAdjustmentNoOp             = "No change in original PV capacity is needed."
+	VolumeAdjustmentNoOp             = "No change in PV capacity is needed."
 	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%, an extra headroom is added to avoid disk capacity issue in the target cluster."
 	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values is used to avoid disk capacity issue in the target cluster."
 )
