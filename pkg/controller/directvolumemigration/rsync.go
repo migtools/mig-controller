@@ -1730,7 +1730,7 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
 
 	rsyncCommandStr := strings.Join(rsyncCommand, " ")
-	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" exit $rc; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; if [ $? -eq 0 ]; then %s; rc=$?; break; fi; done;", rsyncCommandStr)
+	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" EXIT SIGINT SIGTERM; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; rc=$?; if [ $rc -eq 0 ]; then %s; rc=$?; break; fi; done; exit $rc;", rsyncCommandStr)
 	rsyncContainerCommand := []string{
 		"/bin/bash",
 		"-c",

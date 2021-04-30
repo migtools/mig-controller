@@ -347,7 +347,8 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p
 		LogMessage:        podRef.Status.Message,
 	}
 	var containerStatus *kapi.ContainerStatus
-	for _, c := range podRef.Status.ContainerStatuses {
+	for i := range podRef.Status.ContainerStatuses {
+		c := podRef.Status.ContainerStatuses[i]
 		if c.Name == RsyncContainerName {
 			containerStatus = &c
 		}
