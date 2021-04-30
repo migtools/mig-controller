@@ -38,7 +38,7 @@ const (
 const (
 	VolumeAdjustmentNoOp             = "No change in PV capacity is needed."
 	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%. Additional capacity will be allocated to avoid issues migrating data to the target cluster."
-	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values is used to avoid disk capacity issue in the target cluster."
+	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values will be used to avoid disk capacity issue in the target cluster."
 )
 
 // MigAnalyticSpec defines the desired state of MigAnalytic
