@@ -35,8 +35,6 @@ const (
 	EnsureRsyncRouteAdmitted             = "EnsureRsyncRouteAdmitted"
 	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
 	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
-	CreateStunnelClientPods              = "CreateStunnelClientPods"
-	WaitForStunnelClientPodsRunning      = "WaitForStunnelClientPodsRunning"
 	CreatePVProgressCRs                  = "CreatePVProgressCRs"
 	RunRsyncOperations                   = "RunRsyncOperations"
 	CreateRsyncClientPods                = "CreateRsyncClientPods"
@@ -124,8 +122,6 @@ var VolumeMigration = Itinerary{
 		{phase: CreatePVProgressCRs},
 		{phase: CreateRsyncTransferPods},
 		{phase: WaitForRsyncTransferPodsRunning},
-		{phase: CreateStunnelClientPods},
-		{phase: WaitForStunnelClientPodsRunning},
 		{phase: RunRsyncOperations},
 		{phase: DeleteRsyncResources},
 		{phase: WaitForRsyncResourcesTerminated},
@@ -371,54 +367,6 @@ func (t *Task) Run(ctx context.Context) error {
 					},
 				)
 			}
-		}
-	case CreateStunnelClientPods:
-		err := t.createStunnelClientPods()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		t.Requeue = NoReQ
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case WaitForStunnelClientPodsRunning:
-		running, err := t.areStunnelClientPodsRunning()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		if running {
-			t.Requeue = NoReQ
-			conditions := t.Owner.Status.FindConditionByCategory(Warn)
-			for _, c := range conditions {
-				if c.Reason == StunnelClientPodsPending {
-					t.Owner.Status.DeleteCondition("StunnelClientPodsPending")
-				}
-			}
-			if err = t.next(); err != nil {
-				return liberr.Wrap(err)
-			}
-		} else {
-			t.Owner.Status.StageCondition(Running)
-			cond := t.Owner.Status.FindCondition(Running)
-			if cond == nil {
-				return fmt.Errorf("`Running` condition missing on DVM %s/%s", t.Owner.Namespace, t.Owner.Name)
-			}
-			now := time.Now().UTC()
-			if now.After(cond.LastTransitionTime.Time) {
-				if now.Sub(cond.LastTransitionTime.Time).Round(time.Minute) > 10*time.Minute {
-					t.Owner.Status.SetCondition(
-						migapi.Condition{
-							Type:     StunnelClientPodsPending,
-							Status:   True,
-							Reason:   migapi.NotReady,
-							Category: Warn,
-							Message:  "Stunnel Client Pod(s) on the source cluster are not ready after 10 minutes.",
-							Durable:  true,
-						},
-					)
-				}
-			}
-			t.Requeue = PollReQ
 		}
 	case RunRsyncOperations:
 		allCompleted, anyFailed, failureReasons, err := t.runRsyncOperations()

@@ -19,8 +19,12 @@ package directvolumemigrationprogress
 import (
 	"bytes"
 	"context"
+	"github.com/konveyor/mig-controller/pkg/compat"
+	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
 	"io"
+	kapi "k8s.io/api/core/v1"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"strings"
 	"testing"
 	"time"
@@ -335,4 +339,560 @@ func Test_getLastMatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakeGetPodLogs struct {
+	podLogMessage string
+	err           error
+}
+
+func (f fakeGetPodLogs) getPodLogs(pod *kapi.Pod, containerName string, tailLines *int64, previous bool) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.podLogMessage, nil
+}
+
+func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
+	zero := int32(0)
+	one := int32(1)
+	type fields struct {
+		Cluster   *migapi.MigCluster
+		Client    client.Client
+		SrcClient compat.Client
+		Owner     *migapi.DirectVolumeMigrationProgress
+	}
+	type args struct {
+		podRef *kapi.Pod
+		p      GetPodLogger
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *migapi.RsyncPodStatus
+	}{
+		{
+			name: "Given a ready and running Pod.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name: "stunnel",
+								State: kapi.ContainerState{
+									Running: &kapi.ContainerStateRunning{
+										StartedAt: metav1.Time{},
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: true,
+								State: kapi.ContainerState{
+									Running: &kapi.ContainerStateRunning{
+										StartedAt: metav1.Time{},
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "\"2021/04/23 16:16:14 [169] cd+++++++++ diagnostic.data/\\n427.68K   0%   11.02MB/s    0:00:00 (xfr#24, to-chk=4/31)202\\n452.92K   0%   10.80MB/s    0:00:00 (xfr#25, to-chk=3/31)202\\n2021/04/23 16:16:14 [169] cd+++++++++ journal/\\n69.69M  22%   66.13MB/s    0:00:03  \\r        105.31M  33%   \"",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodRunning,
+				LogMessage:                  "\"2021/04/23 16:16:14 [169] cd+++++++++ diagnostic.data/\\n427.68K   0%   11.02MB/s    0:00:00 (xfr#24, to-chk=4/31)202\\n452.92K   0%   10.80MB/s    0:00:00 (xfr#25, to-chk=3/31)202\\n2021/04/23 16:16:14 [169] cd+++++++++ journal/\\n69.69M  22%   66.13MB/s    0:00:03  \\r        105.31M  33%   \"",
+				LastObservedProgressPercent: "33%",
+				LastObservedTransferRate:    "66.13MB/s",
+				ExitCode:                    nil,
+			},
+		},
+		{
+			name: "Given a non ready Pod but rsync container is terminated successfully.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name: "stunnel",
+								State: kapi.ContainerState{
+									Running: &kapi.ContainerStateRunning{
+										StartedAt: metav1.Time{},
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   0,
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodSucceeded,
+				LogMessage:                  "",
+				CreationTimestamp:           &metav1.Time{},
+				LastObservedProgressPercent: "100%",
+				LastObservedTransferRate:    "",
+				ExitCode:                    &zero,
+			},
+		},
+		{
+			name: "Given a succeeded Pod.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						Phase: kapi.PodSucceeded,
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name:  "stunnel",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   0,
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   0,
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodSucceeded,
+				LogMessage:                  "",
+				CreationTimestamp:           &metav1.Time{},
+				LastObservedProgressPercent: "100%",
+				LastObservedTransferRate:    "",
+				ExitCode:                    &zero,
+			},
+		},
+		{
+			name: "Given a failed reference Pod.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						Phase: kapi.PodFailed,
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name: "stunnel",
+								State: kapi.ContainerState{
+									Running: &kapi.ContainerStateRunning{
+										StartedAt: metav1.Time{},
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   1,
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodFailed,
+				LogMessage:                  "",
+				LastObservedProgressPercent: "",
+				LastObservedTransferRate:    "",
+				ExitCode:                    &one,
+			},
+		},
+		{
+			name: "Given a non ready and failed rsync container.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name:  "stunnel",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   1,
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: false,
+								LastTerminationState: kapi.ContainerState{
+									Terminated: &kapi.ContainerStateTerminated{
+										FinishedAt: metav1.Time{},
+										ExitCode:   1,
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodFailed,
+				LogMessage:                  "",
+				LastObservedProgressPercent: "",
+				LastObservedTransferRate:    "",
+				ExitCode:                    &one,
+			},
+		},
+		{
+			name: "Given a non ready rsync container and refPod in pending state.",
+			fields: fields{
+				Client:    fake.NewFakeClient(),
+				SrcClient: fakecompat.NewFakeClient(),
+				Cluster: &migapi.MigCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "migcluster-host",
+						Namespace: "openshift-migration",
+					},
+					Spec: migapi.MigClusterSpec{
+						IsHostCluster: false,
+						Insecure:      true,
+					},
+					Status: migapi.MigClusterStatus{
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{
+								{
+									Type:     "Ready",
+									Status:   "True",
+									Category: "Required",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				podRef: &kapi.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "dvm-rsync",
+						Namespace:         "test-app-1",
+						CreationTimestamp: metav1.Time{},
+					},
+					Spec: kapi.PodSpec{
+						Containers: []kapi.Container{
+							{
+								Name: "stunnel",
+							},
+							{
+								Name: "rsync-client",
+							},
+						},
+					},
+					Status: kapi.PodStatus{
+						Phase: kapi.PodPending,
+						ContainerStatuses: []kapi.ContainerStatus{
+							{
+								Name:  "stunnel",
+								Ready: false,
+								State: kapi.ContainerState{
+									Waiting: &kapi.ContainerStateWaiting{
+										Reason: ContainerCreating,
+									},
+								},
+							},
+							{
+								Name:  "rsync-client",
+								Ready: false,
+								State: kapi.ContainerState{
+									Waiting: &kapi.ContainerStateWaiting{
+										Reason: ContainerCreating,
+									},
+								},
+							},
+						},
+					},
+				},
+				p: fakeGetPodLogs{
+					podLogMessage: "",
+					err:           nil,
+				},
+			},
+			want: &migapi.RsyncPodStatus{
+				PodName:                     "dvm-rsync",
+				PodPhase:                    kapi.PodPending,
+				LogMessage:                  "",
+				LastObservedProgressPercent: "",
+				LastObservedTransferRate:    "",
+				ExitCode:                    nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &RsyncPodProgressTask{
+				Cluster:   tt.fields.Cluster,
+				Client:    tt.fields.Client,
+				SrcClient: tt.fields.SrcClient,
+				Owner:     tt.fields.Owner,
+			}
+			got := r.getRsyncClientContainerStatus(tt.args.podRef, tt.args.p)
+			if !isRsyncStatusEqual(got, tt.want) {
+				t.Errorf("getRsyncClientContainerStatus() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func isRsyncStatusEqual(r1 *migapi.RsyncPodStatus, r2 *migapi.RsyncPodStatus) bool {
+	if r1 == nil && r2 == nil {
+		return true
+	}
+	if r1 == nil || r2 == nil {
+		return false
+	}
+	if r1.PodName == r2.PodName && r1.PodPhase == r2.PodPhase && len(r1.LogMessage) == len(r2.LogMessage) && reflect.DeepEqual(r1.ExitCode, r2.ExitCode) &&
+		r1.LastObservedTransferRate == r2.LastObservedTransferRate && r1.LastObservedProgressPercent == r2.LastObservedProgressPercent {
+		return true
+	}
+	return false
 }

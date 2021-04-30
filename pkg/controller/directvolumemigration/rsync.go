@@ -1624,8 +1624,10 @@ type rsyncClientPodRequirements struct {
 	password string
 	// privileged whether Rsync Pod will run privileged
 	privileged bool
-	// resourceReq resource requirements for the Pod
-	resourceReq corev1.ResourceRequirements
+	// rsyncResourceReq resource requirements for the rsync container
+	rsyncResourceReq corev1.ResourceRequirements
+	// stunnelResourceReq resource requirements for the stunnel container
+	stunnelResourceReq corev1.ResourceRequirements
 	// nodeName node on which Rsync Pod will be launched
 	nodeName string
 	// destIP destination IP address for Stunnel route
@@ -1640,12 +1642,35 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	trueBool := true
 	isPrivileged := req.privileged
 	volumes := []corev1.Volume{}
-	volumeMounts := []corev1.VolumeMount{}
+	rsyncVolumeMounts := []corev1.VolumeMount{}
 	containers := []corev1.Container{}
-	volumeMounts = append(volumeMounts, corev1.VolumeMount{
-		Name:      req.pvInfo.dnsSafeName,
-		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.dnsSafeName),
+	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
+		Name:      req.pvInfo.name,
+		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.name),
 	})
+
+	// shared volumeMount for inter-process communication between rsync and stunnel
+	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
+		Name:      "rsync-stunnel-ipc",
+		MountPath: "/usr/share/rsync-stunnel-mgmt",
+	})
+
+	stunnelVolumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "stunnel-conf",
+			MountPath: "/etc/stunnel/stunnel.conf",
+			SubPath:   "stunnel.conf",
+		},
+		{
+			Name:      "stunnel-certs",
+			MountPath: "/etc/stunnel/certs",
+		},
+		{
+			Name:      "rsync-stunnel-ipc",
+			MountPath: "/usr/share/rsync-stunnel-mgmt",
+		},
+	}
+
 	volumes = append(volumes, corev1.Volume{
 		Name: req.pvInfo.dnsSafeName,
 		VolumeSource: corev1.VolumeSource{
@@ -1654,10 +1679,78 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 			},
 		},
 	})
+
+	// append stunnel config volume
+	volumes = append(volumes, corev1.Volume{
+		Name: "stunnel-conf",
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: DirectVolumeMigrationStunnelConfig,
+				},
+			},
+		},
+	})
+
+	// append stunnel certs
+	volumes = append(volumes, corev1.Volume{
+		Name: "stunnel-certs",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: DirectVolumeMigrationStunnelCerts,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  "tls.crt",
+						Path: "tls.crt",
+					},
+					{
+						Key:  "ca.crt",
+						Path: "ca.crt",
+					},
+					{
+						Key:  "tls.key",
+						Path: "tls.key",
+					},
+				},
+			},
+		},
+	})
+
+	// append shared volume
+	volumes = append(volumes, corev1.Volume{
+		Name: "rsync-stunnel-ipc",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+
 	rsyncCommand := []string{"rsync"}
 	rsyncCommand = append(rsyncCommand, req.rsyncOptions...)
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.dnsSafeName))
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.dnsSafeName))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.name))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
+
+	rsyncCommandStr := strings.Join(rsyncCommand, " ")
+	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" EXIT SIGINT SIGTERM; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; rc=$?; if [ $rc -eq 0 ]; then %s; rc=$?; break; fi; done; exit $rc;", rsyncCommandStr)
+	rsyncContainerCommand := []string{
+		"/bin/bash",
+		"-c",
+		rsyncCommandBashScript,
+	}
+
+	stunnelContainerCommand := []string{
+		"/bin/bash",
+		"-c",
+		`/bin/stunnel /etc/stunnel/stunnel.conf
+         while true
+         do test -f /usr/share/rsync-stunnel-mgmt/rsync-client-container-done
+         if [ $? -eq 0 ]
+         then
+         break
+         fi
+         done
+         exit 0`,
+	}
+
 	labels := map[string]string{
 		"app":                   DirectVolumeMigrationRsyncTransfer,
 		"directvolumemigration": DirectVolumeMigrationRsyncClient,
@@ -1674,7 +1767,7 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 			},
 		},
 		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-		Command:                  rsyncCommand,
+		Command:                  rsyncContainerCommand,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          DirectVolumeMigrationRsyncClient,
@@ -1682,14 +1775,43 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 				ContainerPort: int32(22),
 			},
 		},
-		VolumeMounts: volumeMounts,
+		VolumeMounts: rsyncVolumeMounts,
 		SecurityContext: &corev1.SecurityContext{
 			Privileged:             &isPrivileged,
 			RunAsUser:              &runAsUser,
 			ReadOnlyRootFilesystem: &trueBool,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+			},
 		},
-		Resources: req.resourceReq,
+		Resources: req.rsyncResourceReq,
 	})
+
+	// append stunnel container
+	containers = append(containers, corev1.Container{
+		Name:                     DirectVolumeMigrationStunnel,
+		Image:                    req.image,
+		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+		Command:                  stunnelContainerCommand,
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          DirectVolumeMigrationStunnel,
+				Protocol:      corev1.ProtocolTCP,
+				ContainerPort: int32(2222),
+			},
+		},
+		VolumeMounts: stunnelVolumeMounts,
+		SecurityContext: &corev1.SecurityContext{
+			Privileged:             &isPrivileged,
+			RunAsUser:              &runAsUser,
+			ReadOnlyRootFilesystem: &trueBool,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+			},
+		},
+		Resources: req.stunnelResourceReq,
+	})
+
 	clientPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dvm-rsync-",
@@ -1737,8 +1859,13 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
-	t.Log.V(4).Info("Getting limits and requests for Rsync client Pods")
-	limits, requests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	t.Log.V(4).Info("Getting limits and requests for Rsync client container")
+	rsyncLimits, rsyncRequests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	if err != nil {
+		return req, liberr.Wrap(err)
+	}
+	t.Log.V(4).Info("Getting limits and requests for Stunnel client container")
+	stunnelLimits, stunnelRequests, err := t.getPodResourceLists(STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
 	if err != nil {
 		return req, liberr.Wrap(err)
 	}
@@ -1756,13 +1883,17 @@ func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClie
 				namespace: ns,
 				image:     transferImage,
 				password:  password,
-				resourceReq: corev1.ResourceRequirements{
-					Limits:   limits,
-					Requests: requests,
+				rsyncResourceReq: corev1.ResourceRequirements{
+					Limits:   rsyncLimits,
+					Requests: rsyncRequests,
+				},
+				stunnelResourceReq: corev1.ResourceRequirements{
+					Limits:   stunnelLimits,
+					Requests: stunnelRequests,
 				},
 				privileged:   isPrivileged,
 				nodeName:     pvcNodeMap[ns+"/"+vol.name],
-				destIP:       fmt.Sprintf("%s.%s.svc", DirectVolumeMigrationRsyncTransferSvc, ns),
+				destIP:       "localhost",
 				rsyncOptions: rsyncOptions,
 			}
 			req = append(req, podRequirements)

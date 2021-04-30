@@ -74,7 +74,7 @@ func getRsyncClientPodRequirements(pvcName string, ns string) rsyncClientPodRequ
 		image:      "quay.io/konveyor/rsync-transfer:latest",
 		password:   "verySecurePassword",
 		privileged: false,
-		resourceReq: corev1.ResourceRequirements{
+		rsyncResourceReq: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("1Gi"),
