@@ -561,7 +561,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 	return nil
 }
 
-// Add direct volume pods
+// Add migration associated pods (stage, registry, rsync, stunnel)
 func (t *PlanTree) addMigrationPods(migration *model.Migration, parent *TreeNode) error {
 	// Source cluster pods
 	err := t.addMigrationPodsForCluster(t.cluster.source, migration, parent)
@@ -576,7 +576,7 @@ func (t *PlanTree) addMigrationPods(migration *model.Migration, parent *TreeNode
 	return nil
 }
 
-// Add direct volume pods for a specific cluster
+// Add migration pods for a specific cluster
 func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *model.Migration, parent *TreeNode) error {
 	cLabel := t.cLabel(migration.DecodeObject())
 
@@ -599,16 +599,72 @@ func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *
 				continue
 			}
 		}
-		parent.Children = append(
-			parent.Children,
-			TreeNode{
+
+		node := TreeNode{
+			Kind:        migref.ToKind(m),
+			ObjectLink:  PodHandler{}.Link(&cluster, m),
+			Namespace:   m.Namespace,
+			Name:        m.Name,
+			ClusterType: t.clusterType(&cluster),
+		}
+
+		_, isStagePod := object.Labels[migapi.StagePodLabel]
+		if isStagePod {
+			t.addPVCsForPod(m, &node)
+		}
+
+		parent.Children = append(parent.Children, node)
+	}
+	return nil
+}
+
+//
+// Add PVCs related to a pod
+func (t *PlanTree) addPVCsForPod(pod *model.Pod, parent *TreeNode) error {
+	cluster := t.cluster.source
+	podObject := pod.DecodeObject()
+
+	var pvcNames []string
+
+	for _, volume := range podObject.Spec.Volumes {
+		pvc := volume.PersistentVolumeClaim
+		if pvc != nil {
+			if pvc.ClaimName != "" {
+				pvcNames = append(pvcNames, pvc.ClaimName)
+			}
+		}
+	}
+
+	for _, pvcName := range pvcNames {
+		collection := model.PVC{
+			Base: model.Base{
+				Cluster: cluster.PK,
+				Name:    pvcName,
+			},
+		}
+		list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{}})
+		if err != nil {
+			Log.Trace(err)
+			return err
+		}
+		for _, m := range list {
+			node := TreeNode{
 				Kind:        migref.ToKind(m),
-				ObjectLink:  PodHandler{}.Link(&cluster, m),
+				ObjectLink:  PvcHandler{}.Link(&cluster, m),
 				Namespace:   m.Namespace,
 				Name:        m.Name,
 				ClusterType: t.clusterType(&cluster),
-			})
+			}
+
+			err = t.addPVForPVC(cluster, m, &node)
+			if err != nil {
+				Log.Trace(err)
+				return err
+			}
+			parent.Children = append(parent.Children, node)
+		}
 	}
+
 	return nil
 }
 
