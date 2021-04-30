@@ -331,7 +331,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case WaitForRsyncTransferPodsRunning:
-		running, err := t.areRsyncTransferPodsRunning()
+		running, nonRunningPod, err := t.areRsyncTransferPodsRunning()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -354,8 +354,15 @@ func (t *Task) Run(ctx context.Context) error {
 				return fmt.Errorf("'Running' condition not found on DVM [%v/%v]", t.Owner.Namespace, t.Owner.Name)
 			}
 			now := time.Now().UTC()
-			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 10*time.Minute {
-				msg := "Rsync Transfer Pod(s) on destination cluster have not started Running after 10 minutes."
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 3*time.Minute {
+				var msg string
+				if nonRunningPod != nil {
+					msg = fmt.Sprintf("Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes. "+
+						"Run this command on the destination cluster and check the Pod events. oc describe pod %s --namespace %s", nonRunningPod.Name, nonRunningPod.Namespace)
+				} else {
+					msg = "Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes."
+				}
+
 				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
 					migapi.Condition{

@@ -112,11 +112,11 @@ data:
    {{ end }}
 `
 
-func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
+func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod *corev1.Pod, e error) {
 	// Get client for destination
 	destClient, err := t.getDestinationClient()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
@@ -134,12 +134,12 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 			},
 			&pods)
 		if err != nil {
-			return false, err
+			return false, nil, err
 		}
 		if len(pods.Items) != 1 {
 			t.Log.Info("Unexpected number of DVM Rsync Pods found.",
 				"podExpected", 1, "podsFound", len(pods.Items))
-			return false, nil
+			return false, nil, nil
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
@@ -155,17 +155,17 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 							"pod", path.Join(pod.Namespace, pod.Name),
 							"podPhase", pod.Status.Phase,
 							"podConditionMessage", podCond.Message)
-						return false, nil
+						return false, &pod, nil
 					}
 				}
 				t.Log.Info("Found non-running Rsync Transfer Pod on destination cluster.",
 					"pod", path.Join(pod.Namespace, pod.Name),
 					"podPhase", pod.Status.Phase)
-				return false, nil
+				return false, &pod, nil
 			}
 		}
 	}
-	return true, nil
+	return true, nil, nil
 }
 
 // Generate SSH keys to be used
