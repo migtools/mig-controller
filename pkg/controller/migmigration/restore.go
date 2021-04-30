@@ -44,7 +44,7 @@ func (t *Task) ensureFinalRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
-	newRestore, err := t.buildRestore(client, backup.Name)
+	newRestore, err := t.buildRestore(client, backup.Name, "final")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -93,7 +93,7 @@ func (t *Task) ensureStageRestore() (*velero.Restore, error) {
 	if err != nil {
 		return nil, err
 	}
-	newRestore, err := t.buildRestore(client, backup.Name)
+	newRestore, err := t.buildRestore(client, backup.Name, "stage")
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -376,15 +376,22 @@ func (t *Task) setFinalRestorePartialFailureWarning(restore *velero.Restore) {
 }
 
 // Build a Restore as desired for the destination cluster.
-func (t *Task) buildRestore(client k8sclient.Client, backupName string) (*velero.Restore, error) {
+func (t *Task) buildRestore(client k8sclient.Client, backupName string, restoreTypePrefix string) (*velero.Restore, error) {
 	annotations, err := t.getAnnotations(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+
+	// Construct a name like "$migrationname-54823-stage" or "$migrationname-54823-final".
+	// This will produce a 57 character string max. Note that generateName gracefully handles strings >63 char.
+	fmtString := fmt.Sprintf("%%.%ds", 55-len(restoreTypePrefix))
+	migrationNameTruncated := fmt.Sprintf(fmtString, t.Owner.GetName())
+	truncatedGenerateName := fmt.Sprintf("%s-%s-", migrationNameTruncated, restoreTypePrefix)
+
 	restore := &velero.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:       t.Owner.GetCorrelationLabels(),
-			GenerateName: t.Owner.GetName() + "-",
+			GenerateName: truncatedGenerateName,
 			Namespace:    migapi.VeleroNamespace,
 			Annotations:  annotations,
 		},
