@@ -47,12 +47,6 @@ const (
 	ClosedIndexField = "closed"
 )
 
-// Registry deployment constants
-const (
-	MigRegistryDefaultLivenessTimeout  = 3
-	MigRegistryDefaultReadinessTimeout = 3
-)
-
 // MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
 	Reference *kapi.ObjectReference `json:"reference"`
