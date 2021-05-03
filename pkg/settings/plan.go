@@ -89,6 +89,5 @@ func (r *Plan) Load() error {
 	if len(moveStorageClasses) > 0 {
 		r.MoveStorageClasses = strings.Split(moveStorageClasses, ",")
 	}
-
 	return nil
 }
