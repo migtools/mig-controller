@@ -20,6 +20,10 @@ const (
 	PlanParam = "plan"
 	PlansRoot = Root + "/plans"
 	PlanRoot  = PlansRoot + "/:" + PlanParam
+
+	TreeMigrationParam    = "migration"
+	PlanTreeRoot          = PlanRoot + "/tree"
+	PlanTreeMigrationRoot = PlanTreeRoot + "/:" + TreeMigrationParam
 )
 
 //
@@ -29,6 +33,8 @@ type PlanHandler struct {
 	BaseHandler
 	// Plan referenced in the request.
 	plan model.Plan
+	// Migration referenced in the request (optional).
+	migration model.Migration
 }
 
 //
@@ -38,7 +44,8 @@ func (h PlanHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PlansRoot+"/", h.List)
 	r.GET(PlanRoot, h.Get)
 	r.GET(PlanRoot+"/pods", h.Pods)
-	r.GET(PlanRoot+"/tree", h.Tree)
+	r.GET(PlanTreeRoot, h.Tree)
+	r.GET(PlanTreeMigrationRoot, h.Tree)
 }
 
 //
@@ -50,8 +57,9 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	if status != http.StatusOK {
 		return status
 	}
-	name := ctx.Param(PlanParam)
-	if name != "" {
+	// Check plan param
+	planName := ctx.Param(PlanParam)
+	if planName != "" {
 		h.plan = model.Plan{
 			CR: model.CR{
 				Namespace: ctx.Param(NsParam),
@@ -71,6 +79,26 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 	status = h.allow(h.getSAR())
 	if status != http.StatusOK {
 		return status
+	}
+
+	// Check migration param (if a plan tree filter param is given)
+	migrationName := ctx.Param(TreeMigrationParam)
+	if migrationName != "" {
+		h.migration = model.Migration{
+			CR: model.CR{
+				Namespace: ctx.Param(NsParam),
+				Name:      ctx.Param(TreeMigrationParam),
+			},
+		}
+		err := h.migration.Get(h.container.Db)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				Log.Trace(err)
+				return http.StatusInternalServerError
+			} else {
+				return http.StatusNotFound
+			}
+		}
 	}
 
 	return http.StatusOK
@@ -163,8 +191,9 @@ func (h PlanHandler) Tree(ctx *gin.Context) {
 		return
 	}
 	tree := PlanTree{
-		db:   h.container.Db,
-		plan: &h.plan,
+		db:        h.container.Db,
+		plan:      &h.plan,
+		migration: &h.migration,
 	}
 	root, err := tree.Build()
 	if err != nil {
@@ -231,6 +260,8 @@ type TreeNode struct {
 type PlanTree struct {
 	// Subject.
 	plan *model.Plan
+	// Optional migration for filtering tree.
+	migration *model.Migration
 	// DB client.
 	db model.DB
 	// Plan clusters.
@@ -354,6 +385,12 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 		if ref.Namespace != t.plan.Namespace ||
 			ref.Name != t.plan.Name {
 			continue
+		}
+		// If a filter was provided, skip non-matching migrations
+		if t.migration != nil && t.migration.Name != "" {
+			if t.migration.Name != migration.Name {
+				continue
+			}
 		}
 		node := TreeNode{
 			Kind:        migref.ToKind(m),
