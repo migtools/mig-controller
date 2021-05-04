@@ -1,0 +1,26 @@
+name: Pull Request Test
+on: [pull_request]
+jobs:
+  build:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+      - name: Setup dependencies
+        run: |
+          sudo apt-get install -y libgpgme-dev libdevmapper-dev btrfs-progs libbtrfs-dev
+          curl -L -o kubebuilder.tar.gz https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${KUBEBUILDER_VERSION}/kubebuilder_${KUBEBUILDER_VERSION}_$(go env GOHOSTOS)_$(go env GOARCH).tar.gz
+          tar -xvf kubebuilder.tar.gz
+          sudo mv kubebuilder_${KUBEBUILDER_VERSION}_$(go env GOHOSTOS)_$(go env GOARCH) /usr/local/kubebuilder
+        env:
+          KUBEBUILDER_VERSION: 2.3.1
+      - name: Check out the code
+        uses: actions/checkout@v2
+      - name: Run 'make test'
+        run: make test
+        env:
+          BUILDTAGS: "containers_image_ostree_stub exclude_graphdriver_devicemapper exclude_graphdriver_btrfs containers_image_openpgp exclude_graphdriver_overlay"
+          GOBIN: "/home/runner/go/bin"
