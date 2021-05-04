@@ -218,7 +218,7 @@ func (r *RsyncPodProgressTask) Run() error {
 			if pvProgress.Status.RsyncPodExistsInHistory(pod.Name) {
 				continue
 			}
-			rsyncPodStatus := r.getRsyncClientContainerStatus(pod,r)
+			rsyncPodStatus := r.getRsyncClientContainerStatus(pod, r)
 			if rsyncPodStatus != nil {
 				// dead pods go in history
 				if IsPodTerminal(rsyncPodStatus.PodPhase) {

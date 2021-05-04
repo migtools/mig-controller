@@ -1245,8 +1245,8 @@ func (t *Task) setProgress(progress []string) {
 // Advance the task to the next phase.
 func (t *Task) next() error {
 	// Write time taken to complete phase
-	t.Owner.Status.StageCondition(Running)
-	cond := t.Owner.Status.FindCondition(Running)
+	t.Owner.Status.StageCondition(migapi.Running)
+	cond := t.Owner.Status.FindCondition(migapi.Running)
 	if cond != nil {
 		elapsed := time.Since(cond.LastTransitionTime.Time)
 		t.Log.Info("Phase completed", "phaseElapsed", elapsed)
@@ -1425,7 +1425,7 @@ func (t *Task) fail(nextPhase string, reasons []string) {
 	t.Log.Info("Marking migration as FAILED. See Status.Errors",
 		"migrationErrors", t.Owner.Status.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{
-		Type:     Failed,
+		Type:     migapi.Failed,
 		Status:   True,
 		Reason:   t.Phase,
 		Category: Advisory,
@@ -1459,7 +1459,7 @@ func (t *Task) UID() string {
 
 // Get whether the migration has failed
 func (t *Task) failed() bool {
-	return t.Owner.HasErrors() || t.Owner.Status.HasCondition(Failed)
+	return t.Owner.HasErrors() || t.Owner.Status.HasCondition(migapi.Failed)
 }
 
 // Get whether the migration is cancelled.

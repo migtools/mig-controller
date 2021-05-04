@@ -271,7 +271,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				requestedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("200"),
-			wantReason:       VolumeAdjustmentCapacityMismatch,
+			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = volume with threshold size",
@@ -284,7 +284,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				requestedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("206"),
-			wantReason:       VolumeAdjustmentUsageExceeded,
+			wantReason:       migapi.VolumeAdjustmentUsageExceeded,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = requested capacity",
@@ -297,7 +297,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				requestedCapacity: resource.MustParse("250"),
 			},
 			wantProposedSize: resource.MustParse("250"),
-			wantReason:       VolumeAdjustmentNoOp,
+			wantReason:       migapi.VolumeAdjustmentNoOp,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
@@ -311,7 +311,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				requestedCapacity: resource.MustParse("150"),
 			},
 			wantProposedSize: resource.MustParse("200"),
-			wantReason:       VolumeAdjustmentCapacityMismatch,
+			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
 		},
 	}
 	for _, tt := range tests {

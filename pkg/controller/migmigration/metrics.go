@@ -72,15 +72,15 @@ func recordMetrics(client client.Client) {
 			// for all migmigrations, count # in idle, running, completed, failed
 			for _, m := range migrations {
 				// Stage
-				if m.Spec.Stage && m.Status.HasCondition(Running) {
+				if m.Spec.Stage && m.Status.HasCondition(migapi.Running) {
 					stageRunning++
 					continue
 				}
-				if m.Spec.Stage && m.Status.HasCondition(Succeeded) {
+				if m.Spec.Stage && m.Status.HasCondition(migapi.Succeeded) {
 					stageCompleted++
 					continue
 				}
-				if m.Spec.Stage && m.Status.HasCondition(Failed) {
+				if m.Spec.Stage && m.Status.HasCondition(migapi.Failed) {
 					stageFailed++
 					continue
 				}
@@ -90,15 +90,15 @@ func recordMetrics(client client.Client) {
 				}
 
 				// Final
-				if !m.Spec.Stage && m.Status.HasCondition(Running) {
+				if !m.Spec.Stage && m.Status.HasCondition(migapi.Running) {
 					finalRunning++
 					continue
 				}
-				if !m.Spec.Stage && m.Status.HasCondition(Succeeded) {
+				if !m.Spec.Stage && m.Status.HasCondition(migapi.Succeeded) {
 					finalCompleted++
 					continue
 				}
-				if !m.Spec.Stage && m.Status.HasCondition(Failed) {
+				if !m.Spec.Stage && m.Status.HasCondition(migapi.Failed) {
 					finalFailed++
 					continue
 				}

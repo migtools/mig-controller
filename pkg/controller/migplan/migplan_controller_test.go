@@ -27,11 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -528,6 +527,79 @@ func Test(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("checkIfMigAnalyticsReady() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReconcileMigPlan_processProposedPVCapacities(t *testing.T) {
+	type args struct {
+		plan     *migapi.MigPlan
+		analytic *migapi.MigAnalytic
+	}
+	tests := []struct {
+		name               string
+		args               args
+		wantConditions     []migapi.Condition
+		dontWantConditions []migapi.Condition
+		// determines whether or not to assert the message of the condition
+		// when enabled, the test case will also assert whether the message in the conditions are equal
+		assertMessage bool
+	}{
+		{
+			name: "When MigAnalytic failed to get PV data from a volume because it was probably not attached to a Pod, MigPlan should show appropriate condition",
+			args: args{
+				analytic: &migapi.MigAnalytic{
+					Status: migapi.MigAnalyticStatus{
+						Analytics: migapi.MigAnalyticPlan{
+							Namespaces: []migapi.MigAnalyticNamespace{
+								{
+									Namespace:         "test-ns",
+									PersistentVolumes: []migapi.MigAnalyticPersistentVolumeClaim{},
+								},
+							},
+						},
+						Conditions: migapi.Conditions{
+							List: []migapi.Condition{},
+						},
+					},
+				},
+				plan: &migapi.MigPlan{
+					Spec: migapi.MigPlanSpec{
+						PersistentVolumes: migapi.PersistentVolumes{
+							List: []migapi.PV{
+								{PVC: migapi.PVC{Namespace: "test-ns", Name: "pvc-0"}, Name: "pv-0"},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: []migapi.Condition{{
+				Type:     PvUsageAnalysisFailed,
+				Category: Warn,
+				Message:  "Failed to compute PV resizing data for the following volumes. PV resizing will be disabled for these volumes and the migration may fail if the volumes are full or their requested and actual capacities differ in the source cluster. Please ensure that the volumes are attached to one or more running Pods for PV resizing to work correctly: [pv-0]",
+			}},
+			dontWantConditions: []migapi.Condition{},
+			assertMessage:      true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ReconcileMigPlan{}
+			r.processProposedPVCapacities(context.TODO(), tt.args.plan, tt.args.analytic)
+			for _, want := range tt.wantConditions {
+				got := tt.args.plan.Status.FindCondition(want.Type)
+				if got == nil {
+					t.Errorf("processProposedPVCapacities() didn't find expected condition %v on MigPlan", want)
+				}
+				if got != nil && tt.assertMessage && got.Message != want.Message {
+					t.Errorf("processProposedPVCapacities() found expected condition on MigPlan but the message was incorrect; want %s got %s", want.Message, got.Message)
+				}
+			}
+			for _, dontWant := range tt.dontWantConditions {
+				if got := tt.args.plan.Status.FindCondition(dontWant.Type); got != nil {
+					t.Errorf("processProposedPVCapacities() found unexpected condition %v on MigPlan", dontWant)
+				}
 			}
 		})
 	}

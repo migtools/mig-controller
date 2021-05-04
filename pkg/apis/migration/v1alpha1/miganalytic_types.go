@@ -23,6 +23,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// VolumeAdjuster condition types
+const (
+	ExtendedPVAnalysisFailed  = "ExtendedPVAnalysisFailed"
+	ExtendedPVAnalysisStarted = "ExtendedPVAnalysisStarted"
+)
+
+// VolumeAdjuster reasons
+const (
+	FailedRunningDf = "FailedRunningDf"
+)
+
+// Proposed volume size computation reasons
+const (
+	VolumeAdjustmentNoOp             = "No change in PV capacity is needed."
+	VolumeAdjustmentUsageExceeded    = "PV usage is close to 100%. Additional capacity will be allocated to avoid issues migrating data to the target cluster."
+	VolumeAdjustmentCapacityMismatch = "Requested capacity of PV is not equal to its actual provisioned capacity.  Maximum of both values will be used to avoid disk capacity issue in the target cluster."
+)
+
 // MigAnalyticSpec defines the desired state of MigAnalytic
 type MigAnalyticSpec struct {
 	MigPlanRef *kapi.ObjectReference `json:"migPlanRef"`

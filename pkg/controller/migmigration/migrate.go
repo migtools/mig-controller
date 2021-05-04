@@ -91,12 +91,12 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 		// Close the Jaeger span for the migration
 		migtrace.CloseMigrationSpan(string(migration.GetUID()))
 
-		migration.Status.DeleteCondition(Running)
-		failed := task.Owner.Status.FindCondition(Failed)
+		migration.Status.DeleteCondition(migapi.Running)
+		failed := task.Owner.Status.FindCondition(migapi.Failed)
 		warnings := task.Owner.Status.FindConditionByCategory(migapi.Warn)
 		if failed == nil && len(warnings) == 0 {
 			migration.Status.SetCondition(migapi.Condition{
-				Type:     Succeeded,
+				Type:     migapi.Succeeded,
 				Status:   True,
 				Reason:   task.Phase,
 				Category: Advisory,
@@ -120,7 +120,7 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 	phase, n, total := task.Itinerary.progressReport(task.Phase)
 	message := fmt.Sprintf("Step: %d/%d", n, total)
 	migration.Status.SetCondition(migapi.Condition{
-		Type:     Running,
+		Type:     migapi.Running,
 		Status:   True,
 		Reason:   phase,
 		Category: Advisory,
