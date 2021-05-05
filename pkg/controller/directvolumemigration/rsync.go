@@ -112,7 +112,7 @@ data:
    {{ end }}
 `
 
-func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod *corev1.Pod, e error) {
+func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
 	// Get client for destination
 	destClient, err := t.getDestinationClient()
 	if err != nil {
@@ -149,21 +149,30 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 					"Found abnormal event for Rsync transfer Pod on destination cluster",
 					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
 
+				isUnschedulable := false
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
 						t.Log.Info("Found UNSCHEDULABLE Rsync Transfer Pod on destination cluster",
 							"pod", path.Join(pod.Namespace, pod.Name),
 							"podPhase", pod.Status.Phase,
 							"podConditionMessage", podCond.Message)
-						return false, &pod, nil
+						nonRunningPods = append(nonRunningPods, &pod)
+						isUnschedulable = true
+						break
 					}
+				}
+				if isUnschedulable {
+					continue
 				}
 				t.Log.Info("Found non-running Rsync Transfer Pod on destination cluster.",
 					"pod", path.Join(pod.Namespace, pod.Name),
 					"podPhase", pod.Status.Phase)
-				return false, &pod, nil
+				nonRunningPods = append(nonRunningPods, &pod)
 			}
 		}
+	}
+	if len(nonRunningPods) > 0 {
+		return false, nonRunningPods, nil
 	}
 	return true, nil, nil
 }
