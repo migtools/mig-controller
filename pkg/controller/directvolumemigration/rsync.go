@@ -112,11 +112,11 @@ data:
    {{ end }}
 `
 
-func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
+func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
 	// Get client for destination
 	destClient, err := t.getDestinationClient()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	pvcMap := t.getPVCNamespaceMap()
@@ -134,12 +134,12 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 			},
 			&pods)
 		if err != nil {
-			return false, err
+			return false, nil, err
 		}
 		if len(pods.Items) != 1 {
 			t.Log.Info("Unexpected number of DVM Rsync Pods found.",
 				"podExpected", 1, "podsFound", len(pods.Items))
-			return false, nil
+			return false, nil, nil
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
@@ -149,23 +149,32 @@ func (t *Task) areRsyncTransferPodsRunning() (bool, error) {
 					"Found abnormal event for Rsync transfer Pod on destination cluster",
 					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
 
+				isUnschedulable := false
 				for _, podCond := range pod.Status.Conditions {
 					if podCond.Reason == corev1.PodReasonUnschedulable {
 						t.Log.Info("Found UNSCHEDULABLE Rsync Transfer Pod on destination cluster",
 							"pod", path.Join(pod.Namespace, pod.Name),
 							"podPhase", pod.Status.Phase,
 							"podConditionMessage", podCond.Message)
-						return false, nil
+						nonRunningPods = append(nonRunningPods, &pod)
+						isUnschedulable = true
+						break
 					}
+				}
+				if isUnschedulable {
+					continue
 				}
 				t.Log.Info("Found non-running Rsync Transfer Pod on destination cluster.",
 					"pod", path.Join(pod.Namespace, pod.Name),
 					"podPhase", pod.Status.Phase)
-				return false, nil
+				nonRunningPods = append(nonRunningPods, &pod)
 			}
 		}
 	}
-	return true, nil
+	if len(nonRunningPods) > 0 {
+		return false, nonRunningPods, nil
+	}
+	return true, nil, nil
 }
 
 // Generate SSH keys to be used

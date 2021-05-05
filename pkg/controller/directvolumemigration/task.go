@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -331,7 +332,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case WaitForRsyncTransferPodsRunning:
-		running, err := t.areRsyncTransferPodsRunning()
+		running, nonRunningPods, err := t.areRsyncTransferPodsRunning()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -354,8 +355,20 @@ func (t *Task) Run(ctx context.Context) error {
 				return fmt.Errorf("'Running' condition not found on DVM [%v/%v]", t.Owner.Namespace, t.Owner.Name)
 			}
 			now := time.Now().UTC()
-			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 10*time.Minute {
-				msg := "Rsync Transfer Pod(s) on destination cluster have not started Running after 10 minutes."
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > 3*time.Minute {
+				// ["ns1/pod1", "ns2/pod2"]
+				nonRunningPodStrings := []string{}
+				for _, nonRunningPod := range nonRunningPods {
+					if nonRunningPod != nil {
+						nonRunningPodStrings = append(nonRunningPodStrings,
+							fmt.Sprintf("oc describe pod %s -n %s", nonRunningPod.Name, nonRunningPod.Namespace))
+					}
+				}
+
+				msg := fmt.Sprintf("Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes. "+
+					"Run these command(s) to check Pod warning events: [%s]",
+					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")))
+
 				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
 					migapi.Condition{
