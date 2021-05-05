@@ -366,8 +366,7 @@ func (t *Task) Run(ctx context.Context) error {
 					}
 				}
 
-				var msg string
-				msg = fmt.Sprintf("Rsync Transfer Pod(s) [%s] on destination cluster have not started Running within 3 minutes. "+
+				msg := fmt.Sprintf("Rsync Transfer Pod(s) [%s] on destination cluster have not started Running within 3 minutes. "+
 					"Run this command on the destination cluster and check the Pod events. "+
 					"oc describe pods --selector purpose=%s --all-namespaces",
 					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")), DirectVolumeMigrationRsync)
