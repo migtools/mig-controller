@@ -362,14 +362,13 @@ func (t *Task) Run(ctx context.Context) error {
 				for _, nonRunningPod := range nonRunningPods {
 					if nonRunningPod != nil {
 						nonRunningPodStrings = append(nonRunningPodStrings,
-							fmt.Sprintf("%s ", path.Join(nonRunningPod.Namespace, nonRunningPod.Name)))
+							fmt.Sprintf("%s", path.Join(nonRunningPod.Namespace, nonRunningPod.Name)))
 					}
 				}
 
-				msg := fmt.Sprintf("Rsync Transfer Pod(s) [%s] on destination cluster have not started Running within 3 minutes. "+
-					"Run this command on the destination cluster and check the Pod events. "+
-					"oc describe pods --selector purpose=%s --all-namespaces",
-					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")), DirectVolumeMigrationRsync)
+				msg := fmt.Sprintf("Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes. "+
+					"Run 'oc describe' to check for warning events on these Pod(s): [%s]",
+					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")))
 
 				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
