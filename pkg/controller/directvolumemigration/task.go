@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -362,12 +361,12 @@ func (t *Task) Run(ctx context.Context) error {
 				for _, nonRunningPod := range nonRunningPods {
 					if nonRunningPod != nil {
 						nonRunningPodStrings = append(nonRunningPodStrings,
-							fmt.Sprintf("%s", path.Join(nonRunningPod.Namespace, nonRunningPod.Name)))
+							fmt.Sprintf("oc describe pod %s -n %s", nonRunningPod.Name, nonRunningPod.Namespace))
 					}
 				}
 
 				msg := fmt.Sprintf("Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes. "+
-					"Run 'oc describe' to check for warning events on these Pod(s): [%s]",
+					"Run these command(s) to check Pod warning events: [%s]",
 					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")))
 
 				t.Log.Info(msg)
