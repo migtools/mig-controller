@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS {{.Table}} (
 `
 
 var IndexDDL = `
-CREATE INDEX IF NOT EXISTS {{.Table}}Index
+CREATE INDEX IF NOT EXISTS {{.Index}}Index
 ON {{.Table}}
 (
 {{ range $i,$f := .Fields -}}
@@ -167,6 +167,7 @@ LIMIT {{.Options.Page.Limit}} OFFSET {{.Options.Page.Offset}}
 //   key - Natural key.
 //   fk:<table>(field) - Foreign key.
 //   unique(<group>) - Unique constraint collated by <group>.
+//   index(<group>) - Non-unique indexed fields collated by <group>.
 //   const - Not updated.
 type Table struct {
 	// Database connection.
@@ -221,9 +222,9 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 		return nil, err
 	}
 	list = append(list, bfr.String())
-	// Index.
-	fields = t.KeyFields(fields)
-	if len(fields) > 0 {
+	// Natural key index.
+	keyFields := t.KeyFields(fields)
+	if len(keyFields) > 0 {
 		tpl, err = tpl.Parse(IndexDDL)
 		if err != nil {
 			Log.Trace(err)
@@ -234,7 +235,40 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 			bfr,
 			TmplData{
 				Table:  t.Name(model),
-				Fields: fields,
+				Index:  t.Name(model),
+				Fields: keyFields,
+			})
+		if err != nil {
+			Log.Trace(err)
+			return nil, err
+		}
+		list = append(list, bfr.String())
+	}
+	// Non-unique indexes.
+	indexes := map[string][]*Field{}
+	for _, field := range fields {
+		for _, name := range field.Index() {
+			list, found := indexes[name]
+			if found {
+				indexes[name] = append(list, field)
+			} else {
+				indexes[name] = []*Field{field}
+			}
+		}
+	}
+	for group, idxFields := range indexes {
+		tpl, err = tpl.Parse(IndexDDL)
+		if err != nil {
+			Log.Trace(err)
+			return nil, err
+		}
+		bfr = &bytes.Buffer{}
+		err = tpl.Execute(
+			bfr,
+			TmplData{
+				Table:  t.Name(model),
+				Index:  t.Name(model) + group,
+				Fields: idxFields,
 			})
 		if err != nil {
 			Log.Trace(err)
@@ -815,6 +849,10 @@ func (t Table) scan(row Row, fields []*Field) error {
 var UniqueRegex = regexp.MustCompile(`(unique)(\()(.+)(\))`)
 
 //
+// Regex used for `index(group)` tags.
+var IndexRegex = regexp.MustCompile(`(index)(\()(.+)(\))`)
+
+//
 // Regex used for `fk:<table>(field)` tags.
 var FkRegex = regexp.MustCompile(`(fk):(.+)(\()(.+)(\))`)
 
@@ -973,6 +1011,21 @@ func (f *Field) Unique() []string {
 }
 
 //
+// Get whether the field is part of a non-unique index.
+func (f *Field) Index() []string {
+	list := []string{}
+	for _, opt := range strings.Split(f.Tag, ",") {
+		opt = strings.TrimSpace(opt)
+		m := IndexRegex.FindStringSubmatch(opt)
+		if m != nil && len(m) == 5 {
+			list = append(list, m[3])
+		}
+	}
+
+	return list
+}
+
+//
 // Get whether the field is a foreign key.
 func (f *Field) Fk() *FK {
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -1026,6 +1079,8 @@ func (f *FK) DDL(field *Field) string {
 type TmplData struct {
 	// Table name.
 	Table string
+	// Index name.
+	Index string
 	// Fields.
 	Fields []*Field
 	// Constraint DDL.
