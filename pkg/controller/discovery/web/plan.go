@@ -475,7 +475,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		// Add move and snapshot PVCs if this is a stage backup
 		_, found := object.Labels[migapi.StageBackupLabel]
 		if found {
-			err = t.addMoveAndSnapshotPVCsForCluster(cluster, false, &node)
+			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
 				Log.Trace(err)
 				return err
@@ -488,7 +488,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 }
 
 // Add PVCs that will be moved or snapshotted
-func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, isDest bool, parent *TreeNode) error {
+func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, parent *TreeNode) error {
 	// Get list of PVC names that will be moved / snapshotted from MigPlan
 	planObject := t.plan.DecodeObject()
 	pvcsToInclude := []migapi.PVC{}
@@ -500,7 +500,7 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, isDes
 	}
 
 	var namespaces []string
-	if isDest {
+	if t.clusterType(&cluster) == clusterTypeTarget {
 		namespaces = planObject.GetDestinationNamespaces()
 	} else {
 		namespaces = planObject.GetSourceNamespaces()
@@ -592,7 +592,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		// Add move and snapshot PVCs if this is a stage restore
 		_, found := object.Labels[migapi.StageRestoreLabel]
 		if found {
-			err = t.addMoveAndSnapshotPVCsForCluster(cluster, true, &node)
+			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
 				Log.Trace(err)
 				return err
@@ -966,12 +966,12 @@ func (t *PlanTree) addDirectVolumeProgressPods(directVolumeProgress *model.Direc
 // Add direct volume progress pods
 func (t *PlanTree) addDirectVolumeProgressPVCs(directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
 	// Source cluster PVC
-	err := t.addDirectVolumeProgressPVCForCluster(t.cluster.source, false, directVolumeProgress, parent)
+	err := t.addDirectVolumeProgressPVCForCluster(t.cluster.source, directVolumeProgress, parent)
 	if err != nil {
 		return err
 	}
 	// Destination cluster PVC
-	err = t.addDirectVolumeProgressPVCForCluster(t.cluster.destination, true, directVolumeProgress, parent)
+	err = t.addDirectVolumeProgressPVCForCluster(t.cluster.destination, directVolumeProgress, parent)
 	if err != nil {
 		return err
 	}
@@ -1011,22 +1011,26 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 }
 
 // Add direct volume PVC for a specific cluster
-func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster, isDest bool,
+func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 	directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
+	planObject := t.plan.DecodeObject()
+	if planObject == nil {
+		return nil
+	}
 	dvmpObject := directVolumeProgress.DecodeObject()
+	if dvmpObject == nil {
+		return nil
+	}
 	podSelector := dvmpObject.Spec.PodSelector
 	if podSelector == nil {
 		return nil
 	}
 
 	pvcNamespace := dvmpObject.Spec.PodNamespace
-	if isDest && t.plan != nil {
-		migPlan := t.plan.DecodeObject()
-		if migPlan != nil {
-			destNs := migPlan.GetNamespaceMapping()[pvcNamespace]
-			if len(destNs) > 0 {
-				pvcNamespace = destNs
-			}
+	if t.clusterType(&cluster) == clusterTypeTarget {
+		destNs := planObject.GetNamespaceMapping()[pvcNamespace]
+		if len(destNs) > 0 {
+			pvcNamespace = destNs
 		}
 	}
 	pvcName, ok := podSelector[migapi.RsyncPodIdentityLabel]
