@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -88,7 +88,8 @@ func PodManagersRecreated(client k8sclient.Client, options *k8sclient.ListOption
 
 // DaemonSetsRecreated checks the number of pod replicas managed by DaemonSets
 func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions) (bool, error) {
-	daemonSetList := v1beta1.DaemonSetList{}
+	// the use of appsv1 is explicit, the compact client will downconvert to extv1beta1 if needed
+	daemonSetList := appsv1.DaemonSetList{}
 
 	err := client.List(context.TODO(), options, &daemonSetList)
 	if err != nil {
