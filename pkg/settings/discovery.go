@@ -9,7 +9,8 @@ import (
 const (
 	AllowedOrigins = "CORS_ALLOWED_ORIGINS"
 	WorkingDir     = "WORKING_DIR"
-	AuthOptinal    = "AUTH_OPTIONAL"
+	AuthOptional   = "AUTH_OPTIONAL"
+	CollectEvents  = "DISCOVERY_COLLECT_EVENTS"
 )
 
 // CORS
@@ -18,13 +19,15 @@ type CORS struct {
 	AllowedOrigins []string
 }
 
-// Plan settings.
+// Discovery settings.
 //   Origins: Permitted CORS allowed origins.
 //   AuthOptional: Authorization header is optional.
+//   CollectEvents: Discovery Service event collection switch. May want to turn off in large clusters.
 type Discovery struct {
-	CORS         CORS
-	WorkingDir   string
-	AuthOptional bool
+	CORS          CORS
+	WorkingDir    string
+	AuthOptional  bool
+	CollectEvents bool
 }
 
 // Load settings.
@@ -48,7 +51,9 @@ func (r *Discovery) Load() error {
 		r.WorkingDir = os.TempDir()
 	}
 	// Auth
-	r.AuthOptional = getEnvBool(AuthOptinal, false)
+	r.AuthOptional = getEnvBool(AuthOptional, false)
+	// CollectEvents
+	r.CollectEvents = getEnvBool(CollectEvents, true)
 
 	return nil
 }
