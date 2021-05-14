@@ -3,7 +3,7 @@ package model
 import (
 	"encoding/json"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 //
@@ -14,7 +14,7 @@ type Event struct {
 
 //
 // Update the model `with` a k8s Event.
-func (m *Event) With(object *v1.Event) {
+func (m *Event) With(object *corev1.Event) {
 	m.UID = string(object.UID)
 	m.Version = object.ResourceVersion
 	m.Namespace = object.Namespace
@@ -30,15 +30,15 @@ func (m *Event) With(object *v1.Event) {
 
 //
 // Encode the object.
-func (m *Event) EncodeObject(event *v1.Event) {
+func (m *Event) EncodeObject(event *corev1.Event) {
 	object, _ := json.Marshal(event)
 	m.Object = string(object)
 }
 
 //
 // Encode the object.
-func (m *Event) DecodeObject() *v1.Event {
-	event := &v1.Event{}
+func (m *Event) DecodeObject() *corev1.Event {
+	event := &corev1.Event{}
 	json.Unmarshal([]byte(m.Object), event)
 	return event
 }

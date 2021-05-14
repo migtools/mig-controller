@@ -1,7 +1,6 @@
 package web
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,9 +9,9 @@ import (
 )
 
 const (
-	EventParam = "event"
-	EventsRoot = NamespaceRoot + "/events"
-	EventRoot  = EventsRoot + "/:" + EventParam
+	EventInvolvedUIDParam = "involvedobjectuid"
+	EventsRoot            = NamespaceRoot + "/events"
+	EventRoot             = EventsRoot + "/:" + EventInvolvedUIDParam
 )
 
 //
@@ -73,35 +72,44 @@ func (h EventHandler) List(ctx *gin.Context) {
 }
 
 //
-// Get a specific Event on a cluster.
+// Get Events for a particular involvedObject UID on a cluster.
 func (h EventHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	m := model.Event{
+	db := h.container.Db
+	collection := model.Event{
 		Base: model.Base{
 			Cluster:   h.cluster.PK,
 			Namespace: ctx.Param(Ns2Param),
-			Name:      ctx.Param(EventParam),
 		},
 	}
-	err := m.Get(h.container.Db)
+	count, err := collection.Count(db, model.ListOptions{
+		Labels: model.Labels{
+			"involvedObjectUID": ctx.Param(EventInvolvedUIDParam),
+		},
+	})
 	if err != nil {
-		if err != sql.ErrNoRows {
-			Log.Trace(err)
-			ctx.Status(http.StatusInternalServerError)
-			return
-		} else {
-			ctx.Status(http.StatusNotFound)
-			return
-		}
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
-	r := Event{}
-	r.With(&m)
-	r.SelfLink = h.Link(&h.cluster, &m)
-	content := r
+	list, err := collection.List(db, model.ListOptions{})
+	if err != nil {
+		Log.Trace(err)
+		ctx.Status(http.StatusInternalServerError)
+		return
+	}
+	content := EventList{
+		Count: count,
+	}
+	for _, m := range list {
+		r := Event{}
+		r.With(m)
+		r.SelfLink = h.Link(&h.cluster, m)
+		content.Items = append(content.Items, r)
+	}
 
 	ctx.JSON(http.StatusOK, content)
 }
@@ -112,10 +120,10 @@ func (h EventHandler) Link(c *model.Cluster, m *model.Event) string {
 	return h.BaseHandler.Link(
 		EventRoot,
 		Params{
-			NsParam:      c.Namespace,
-			ClusterParam: c.Name,
-			Ns2Param:     m.Namespace,
-			EventParam:   m.Name,
+			NsParam:               c.Namespace,
+			ClusterParam:          c.Name,
+			Ns2Param:              m.Namespace,
+			EventInvolvedUIDParam: m.Name,
 		})
 }
 
