@@ -265,13 +265,14 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 	reason = migapi.VolumeAdjustmentNoOp
 
 	if actualCapacity.Cmp(maxSize) == 1 {
-		maxSize = actualCapacity
 		reason = migapi.VolumeAdjustmentCapacityMismatch
 	}
 
 	if volumeSizeWithThreshold.Cmp(maxSize) == 1 {
 		maxSize = volumeSizeWithThreshold
-		reason = migapi.VolumeAdjustmentUsageExceeded
+		if usagePercentage+int64(pva.getVolumeUsagePercentageThreshold()) > 100 {
+			reason = migapi.VolumeAdjustmentUsageExceeded
+		}
 	}
 
 	proposedSize = maxSize

@@ -261,7 +261,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 		wantReason       string
 	}{
 		{
-			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here proposed size = actual capacity",
+			name: "Given requested capacity < actual capacity, should return 103% of used capacity of the volume",
 			fields: fields{
 				Client: fake.NewFakeClient(),
 			},
@@ -270,11 +270,11 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				actualCapacity:    resource.MustParse("200"),
 				requestedCapacity: resource.MustParse("20"),
 			},
-			wantProposedSize: resource.MustParse("200"),
+			wantProposedSize: resource.MustParse("106"),
 			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
 		},
 		{
-			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = volume with threshold size",
+			name: "Given volume usage close to 100%, should return 103% of original capacity",
 			fields: fields{
 				Client: fake.NewFakeClient(),
 			},
@@ -287,7 +287,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 			wantReason:       migapi.VolumeAdjustmentUsageExceeded,
 		},
 		{
-			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate proposed volume size is returned, here proposed size = requested capacity",
+			name: "Given requested capacity > actual capacity, should return requested capacity",
 			fields: fields{
 				Client: fake.NewFakeClient(),
 			},
@@ -300,8 +300,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 			wantReason:       migapi.VolumeAdjustmentNoOp,
 		},
 		{
-			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
-				"is greater than requested capacity and actual capacity is greater than requested capacity",
+			name: "Given requested capacity < actual capacity and usage not close to 100%, should return requested capacity",
 			fields: fields{
 				Client: fake.NewFakeClient(),
 			},
@@ -310,7 +309,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				actualCapacity:    resource.MustParse("200"),
 				requestedCapacity: resource.MustParse("150"),
 			},
-			wantProposedSize: resource.MustParse("200"),
+			wantProposedSize: resource.MustParse("150"),
 			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
 		},
 	}
