@@ -163,8 +163,8 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 	}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(backupAssociationLabel),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(backupAssociationLabel))
 	if err != nil {
 		log.Trace(err)
 	}
@@ -180,8 +180,8 @@ func (t Task) getBackup(labels map[string]string) (*velero.Backup, error) {
 	list := velero.BackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -494,8 +494,8 @@ func (t *Task) deleteCorrelatedBackups() error {
 	list := velero.BackupList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -619,8 +619,8 @@ func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
 	migrationList := migapi.MigMigrationList{}
 	err := t.Client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(corrLabel),
 		&migrationList,
+		k8sclient.MatchingLabels(corrLabel),
 	)
 	if err != nil {
 		return false, liberr.Wrap(err)
@@ -660,8 +660,8 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 	list := velero.BackupList{}
 	err = clusterClient.List(
 		context.TODO(),
-		k8sclient.InNamespace(migapi.VeleroNamespace),
-		&list)
+		&list,
+		k8sclient.InNamespace(migapi.VeleroNamespace))
 	if err != nil {
 		return 0, 0, liberr.Wrap(err)
 	}
@@ -751,8 +751,8 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 	list := velero.PodVolumeBackupList{}
 	err = clusterClient.List(
 		context.TODO(),
-		k8sclient.InNamespace(migapi.VeleroNamespace),
-		&list)
+		&list,
+		k8sclient.InNamespace(migapi.VeleroNamespace))
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}

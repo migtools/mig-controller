@@ -40,16 +40,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log logging.Logger
+var log *logging.Logger
 
 // Application settings.
 var Settings = &settings.Settings
 
 func init() {
 	log = logging.WithName("discovery")
-	model.Log = &log
-	container.Log = &log
-	web.Log = &log
+	model.Log = logging.WithName("discovery")
+	container.Log = logging.WithName("discovery")
+	web.Log = logging.WithName("discovery")
 }
 
 func Add(mgr manager.Manager) error {
@@ -133,8 +133,7 @@ type ReconcileDiscovery struct {
 	web       *web.WebServer
 }
 
-func (r *ReconcileDiscovery) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Reset()
+func (r *ReconcileDiscovery) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	reQueue := reconcile.Result{RequeueAfter: time.Second * 10}
 	err := r.container.Prune()
 	if err != nil {

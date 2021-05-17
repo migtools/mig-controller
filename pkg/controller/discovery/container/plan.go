@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,7 +60,7 @@ func (r *Plan) Reconcile() error {
 func (r *Plan) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.MigPlanList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -94,7 +95,7 @@ func (r *Plan) GetStored() ([]model.Model, error) {
 //
 
 func (r *Plan) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.MigPlan)
 	if !cast {
 		return false
@@ -107,7 +108,7 @@ func (r *Plan) Create(e event.CreateEvent) bool {
 }
 
 func (r *Plan) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*migapi.MigPlan)
 	if !cast {
 		return false
@@ -120,7 +121,7 @@ func (r *Plan) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Plan) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.MigPlan)
 	if !cast {
 		return false
@@ -184,7 +185,7 @@ func (r *Migration) Reconcile() error {
 func (r *Migration) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.MigMigrationList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -219,7 +220,7 @@ func (r *Migration) GetStored() ([]model.Model, error) {
 //
 
 func (r *Migration) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.MigMigration)
 	if !cast {
 		return false
@@ -232,7 +233,7 @@ func (r *Migration) Create(e event.CreateEvent) bool {
 }
 
 func (r *Migration) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*migapi.MigMigration)
 	if !cast {
 		return false
@@ -245,7 +246,7 @@ func (r *Migration) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Migration) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.MigMigration)
 	if !cast {
 		return false

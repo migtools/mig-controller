@@ -32,8 +32,8 @@ func (t *Task) getDirectImageStreamMigrations() ([]migapi.DirectImageStreamMigra
 	dismList := migapi.DirectImageStreamMigrationList{}
 	err := t.Client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
-		&dismList)
+		&dismList,
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()))
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -52,8 +52,8 @@ func (t *Task) listImageStreams() error {
 		isList := imagev1.ImageStreamList{}
 		err := srcClient.List(
 			context.TODO(),
-			k8sclient.InNamespace(srcNsName),
-			&isList)
+			&isList,
+			k8sclient.InNamespace(srcNsName))
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -104,8 +104,8 @@ func (t *Task) createDirectImageStreamMigrations() error {
 		dismList := migapi.DirectImageStreamMigrationList{}
 		err = t.Client.List(
 			context.TODO(),
-			k8sclient.MatchingLabels(t.Owner.DirectImageStreamMigrationLabels(imageStream)),
-			&dismList)
+			&dismList,
+			k8sclient.MatchingLabels(t.Owner.DirectImageStreamMigrationLabels(imageStream)))
 		if err != nil {
 			return liberr.Wrap(err)
 		}

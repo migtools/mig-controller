@@ -71,8 +71,8 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 	list := migapi.DirectVolumeMigrationList{}
 	err := t.Client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}

@@ -4,13 +4,13 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func MigrationRequests(a handler.MapObject) []reconcile.Request {
+func MigrationRequests(a client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
-	migration, cast := a.Object.(*migapi.MigMigration)
+	migration, cast := a.(*migapi.MigMigration)
 	if !cast {
 		return requests
 	}

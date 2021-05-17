@@ -17,10 +17,10 @@ limitations under the License.
 package directimagestreammigration
 
 import (
+	"context"
 	stdlog "log"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/konveyor/mig-controller/pkg/apis"
@@ -54,8 +54,8 @@ func TestMain(m *testing.M) {
 // writes the request to requests after Reconcile is finished.
 func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
 	requests := make(chan reconcile.Request)
-	fn := reconcile.Func(func(req reconcile.Request) (reconcile.Result, error) {
-		result, err := inner.Reconcile(req)
+	fn := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+		result, err := inner.Reconcile(ctx, req)
 		requests <- req
 		return result, err
 	})
@@ -63,13 +63,11 @@ func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan 
 }
 
 // StartTestManager adds recFn
-func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) (chan struct{}, *sync.WaitGroup) {
-	stop := make(chan struct{})
-	wg := &sync.WaitGroup{}
+func StartTestManager(mgr manager.Manager, g *gomega.GomegaWithT) context.CancelFunc {
+	ctx := context.Background()
+	ctx, stopFunc := context.WithCancel(ctx)
 	go func() {
-		wg.Add(1)
-		g.Expect(mgr.Start(stop)).NotTo(gomega.HaveOccurred())
-		wg.Done()
+		g.Expect(mgr.Start(ctx)).NotTo(gomega.HaveOccurred())
 	}()
-	return stop, wg
+	return stopFunc
 }

@@ -25,12 +25,12 @@ func FindVeleroPods(client k8sclient.Client) ([]corev1.Pod, error) {
 		})
 	err := client.List(
 		context.TODO(),
+		list,
 		&k8sclient.ListOptions{
 			Namespace:     migapi.VeleroNamespace,
 			LabelSelector: labelSelector,
 			FieldSelector: fieldSelector,
-		},
-		list)
+		})
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}

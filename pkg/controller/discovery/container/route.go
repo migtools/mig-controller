@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "github.com/openshift/api/route/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -58,7 +59,7 @@ func (r *Route) Reconcile() error {
 func (r *Route) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.RouteList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -101,7 +102,7 @@ func (r *Route) GetStored() ([]model.Model, error) {
 //
 
 func (r *Route) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false
@@ -118,7 +119,7 @@ func (r *Route) Create(e event.CreateEvent) bool {
 }
 
 func (r *Route) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*v1.Route)
 	if !cast {
 		return false
@@ -135,7 +136,7 @@ func (r *Route) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Route) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false

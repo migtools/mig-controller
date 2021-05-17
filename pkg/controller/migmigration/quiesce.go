@@ -123,8 +123,8 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -160,8 +160,8 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -207,8 +207,8 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -244,8 +244,8 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -292,8 +292,8 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -328,8 +328,8 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -376,8 +376,8 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -417,8 +417,8 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -466,8 +466,8 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -507,8 +507,8 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -551,7 +551,7 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 	for _, ns := range t.sourceNamespaces() {
 		list := batchv1beta.CronJobList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &list)
+		err := client.List(context.TODO(), &list, options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -584,7 +584,7 @@ func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) e
 	for _, ns := range namespaces {
 		list := batchv1beta.CronJobList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &list)
+		err := client.List(context.TODO(), &list, options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -618,8 +618,8 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -654,8 +654,8 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -716,8 +716,8 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
-			options,
-			&list)
+			&list,
+			options)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}

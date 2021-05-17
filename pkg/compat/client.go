@@ -13,7 +13,6 @@ import (
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	batchv2alpha "k8s.io/api/batch/v2alpha1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 	dapi "k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -109,31 +108,59 @@ func (c client) MinorVersion() int {
 
 //
 // supportedVersion will determine correct version of the object provided, based on cluster version
-func (c client) supportedVersion(obj runtime.Object) runtime.Object {
+func (c client) supportedVersion(obj k8sclient.Object) k8sclient.Object {
 	if c.Minor < 16 {
 		switch obj.(type) {
 
 		// Deployment
 		case *appsv1.Deployment:
 			return &appsv1beta1.Deployment{}
-		case *appsv1.DeploymentList:
-			return &appsv1beta1.DeploymentList{}
 
 		// DaemonSet
 		case *appsv1.DaemonSet:
 			return &extv1beta1.DaemonSet{}
-		case *appsv1.DaemonSetList:
-			return &extv1beta1.DaemonSetList{}
 
 		// ReplicaSet
 		case *appsv1.ReplicaSet:
 			return &extv1beta1.ReplicaSet{}
-		case *appsv1.ReplicaSetList:
-			return &extv1beta1.ReplicaSetList{}
 
 		// StatefulSet
 		case *appsv1.StatefulSet:
 			return &appsv1beta1.StatefulSet{}
+		}
+	}
+
+	if c.Minor < 8 {
+		switch obj.(type) {
+
+		// CronJob
+		case *batchv1beta.CronJob:
+			return &batchv2alpha.CronJob{}
+		}
+	}
+
+	return obj
+}
+
+//
+// supportedVersion will determine correct version of the object provided, based on cluster version
+func (c client) supportedVersionList(obj k8sclient.ObjectList) k8sclient.ObjectList {
+	if c.Minor < 16 {
+		switch obj.(type) {
+
+		// Deployment
+		case *appsv1.DeploymentList:
+			return &appsv1beta1.DeploymentList{}
+
+		// DaemonSet
+		case *appsv1.DaemonSetList:
+			return &extv1beta1.DaemonSetList{}
+
+		// ReplicaSet
+		case *appsv1.ReplicaSetList:
+			return &extv1beta1.ReplicaSetList{}
+
+		// StatefulSet
 		case *appsv1.StatefulSetList:
 			return &appsv1beta1.StatefulSetList{}
 		}
@@ -145,8 +172,6 @@ func (c client) supportedVersion(obj runtime.Object) runtime.Object {
 		// CronJob
 		case *batchv1beta.CronJobList:
 			return &batchv2alpha.CronJobList{}
-		case *batchv1beta.CronJob:
-			return &batchv2alpha.CronJob{}
 		}
 	}
 
@@ -155,7 +180,7 @@ func (c client) supportedVersion(obj runtime.Object) runtime.Object {
 
 //
 // Down convert a resource as needed based on cluster version.
-func (c client) downConvert(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
+func (c client) downConvert(ctx context.Context, obj k8sclient.Object) (k8sclient.Object, error) {
 	new := c.supportedVersion(obj)
 	if new == obj {
 		return obj, nil
@@ -171,8 +196,35 @@ func (c client) downConvert(ctx context.Context, obj runtime.Object) (runtime.Ob
 
 //
 // upConvert will convert src resource to dst as needed based on cluster version
-func (c client) upConvert(ctx context.Context, src runtime.Object, dst runtime.Object) error {
+func (c client) upConvert(ctx context.Context, src k8sclient.Object, dst k8sclient.Object) error {
 	if c.supportedVersion(dst) == dst {
+		dst = src
+		return nil
+	}
+
+	return scheme.Scheme.Convert(src, dst, ctx)
+}
+
+//
+// Down convert a resource as needed based on cluster version.
+func (c client) downConvertList(ctx context.Context, obj k8sclient.ObjectList) (k8sclient.ObjectList, error) {
+	new := c.supportedVersionList(obj)
+	if new == obj {
+		return obj, nil
+	}
+
+	err := scheme.Scheme.Convert(obj, new, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return new, nil
+}
+
+//
+// upConvert will convert src resource to dst as needed based on cluster version
+func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst k8sclient.ObjectList) error {
+	if c.supportedVersionList(dst) == dst {
 		dst = src
 		return nil
 	}
@@ -183,7 +235,7 @@ func (c client) upConvert(ctx context.Context, src runtime.Object, dst runtime.O
 //
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Object) error {
+func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object) error {
 	obj := c.supportedVersion(in)
 	start := time.Now()
 	err := c.Client.Get(ctx, key, obj)
@@ -199,33 +251,33 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in runtime.Obj
 //
 // List the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) List(ctx context.Context, opt *k8sclient.ListOptions, in runtime.Object) error {
-	obj, err := c.downConvert(ctx, in)
+func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8sclient.ListOption) error {
+	obj, err := c.downConvertList(ctx, in)
 	if err != nil {
 		return err
 	}
 
 	start := time.Now()
-	err = c.Client.List(ctx, opt, obj)
+	err = c.Client.List(ctx, obj, opt...)
 	if err != nil {
 		return err
 	}
 	elapsed := float64(time.Since(start) / nanoToMilli)
 	Metrics.List(c, in, elapsed)
 
-	return c.upConvert(ctx, obj, in)
+	return c.upConvertList(ctx, obj, in)
 }
 
 // Create the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Create(ctx context.Context, in runtime.Object) error {
+func (c client) Create(ctx context.Context, in k8sclient.Object, opt ...k8sclient.CreateOption) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
 	}
 
 	start := time.Now()
-	err = c.Client.Create(ctx, obj)
+	err = c.Client.Create(ctx, obj, opt...)
 	elapsed := float64(time.Since(start) / nanoToMilli)
 	Metrics.Create(c, in, elapsed)
 
@@ -234,7 +286,7 @@ func (c client) Create(ctx context.Context, in runtime.Object) error {
 
 // Delete the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.DeleteOptionFunc) error {
+func (c client) Delete(ctx context.Context, in k8sclient.Object, opt ...k8sclient.DeleteOption) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
@@ -250,14 +302,14 @@ func (c client) Delete(ctx context.Context, in runtime.Object, opt ...k8sclient.
 
 // Update the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Update(ctx context.Context, in runtime.Object) error {
+func (c client) Update(ctx context.Context, in k8sclient.Object, opt ...k8sclient.UpdateOption) error {
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
 		return err
 	}
 
 	start := time.Now()
-	err = c.Client.Update(ctx, obj)
+	err = c.Client.Update(ctx, obj, opt...)
 	elapsed := float64(time.Since(start) / nanoToMilli)
 	Metrics.Update(c, in, elapsed)
 

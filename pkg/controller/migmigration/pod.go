@@ -73,11 +73,11 @@ func (t *Task) restartResticPods() error {
 		"namespace", migapi.VeleroNamespace)
 	err = client.List(
 		context.TODO(),
+		&list,
 		&k8sclient.ListOptions{
 			Namespace:     migapi.VeleroNamespace,
 			LabelSelector: selector,
-		},
-		&list)
+		})
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -126,11 +126,11 @@ func (t *Task) haveResticPodsStarted() (bool, error) {
 	t.Log.Info("Getting Restic DaemonSet on source cluster")
 	err = client.List(
 		context.TODO(),
+		&list,
 		&k8sclient.ListOptions{
 			Namespace:     migapi.VeleroNamespace,
 			LabelSelector: selector,
-		},
-		&list)
+		})
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
@@ -251,11 +251,11 @@ func (t *Task) haveVeleroPodsStarted() (bool, error) {
 		})
 		err = client.List(
 			context.TODO(),
+			&list,
 			&k8sclient.ListOptions{
 				Namespace:     migapi.VeleroNamespace,
 				LabelSelector: selector,
-			},
-			&list)
+			})
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}

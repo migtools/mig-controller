@@ -1584,7 +1584,7 @@ func (t *Task) hasImageStreams() (bool, error) {
 	}
 	for _, ns := range t.sourceNamespaces() {
 		imageStreamList := imagev1.ImageStreamList{}
-		err := client.List(context.Background(), &k8sclient.ListOptions{Namespace: ns}, &imageStreamList)
+		err := client.List(context.Background(), &imageStreamList, k8sclient.InNamespace(ns))
 		if err != nil {
 			log.Trace(err)
 			return false, err

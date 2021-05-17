@@ -31,10 +31,15 @@ func TestStorageDirectImageStreamMigration(t *testing.T) {
 		Namespace: "default",
 	}
 	created := &DirectImageStreamMigration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DirectImageStreamMigration",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
-		}}
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create

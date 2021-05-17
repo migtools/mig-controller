@@ -121,7 +121,7 @@ func (r *Container) Prune() error {
 		return err
 	}
 	list := migapi.MigClusterList{}
-	err = r.Client.List(context.TODO(), nil, &list)
+	err = r.Client.List(context.TODO(), &list)
 	if err != nil {
 		Log.Trace(err)
 		return err

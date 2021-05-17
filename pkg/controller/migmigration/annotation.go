@@ -169,7 +169,7 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 	list := corev1.PodList{}
 	// include stage pods only
 	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
-	err := client.List(context.TODO(), options, &list)
+	err := client.List(context.TODO(), &list, options)
 	if err != nil {
 		return itemsUpdated, nil, liberr.Wrap(err)
 	}
@@ -329,7 +329,7 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 		}
 		list := corev1.ServiceAccountList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &list)
+		err := client.List(context.TODO(), &list, options)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)
 		}
@@ -366,7 +366,7 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 	for _, ns := range t.sourceNamespaces() {
 		imageStreamList := imagev1.ImageStreamList{}
 		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), options, &imageStreamList)
+		err := client.List(context.TODO(), &imageStreamList, options)
 		if err != nil {
 			log.Trace(err)
 			return itemsUpdated, err
@@ -440,7 +440,7 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 	for _, ns := range namespaceList {
 		options := k8sclient.InNamespace(ns)
 		podList := corev1.PodList{}
-		err := client.List(context.TODO(), options, &podList)
+		err := client.List(context.TODO(), &podList, options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -512,7 +512,7 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 	for _, ns := range namespaceList {
 		options := k8sclient.InNamespace(ns)
 		pvcList := corev1.PersistentVolumeClaimList{}
-		err := client.List(context.TODO(), options, &pvcList)
+		err := client.List(context.TODO(), &pvcList, options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -563,7 +563,7 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 	}
 	options := k8sclient.MatchingLabels(labels)
 	pvList := corev1.PersistentVolumeList{}
-	err := client.List(context.TODO(), options, &pvList)
+	err := client.List(context.TODO(), &pvList, options)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -589,7 +589,7 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 	}
 	options := k8sclient.MatchingLabels(labels)
 	pvList := corev1.ServiceAccountList{}
-	err := client.List(context.TODO(), options, &pvList)
+	err := client.List(context.TODO(), &pvList, options)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -612,7 +612,7 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 	}
 	options := k8sclient.MatchingLabels(labels)
 	imageStreamList := imagev1.ImageStreamList{}
-	err := client.List(context.TODO(), options, &imageStreamList)
+	err := client.List(context.TODO(), &imageStreamList, options)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

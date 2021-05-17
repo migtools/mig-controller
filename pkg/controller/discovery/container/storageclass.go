@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,7 +60,7 @@ func (r *StorageClass) Reconcile() error {
 func (r *StorageClass) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.StorageClassList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -102,7 +103,7 @@ func (r *StorageClass) GetStored() ([]model.Model, error) {
 //
 
 func (r *StorageClass) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.StorageClass)
 	if !cast {
 		return false
@@ -119,7 +120,7 @@ func (r *StorageClass) Create(e event.CreateEvent) bool {
 }
 
 func (r *StorageClass) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*v1.StorageClass)
 	if !cast {
 		return false
@@ -136,7 +137,7 @@ func (r *StorageClass) Update(e event.UpdateEvent) bool {
 }
 
 func (r *StorageClass) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.StorageClass)
 	if !cast {
 		return false

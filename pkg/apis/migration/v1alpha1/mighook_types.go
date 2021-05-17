@@ -96,8 +96,8 @@ func (r *MigHook) GetPhaseJob(client k8sclient.Client, phase string, owner strin
 	labels[HookOwnerLabel] = owner
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -115,8 +115,8 @@ func (r *MigHook) GetPhaseConfigMap(client k8sclient.Client, phase string, owner
 	labels[HookOwnerLabel] = owner
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}

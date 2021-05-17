@@ -44,19 +44,16 @@ func TestReconcile(t *testing.T) {
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 
 	recFn, requests := SetupTestReconcile(newReconciler(mgr))
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
 
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	stopFunc := StartTestManager(mgr, g)
 
-	defer func() {
-		close(stopMgr)
-		mgrStopped.Wait()
-	}()
+	defer stopFunc()
 
 	// Create the directvolumemigration object and expect the Reconcile and Deployment to be created
 	err = c.Create(context.TODO(), instance)

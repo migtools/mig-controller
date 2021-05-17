@@ -33,10 +33,15 @@ func TestStorageMigPlan(t *testing.T) {
 		Namespace: "default",
 	}
 	created := &MigPlan{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MigPlan",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
-		}}
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create

@@ -1,6 +1,7 @@
 package migcluster
 
 import (
+	"context"
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -25,6 +26,7 @@ type RemoteClusterSource struct {
 
 // Start the source.
 func (r *RemoteClusterSource) Start(
+	ctx context.Context,
 	handler handler.EventHandler,
 	queue workqueue.RateLimitingInterface,
 	predicates ...predicate.Predicate) error {
@@ -83,7 +85,6 @@ func (r *RemoteClusterSource) run() {
 // Enqueue a reconcile request.
 func (r *RemoteClusterSource) enqueue(cluster v1alpha1.MigCluster) {
 	clusterEvent := event.GenericEvent{
-		Meta:   &cluster.ObjectMeta,
 		Object: &cluster,
 	}
 	for _, p := range r.predicates {

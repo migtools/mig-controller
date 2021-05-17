@@ -1,6 +1,7 @@
 package migstorage
 
 import (
+	"context"
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -24,6 +25,7 @@ type ProviderSource struct {
 
 // Start the source.
 func (p *ProviderSource) Start(
+	ctx context.Context,
 	handler handler.EventHandler,
 	queue workqueue.RateLimitingInterface,
 	predicates ...predicate.Predicate) error {
@@ -88,7 +90,6 @@ func (p *ProviderSource) run() {
 // Enqueue a reconcile request.
 func (p *ProviderSource) enqueue(storage v1alpha1.MigStorage) {
 	event := event2.GenericEvent{
-		Meta:   &storage.ObjectMeta,
 		Object: &storage,
 	}
 	for _, predicate := range p.predicates {

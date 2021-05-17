@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,14 +22,17 @@ func GetAbnormalEventsForResource(client client.Client,
 	uniqueEventMap := make(map[string]corev1.Event)
 
 	eList := corev1.EventList{}
-	options := k8sclient.InNamespace(nsName.Namespace)
+	options := k8sclient.ListOptions{}
+	k8sclient.InNamespace(nsName.Namespace).ApplyToList(&options)
 	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=%s,type!=Normal",
 		nsName.Name, resourceKind)
-	err := options.SetFieldSelector(fieldSelector)
+	selector, err := fields.ParseSelector(fieldSelector)
 	if err != nil {
 		return nil, fmt.Errorf("field selector construction failed: fieldSelector=[%v]", fieldSelector)
 	}
-	err = client.List(context.TODO(), options, &eList)
+	matchingFields := k8sclient.MatchingFieldsSelector{Selector: selector}
+	matchingFields.ApplyToList(&options)
+	err = client.List(context.TODO(), &eList, &options)
 	if err != nil {
 		return nil, err
 	}

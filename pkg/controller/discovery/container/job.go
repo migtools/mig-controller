@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -60,7 +61,7 @@ func (r *Job) Reconcile() error {
 func (r *Job) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := batchv1.JobList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -103,7 +104,7 @@ func (r *Job) GetStored() ([]model.Model, error) {
 //
 
 func (r *Job) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
@@ -120,7 +121,7 @@ func (r *Job) Create(e event.CreateEvent) bool {
 }
 
 func (r *Job) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*batchv1.Job)
 	if !cast {
 		return false
@@ -137,7 +138,7 @@ func (r *Job) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Job) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false

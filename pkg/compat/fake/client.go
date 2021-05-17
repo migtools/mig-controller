@@ -6,7 +6,6 @@ import (
 
 	"github.com/konveyor/mig-controller/pkg/compat"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	krand "k8s.io/apimachinery/pkg/util/rand"
 	dapi "k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
@@ -28,13 +27,13 @@ func (fake fakeCompatClient) MajorVersion() int {
 func (fake fakeCompatClient) MinorVersion() int {
 	return 0
 }
-func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj runtime.Object) error {
+func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object) error {
 	return fake.Client.Get(ctx, key, obj)
 }
-func (fake fakeCompatClient) List(ctx context.Context, opt *k8sclient.ListOptions, obj runtime.Object) error {
-	return fake.Client.List(ctx, opt, obj)
+func (fake fakeCompatClient) List(ctx context.Context, obj k8sclient.ObjectList, opt ...k8sclient.ListOption) error {
+	return fake.Client.List(ctx, obj, opt...)
 }
-func (fake fakeCompatClient) Create(ctx context.Context, obj runtime.Object) error {
+func (fake fakeCompatClient) Create(ctx context.Context, obj k8sclient.Object, opt ...k8sclient.CreateOption) error {
 	switch obj.(type) {
 	case *corev1.Pod:
 		s := obj.(*corev1.Pod)
@@ -43,17 +42,17 @@ func (fake fakeCompatClient) Create(ctx context.Context, obj runtime.Object) err
 		}
 		obj = s
 	}
-	return fake.Client.Create(ctx, obj)
+	return fake.Client.Create(ctx, obj, opt...)
 }
-func (fake fakeCompatClient) Delete(ctx context.Context, obj runtime.Object, opt ...k8sclient.DeleteOptionFunc) error {
+func (fake fakeCompatClient) Delete(ctx context.Context, obj k8sclient.Object, opt ...k8sclient.DeleteOption) error {
 	return fake.Client.Delete(ctx, obj, opt...)
 }
-func (fake fakeCompatClient) Update(ctx context.Context, obj runtime.Object) error {
-	return fake.Client.Update(ctx, obj)
+func (fake fakeCompatClient) Update(ctx context.Context, obj k8sclient.Object, opt ...k8sclient.UpdateOption) error {
+	return fake.Client.Update(ctx, obj, opt...)
 }
 
-func NewFakeClient(obj ...runtime.Object) compat.Client {
+func NewFakeClient(obj ...k8sclient.Object) compat.Client {
 	return fakeCompatClient{
-		Client: fake.NewFakeClient(obj...),
+		Client: fake.NewClientBuilder().WithObjects(obj...).Build(),
 	}
 }

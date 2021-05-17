@@ -36,6 +36,7 @@ func (p *PodCommand) Run() error {
 			Version: "v1",
 			Kind:    "pods",
 		},
+		false,
 		p.RestCfg,
 		codec)
 	if err != nil {

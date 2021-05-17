@@ -194,7 +194,7 @@ func (h *LogHandler) getLog(ctx *gin.Context, pod *model.Pod) {
 		return
 	}
 	request := podClient.GetLogs(pod.Name, options)
-	stream, err := request.Stream()
+	stream, err := request.Stream(ctx)
 	if err != nil {
 		stErr, cast := err.(*errors.StatusError)
 		if cast {

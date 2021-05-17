@@ -14,7 +14,6 @@ import (
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
 	corev1 "k8s.io/api/core/v1"
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -378,12 +377,14 @@ func isRegistryPodUnHealthy(registryPods corev1.PodList) (bool, corev1.Pod, stri
 func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1.PodList, error) {
 
 	registryPodList := corev1.PodList{}
-	err := registryClient.List(context.TODO(), &k8sclient.ListOptions{
-		LabelSelector: k8sLabels.SelectorFromSet(map[string]string{
+	err := registryClient.List(
+		context.TODO(),
+		&registryPodList,
+		k8sclient.MatchingLabels(map[string]string{
 			migapi.MigrationRegistryLabel: True,
 			"migplan":                     string(plan.UID),
 		}),
-	}, &registryPodList)
+	)
 
 	if err != nil {
 		log.Trace(err)

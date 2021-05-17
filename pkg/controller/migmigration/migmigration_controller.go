@@ -50,7 +50,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migmigration_controller")}
+	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migmigration_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -73,12 +73,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigPlans referenced by MigMigrations
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigPlan{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigMigration{})
-				}),
-		},
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigMigration{})
+		}),
 		&PlanPredicate{})
 	if err != nil {
 		return err
@@ -107,9 +104,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Plan
 	err = indexer.IndexField(
+		context.Background(),
 		&migapi.MigMigration{},
 		migapi.PlanIndexField,
-		func(rawObj runtime.Object) []string {
+		func(rawObj client.Object) []string {
 			m, cast := rawObj.(*migapi.MigMigration)
 			if !cast {
 				return nil
@@ -144,12 +142,10 @@ type ReconcileMigMigration struct {
 }
 
 // Reconcile performs Migrations based on the data in MigMigration
-func (r *ReconcileMigMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
 	// Set values.
-	log.SetValues("migMigration", request.Name)
+	log = logging.WithName("migration", "migMigration", request.Name)
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}

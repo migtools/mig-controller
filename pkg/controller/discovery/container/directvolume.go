@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -60,7 +61,7 @@ func (r *DirectVolumeMigration) Reconcile() error {
 func (r *DirectVolumeMigration) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := migapi.DirectVolumeMigrationList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -95,7 +96,7 @@ func (r *DirectVolumeMigration) GetStored() ([]model.Model, error) {
 //
 
 func (r *DirectVolumeMigration) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
@@ -108,7 +109,7 @@ func (r *DirectVolumeMigration) Create(e event.CreateEvent) bool {
 }
 
 func (r *DirectVolumeMigration) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
@@ -121,7 +122,7 @@ func (r *DirectVolumeMigration) Update(e event.UpdateEvent) bool {
 }
 
 func (r *DirectVolumeMigration) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false

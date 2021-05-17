@@ -157,7 +157,7 @@ func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) 
 func (t *Task) listStagePods(client k8sclient.Client) (StagePodList, error) {
 	podList := corev1.PodList{}
 	options := k8sclient.MatchingLabels(t.stagePodLabels())
-	err := client.List(context.TODO(), options, &podList)
+	err := client.List(context.TODO(), &podList, options)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -235,7 +235,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 
 	for _, ns := range t.sourceNamespaces() {
 		list := &corev1.PersistentVolumeClaimList{}
-		err = client.List(context.TODO(), k8sclient.InNamespace(ns), list)
+		err = client.List(context.TODO(), list, k8sclient.InNamespace(ns))
 		if err != nil {
 			log.Trace(err)
 			return nil
@@ -340,7 +340,7 @@ func buildResourceLimitMapping(namespaces []string, client k8sclient.Client) (ma
 	for _, ns := range namespaces {
 		resourceLimitMapping[ns] = make(map[string]resource.Quantity)
 		limitRangeList := corev1.LimitRangeList{}
-		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &limitRangeList)
+		err := client.List(context.TODO(), &limitRangeList, k8sclient.InNamespace(ns))
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
@@ -408,7 +408,7 @@ func (t *Task) ensureStagePodsFromRunning() error {
 	for _, ns := range t.sourceNamespaces() {
 		t.Log.Info("Building list of stage pods for src cluster namespace", "namespace", ns)
 		podList := corev1.PodList{}
-		err := client.List(context.TODO(), k8sclient.InNamespace(ns), &podList)
+		err := client.List(context.TODO(), &podList, k8sclient.InNamespace(ns))
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -510,7 +510,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 	podList := corev1.PodList{}
 	// Following line still uses MigMigration-based correlation labels since it is not part of rollback process
 	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
-	err = client.List(context.TODO(), options, &podList)
+	err = client.List(context.TODO(), &podList, options)
 	if err != nil {
 		return
 	}
@@ -646,7 +646,7 @@ func (t *Task) allStagePodsMatch() (report []string, err error) {
 	podDList := corev1.PodList{}
 
 	options := k8sclient.MatchingLabels(t.stagePodLabels())
-	err = dstClient.List(context.TODO(), options, &podDList)
+	err = dstClient.List(context.TODO(), &podDList, options)
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -657,7 +657,7 @@ func (t *Task) allStagePodsMatch() (report []string, err error) {
 		return
 	}
 	podSList := corev1.PodList{}
-	err = srcClient.List(context.TODO(), options, &podSList)
+	err = srcClient.List(context.TODO(), &podSList, options)
 
 	dPods := make(map[string]string)
 
@@ -711,9 +711,13 @@ func (t *Task) ensureStagePodsDeleted() error {
 	t.Log.Info("Checking for leftover Stage Pods on source cluster")
 	// Clean up source cluster namespaces
 	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
 		podList := corev1.PodList{}
-		err := srcClient.List(context.TODO(), options, &podList)
+		err := srcClient.List(
+			context.TODO(),
+			&podList,
+			k8sclient.MatchingLabels(t.stagePodCleanupLabel()),
+			k8sclient.InNamespace(srcNamespace),
+		)
 		if err != nil {
 			return err
 		}
@@ -732,9 +736,13 @@ func (t *Task) ensureStagePodsDeleted() error {
 	t.Log.Info("Checking for leftover Stage Pods on destination cluster")
 	// Clean up destination cluster namespaces
 	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
 		podList := corev1.PodList{}
-		err := destClient.List(context.TODO(), options, &podList)
+		err := destClient.List(
+			context.TODO(),
+			&podList,
+			k8sclient.MatchingLabels(t.stagePodCleanupLabel()),
+			k8sclient.InNamespace(destNamespace),
+		)
 		if err != nil {
 			return err
 		}
@@ -772,9 +780,13 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 
 	t.Log.Info("Checking if source cluster Stage Pods are terminated")
 	for _, srcNamespace := range t.PlanResources.MigPlan.GetSourceNamespaces() {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(srcNamespace)
 		podList := corev1.PodList{}
-		err := srcClient.List(context.TODO(), options, &podList)
+		err := srcClient.List(
+			context.TODO(),
+			&podList,
+			k8sclient.MatchingLabels(t.stagePodCleanupLabel()),
+			k8sclient.InNamespace(srcNamespace),
+		)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
@@ -792,9 +804,13 @@ func (t *Task) ensureStagePodsTerminated() (bool, error) {
 
 	t.Log.Info("Checking if destination cluster Stage Pods are terminated")
 	for _, destNamespace := range t.PlanResources.MigPlan.GetDestinationNamespaces() {
-		options := k8sclient.MatchingLabels(t.stagePodCleanupLabel()).InNamespace(destNamespace)
 		podList := corev1.PodList{}
-		err := destClient.List(context.TODO(), options, &podList)
+		err := destClient.List(
+			context.TODO(),
+			&podList,
+			k8sclient.MatchingLabels(t.stagePodCleanupLabel()),
+			k8sclient.InNamespace(destNamespace),
+		)
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}

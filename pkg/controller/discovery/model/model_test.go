@@ -14,7 +14,7 @@ var uid = 0
 func init() {
 	Settings.Load()
 	log := logging.WithName("Test")
-	Log = &log
+	Log = log
 }
 
 func UID() string {

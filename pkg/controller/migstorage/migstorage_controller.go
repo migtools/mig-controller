@@ -48,7 +48,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migstorage_controller")}
+	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migstorage_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -81,12 +81,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to Secrets referenced by MigStorage.
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigStorage{})
-				}),
-		})
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigStorage{})
+		}),
+	)
 	if err != nil {
 		return err
 	}
@@ -105,11 +103,9 @@ type ReconcileMigStorage struct {
 	tracer opentracing.Tracer
 }
 
-func (r *ReconcileMigStorage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("migStorage", request.Name)
+	log = logging.WithName("storage", "migStorage", request.Name)
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}

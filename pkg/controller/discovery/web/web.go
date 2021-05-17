@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 	"sort"
@@ -277,7 +278,6 @@ type BaseHandler struct {
 // Prepare the handler to fulfil the request.
 // Set the `token` and `page` fields using passed parameters.
 func (h *BaseHandler) Prepare(ctx *gin.Context) int {
-	Log.Reset()
 	status := h.setToken(ctx)
 	if status != http.StatusOK {
 		return status
@@ -350,7 +350,7 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 		Log.Trace(err)
 		return http.StatusInternalServerError
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, restCfg, codec)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, restCfg, codec)
 	if err != nil {
 		Log.Trace(err)
 		return http.StatusInternalServerError
@@ -359,7 +359,7 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 	post := restClient.Post()
 	post.Resource("selfsubjectaccessreviews")
 	post.Body(&sar)
-	reply := post.Do()
+	reply := post.Do(context.TODO())
 	reply.StatusCode(&status)
 	switch status {
 	case http.StatusForbidden, http.StatusUnauthorized:
