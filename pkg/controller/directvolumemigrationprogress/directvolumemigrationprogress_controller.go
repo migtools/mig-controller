@@ -107,10 +107,9 @@ type ReconcileDirectVolumeMigrationProgress struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrationprogresses/status,verbs=get;update;patch
-func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("dvmp", request.Name)
+	log = logging.WithName("pvmigrationprogress", "dvmp", request.Name)
 	// Fetch the DirectVolumeMigrationProgress instance
 	pvProgress := &migapi.DirectVolumeMigrationProgress{}
 	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)
@@ -124,7 +123,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(request reconcile.Req
 	// Set MigMigration name key on logger
 	migration, err := pvProgress.GetMigrationforDVMP(r)
 	if migration != nil {
-		log.SetValues("migMigration", migration.Name)
+		log.Real = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing
@@ -444,7 +443,10 @@ func getPod(client compat.Client, podReference *kapi.ObjectReference) (*kapi.Pod
 func (r *RsyncPodProgressTask) getAllMatchingRsyncPods() (*kapi.PodList, error) {
 	podList := kapi.PodList{}
 	err := r.SrcClient.List(context.TODO(),
-		client.InNamespace(r.Owner.Spec.PodNamespace).MatchingLabels(r.Owner.Spec.PodSelector), &podList)
+		&podList,
+		client.InNamespace(r.Owner.Spec.PodNamespace),
+		client.MatchingLabels(r.Owner.Spec.PodSelector),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +469,7 @@ func (r *RsyncPodProgressTask) getPodLogs(pod *kapi.Pod, containerName string, t
 		Previous:  previous,
 		Container: containerName,
 	})
-	readCloser, err := req.Stream()
+	readCloser, err := req.Stream(context.TODO())
 	if err != nil {
 		return "", err
 	}

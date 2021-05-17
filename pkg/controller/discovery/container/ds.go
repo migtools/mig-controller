@@ -1,6 +1,7 @@
 package container
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -39,7 +40,7 @@ type DataSource struct {
 	// The k8s manager.
 	manager controllerruntime.Manager
 	// The k8s manager/controller `stop` channel.
-	stopChannel chan struct{}
+	stopFunc context.CancelFunc
 	// Model event channel.
 	eventChannel chan ModelEvent
 	// The model version threshold used to determine if a
@@ -68,7 +69,7 @@ func (r *DataSource) IsReady() bool {
 // for the container k8s manager/controller but is should never be called. The design
 // is for watches added by each collection reference a predicate that handles the change
 // rather than queuing a reconcile event.
-func (r *DataSource) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *DataSource) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	return reconcile.Result{Requeue: false}, nil
 }
 
@@ -81,7 +82,8 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	var err error
 	r.versionThreshold = 0
 	r.eventChannel = make(chan ModelEvent, 100)
-	r.stopChannel = make(chan struct{})
+	ctx := context.Background()
+	ctx, r.stopFunc = context.WithCancel(ctx)
 	for _, collection := range r.Collections {
 		collection.Bind(r)
 	}
@@ -105,7 +107,7 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 		Log.Trace(err)
 		return err
 	}
-	go r.manager.Start(r.stopChannel)
+	go r.manager.Start(ctx)
 	for _, collection := range r.Collections {
 		err = collection.Reconcile()
 		if err != nil {
@@ -137,7 +139,7 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 // of the associated data in the DB. The data should be deleted
 // when the DataSource is not being restarted.
 func (r *DataSource) Stop(purge bool) {
-	close(r.stopChannel)
+	r.stopFunc()
 	close(r.eventChannel)
 	for _, collection := range r.Collections {
 		collection.Reset()
@@ -231,7 +233,7 @@ func (r *DataSource) buildManager(name string) error {
 	if name == "" {
 		name = "local"
 	}
-	r.manager, err = manager.New(r.RestCfg, manager.Options{})
+	r.manager, err = manager.New(r.RestCfg, manager.Options{MetricsBindAddress: "0"})
 	if err != nil {
 		Log.Trace(err)
 		return err

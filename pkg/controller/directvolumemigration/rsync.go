@@ -129,11 +129,11 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 		pods := corev1.PodList{}
 		err = destClient.List(
 			context.TODO(),
+			&pods,
 			&k8sclient.ListOptions{
 				Namespace:     ns,
 				LabelSelector: selector,
-			},
-			&pods)
+			})
 		if err != nil {
 			return false, nil, err
 		}
@@ -934,7 +934,7 @@ func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 		ns := getSourceNs(bothNs)
 
 		nsPodList := corev1.PodList{}
-		err = srcClient.List(context.TODO(), k8sclient.InNamespace(ns), &nsPodList)
+		err = srcClient.List(context.TODO(), &nsPodList, k8sclient.InNamespace(ns))
 		if err != nil {
 			return nil, err
 		}
@@ -1044,7 +1044,7 @@ func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext,
 			return nil, err
 		}
 		podList := &corev1.PodList{}
-		err = srcClient.List(context.TODO(), &k8sclient.ListOptions{Namespace: ns}, podList)
+		err = srcClient.List(context.TODO(), podList, &k8sclient.ListOptions{Namespace: ns})
 		if err != nil {
 			return nil, err
 		}
@@ -1434,11 +1434,11 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 	// Get Pod list
 	err := client.List(
 		context.TODO(),
+		&podList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&podList)
+		})
 	if err != nil {
 		return err, false
 	}
@@ -1451,11 +1451,11 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 	// Get Secret list
 	err = client.List(
 		context.TODO(),
+		&secretList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&secretList)
+		})
 	if err != nil {
 		return err, false
 	}
@@ -1467,11 +1467,11 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 	// Get configmap list
 	err = client.List(
 		context.TODO(),
+		&cmList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&cmList)
+		})
 	if err != nil {
 		return err, false
 	}
@@ -1483,11 +1483,11 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 	// Get svc list
 	err = client.List(
 		context.TODO(),
+		&svcList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&svcList)
+		})
 	if err != nil {
 		return err, false
 	}
@@ -1500,11 +1500,11 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 	// Get route list
 	err = client.List(
 		context.TODO(),
+		&routeList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&routeList)
+		})
 	if err != nil {
 		return err, false
 	}
@@ -1546,22 +1546,22 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 	// Get Pod list
 	err := client.List(
 		context.TODO(),
+		&podList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&podList)
+		})
 	if err != nil {
 		return err
 	}
 	// Get Secret list
 	err = client.List(
 		context.TODO(),
+		&secretList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&secretList)
+		})
 	if err != nil {
 		return err
 	}
@@ -1569,11 +1569,11 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 	// Get configmap list
 	err = client.List(
 		context.TODO(),
+		&cmList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&cmList)
+		})
 	if err != nil {
 		return err
 	}
@@ -1581,11 +1581,11 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 	// Get svc list
 	err = client.List(
 		context.TODO(),
+		&svcList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&svcList)
+		})
 	if err != nil {
 		return err
 	}
@@ -1593,11 +1593,11 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 	// Get route list
 	err = client.List(
 		context.TODO(),
+		&routeList,
 		&k8sclient.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
-		},
-		&routeList)
+		})
 	if err != nil {
 		return err
 	}
@@ -2417,7 +2417,10 @@ func (t *Task) getAllPodsForOperation(client compat.Client, operation migapi.Rsy
 	pvcNamespace, pvcName := operation.GetPVDetails()
 	labels := GetRsyncPodSelector(pvcName)
 	err := client.List(context.TODO(),
-		k8sclient.InNamespace(pvcNamespace).MatchingLabels(labels), &podList)
+		&podList,
+		k8sclient.InNamespace(pvcNamespace),
+		k8sclient.MatchingLabels(labels),
+	)
 	if err != nil {
 		t.Log.Error(err,
 			"failed to list all Rsync Pods for PVC", "pvc", operation)

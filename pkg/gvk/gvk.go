@@ -1,6 +1,7 @@
 package gvk
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -253,7 +254,7 @@ func (r *Compare) collectIncompatibleMapping(incompatibleResources []schema.Grou
 func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
 	namespacesOccurred := []string{}
 	options := metav1.ListOptions{}
-	resourceList, err := r.SrcClient.Resource(gvr).List(options)
+	resourceList, err := r.SrcClient.Resource(gvr).List(context.Background(), options)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +270,7 @@ func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
 
 func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.APIResourceList, error) {
 	options := metav1.ListOptions{}
-	crdList, err := r.SrcClient.Resource(crdGVR).List(options)
+	crdList, err := r.SrcClient.Resource(crdGVR).List(context.Background(), options)
 	if err != nil {
 		return nil, err
 	}

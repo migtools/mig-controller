@@ -148,7 +148,7 @@ func (r PlanStorage) getLabels() map[string]string {
 	}
 	migrationControllerList.SetGroupVersionKind(gvk)
 	options := k8sclient.InNamespace(migapi.VeleroNamespace)
-	err := r.List(context.TODO(), options, &migrationControllerList)
+	err := r.List(context.TODO(), &migrationControllerList, options)
 	if err == nil && len(migrationControllerList.Items) > 0 {
 		labels["migrationcontroller"] = string(migrationControllerList.Items[0].GetUID())
 	}

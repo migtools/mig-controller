@@ -48,7 +48,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDirectImageStreamMigration{
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetRecorder("directimagestreammigration_controller"),
+		EventRecorder: mgr.GetEventRecorderFor("directimagestreammigration_controller"),
 	}
 }
 
@@ -69,13 +69,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.DirectImageStreamMigration{})
-				}),
-		},
-		//		&ClusterPredicate{}
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.DirectImageStreamMigration{})
+		}),
 	)
 	if err != nil {
 		return err
@@ -101,10 +97,8 @@ type ReconcileDirectImageStreamMigration struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations/status,verbs=get;update;patch
-func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
-	log.Reset()
-	log.SetValues("dism", request.Name)
+func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	log = logging.WithName("directimagestream", "dism", request.Name)
 	// Fetch the DirectImageStreamMigration instance
 	imageStreamMigration := &migapi.DirectImageStreamMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageStreamMigration)
@@ -121,7 +115,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(request reconcile.Reques
 	// Set MigMigration name key on logger
 	migration, err := imageStreamMigration.GetMigrationForDISM(r)
 	if migration != nil {
-		log.SetValues("migMigration", migration.Name)
+		log.Real = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx

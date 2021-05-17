@@ -49,7 +49,7 @@ func PodManagersRecreated(client k8sclient.Client, options *k8sclient.ListOption
 
 	for _, gvk := range podManagingResources {
 		podManagersList.SetGroupVersionKind(gvk)
-		err := client.List(context.TODO(), options, &podManagersList)
+		err := client.List(context.TODO(), &podManagersList, options)
 		if err != nil {
 			return false, err
 		}
@@ -90,7 +90,7 @@ func PodManagersRecreated(client k8sclient.Client, options *k8sclient.ListOption
 func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions) (bool, error) {
 	daemonSetList := v1beta1.DaemonSetList{}
 
-	err := client.List(context.TODO(), options, &daemonSetList)
+	err := client.List(context.TODO(), &daemonSetList, options)
 	if err != nil {
 		return false, err
 	}
@@ -108,7 +108,7 @@ func DaemonSetsRecreated(client k8sclient.Client, options *k8sclient.ListOptions
 func PodsUnhealthy(client k8sclient.Client, options *k8sclient.ListOptions) (*[]unstructured.Unstructured, error) {
 	podList := corev1.PodList{}
 
-	err := client.List(context.TODO(), options, &podList)
+	err := client.List(context.TODO(), &podList, options)
 	if err != nil {
 		return nil, err
 	}

@@ -61,9 +61,11 @@ func (t *Task) getAppState(client k8sclient.Client) error {
 		t.Log.Info("Checking migrated app health in destination"+
 			"cluster namespace.",
 			"namespace", namespace)
-		options := k8sclient.InNamespace(namespace)
+		options := k8sclient.ListOptions{
+			Namespace: namespace,
+		}
 
-		unhealthyPods, err := health.PodsUnhealthy(client, options)
+		unhealthyPods, err := health.PodsUnhealthy(client, &options)
 		if err != nil {
 			return err
 		}
@@ -90,14 +92,16 @@ func (t *Task) podsRecreated(client k8sclient.Client) (bool, error) {
 	targetNamespaces := t.PlanResources.MigPlan.Spec.Namespaces
 	// Scan namespaces for resources to wait
 	for _, namespace := range targetNamespaces {
-		options := k8sclient.InNamespace(namespace)
+		options := k8sclient.ListOptions{
+			Namespace: namespace,
+		}
 
-		finished, err := health.DaemonSetsRecreated(client, options)
+		finished, err := health.DaemonSetsRecreated(client, &options)
 		if err != nil || !finished {
 			return finished, err
 		}
 
-		finished, err = health.PodManagersRecreated(client, options)
+		finished, err = health.PodManagersRecreated(client, &options)
 		if err != nil || !finished {
 			return finished, err
 		}

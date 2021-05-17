@@ -67,7 +67,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migplan_controller")}
+	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migplan_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -91,12 +91,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigClusters referenced by MigPlans
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigPlan{})
-				}),
-		},
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigPlan{})
+		}),
 		&ClusterPredicate{})
 	if err != nil {
 		return err
@@ -105,12 +102,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigStorage referenced by MigPlans
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStorage{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigPlan{})
-				}),
-		},
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigPlan{})
+		}),
 		&StoragePredicate{})
 	if err != nil {
 		return err
@@ -119,9 +113,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigMigrations.
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigMigration{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(MigrationRequests),
-		},
+		handler.EnqueueRequestsFromMapFunc(MigrationRequests),
 		&MigrationPredicate{})
 	if err != nil {
 		return err
@@ -132,9 +124,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Plan
 	err = indexer.IndexField(
+		context.Background(),
 		&migapi.MigPlan{},
 		migapi.ClosedIndexField,
-		func(rawObj runtime.Object) []string {
+		func(rawObj k8sclient.Object) []string {
 			p, cast := rawObj.(*migapi.MigPlan)
 			if !cast {
 				return nil
@@ -148,9 +141,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	// Pod
 	err = indexer.IndexField(
+		context.Background(),
 		&kapi.Pod{},
 		"status.phase",
-		func(rawObj runtime.Object) []string {
+		func(rawObj k8sclient.Object) []string {
 			p, cast := rawObj.(*kapi.Pod)
 			if !cast {
 				return nil
@@ -177,11 +171,9 @@ type ReconcileMigPlan struct {
 	tracer opentracing.Tracer
 }
 
-func (r *ReconcileMigPlan) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("migPlan", request.Name)
+	log = logging.WithName("plan", "migPlan", request.Name)
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
@@ -508,7 +500,7 @@ func (r *ReconcileMigPlan) ensureMigAnalytics(ctx context.Context, plan *migapi.
 		defer span.Finish()
 	}
 	migAnalytics := &migapi.MigAnalyticList{}
-	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	err := r.List(context.TODO(), migAnalytics, k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}))
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return liberr.Wrap(err)
@@ -552,7 +544,7 @@ func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(ctx context.Context, plan *m
 		defer span.Finish()
 	}
 	migAnalytics := &migapi.MigAnalyticList{}
-	err := r.List(context.TODO(), k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}), migAnalytics)
+	err := r.List(context.TODO(), migAnalytics, k8sclient.MatchingLabels(map[string]string{MigPlan: plan.Name}))
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}

@@ -31,10 +31,15 @@ func TestHookMigHook(t *testing.T) {
 		Namespace: "default",
 	}
 	created := &MigHook{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MigHook",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
-		}}
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create

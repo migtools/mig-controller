@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,7 +60,7 @@ func (r *Backup) Reconcile() error {
 func (r *Backup) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := velero.BackupList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -102,7 +103,7 @@ func (r *Backup) GetStored() ([]model.Model, error) {
 //
 
 func (r *Backup) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.Backup)
 	if !cast {
 		return false
@@ -119,7 +120,7 @@ func (r *Backup) Create(e event.CreateEvent) bool {
 }
 
 func (r *Backup) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*velero.Backup)
 	if !cast {
 		return false
@@ -136,7 +137,7 @@ func (r *Backup) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Backup) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.Backup)
 	if !cast {
 		return false
@@ -204,7 +205,7 @@ func (r *Restore) Reconcile() error {
 func (r *Restore) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := velero.RestoreList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -247,7 +248,7 @@ func (r *Restore) GetStored() ([]model.Model, error) {
 //
 
 func (r *Restore) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.Restore)
 	if !cast {
 		return false
@@ -264,7 +265,7 @@ func (r *Restore) Create(e event.CreateEvent) bool {
 }
 
 func (r *Restore) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*velero.Restore)
 	if !cast {
 		return false
@@ -281,7 +282,7 @@ func (r *Restore) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Restore) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.Restore)
 	if !cast {
 		return false
@@ -349,7 +350,7 @@ func (r *PodVolumeBackup) Reconcile() error {
 func (r *PodVolumeBackup) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := velero.PodVolumeBackupList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -392,7 +393,7 @@ func (r *PodVolumeBackup) GetStored() ([]model.Model, error) {
 //
 
 func (r *PodVolumeBackup) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.PodVolumeBackup)
 	if !cast {
 		return false
@@ -409,7 +410,7 @@ func (r *PodVolumeBackup) Create(e event.CreateEvent) bool {
 }
 
 func (r *PodVolumeBackup) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*velero.PodVolumeBackup)
 	if !cast {
 		return false
@@ -426,7 +427,7 @@ func (r *PodVolumeBackup) Update(e event.UpdateEvent) bool {
 }
 
 func (r *PodVolumeBackup) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.PodVolumeBackup)
 	if !cast {
 		return false
@@ -494,7 +495,7 @@ func (r *PodVolumeRestore) Reconcile() error {
 func (r *PodVolumeRestore) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := velero.PodVolumeRestoreList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -537,7 +538,7 @@ func (r *PodVolumeRestore) GetStored() ([]model.Model, error) {
 //
 
 func (r *PodVolumeRestore) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.PodVolumeRestore)
 	if !cast {
 		return false
@@ -554,7 +555,7 @@ func (r *PodVolumeRestore) Create(e event.CreateEvent) bool {
 }
 
 func (r *PodVolumeRestore) Update(e event.UpdateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*velero.PodVolumeRestore)
 	if !cast {
 		return false
@@ -571,7 +572,7 @@ func (r *PodVolumeRestore) Update(e event.UpdateEvent) bool {
 }
 
 func (r *PodVolumeRestore) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*velero.PodVolumeRestore)
 	if !cast {
 		return false

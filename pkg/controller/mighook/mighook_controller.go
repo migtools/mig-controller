@@ -45,7 +45,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("mighook_controller")}
+	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("mighook_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -79,11 +79,9 @@ type ReconcileMigHook struct {
 	tracer opentracing.Tracer
 }
 
-func (r *ReconcileMigHook) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("migHook", request.Name)
+	log = logging.WithName("hook", "migHook", request.Name)
 
 	// Fetch the MigHook instance
 	hook := &migapi.MigHook{}

@@ -72,7 +72,7 @@ func ListTemplatePods(client k8sclient.Client, namespaces []string) ([]corev1.Po
 func listDeploymentTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := appsv1.DeploymentList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func listDeploymentTemplatePodsForNamespace(client k8sclient.Client, ns string) 
 func listDeploymentConfigTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := ocappsv1.DeploymentConfigList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func listDeploymentConfigTemplatePodsForNamespace(client k8sclient.Client, ns st
 func listReplicationControllerTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := corev1.ReplicationControllerList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func listReplicationControllerTemplatePodsForNamespace(client k8sclient.Client, 
 func listDaemonSetTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := appsv1.DaemonSetList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func listDaemonSetTemplatePodsForNamespace(client k8sclient.Client, ns string) (
 func listStatefulSetTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := appsv1.StatefulSetList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func listStatefulSetTemplatePodsForNamespace(client k8sclient.Client, ns string)
 func listReplicaSetTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := appsv1.ReplicaSetList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func listReplicaSetTemplatePodsForNamespace(client k8sclient.Client, ns string) 
 func listJobTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := batchv1.JobList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func listJobTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]core
 func listCronJobTemplatePodsForNamespace(client k8sclient.Client, ns string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 	list := batchv1beta.CronJobList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(ns), &list)
+	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
 		return nil, err
 	}

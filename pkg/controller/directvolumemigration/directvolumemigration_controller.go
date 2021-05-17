@@ -91,12 +91,10 @@ type ReconcileDirectVolumeMigration struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directvolumemigrations/status,verbs=get;update;patch
-func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
-	log.Reset()
+func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 
 	// Set values
-	log.SetValues("dvm", request.Name)
+	log = logging.WithName("directvolume", "dvm", request.Name)
 
 	// Fetch the DirectVolumeMigration instance
 	direct := &migapi.DirectVolumeMigration{}
@@ -114,7 +112,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(request reconcile.Request) (r
 	// Set MigMigration name key on logger
 	migration, err := direct.GetMigrationForDVM(r)
 	if migration != nil {
-		log.SetValues("migMigration", migration.Name)
+		log.Real = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx

@@ -362,7 +362,7 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 				}),
 			Namespace: name,
 		}
-		err := client.List(context.TODO(), &options, &list)
+		err := client.List(context.TODO(), &list, &options)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -1033,11 +1033,11 @@ func (r ReconcileMigPlan) validateSourceRegistryProxySecret(plan *migapi.MigPlan
 	}
 	err = srcClient.List(
 		context.TODO(),
+		&list,
 		&k8sclient.ListOptions{
 			Namespace:     migapi.VeleroNamespace,
 			LabelSelector: selector,
 		},
-		&list,
 	)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -1095,11 +1095,11 @@ func (r ReconcileMigPlan) validateDestinationRegistryProxySecret(plan *migapi.Mi
 	}
 	err = destClient.List(
 		context.TODO(),
+		&list,
 		&k8sclient.ListOptions{
 			Namespace:     migapi.VeleroNamespace,
 			LabelSelector: selector,
 		},
-		&list,
 	)
 	if err != nil {
 		return liberr.Wrap(err)

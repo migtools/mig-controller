@@ -195,7 +195,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 	pvMap := PvMap{}
 	list := core.PersistentVolumeList{}
-	err := client.List(context.TODO(), &k8sclient.ListOptions{}, &list)
+	err := client.List(context.TODO(), &list, &k8sclient.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPlan) (Claims, error) {
 	claims := Claims{}
 	list := &core.PersistentVolumeClaimList{}
-	err := client.List(context.TODO(), &k8sclient.ListOptions{}, list)
+	err := client.List(context.TODO(), list, &k8sclient.ListOptions{})
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -231,7 +231,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 	}
 
 	runningPods := &core.PodList{}
-	err = client.List(context.TODO(), &k8sclient.ListOptions{}, runningPods)
+	err = client.List(context.TODO(), runningPods, &k8sclient.ListOptions{})
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}

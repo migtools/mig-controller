@@ -1020,7 +1020,12 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 			}
 			podExistsInSource := func(pod *corev1.Pod) bool {
 				srcPods := corev1.PodList{}
-				errs := tt.args.client.List(context.TODO(), k8sclient.InNamespace(pod.Namespace).MatchingLabels(pod.Labels), &srcPods)
+				errs := tt.args.client.List(
+					context.TODO(),
+					&srcPods,
+					k8sclient.InNamespace(pod.Namespace),
+					k8sclient.MatchingLabels(pod.Labels),
+				)
 				if errs != nil {
 					t.Errorf("RsyncOperationsContext.EnsureRsyncOperations() failed getting pods in source namespace")
 				}

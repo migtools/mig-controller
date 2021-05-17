@@ -233,10 +233,11 @@ var migAnalytic4 = &migapi.MigAnalytic{
 
 var expected1 = migapi.MigAnalytic{
 	ObjectMeta: metav1.ObjectMeta{
-		GenerateName: "test-plan-",
-		Namespace:    "test-ns",
-		Labels:       map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
-		Annotations:  map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
+		GenerateName:    "test-plan-",
+		Namespace:       "test-ns",
+		ResourceVersion: "1",
+		Labels:          map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
+		Annotations:     map[string]string{MigPlan: "test-plan", CreatedBy: "test-plan"},
 		OwnerReferences: []metav1.OwnerReference{
 			{
 				APIVersion: "",
@@ -263,9 +264,10 @@ var expected1 = migapi.MigAnalytic{
 
 var expected2 = migapi.MigAnalytic{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "miganalytic-01",
-		Namespace: "openshift-migration",
-		Labels:    map[string]string{MigPlan: "migplan-01"},
+		Name:            "miganalytic-01",
+		Namespace:       "openshift-migration",
+		ResourceVersion: "1",
+		Labels:          map[string]string{MigPlan: "migplan-01"},
 	},
 	Spec: migapi.MigAnalyticSpec{
 		MigPlanRef: &corev1.ObjectReference{
@@ -369,12 +371,15 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			gotList := &migapi.MigAnalyticList{}
-			err := r.List(context.TODO(), &client.ListOptions{}, gotList)
+			err := r.List(context.TODO(), gotList, &client.ListOptions{})
 			if err != nil {
 				t.Errorf("ensureMigAnalytics() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			for _, got := range gotList.Items {
 				if got.Name == "miganalytic-00" || got.Name == "miganalytic-01" || got.GenerateName == "test-plan-" {
+					if got.GenerateName == "test-plan-" {
+						got.Name = ""
+					}
 					if !reflect.DeepEqual(got, tt.want) {
 						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, tt.want)
 					}

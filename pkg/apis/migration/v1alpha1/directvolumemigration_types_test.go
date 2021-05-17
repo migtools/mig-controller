@@ -31,10 +31,15 @@ func TestStorageDirectVolumeMigration(t *testing.T) {
 		Namespace: "default",
 	}
 	created := &DirectVolumeMigration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DirectVolumeMigration",
+			APIVersion: "migration.openshift.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
-		}}
+		},
+	}
 	g := gomega.NewGomegaWithT(t)
 
 	// Test Create

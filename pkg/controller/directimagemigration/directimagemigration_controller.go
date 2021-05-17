@@ -48,7 +48,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDirectImageMigration{
 		Client:        mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetRecorder("directimagemigration_controller"),
+		EventRecorder: mgr.GetEventRecorderFor("directimagemigration_controller"),
 	}
 }
 
@@ -69,13 +69,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.DirectImageMigration{})
-				}),
-		},
-		//		&ClusterPredicate{}
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.DirectImageMigration{})
+		}),
 	)
 	if err != nil {
 		return err
@@ -110,11 +106,9 @@ type ReconcileDirectImageMigration struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagemigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagemigrations/status,verbs=get;update;patch
-func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the DirectImageMigration instance
-	log.Reset()
-	log.SetValues("dim", request.Name)
+	log = logging.WithName("directimage", "dim", request.Name)
 	imageMigration := &migapi.DirectImageMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageMigration)
 	if err != nil {
@@ -130,7 +124,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(request reconcile.Request) (re
 	// Set MigMigration name key on logger
 	migration, err := imageMigration.GetMigrationForDIM(r)
 	if migration != nil {
-		log.SetValues("migMigration", migration.Name)
+		log.Real = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx

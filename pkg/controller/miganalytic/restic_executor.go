@@ -91,10 +91,12 @@ func (r *ResticDFCommandExecutor) loadResticPodReferences() error {
 		r.ResticPodReferences = make(map[string]*corev1.Pod)
 	}
 	resticPodList := corev1.PodList{}
-	labelSelector := client.InNamespace(r.Namespace).MatchingLabels(
-		map[string]string{
-			ResticPodLabelKey: ResticPodLabelValue})
-	err := r.Client.List(context.TODO(), labelSelector, &resticPodList)
+
+	err := r.Client.List(context.TODO(),
+		&resticPodList,
+		client.InNamespace(r.Namespace),
+		client.MatchingLabels(map[string]string{ResticPodLabelKey: ResticPodLabelValue}),
+	)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

@@ -363,7 +363,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Deployment
 	dList := appv1.DeploymentList{}
-	err = client.List(context.TODO(), options, &dList)
+	err = client.List(context.TODO(), &dList, options)
 	if err != nil {
 		return err
 	}
@@ -376,7 +376,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// DeploymentConfig
 	dcList := ocapi.DeploymentConfigList{}
-	err = client.List(context.TODO(), options, &dcList)
+	err = client.List(context.TODO(), &dcList, options)
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Service
 	svList := kapi.ServiceList{}
-	err = client.List(context.TODO(), options, &svList)
+	err = client.List(context.TODO(), &svList, options)
 	if err != nil {
 		return err
 	}
@@ -402,7 +402,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Pod
 	pList := kapi.PodList{}
-	err = client.List(context.TODO(), options, &pList)
+	err = client.List(context.TODO(), &pList, options)
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Secret
 	sList := kapi.SecretList{}
-	err = client.List(context.TODO(), options, &sList)
+	err = client.List(context.TODO(), &sList, options)
 	if err != nil {
 		return err
 	}
@@ -428,7 +428,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// ImageStream
 	iList := imgapi.ImageStreamList{}
-	err = client.List(context.TODO(), options, &iList)
+	err = client.List(context.TODO(), &iList, options)
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Backup
 	bList := velero.BackupList{}
-	err = client.List(context.TODO(), options, &bList)
+	err = client.List(context.TODO(), &bList, options)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// Restore
 	rList := velero.RestoreList{}
-	err = client.List(context.TODO(), options, &rList)
+	err = client.List(context.TODO(), &rList, options)
 	if err != nil {
 		return err
 	}
@@ -467,7 +467,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// BSL
 	bslList := velero.BackupStorageLocationList{}
-	err = client.List(context.TODO(), options, &bslList)
+	err = client.List(context.TODO(), &bslList, options)
 	if err != nil {
 		return err
 	}
@@ -480,7 +480,7 @@ func (m *MigCluster) DeleteResources(client k8sclient.Client, labels map[string]
 
 	// VSL
 	vslList := velero.VolumeSnapshotLocationList{}
-	err = client.List(context.TODO(), options, &vslList)
+	err = client.List(context.TODO(), &vslList, options)
 	if err != nil {
 		return err
 	}
@@ -633,8 +633,8 @@ func (r *MigCluster) GetKubeStorageClasses(client k8sclient.Client) ([]storageap
 	list := storageapi.StorageClassList{}
 	err := client.List(
 		context.TODO(),
-		&k8sclient.ListOptions{},
-		&list)
+		&list,
+		&k8sclient.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -659,8 +659,8 @@ func (m *MigCluster) GetInternalRegistryPath(c k8sclient.Client) (string, error)
 	isList := imgapi.ImageStreamList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.InNamespace("openshift"),
-		&isList)
+		&isList,
+		k8sclient.InNamespace("openshift"))
 	if err == nil && len(isList.Items) > 0 {
 		if value := isList.Items[0].Status.DockerImageRepository; len(value) > 0 {
 			ref, err := reference.Parse(value)

@@ -49,7 +49,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("migcluster_controller")}
+	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migcluster_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -82,12 +82,10 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(
-				func(a handler.MapObject) []reconcile.Request {
-					return migref.GetRequests(a, migapi.MigCluster{})
-				}),
-		})
+		handler.EnqueueRequestsFromMapFunc(func(a k8sclient.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigCluster{})
+		}),
+	)
 	if err != nil {
 		return err
 	}
@@ -107,11 +105,9 @@ type ReconcileMigCluster struct {
 	tracer     opentracing.Tracer
 }
 
-func (r *ReconcileMigCluster) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("migCluster", request.Name)
+	log = logging.WithName("cluster", "migCluster", request.Name)
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}

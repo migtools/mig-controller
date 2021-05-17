@@ -215,10 +215,9 @@ func (r *MigPlan) ListMigrations(client k8sclient.Client) ([]*MigMigration, erro
 	// Search
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingField(
-			PlanIndexField,
-			fmt.Sprintf("%s/%s", r.Namespace, r.Name)),
-		&qlist)
+		&qlist,
+		k8sclient.MatchingFields{PlanIndexField: fmt.Sprintf("%s/%s", r.Namespace, r.Name)},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -298,8 +297,8 @@ func (r *MigPlan) GetRegistrySecret(client k8sclient.Client) (*kapi.Secret, erro
 	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -350,11 +349,11 @@ func (r *MigPlan) GetProxySecret(client k8sclient.Client) (*kapi.Secret, error) 
 	})
 	err := client.List(
 		context.TODO(),
+		&list,
 		&k8sclient.ListOptions{
 			Namespace:     VeleroNamespace,
 			LabelSelector: selector,
 		},
-		&list,
 	)
 	// If error listing secrets return no env vars
 	if err != nil {
@@ -475,8 +474,8 @@ func (r *MigPlan) GetRegistryDeployment(client k8sclient.Client) (*appsv1.Deploy
 	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -554,8 +553,8 @@ func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, er
 	labels[MigrationRegistryLabel] = True
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -584,8 +583,8 @@ func (r *MigPlan) GetBSL(client k8sclient.Client) (*velero.BackupStorageLocation
 	labels := r.GetCorrelationLabels()
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -603,8 +602,8 @@ func (r *MigPlan) GetVSL(client k8sclient.Client) (*velero.VolumeSnapshotLocatio
 	labels := r.GetCorrelationLabels()
 	err := client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}

@@ -73,7 +73,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetRecorder("miganalytic_controller")}
+	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("miganalytic_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -123,11 +123,9 @@ type MigAnalyticPersistentVolumeDetails struct {
 	VolumeName          string
 }
 
-func (r *ReconcileMigAnalytic) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	ctx := context.Background()
+func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log.Reset()
-	log.SetValues("migAnalytic", request.Name)
+	log = logging.WithName("analytics", "migAnalytic", request.Name)
 
 	// Fetch the MigAnalytic instance
 	analytic := &migapi.MigAnalytic{}
@@ -382,8 +380,8 @@ func (r *ReconcileMigAnalytic) getNodeToPVCMapForNS(ns *migapi.MigAnalyticNamesp
 	nodeToPVDetails := map[string][]MigAnalyticPersistentVolumeDetails{}
 	err := client.List(
 		context.TODO(),
-		k8sclient.InNamespace(ns.Namespace),
-		&podList)
+		&podList,
+		k8sclient.InNamespace(ns.Namespace))
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -460,7 +458,7 @@ func (r *ReconcileMigAnalytic) analyzeK8SResources(dynamic dynamic.Interface,
 				}
 			}
 
-			list, err := dynamic.Resource(gvr).Namespace(ns.Namespace).List(metav1.ListOptions{})
+			list, err := dynamic.Resource(gvr).Namespace(ns.Namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -511,7 +509,7 @@ func (r *ReconcileMigAnalytic) analyzeImages(client compat.Client,
 		return liberr.Wrap(err)
 	}
 
-	err = client.List(context.TODO(), k8sclient.InNamespace(namespace.Namespace), &imageStreamList)
+	err = client.List(context.TODO(), &imageStreamList, k8sclient.InNamespace(namespace.Namespace))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -546,7 +544,7 @@ func (r *ReconcileMigAnalytic) analyzeImages(client compat.Client,
 func (r *ReconcileMigAnalytic) analyzePVCapacity(client compat.Client,
 	namespace *migapi.MigAnalyticNamespace) error {
 	pvcList := corev1.PersistentVolumeClaimList{}
-	err := client.List(context.TODO(), k8sclient.InNamespace(namespace.Namespace), &pvcList)
+	err := client.List(context.TODO(), &pvcList, k8sclient.InNamespace(namespace.Namespace))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -643,7 +641,7 @@ func findSpecTag(tags []imagev1.TagReference, name string) *imagev1.TagReference
 func GetRegistryInfo(major, minor int, client compat.Client) (string, error) {
 	imageStreams := imagev1.ImageStreamList{}
 
-	err := client.List(context.TODO(), k8sclient.InNamespace("openshift"), &imageStreams)
+	err := client.List(context.TODO(), &imageStreams, k8sclient.InNamespace("openshift"))
 	if err == nil && len(imageStreams.Items) > 0 {
 		if value := imageStreams.Items[0].Status.DockerImageRepository; len(value) > 0 {
 			ref, err := reference.Parse(value)

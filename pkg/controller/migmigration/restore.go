@@ -130,8 +130,8 @@ func (t Task) getRestore(labels map[string]string) (*velero.Restore, error) {
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(labels),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(labels))
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +155,8 @@ func (t *Task) getPodVolumeRestoresForRestore(restore *velero.Restore) *velero.P
 	}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(restoreAssociationLabel),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(restoreAssociationLabel))
 	if err != nil {
 		log.Trace(err)
 	}
@@ -441,8 +441,8 @@ func (t *Task) deleteCorrelatedRestores() error {
 	list := velero.RestoreList{}
 	err = client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()),
-		&list)
+		&list,
+		k8sclient.MatchingLabels(t.PlanResources.MigPlan.GetCorrelationLabels()))
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -475,8 +475,8 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 	list := velero.RestoreList{}
 	err = clusterClient.List(
 		context.TODO(),
-		k8sclient.InNamespace(migapi.VeleroNamespace),
-		&list)
+		&list,
+		k8sclient.InNamespace(migapi.VeleroNamespace))
 	if err != nil {
 		return 0, 0, liberr.Wrap(err)
 	}
@@ -546,8 +546,8 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 	list := velero.PodVolumeRestoreList{}
 	err = clusterClient.List(
 		context.TODO(),
-		k8sclient.InNamespace(migapi.VeleroNamespace),
-		&list)
+		&list,
+		k8sclient.InNamespace(migapi.VeleroNamespace))
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
@@ -653,10 +653,12 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 		return liberr.Wrap(err)
 	}
 
-	listOptions := k8sclient.MatchingLabels(map[string]string{
+	clientListOptions := k8sclient.ListOptions{}
+	matchingLabels := k8sclient.MatchingLabels(map[string]string{
 		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
-	}).AsListOptions()
-
+	})
+	matchingLabels.ApplyToList(&clientListOptions)
+	listOptions := clientListOptions.AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombined := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
@@ -665,19 +667,19 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 				"namespace", ns,
 				"gvk", gvkCombined,
 				"label", fmt.Sprintf("%v:%v", migapi.MigPlanLabel, string(t.PlanResources.MigPlan.UID)))
-			err = client.Resource(gvr).DeleteCollection(&metav1.DeleteOptions{}, *listOptions)
+			err = client.Resource(gvr).DeleteCollection(context.Background(), metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
 			}
 			if !k8serror.IsMethodNotSupported(err) && !k8serror.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
+			list, err := client.Resource(gvr).Namespace(ns).List(context.Background(), *listOptions)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 			for _, r := range list.Items {
-				err = client.Resource(gvr).Namespace(ns).Delete(r.GetName(), nil)
+				err = client.Resource(gvr).Namespace(ns).Delete(context.Background(), r.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					// Will ignore the ones that were removed, or for some reason are not supported
 					// Assuming that main resources will be removed, such as pods and pvcs
@@ -710,7 +712,7 @@ func (t *Task) deleteMovedNfsPVs() error {
 		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
 	})
 	list := corev1.PersistentVolumeList{}
-	err = dstClient.List(context.TODO(), listOptions, &list)
+	err = dstClient.List(context.TODO(), &list, listOptions)
 	if err != nil {
 		return err
 	}
@@ -748,15 +750,18 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 		return false, liberr.Wrap(err)
 	}
 
-	listOptions := k8sclient.MatchingLabels(map[string]string{
+	clientListOptions := k8sclient.ListOptions{}
+	matchingLabels := k8sclient.MatchingLabels(map[string]string{
 		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
-	}).AsListOptions()
+	})
+	matchingLabels.ApplyToList(&clientListOptions)
+	listOptions := clientListOptions.AsListOptions()
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
 			log.Info("Rollback: Checking for leftover resources in destination cluster",
 				"gvk", gvkCombinedName, "namespace", ns)
-			list, err := client.Resource(gvr).Namespace(ns).List(*listOptions)
+			list, err := client.Resource(gvr).Namespace(ns).List(context.Background(), *listOptions)
 			if err != nil {
 				return false, liberr.Wrap(err)
 			}

@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -59,7 +60,7 @@ func (r *Namespace) Reconcile() error {
 func (r *Namespace) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.NamespaceList{}
-	err := r.ds.Client.List(context.TODO(), nil, &onCluster)
+	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		Log.Trace(err)
 		return nil, err
@@ -102,7 +103,7 @@ func (r *Namespace) GetStored() ([]model.Model, error) {
 //
 
 func (r *Namespace) Create(e event.CreateEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Namespace)
 	if !cast {
 		return false
@@ -123,7 +124,7 @@ func (r *Namespace) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Namespace) Delete(e event.DeleteEvent) bool {
-	Log.Reset()
+	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Namespace)
 	if !cast {
 		return false

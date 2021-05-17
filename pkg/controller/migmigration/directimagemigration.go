@@ -31,8 +31,8 @@ func (t *Task) getDirectImageMigration() (*migapi.DirectImageMigration, error) {
 	dimList := migapi.DirectImageMigrationList{}
 	err := t.Client.List(
 		context.TODO(),
-		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()),
-		&dimList)
+		&dimList,
+		k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels()))
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
