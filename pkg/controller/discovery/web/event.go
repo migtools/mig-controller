@@ -10,7 +10,7 @@ import (
 
 const (
 	EventInvolvedUIDParam = "involvedobjectuid"
-	EventsRoot            = NamespaceRoot + "/events"
+	EventsRoot            = Root + "/events"
 	EventRoot             = EventsRoot + "/:" + EventInvolvedUIDParam
 )
 
@@ -18,14 +18,13 @@ const (
 // Event (route) handler.
 type EventHandler struct {
 	// Base
-	ClusterScoped
+	BaseHandler
 }
 
 //
 // Add routes.
 func (h EventHandler) AddRoutes(r *gin.Engine) {
 	r.GET(EventsRoot, h.List)
-	r.GET(EventsRoot+"/", h.List)
 	r.GET(EventRoot, h.Get)
 }
 
@@ -38,11 +37,8 @@ func (h EventHandler) List(ctx *gin.Context) {
 		return
 	}
 	db := h.container.Db
-	collection := model.Event{
-		Base: model.Base{
-			Cluster: h.cluster.PK,
-		},
-	}
+	collection := model.Event{}
+
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
@@ -64,7 +60,7 @@ func (h EventHandler) List(ctx *gin.Context) {
 	for _, m := range list {
 		r := Event{}
 		r.With(m)
-		r.SelfLink = h.Link(&h.cluster, m)
+		r.SelfLink = h.Link(m)
 		content.Items = append(content.Items, r)
 	}
 
@@ -80,12 +76,7 @@ func (h EventHandler) Get(ctx *gin.Context) {
 		return
 	}
 	db := h.container.Db
-	collection := model.Event{
-		Base: model.Base{
-			Cluster:   h.cluster.PK,
-			Namespace: ctx.Param(Ns2Param),
-		},
-	}
+	collection := model.Event{}
 	count, err := collection.Count(db, model.ListOptions{
 		Labels: model.Labels{
 			"involvedObjectUID": ctx.Param(EventInvolvedUIDParam),
@@ -107,7 +98,7 @@ func (h EventHandler) Get(ctx *gin.Context) {
 	for _, m := range list {
 		r := Event{}
 		r.With(m)
-		r.SelfLink = h.Link(&h.cluster, m)
+		r.SelfLink = h.Link(m)
 		content.Items = append(content.Items, r)
 	}
 
@@ -116,13 +107,11 @@ func (h EventHandler) Get(ctx *gin.Context) {
 
 //
 // Build self link.
-func (h EventHandler) Link(c *model.Cluster, m *model.Event) string {
+func (h EventHandler) Link(m *model.Event) string {
 	return h.BaseHandler.Link(
 		EventRoot,
 		Params{
-			NsParam:               c.Namespace,
-			ClusterParam:          c.Name,
-			Ns2Param:              m.Namespace,
+			NsParam:               m.Namespace,
 			EventInvolvedUIDParam: m.Name,
 		})
 }

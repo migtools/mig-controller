@@ -148,10 +148,8 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 			},
 		},
 		EventHandler{
-			ClusterScoped: ClusterScoped{
-				BaseHandler: BaseHandler{
-					container: w.Container,
-				},
+			BaseHandler: BaseHandler{
+				container: w.Container,
 			},
 		},
 		ServiceHandler{
