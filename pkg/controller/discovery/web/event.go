@@ -86,7 +86,11 @@ func (h EventHandler) Get(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	list, err := collection.List(db, model.ListOptions{})
+	list, err := collection.List(db, model.ListOptions{
+		Labels: model.Labels{
+			"involvedObjectUID": ctx.Param(EventInvolvedUIDParam),
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
