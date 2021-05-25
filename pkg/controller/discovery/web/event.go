@@ -98,6 +98,7 @@ func (h EventHandler) Get(ctx *gin.Context) {
 	}
 	content := EventList{
 		Count: count,
+		UID:   ctx.Param(EventInvolvedUIDParam),
 	}
 	for _, m := range list {
 		r := Event{}
@@ -145,6 +146,8 @@ func (r *Event) With(m *model.Event) {
 type EventList struct {
 	// Total number in the collection.
 	Count int64 `json:"count"`
+	// UID of involvedObject events were retrieved for
+	UID string `json:"uid"`
 	// List of resources.
 	Items []Event `json:"resources"`
 }
