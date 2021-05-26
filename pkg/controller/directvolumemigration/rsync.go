@@ -1710,8 +1710,8 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	rsyncVolumeMounts := []corev1.VolumeMount{}
 	containers := []corev1.Container{}
 	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
-		Name:      req.pvInfo.name,
-		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.name),
+		Name:      req.pvInfo.dnsSafeName,
+		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.dnsSafeName),
 	})
 
 	// shared volumeMount for inter-process communication between rsync and stunnel
@@ -1791,8 +1791,8 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 
 	rsyncCommand := []string{"rsync"}
 	rsyncCommand = append(rsyncCommand, req.rsyncOptions...)
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.name))
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.dnsSafeName))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.dnsSafeName))
 
 	rsyncCommandStr := strings.Join(rsyncCommand, " ")
 	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" EXIT SIGINT SIGTERM; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; rc=$?; if [ $rc -eq 0 ]; then %s; rc=$?; break; fi; done; exit $rc;", rsyncCommandStr)
@@ -2499,6 +2499,7 @@ func (t *Task) analyzeRsyncPodStatus(pod *corev1.Pod) (failed bool, succeeded bo
 // GetRsyncPodSelector returns pod selector used to identify sibling Rsync pods
 func GetRsyncPodSelector(pvcName string) map[string]string {
 	selector := make(map[string]string, 1)
+	pvcName, _ = getDNSSafeName(pvcName)
 	selector[migapi.RsyncPodIdentityLabel] = pvcName
 	return selector
 }
@@ -2519,7 +2520,7 @@ func getDNSSafeName(name string) (string, error) {
 	//   investigate if we can make a thread safe global variable and use it.
 	re, err := regexp.Compile(`(\.+|\%+|\/+)`)
 	if err != nil {
-		return "", err
+		return name, err
 	}
 	if utf8.RuneCountInString(name) > 63 {
 		return re.ReplaceAllString(name[:63], "-"), nil
