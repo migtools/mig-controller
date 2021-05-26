@@ -153,8 +153,7 @@ func (r *ReconcileDiscovery) Reconcile(ctx context.Context, request reconcile.Re
 	if !r.IsValid(cluster) {
 		return reconcile.Result{Requeue: false}, nil
 	}
-	err = r.container.Add(
-		cluster,
+	containers := []container.Collection{
 		&container.Backup{},
 		&container.Restore{},
 		&container.DirectVolumeMigration{},
@@ -172,6 +171,13 @@ func (r *ReconcileDiscovery) Reconcile(ctx context.Context, request reconcile.Re
 		&container.Job{},
 		&container.PV{},
 		&container.StorageClass{},
+	}
+	if Settings.Discovery.CollectEvents {
+		containers = append(containers, &container.Event{})
+	}
+	err = r.container.Add(
+		cluster,
+		containers...,
 	)
 	if err != nil {
 		log.Trace(err)
