@@ -1217,6 +1217,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
 	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
 	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
+	unknownPods := []*migapi.PodProgress{}
 	var pendingSinceTimeLimitPods []string
 	pvcMap := t.getPVCNamespaceMap()
 	for bothNs, vols := range pvcMap {
@@ -1261,6 +1262,8 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 						pendingSinceTimeLimitPods = append(pendingSinceTimeLimitPods, fmt.Sprintf("%s/%s", podProgress.Namespace, podProgress.Name))
 					}
 				}
+			case dvmp.Status.PodPhase == "":
+				unknownPods = append(unknownPods, podProgress)
 			case !operation.Failed:
 				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
 			}
@@ -1270,6 +1273,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
 	isAnyPending := len(t.Owner.Status.PendingPods) > 0
 	isAnyRunning := len(t.Owner.Status.RunningPods) > 0
+	isAnyUnknown := len(unknownPods) > 0
 	if len(pendingSinceTimeLimitPods) > 0 {
 		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingSinceTimeLimitPods[:], ", "))
 		t.Log.Info(pendingMessage)
@@ -1281,7 +1285,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 			Message:  pendingMessage,
 		})
 	}
-	return !isAnyRunning && !isAnyPending && isCompleted, nil
+	return !isAnyRunning && !isAnyPending && isCompleted && !isAnyUnknown, nil
 }
 
 func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
@@ -2040,6 +2044,7 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 	if status.AnyErrored() {
 		// check if we are seeing errors running any of the operation for over 5 minutes
 		// if yes, set a warning condition
+		t.Owner.Status.StageCondition(Running)
 		runningCondition := t.Owner.Status.Conditions.FindCondition(Running)
 		if runningCondition != nil &&
 			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
@@ -2056,6 +2061,7 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 	if len(garbageCollectionErrors) > 0 {
 		// check if we are seeing errors running any of the operation for over 5 minutes
 		// if yes, set a warning condition
+		t.Owner.Status.StageCondition(Running)
 		runningCondition := t.Owner.Status.Conditions.FindCondition(Running)
 		if runningCondition != nil &&
 			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
@@ -2441,7 +2447,7 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 	if len(podList.Items) < 1 {
 		return nil, nil
 	}
-	var mostRecentPod corev1.Pod
+	var mostRecentPod *corev1.Pod = nil
 	for _, pod := range podList.Items {
 		// if expected attempt label is not found on the pod or its value is not an integer,
 		// there is no way to associate this pod with an Rsync attempt we made, we skip this pod
@@ -2450,11 +2456,13 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 		} else if _, err := strconv.Atoi(val); err != nil {
 			continue
 		}
-		if pod.CreationTimestamp.After(mostRecentPod.CreationTimestamp.Time) {
-			mostRecentPod = pod
+		if mostRecentPod == nil {
+			mostRecentPod = &pod
+		} else if pod.CreationTimestamp.After(mostRecentPod.CreationTimestamp.Time) {
+			mostRecentPod = &pod
 		}
 	}
-	return &mostRecentPod, nil
+	return mostRecentPod, nil
 }
 
 // createNewPodForOperation creates a new pod for given RsyncOperation
