@@ -1285,7 +1285,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 			Message:  pendingMessage,
 		})
 	}
-	return !isAnyRunning && !isAnyPending && isCompleted && !isAnyUnknown, nil
+	return !isAnyRunning && !isAnyPending && !isAnyUnknown && isCompleted, nil
 }
 
 func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
@@ -2448,9 +2448,10 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 		return nil, nil
 	}
 	var mostRecentPod *corev1.Pod = nil
-	for _, pod := range podList.Items {
+	for i := range podList.Items {
 		// if expected attempt label is not found on the pod or its value is not an integer,
 		// there is no way to associate this pod with an Rsync attempt we made, we skip this pod
+		pod := podList.Items[i]
 		if val, exists := pod.Labels[RsyncAttemptLabel]; !exists {
 			continue
 		} else if _, err := strconv.Atoi(val); err != nil {
