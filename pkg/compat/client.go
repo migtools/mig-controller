@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -338,18 +340,30 @@ func (c client) Update(ctx context.Context, in k8sclient.Object, opt ...k8sclien
 
 // Wait until cache contains resource with expected resourceVersion _or_ timeout, whichever comes first.
 func (c client) waitForPopulatedCache(resource k8sclient.Object, expectedRV int) error {
+	log := logging.WithName("compatclient",
+		"func", "waitForPopulatedCache",
+		"resource", path.Join(resource.GetName(), resource.GetNamespace()),
+		"resourceKind", resource.GetObjectKind())
+
 	timeout := 3 * time.Second
 	deadline := time.Now().Add(timeout)
 	pollInterval := time.Millisecond * 5
 
 	// Define a placeholder with the same structure as the original resource to be overwritten with client.Get
-	placeholder := resource.DeepCopyObject().(k8sclient.Object)
+	placeholder, ok := resource.DeepCopyObject().(k8sclient.Object)
+	if !ok {
+		log.V(4).Info("Error type asserting placeholder as k8sclient.Object")
+		return nil
+	}
+
 	key, err := getNsName(placeholder)
 	if err != nil {
+		log.V(4).Info("Error getting nsName for resource")
 		return err
 	}
 	// If no name is defined on the resource, we can't query for it in the cache
 	if key.Name == "" {
+		log.V(4).Info("Found empty name for resource, can't query for cache population.")
 		return nil
 	}
 	// Poll for resource in cache every 5ms until 3s deadline.
@@ -358,27 +372,43 @@ func (c client) waitForPopulatedCache(resource k8sclient.Object, expectedRV int)
 		err := c.Get(context.TODO(), key, placeholder)
 		if err != nil {
 			if k8serror.IsNotFound(err) {
+				log.V(4).Info("Resource not found in cache, polling again.",
+					"pollInterval", pollInterval)
 				time.Sleep(pollInterval)
 				continue
 			} else {
+				log.V(4).Info("Cache get failed", "error", err)
 				return err
 			}
 		}
 		foundRV, err := getResourceVersion(placeholder)
 		if err != nil {
+			log.V(4).Info("Error getting ResourceVersion")
 			return err
 		}
 		if foundRV < expectedRV {
+			log.V(4).Info("ResourceVersion in cache lower than expected, polling again.",
+				"pollInterval", pollInterval,
+				"expectedRV", expectedRV,
+				"foundRV", foundRV)
 			time.Sleep(pollInterval)
 			continue
 		}
 		// Resource found in cache, success
+		log.V(4).Info("Success, resource found in cache",
+			"expectedRV", expectedRV,
+			"foundRV", foundRV)
 		return nil
 	}
 	// Resource not found in cache, stop polling for it
-	return fmt.Errorf("resource key=%v/%v kind=%v not found with "+
+	err = fmt.Errorf("resource key=%v/%v kind=%v not found with "+
 		"expectedResourceVersion>=%v in cache before timeout %v",
 		key.Namespace, key.Name, resource.GetObjectKind(), expectedRV, timeout)
+
+	log.V(4).Info("Timed out waiting for resource to populate in cache",
+		"error", err)
+
+	return err
 }
 
 func getNsName(in k8sclient.Object) (types.NamespacedName, error) {
