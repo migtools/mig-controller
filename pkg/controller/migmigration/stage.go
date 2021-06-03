@@ -523,7 +523,8 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		migevent.LogAbnormalEventsForResource(
 			client, t.Log,
 			"Found abnormal event for Stage Pod",
-			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, "Pod")
+			types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+			pod.UID, "Pod")
 
 		initReady := true
 		for _, c := range pod.Status.InitContainerStatuses {

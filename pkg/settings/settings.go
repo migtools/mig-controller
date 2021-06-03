@@ -20,10 +20,13 @@ const (
 	// Only the discovery should be loaded.
 	DiscoveryRole = "discovery"
 	// Proxy environment variables
-	HttpProxy        = "HTTP_PROXY"
-	HttpsProxy       = "HTTPS_PROXY"
-	NoProxy          = "NO_PROXY"
+	HttpProxy  = "HTTP_PROXY"
+	HttpsProxy = "HTTPS_PROXY"
+	NoProxy    = "NO_PROXY"
+	// Disable image copy
 	DisableImageCopy = "DISABLE_IMAGE_COPY"
+	// Enable cached remote client
+	EnableCachedClient = "ENABLE_CACHED_CLIENT"
 )
 
 // Global
@@ -35,7 +38,8 @@ type _Settings struct {
 	Discovery
 	Plan
 	DvmOpts
-	DisImgCopy bool
+	DisImgCopy         bool
+	EnableCachedClient bool
 	JaegerOpts
 	Roles     map[string]bool
 	ProxyVars map[string]string
@@ -69,6 +73,7 @@ func (r *_Settings) Load() error {
 	}
 
 	r.DisImgCopy = getEnvBool(DisableImageCopy, false)
+	r.EnableCachedClient = getEnvBool(EnableCachedClient, false)
 
 	return nil
 }

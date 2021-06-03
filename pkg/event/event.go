@@ -2,7 +2,6 @@ package event
 
 import (
 	"context"
-	"fmt"
 	"path"
 
 	"github.com/go-logr/logr"
@@ -18,25 +17,28 @@ import (
 // related to a resource we're waiting on.
 // Make sure to pass in the kind exactly as it is capitalized on the event, e.g. "Pod"
 func GetAbnormalEventsForResource(client client.Client,
-	nsName types.NamespacedName, resourceKind string) ([]corev1.Event, error) {
+	resourceNsName types.NamespacedName, resourceUID types.UID) ([]corev1.Event, error) {
 	uniqueEventMap := make(map[string]corev1.Event)
 
 	eList := corev1.EventList{}
-	options := k8sclient.ListOptions{}
-	k8sclient.InNamespace(nsName.Namespace).ApplyToList(&options)
-	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=%s,type!=Normal",
-		nsName.Name, resourceKind)
-	selector, err := fields.ParseSelector(fieldSelector)
-	if err != nil {
-		return nil, fmt.Errorf("field selector construction failed: fieldSelector=[%v]", fieldSelector)
+
+	options := &k8sclient.ListOptions{
+		Namespace: resourceNsName.Namespace,
+		FieldSelector: fields.SelectorFromSet(
+			fields.Set{
+				"involvedObject.uid": string(resourceUID),
+			}),
 	}
-	matchingFields := k8sclient.MatchingFieldsSelector{Selector: selector}
-	matchingFields.ApplyToList(&options)
-	err = client.List(context.TODO(), &eList, &options)
+	k8sclient.InNamespace(resourceNsName.Namespace).ApplyToList(options)
+	err := client.List(context.TODO(), &eList, options)
 	if err != nil {
 		return nil, err
 	}
 	for _, event := range eList.Items {
+		// Check if event is a warning
+		if event.Type != corev1.EventTypeWarning {
+			continue
+		}
 		// Check if same event reason has already been seen
 		eventFromMap, ok := uniqueEventMap[event.Reason]
 		if !ok {
@@ -63,20 +65,21 @@ func GetAbnormalEventsForResource(client client.Client,
 // related to a resource we're waiting on.
 // The message logged will match what is provided in 'message'
 func LogAbnormalEventsForResource(
-	client client.Client, log logr.Logger, message string, nsName types.NamespacedName, resourceKind string) {
+	client client.Client, log logr.Logger, message string,
+	resourceNsName types.NamespacedName, resourceUID types.UID, resourceKind string) {
 
 	relevantEvents, err := GetAbnormalEventsForResource(client,
-		types.NamespacedName{Name: nsName.Name, Namespace: nsName.Namespace}, resourceKind)
+		types.NamespacedName{Name: resourceNsName.Name, Namespace: resourceNsName.Namespace}, resourceUID)
 	if err != nil {
 		log.Info("Error getting events",
 			"kind", resourceKind,
-			"resource", path.Join(nsName.Namespace, nsName.Name),
+			"resource", path.Join(resourceNsName.Namespace, resourceNsName.Name),
 			"error", err)
 		return
 	}
 	for _, rEvent := range relevantEvents {
 		log.Info(message,
-			resourceKind, path.Join(nsName.Namespace, nsName.Name),
+			resourceKind, path.Join(resourceNsName.Namespace, resourceNsName.Name),
 			"eventType", rEvent.Type,
 			"eventReason", rEvent.Reason,
 			"eventMessage", rEvent.Message,
