@@ -1842,6 +1842,7 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 	if status.AnyErrored() {
 		// check if we are seeing errors running any of the operation for over 5 minutes
 		// if yes, set a warning condition
+		t.Owner.Status.StageCondition(Running)
 		runningCondition := t.Owner.Status.Conditions.FindCondition(Running)
 		if runningCondition != nil &&
 			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
@@ -1858,6 +1859,7 @@ func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList
 	if len(garbageCollectionErrors) > 0 {
 		// check if we are seeing errors running any of the operation for over 5 minutes
 		// if yes, set a warning condition
+		t.Owner.Status.StageCondition(Running)
 		runningCondition := t.Owner.Status.Conditions.FindCondition(Running)
 		if runningCondition != nil &&
 			time.Now().Add(time.Minute*-5).After(runningCondition.LastTransitionTime.Time) {
@@ -2242,7 +2244,9 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 		} else if _, err := strconv.Atoi(val); err != nil {
 			continue
 		}
-		if pod.CreationTimestamp.After(mostRecentPod.CreationTimestamp.Time) {
+		if mostRecentPod == nil {
+			mostRecentPod = &pod
+		} else if pod.CreationTimestamp.After(mostRecentPod.CreationTimestamp.Time) {
 			mostRecentPod = &pod
 		}
 	}
@@ -2320,9 +2324,4 @@ func getDNSSafeName(name string) (string, error) {
 		return re.ReplaceAllString(name[:63], "-"), nil
 	}
 	return re.ReplaceAllString(name, "-"), nil
-}
-
-func wrapper(s string) (int, error) {
-	x := map[string]string{}
-	return strconv.Atoi(x["unknown-value"])
 }

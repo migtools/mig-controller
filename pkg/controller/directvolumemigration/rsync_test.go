@@ -682,7 +682,7 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 			name: "when given 0 existing Rsync pods in the source namespace and 1 new pod requirement, 1 new pod should be created in the source namespace",
 			args: args{
 				podRequirements: []rsyncClientPodRequirements{
-					getRsyncClientPodRequirements("111111111111111111111111111111111.11111111111111111111111111111111111111111111111111111111111111", "ns-1"),
+					getRsyncClientPodRequirements("pvc-1", "ns-1"),
 				},
 				client: fakecompat.NewFakeClient(),
 			},
@@ -700,14 +700,14 @@ func TestTask_ensureRsyncOperations(t *testing.T) {
 				},
 			},
 			wantCRStatus: []*migapi.RsyncOperation{
-				getTestRsyncOperationStatus("111111111111111111111111111111111.11111111111111111111111111111111111111111111111111111111111111", "ns-1", 1, false, false),
+				getTestRsyncOperationStatus("pvc-1", "ns-1", 1, false, false),
 			},
 			wantPods: []*corev1.Pod{
-				getTestRsyncPodForPVC("pod-1", "111111111111111111111111111111111.11111111111111111111111111111111111111111111111111111111111111 ", "ns-1", "1", time.Now()),
+				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "1", time.Now()),
 			},
 			dontWantPods: []*corev1.Pod{
-				getTestRsyncPodForPVC("pod-1", "111111111111111111111111111111111.11111111111111111111111111111111111111111111111111111111111111 ", "ns-1", "0", time.Now()),
-				getTestRsyncPodForPVC("pod-1", "111111111111111111111111111111111.11111111111111111111111111111111111111111111111111111111111111 ", "ns-1", "2", time.Now()),
+				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "0", time.Now()),
+				getTestRsyncPodForPVC("pod-1", "pvc-1", "ns-1", "2", time.Now()),
 			},
 		},
 		{
