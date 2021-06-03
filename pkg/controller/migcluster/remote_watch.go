@@ -36,7 +36,6 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 		return liberr.Wrap(err)
 	}
 
-	// sigStopChan := make(chan struct{})
 	ctx := context.TODO()
 	ctx, stopFunc := context.WithCancel(ctx)
 	log.Info("Remote cache: Starting manager for MigCluster",
@@ -133,7 +132,6 @@ func StopRemoteWatch(nsName types.NamespacedName) {
 	remoteWatchMap := remote.GetWatchMap()
 	remoteWatchCluster := remoteWatchMap.Get(nsName)
 	if remoteWatchCluster != nil {
-		// close(remoteWatchCluster.StopChannel)
 		remoteWatchCluster.StopFunc()
 		remoteWatchMap.Delete(nsName)
 	}
