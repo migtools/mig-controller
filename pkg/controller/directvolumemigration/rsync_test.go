@@ -29,7 +29,7 @@ func getTestRsyncPodForPVC(podName string, pvcName string, ns string, attemptNo 
 			Name:      podName,
 			Namespace: ns,
 			Labels: map[string]string{
-				migapi.RsyncPodIdentityLabel: pvcName,
+				migapi.RsyncPodIdentityLabel: getMD5Hash(pvcName),
 				RsyncAttemptLabel:            attemptNo,
 			},
 		},
@@ -1151,46 +1151,6 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 			}
 			if tt.dontWantCondition != nil && tt.fields.Owner.Status.HasCondition(tt.dontWantCondition.Type) {
 				t.Errorf("Task.processRsyncOperationStatus() found unexpected condition of type %s", tt.dontWantCondition.Type)
-			}
-		})
-	}
-}
-
-func Test_getDNSSafeName(t *testing.T) {
-	tests := []struct {
-		name       string
-		volumeName string
-		want       string
-		wantErr    bool
-	}{
-		{
-			name:       "valid name",
-			volumeName: "valid",
-			want:       "valid",
-			wantErr:    false,
-		},
-		{
-			name:       "longer than 63 chars",
-			volumeName: strings.Repeat("1", 64),
-			want:       strings.Repeat("1", 63),
-			wantErr:    false,
-		},
-		{
-			name:       "valid length but invalid characters",
-			volumeName: "11111.11111%11111/11111",
-			want:       "11111-11111-11111-11111",
-			wantErr:    false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := getDNSSafeName(tt.volumeName)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getDNSSafeName() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("getDNSSafeName() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
