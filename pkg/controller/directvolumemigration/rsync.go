@@ -10,6 +10,7 @@ import (
 	"fmt"
 	random "math/rand"
 	"path"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1128,10 +1129,10 @@ func isRsyncPrivileged(client compat.Client) (bool, error) {
 
 // deleteInvalidPVProgressCR deletes an existing CR which doesn't have expected fields
 // used to delete CRs created pre MTCv1.4.3
-func (t *Task) deleteInvalidPVProgressCR(dvmpName string, dvmpNamespace string) error {
+func (t *Task) deleteInvalidPVProgressCR(dvmp *migapi.DirectVolumeMigrationProgress) error {
 	existingDvmp := migapi.DirectVolumeMigrationProgress{}
 	// Make sure existing DVMP CRs which don't have required fields are deleted
-	err := t.Client.Get(context.TODO(), types.NamespacedName{Name: dvmpName, Namespace: dvmpNamespace}, &existingDvmp)
+	err := t.Client.Get(context.TODO(), types.NamespacedName{Name: dvmp.Name, Namespace: dvmp.Namespace}, &existingDvmp)
 	if err != nil {
 		if !k8serror.IsNotFound(err) {
 			return err
@@ -1145,7 +1146,11 @@ func (t *Task) deleteInvalidPVProgressCR(dvmpName string, dvmpNamespace string) 
 		}
 		// if podSelector doesn't have a required label, delete the CR
 		if existingDvmp.Spec.PodSelector != nil {
-			if _, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]; !exists {
+			selector, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]
+			if !exists {
+				shouldDelete = true
+			}
+			if !reflect.DeepEqual(selector, dvmp.Spec.PodSelector) {
 				shouldDelete = true
 			}
 		}
@@ -1154,7 +1159,7 @@ func (t *Task) deleteInvalidPVProgressCR(dvmpName string, dvmpNamespace string) 
 			if err != nil {
 				return err
 			}
-			t.Log.Info("Deleted DVMP as it was missing required fields", "DVMP", path.Join(dvmpNamespace, dvmpName))
+			t.Log.Info("Deleted DVMP as it was missing required fields", "DVMP", path.Join(dvmp.Namespace, dvmp.Name))
 		}
 	}
 	return nil
@@ -1180,7 +1185,7 @@ func (t *Task) createPVProgressCR() error {
 				},
 			}
 			// make sure existing CRs that don't have required fields are deleted
-			err := t.deleteInvalidPVProgressCR(dvmp.Name, dvmp.Namespace)
+			err := t.deleteInvalidPVProgressCR(&dvmp)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -1712,8 +1717,8 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 	rsyncVolumeMounts := []corev1.VolumeMount{}
 	containers := []corev1.Container{}
 	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
-		Name:      req.pvInfo.name,
-		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.name),
+		Name:      req.pvInfo.dnsSafeName,
+		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.dnsSafeName),
 	})
 
 	// shared volumeMount for inter-process communication between rsync and stunnel
@@ -1793,8 +1798,8 @@ func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
 
 	rsyncCommand := []string{"rsync"}
 	rsyncCommand = append(rsyncCommand, req.rsyncOptions...)
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.name))
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.name))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.dnsSafeName))
+	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.dnsSafeName))
 
 	rsyncCommandStr := strings.Join(rsyncCommand, " ")
 	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" EXIT SIGINT SIGTERM; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; rc=$?; if [ $rc -eq 0 ]; then %s; rc=$?; break; fi; done; exit $rc;", rsyncCommandStr)
@@ -2501,6 +2506,7 @@ func (t *Task) analyzeRsyncPodStatus(pod *corev1.Pod) (failed bool, succeeded bo
 // GetRsyncPodSelector returns pod selector used to identify sibling Rsync pods
 func GetRsyncPodSelector(pvcName string) map[string]string {
 	selector := make(map[string]string, 1)
+	pvcName, _ = getDNSSafeName(pvcName)
 	selector[migapi.RsyncPodIdentityLabel] = pvcName
 	return selector
 }
@@ -2521,7 +2527,7 @@ func getDNSSafeName(name string) (string, error) {
 	//   investigate if we can make a thread safe global variable and use it.
 	re, err := regexp.Compile(`(\.+|\%+|\/+)`)
 	if err != nil {
-		return "", err
+		return name, err
 	}
 	if utf8.RuneCountInString(name) > 63 {
 		return re.ReplaceAllString(name[:63], "-"), nil
