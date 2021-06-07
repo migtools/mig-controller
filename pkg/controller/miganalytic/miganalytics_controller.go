@@ -271,7 +271,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 
 	analytic.Status.Analytics.Plan = plan.Name
 	analytic.Status.Analytics.Namespaces = make([]migapi.MigAnalyticNamespace, 0)
-	for i, namespace := range plan.Spec.Namespaces {
+	for i, namespace := range plan.GetSourceNamespaces() {
 		for _, ns := range analytic.Status.Analytics.Namespaces {
 			if ns.Namespace == namespace {
 				continue
