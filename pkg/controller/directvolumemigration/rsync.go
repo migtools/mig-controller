@@ -2326,9 +2326,6 @@ func (t *Task) garbageCollectPodsForRequirements(client compat.Client, op migapi
 					// Delete the pod when the attempt label cannot be parsed as int, we never consider this pod anyway
 					shouldDelete = true
 				}
-			} else {
-				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
-				shouldDelete = true
 			}
 			if shouldDelete {
 				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
