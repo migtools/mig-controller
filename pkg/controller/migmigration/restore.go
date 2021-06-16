@@ -636,7 +636,7 @@ func (t *Task) deleteMigrated() error {
 		return liberr.Wrap(err)
 	}
 
-	err := t.deleteMigratedNamespaceScopedResources()
+	err = t.deleteMigratedNamespaceScopedResources()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -679,6 +679,26 @@ func (t *Task) deleteDeploymentConfigLeftoverPods() error {
 				return liberr.Wrap(err)
 			}
 			for _, rc := range rcList.Items {
+				// Delete Deployer Pod(s) for RC
+				podList := corev1.PodList{}
+				err = destClient.List(
+					context.TODO(),
+					&podList,
+					k8sclient.InNamespace(ns),
+					k8sclient.MatchingLabels(map[string]string{"openshift.io/deployer-pod-for.name": rc.GetName()}),
+				)
+				for _, pod := range podList.Items {
+					t.Log.Info(
+						"Rollback: Deleting Deployer Pod associated with migrated DeploymentConfig.",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"replicationController", path.Join(rc.Namespace, rc.Name),
+						"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+					err = destClient.Delete(context.TODO(), &pod)
+					if err != nil {
+						return liberr.Wrap(err)
+					}
+				}
+
 				// Delete RCs matching DC name to remove old Pods
 				t.Log.Info(
 					"Rollback: Deleting ReplicationController associated with migrated DeploymentConfig.",
