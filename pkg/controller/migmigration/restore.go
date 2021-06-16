@@ -11,6 +11,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/gvk"
+	ocapi "github.com/openshift/api/apps/v1"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -629,7 +630,11 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 
 // Delete namespace and cluster-scoped resources on dest cluster
 func (t *Task) deleteMigrated() error {
-	// TODO: delete 'deployer' Pods associated with DCs even if phase=completed
+	// Delete 'deployer' and 'hooks' Pods that DeploymentConfig leaves behind upon DC deletion.
+	err := t.deleteDeploymentConfigLeftoverPods()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	err := t.deleteMigratedNamespaceScopedResources()
 	if err != nil {
@@ -641,6 +646,51 @@ func (t *Task) deleteMigrated() error {
 		return liberr.Wrap(err)
 	}
 
+	return nil
+}
+
+func (t *Task) deleteDeploymentConfigLeftoverPods() error {
+	for _, ns := range t.destinationNamespaces() {
+		destClient, err := t.getDestinationClient()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		// Iterate over all DeploymentConfigs belonging migrated by current MigPlan in target cluster namespaces
+		dcList := ocapi.DeploymentConfigList{}
+		err = destClient.List(
+			context.TODO(),
+			&dcList,
+			k8sclient.InNamespace(ns),
+			k8sclient.MatchingLabels(map[string]string{migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID)}),
+		)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		for _, dc := range dcList.Items {
+			// Iterate over ReplicationControllers associated with DCs
+			rcList := corev1.ReplicationControllerList{}
+			err = destClient.List(
+				context.TODO(),
+				&rcList,
+				k8sclient.InNamespace(ns),
+				k8sclient.MatchingLabels(map[string]string{"openshift.io/deployment-config.name": dc.GetName()}),
+			)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			for _, rc := range rcList.Items {
+				// Delete RCs matching DC name to remove old Pods
+				t.Log.Info(
+					"Rollback: Deleting ReplicationController associated with migrated DeploymentConfig.",
+					"replicationController", path.Join(rc.Namespace, rc.Name),
+					"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+				err = destClient.Delete(context.TODO(), &rc)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+		}
+	}
 	return nil
 }
 
