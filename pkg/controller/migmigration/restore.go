@@ -650,7 +650,7 @@ func (t *Task) deleteMigrated() error {
 }
 
 func (t *Task) deleteDeploymentConfigLeftoverPods() error {
-	// DeploymentConfigs are an exception to the general policy of deleting everything with
+	// DeploymentConfigs are an exception to the general policy of rollback deleting everything with
 	// the label "migrated-by-migplan: migplan-uid" because DCs spawn additional Pods without
 	// ownerRefs that will mount PVCs. When we delete the DCs, it doesn't cascade to the
 	// deployer and hooks Pods that the DC created, and those Pods sometimes stop PVCs from termianting.
