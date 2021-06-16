@@ -539,7 +539,7 @@ func (t *Task) buildDVMLabels() map[string]string {
 	// Label resources for rollback targeting
 	if t.PlanResources != nil {
 		if t.PlanResources.MigPlan != nil {
-			dvmLabels[migapi.MigMigrationLabel] = string(t.PlanResources.MigPlan.UID)
+			dvmLabels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 		}
 	}
 
