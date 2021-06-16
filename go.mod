@@ -15,13 +15,16 @@ require (
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/goproxy v0.0.0-20201021153353-00ad82a08272 // indirect
 	github.com/gin-contrib/cors v1.3.1
-	github.com/gin-gonic/gin v1.6.3
+	github.com/gin-gonic/gin v1.7.2
 	github.com/go-logr/logr v0.4.0
 	github.com/go-logr/zapr v0.3.0
+	github.com/go-playground/validator/v10 v10.8.0 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/joho/godotenv v1.3.0
+	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/konveyor/controller v0.4.1
-	github.com/konveyor/openshift-velero-plugin v0.0.0-20210517181250-38239ed63b97
+	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
+	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
@@ -33,28 +36,46 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
-	github.com/vmware-tanzu/velero v1.6.0
+	github.com/ugorji/go v1.2.6 // indirect
+	github.com/vmware-tanzu/velero v1.6.2
 	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	google.golang.org/api v0.35.0
-	google.golang.org/genproto v0.0.0-20201106154455-f9bfe239b0ba // indirect
 	google.golang.org/grpc v1.33.2 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.0
-	k8s.io/apimachinery v0.20.0
-	k8s.io/client-go v0.20.0
+	k8s.io/api v0.20.7
+	k8s.io/apimachinery v0.20.7
+	k8s.io/client-go v0.20.7
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
 )
 
+// CVE-2020-28483
+replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.2
+
+// CVE-2021-3121
+replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+
+replace k8s.io/client-go => k8s.io/client-go v0.20.7
+
+replace k8s.io/apimachinery => k8s.io/apimachinery v0.20.7
+
+replace k8s.io/api => k8s.io/api v0.20.7
+
+replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.7
+
+replace k8s.io/apiserver => k8s.io/apiserver v0.20.7
+
 // Use fork
 replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/markusthoemmes/goautoneg v0.0.0-20190713162725-c6008fefa5b1
 
-replace github.com/vmware-tanzu/velero => github.com/konveyor/velero v0.10.2-0.20210517170947-84365048b688
+replace github.com/vmware-tanzu/velero => github.com/openshift/velero v0.10.2-0.20210728132925-bab294f5d24c
 
 //k8s deps pinning
+
 //replace k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20181127025237-2b1284ed4c93
 
 //replace k8s.io/client-go => k8s.io/client-go v0.0.0-20181213151034-8d9ed539ba31
