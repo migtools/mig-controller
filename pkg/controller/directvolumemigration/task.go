@@ -63,8 +63,6 @@ const (
 	DirectVolumeMigrationRsync              = "rsync"
 	DirectVolumeMigrationRsyncClient        = "rsync-client"
 	DirectVolumeMigrationStunnel            = "stunnel"
-	MigratedByPlanLabel                     = "migration.openshift.io/migrated-by-migplan"               // (migplan UID)
-	MigratedByMigrationLabel                = "migration.openshift.io/migrated-by-migmigration"          // (migmigration UID)
 	MigratedByDirectVolumeMigration         = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
 )
 
@@ -538,6 +536,12 @@ func (t *Task) buildDVMLabels() map[string]string {
 	dvmLabels["app"] = DirectVolumeMigrationRsyncTransfer
 	dvmLabels["owner"] = DirectVolumeMigration
 	dvmLabels[migapi.PartOfLabel] = migapi.Application
+	// Label resources for rollback targeting
+	if t.PlanResources != nil {
+		if t.PlanResources.MigPlan != nil {
+			dvmLabels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
+		}
+	}
 
 	return dvmLabels
 }

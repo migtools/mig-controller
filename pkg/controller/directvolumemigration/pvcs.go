@@ -87,8 +87,8 @@ func (t *Task) createDestinationPVCs() error {
 		}
 
 		if migrationUID != "" && t.PlanResources != nil && t.PlanResources.MigPlan != nil {
-			pvcLabels[MigratedByMigrationLabel] = migrationUID
-			pvcLabels[MigratedByPlanLabel] = string(t.PlanResources.MigPlan.UID)
+			pvcLabels[migapi.MigMigrationLabel] = migrationUID
+			pvcLabels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 		} else if t.Owner.UID != "" {
 			pvcLabels[MigratedByDirectVolumeMigration] = string(t.Owner.UID)
 		}
