@@ -4,6 +4,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -46,7 +47,11 @@ func (t *Task) ensureDestinationNamespaces() error {
 			"namespace", destNs.Name)
 		err = destClient.Create(context.TODO(), &destNs)
 		if err != nil {
-			return err
+			if k8serror.IsAlreadyExists(err) {
+				t.Log.Info("Namespace already exists on destination MigCluster", "namespace", destNs.Name)
+			} else {
+				return err
+			}
 		}
 	}
 	return nil
