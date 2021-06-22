@@ -11,7 +11,7 @@ jobs:
           go-version: 1.15
       - name: Setup dependencies
         run: |
-          sudo apt-get install -y libgpgme-dev libdevmapper-dev btrfs-progs libbtrfs-dev
+          sudo apt-get update && sudo apt-get install -y libgpgme-dev libdevmapper-dev btrfs-progs libbtrfs-dev
           curl -L -o kubebuilder.tar.gz https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${KUBEBUILDER_VERSION}/kubebuilder_${KUBEBUILDER_VERSION}_$(go env GOHOSTOS)_$(go env GOARCH).tar.gz
           tar -xvf kubebuilder.tar.gz
           sudo mv kubebuilder_${KUBEBUILDER_VERSION}_$(go env GOHOSTOS)_$(go env GOARCH) /usr/local/kubebuilder
