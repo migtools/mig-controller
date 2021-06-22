@@ -163,7 +163,7 @@ func (t *Task) Run(ctx context.Context) error {
 		// Create the target namespaces on the destination
 		err := t.ensureDestinationNamespaces()
 		if err != nil {
-			liberr.Wrap(err)
+			return liberr.Wrap(err)
 		}
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
