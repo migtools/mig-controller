@@ -529,12 +529,19 @@ func parseLogs(reader io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	carriageReturnMatcher := regexp.MustCompile(`\\r.*$`)
 	data := strings.Split(buf.String(), "\n")
 	logLines := []string{}
 	for _, line := range data {
 		l := strings.TrimSpace(line)
 		if l == "" {
 			continue
+		}
+		if carriageReturnMatcher.MatchString(l) {
+			allUpdates := strings.Split(l, "\\r")
+			if len(allUpdates) > 0 {
+				l = strings.TrimSpace(allUpdates[len(allUpdates)-1])
+			}
 		}
 		if len(l) > 60 {
 			l = l[:60]
