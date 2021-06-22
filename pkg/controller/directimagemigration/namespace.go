@@ -18,6 +18,8 @@ package directimagemigration
 
 import (
 	"context"
+	"fmt"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -63,6 +65,19 @@ func (t *Task) ensureDestinationNamespaces() error {
 				Annotations: srcNS.Annotations,
 			},
 		}
+		existingNamespace := &corev1.Namespace{}
+		err = destClient.Get(context.TODO(),
+			types.NamespacedName{Name: destNs.Name, Namespace: destNs.Namespace}, existingNamespace)
+		if err != nil {
+			if !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
+		if existingNamespace != nil && existingNamespace.DeletionTimestamp != nil {
+			return fmt.Errorf("namespace %s is being terminated on destination MigCluster", destNsName)
+		}
+		t.Log.Info("Creating namespace on destination MigCluster",
+			"namespace", destNs.Name)
 		err = destClient.Create(context.TODO(), &destNs)
 		if k8serror.IsAlreadyExists(err) {
 			t.Log.Info("Namespace already exists on destination", "name", destNsName)
