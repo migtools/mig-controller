@@ -25,6 +25,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/konveyor/mig-controller/pkg/compat"
+	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
+	kapi "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"
@@ -87,6 +92,23 @@ func Test_parseLogs(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
+		{
+			args: args{reader: bytes.NewBufferString(`
+			0:02:36  \r        339.87M  18%    9.76MB/s    0:02:34  \r        350.39M  18%    9.72MB/s    0:02:34  \r        361.27M  19%    9.87MB/s    0:02:30  \r        370.97M  19%    9.62MB/s    0:02:33  \r        381.94M  20%    9.90MB/s    0:02:28  \r        391.94M  20%    9.89MB/s    0:02:27  \r        402.69M  21%    9.62MB/s    0:02:30  \r        413.56M  21%    9.75MB/s    0:02:27  \r        423.89M  22%    9.58MB/s    0:02:29  \r        435.09M  23%    9.86MB/s    0:02:23  \r        444.99M  23%    9.75MB/s    0:02:24  \r        456.16M  24%    9.98MB/s    0:02:20  \r        466.19M  24%    9.74MB/s    0:02:22  \r        476.77M  25%    9.52MB/s    0:02:24  \r        486.93M  25%    9.72MB/s    0:02:20  \r        497.42M  26%    9.51MB/s    0:02:22  \r        508.17M  26%    9.72MB/s    0:02:18  \r        518.42M  27%    9.72MB/s    0:02:17  \r        529.50M  28%    9.72MB/s    0:02:16  \r        540.44M  28%    9.72MB/s    0:02:15  \r        550.47M  29%    9.55MB/s    0:02:16  \r        561.51M  29%    9.55MB/s    0:02:15  \r        572.69M  30%    9.57MB/s    0:02:14  \r        583.34M  30%    9.57MB/s    0:02:13  \r        593.82M  31%    9.83MB/s    0:02:08  \r        604.54M  32%    9.93MB/s    0:02:06  \r        614.89M  32%    9.77MB/s    0:02:07  \r        625.15M  33%    9.77MB/s    0:02:06  \r        629.15M  33%    9.72MB/s    0:01:01 (xfr#1, to-chk=3/5)2021/06/17 11:25:26 [28] <f+++++++++ file_1
+			1.65G  94%   40.95MB/s    0:00:38 (xfr#139, to-chk=23/163)2020/11/03 23:16:34 [1] <f+++++++++ file_2
+			`)},
+			want: strings.Join([]string{
+				"629.15M  33%    9.72MB/s    0:01:01 (xfr#1, to-chk=3/5)2021/",
+				"1.65G  94%   40.95MB/s    0:00:38 (xfr#139, to-chk=23/163)20",
+			}, "\n"),
+			wantErr: false,
+		},
+		{
+			args: args{reader: bytes.NewBufferString(`\r          1.50G  68%   80.62MB/s    0:00:08  \r          1.57G  71%   76.39MB/s    0:00:08  \r          1.67G  75%   77.16MB/s    0:00:06  \r          1.75G  79%   78.02MB/s    0:00:05  \r          1.84G  83%   80.21MB/s    0:00:04  `)},
+			want: strings.Join([]string{
+				"1.84G  83%   80.21MB/s    0:00:04"}, "\n"),
+			wantErr: false,
+		},
 		{
 			args: args{reader: bytes.NewBufferString(`
           1.65G  94%   40.95MB/s    0:00:38 (xfr#139, to-chk=23/163)2020/11/03 23:16:34 [1] <f+++++++++ file76
