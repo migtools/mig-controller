@@ -25,11 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/compat"
-	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
-	kapi "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"

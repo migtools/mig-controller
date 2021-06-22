@@ -229,7 +229,7 @@ func (t *Task) Run() error {
 		// destination
 		err := t.ensureDestinationNamespaces()
 		if err != nil {
-			liberr.Wrap(err)
+			return liberr.Wrap(err)
 		}
 		t.Requeue = NoReQ
 		if err = t.next(); err != nil {
