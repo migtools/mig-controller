@@ -175,6 +175,9 @@ func (t *Task) init() error {
 	} else {
 		t.Itinerary = VolumeMigration
 	}
+	if t.Itinerary.Name != t.Owner.Status.Itinerary {
+		t.Phase = t.Itinerary.Steps[0].phase
+	}
 	return nil
 }
 
