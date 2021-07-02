@@ -235,8 +235,7 @@ func (t *Task) createStunnelConfig() error {
 				Name:      DirectVolumeMigrationStunnelConfig,
 			},
 		}
-		clientConfigMap.Labels = t.Owner.GetCorrelationLabels()
-		clientConfigMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		clientConfigMap.Labels = t.buildDVMLabels()
 
 		err = yaml.Unmarshal(clientTpl.Bytes(), &clientConfigMap)
 		if err != nil {
@@ -249,8 +248,7 @@ func (t *Task) createStunnelConfig() error {
 				Name:      DirectVolumeMigrationStunnelConfig,
 			},
 		}
-		destConfigMap.Labels = t.Owner.GetCorrelationLabels()
-		destConfigMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		destConfigMap.Labels = t.buildDVMLabels()
 
 		err = yaml.Unmarshal(destTpl.Bytes(), &destConfigMap)
 		if err != nil {
@@ -374,9 +372,7 @@ func (t *Task) setupCerts() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: srcNs,
 				Name:      DirectVolumeMigrationStunnelCerts,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
+				Labels:    t.buildDVMLabels(),
 			},
 			Data: map[string][]byte{
 				"tls.crt": caPEM.Bytes(),
@@ -388,9 +384,7 @@ func (t *Task) setupCerts() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: destNs,
 				Name:      DirectVolumeMigrationStunnelCerts,
-				Labels: map[string]string{
-					"app": DirectVolumeMigrationRsyncTransfer,
-				},
+				Labels:    t.buildDVMLabels(),
 			},
 			Data: map[string][]byte{
 				"tls.crt": caPEM.Bytes(),

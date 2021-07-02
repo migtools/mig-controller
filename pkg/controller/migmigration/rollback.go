@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -31,6 +32,90 @@ func (t *Task) deleteMigrated() error {
 	err = t.deleteMovedNfsPVs()
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+
+	err = t.deleteDVMTemporaryResources()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// deleteDVMTemporaryResources deletes temporary resources created by DVM such as configmaps, secrets, etc.
+// TODO: this logic is copied from DVM controller for the time being. The purpose is to address BZ-1977887
+// and avoid cyclic dependencies between controllers. This needs to be updated once crane-lib is integrated
+func (t *Task) deleteDVMTemporaryResources() error {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	selector := labels.SelectorFromSet(map[string]string{
+		migapi.MigPlanLabel: string(t.PlanResources.MigPlan.UID),
+	})
+	for _, ns := range t.sourceNamespaces() {
+		podList := corev1.PodList{}
+		cmList := corev1.ConfigMapList{}
+		secretList := corev1.SecretList{}
+		// Get Pod list
+		err := client.List(
+			context.TODO(),
+			&podList,
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			})
+		if err != nil {
+			return err
+		}
+		// Get Secret list
+		err = client.List(
+			context.TODO(),
+			&secretList,
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			})
+		if err != nil {
+			return err
+		}
+		// Get configmap list
+		err = client.List(
+			context.TODO(),
+			&cmList,
+			&k8sclient.ListOptions{
+				Namespace:     ns,
+				LabelSelector: selector,
+			})
+		if err != nil {
+			return err
+		}
+		// Delete pods
+		for _, pod := range podList.Items {
+			t.Log.Info("Rollback: Deleting DVM Pods from source cluster",
+				"pod", path.Join(pod.Namespace, pod.Name))
+			err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
+		// Delete secrets
+		for _, secret := range secretList.Items {
+			t.Log.Info("Rollback: Deleting DVM Secrets from source cluster",
+				"secret", path.Join(secret.Namespace, secret.Name))
+			err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
+		// Delete configmaps
+		for _, cm := range cmList.Items {
+			t.Log.Info("Rollback: Deleting DVM ConfigMaps from source cluster",
+				"configMap", path.Join(cm.Namespace, cm.Name))
+			err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+		}
 	}
 
 	return nil

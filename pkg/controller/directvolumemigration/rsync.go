@@ -266,8 +266,7 @@ func (t *Task) createRsyncConfig() error {
 				Name:      DirectVolumeMigrationRsyncConfig,
 			},
 		}
-		configMap.Labels = t.Owner.GetCorrelationLabels()
-		configMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		configMap.Labels = t.buildDVMLabels()
 
 		err = yaml.Unmarshal(tpl.Bytes(), &configMap)
 		if err != nil {
@@ -309,8 +308,7 @@ func (t *Task) createRsyncConfig() error {
 				"RSYNC_PASSWORD": []byte(password),
 			},
 		}
-		srcSecret.Labels = t.Owner.GetCorrelationLabels()
-		srcSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		srcSecret.Labels = t.buildDVMLabels()
 
 		t.Log.Info("Creating Rsync Password Secret on source cluster",
 			"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
@@ -329,8 +327,7 @@ func (t *Task) createRsyncConfig() error {
 				"credentials": []byte("root:" + password),
 			},
 		}
-		destSecret.Labels = t.Owner.GetCorrelationLabels()
-		destSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		destSecret.Labels = t.buildDVMLabels()
 
 		t.Log.Info("Creating Rsync Password Secret on destination cluster",
 			"secret", path.Join(destSecret.Namespace, destSecret.Name))
@@ -382,8 +379,7 @@ func (t *Task) createRsyncTransferRoute() error {
 				Type:     corev1.ServiceTypeClusterIP,
 			},
 		}
-		svc.Labels = t.Owner.GetCorrelationLabels()
-		svc.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		svc.Labels = t.buildDVMLabels()
 
 		t.Log.Info("Creating Rsync Transfer Service for Stunnel connection "+
 			"on destination MigCluster ",
@@ -413,8 +409,7 @@ func (t *Task) createRsyncTransferRoute() error {
 				},
 			},
 		}
-		route.Labels = t.Owner.GetCorrelationLabels()
-		route.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+		route.Labels = t.buildDVMLabels()
 
 		// Get cluster subdomain if it exists
 		cluster, err := t.Owner.GetDestinationCluster(t.Client)
@@ -862,8 +857,7 @@ func (t *Task) createRsyncPassword() (string, error) {
 		Type: corev1.SecretTypeBasicAuth,
 	}
 	// Correlation labels for discovery service tree view
-	secret.Labels = t.Owner.GetCorrelationLabels()
-	secret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
+	secret.Labels = t.buildDVMLabels()
 
 	t.Log.Info("Creating Rsync Password Secret on host cluster",
 		"secret", path.Join(secret.Namespace, secret.Name))
