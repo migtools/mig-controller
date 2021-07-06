@@ -22,19 +22,19 @@ func (t *Task) VerificationCompleted() (bool, error) {
 
 	client, err := t.getDestinationClient()
 	if err != nil {
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	// Collect and update info about unhealthy pods
 	err = t.updateResourcesHealth(client)
 	if err != nil {
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 
 	// Check that all pods are recreated
 	finished, err := t.podsRecreated(client)
 	if err != nil {
-		return false, err
+		return false, liberr.Wrap(err)
 	}
 	if !finished {
 		// Stop when unhealthy resources were confirmed
@@ -98,12 +98,12 @@ func (t *Task) podsRecreated(client k8sclient.Client) (bool, error) {
 
 		finished, err := health.DaemonSetsRecreated(client, &options)
 		if err != nil || !finished {
-			return finished, err
+			return finished, liberr.Wrap(err)
 		}
 
 		finished, err = health.PodManagersRecreated(client, &options)
 		if err != nil || !finished {
-			return finished, err
+			return finished, liberr.Wrap(err)
 		}
 	}
 
