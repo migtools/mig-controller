@@ -33,12 +33,9 @@ var phaseDescriptions = map[string]string{
 	CreateRsyncTransferPods:              "Creating Rsync daemon pods on the target cluster",
 	WaitForRsyncTransferPodsRunning:      "Waiting for the Rsync daemon pod to run",
 	EnsureRsyncRouteAdmitted:             "Waiting for Rsync route to be admitted.",
-	CreateRsyncClientPods:                "Creating Rsync client pods",
-	WaitForRsyncClientPodsCompleted:      "Waiting for the Rsync client pods to be completed",
 	DeleteRsyncResources:                 "Deleting Rsync resources created by this migration",
 	WaitForRsyncResourcesTerminated:      "Waiting for Rsync resources to terminate",
 	RunRsyncOperations:                   "Running Rsync Pods to migrate Persistent Volume data",
-	Verification:                         "Verifying migration was successful",
 	MigrationFailed:                      "The migration attempt failed, please see errors for more details",
 	Completed:                            "Complete",
 }
