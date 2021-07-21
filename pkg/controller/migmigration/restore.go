@@ -226,7 +226,7 @@ func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progres
 
 // Returns the restore progress statistics
 func getRestoreStats(restore *velero.Restore) (itemsRestored int, totalItems int) {
-	if restore == nil {
+	if restore == nil || restore.Status.Progress == nil {
 		return
 	}
 
