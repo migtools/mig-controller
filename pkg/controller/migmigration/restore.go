@@ -226,7 +226,7 @@ func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progres
 
 // Returns the restore progress statistics
 func getRestoreStats(restore *velero.Restore) (itemsRestored int, totalItems int) {
-	if restore.Status.Progress == nil {
+	if restore == nil {
 		return
 	}
 
@@ -238,10 +238,10 @@ func getRestoreStats(restore *velero.Restore) (itemsRestored int, totalItems int
 func getRestoreDuration(restore *velero.Restore) (duration string) {
 	if restore.Status.StartTimestamp != nil {
 		if restore.Status.CompletionTimestamp == nil {
-			duration = fmt.Sprintf(" (%s)",
+			duration = fmt.Sprintf("(%s)",
 				time.Now().Sub(restore.Status.StartTimestamp.Time).Round(time.Second))
 		} else {
-			duration = fmt.Sprintf(" (%s)",
+			duration = fmt.Sprintf("(%s)",
 				restore.Status.CompletionTimestamp.Sub(restore.Status.StartTimestamp.Time).Round(time.Second))
 		}
 	}
@@ -269,7 +269,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Restore %s/%s: %d out of estimated total of %d objects restored%s",
+				"Restore %s/%s: %d out of estimated total of %d objects restored %s",
 				restore.Namespace,
 				restore.Name,
 				itemsRestored,
@@ -289,7 +289,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Restore %s/%s: %d out of estimated total of %d objects restored%s",
+				"Restore %s/%s: %d out of estimated total of %d objects restored %s",
 				restore.Namespace,
 				restore.Name,
 				itemsRestored,
@@ -312,7 +312,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		reasons = append(reasons, message)
 		itemsRestored, totalItems := getRestoreStats(restore)
 		message = fmt.Sprintf(
-			"%s %d out of estimated total of %d objects restored%s",
+			"%s %d out of estimated total of %d objects restored %s",
 			message,
 			itemsRestored,
 			totalItems,
@@ -325,7 +325,7 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		completed = true
 		itemsRestored, totalItems := getRestoreStats(restore)
 		message := fmt.Sprintf(
-			"Restore %s/%s: partially failed. %d out of estimated total of %d objects restored%s",
+			"Restore %s/%s: partially failed. %d out of estimated total of %d objects restored %s",
 			restore.Namespace,
 			restore.Name,
 			itemsRestored,
