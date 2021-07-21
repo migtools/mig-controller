@@ -271,7 +271,7 @@ func getPodVolumeBackupsProgress(pvbList *velero.PodVolumeBackupList) (progress 
 
 // getBackupStats returns backup progress statistics
 func getBackupStats(backup *velero.Backup) (itemsBackedUp int, totalItems int) {
-	if backup.Status.Progress == nil {
+	if backup == nil || backup.Status.Progress == nil {
 		return
 	}
 	totalItems = backup.Status.Progress.TotalItems

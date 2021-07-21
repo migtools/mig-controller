@@ -224,6 +224,30 @@ func getPodVolumeRestoresProgress(pvrList *velero.PodVolumeRestoreList) (progres
 	return
 }
 
+// Returns the restore progress statistics
+func getRestoreStats(restore *velero.Restore) (itemsRestored int, totalItems int) {
+	if restore == nil || restore.Status.Progress == nil {
+		return
+	}
+
+	itemsRestored = restore.Status.Progress.ItemsRestored
+	totalItems = restore.Status.Progress.TotalItems
+	return
+}
+
+func getRestoreDuration(restore *velero.Restore) (duration string) {
+	if restore.Status.StartTimestamp != nil {
+		if restore.Status.CompletionTimestamp == nil {
+			duration = fmt.Sprintf("(%s)",
+				time.Now().Sub(restore.Status.StartTimestamp.Time).Round(time.Second))
+		} else {
+			duration = fmt.Sprintf("(%s)",
+				restore.Status.CompletionTimestamp.Sub(restore.Status.StartTimestamp.Time).Round(time.Second))
+		}
+	}
+	return
+}
+
 // Get whether a resource has completed on the destination cluster.
 func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 	completed := false
@@ -241,13 +265,16 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 				restore.Namespace,
 				restore.Name))
 	case velero.RestorePhaseInProgress:
+		itemsRestored, totalItems := getRestoreStats(restore)
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Restore %s/%s: %s",
+				"Restore %s/%s: %d out of estimated total of %d objects restored %s",
 				restore.Namespace,
 				restore.Name,
-				restore.Status.Phase))
+				itemsRestored,
+				totalItems,
+				getRestoreDuration(restore)))
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
@@ -258,13 +285,16 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 		progress = append(progress, stageReport...)
 	case velero.RestorePhaseCompleted:
 		completed = true
+		itemsRestored, totalItems := getRestoreStats(restore)
 		progress = append(
 			progress,
 			fmt.Sprintf(
-				"Restore %s/%s: %s",
+				"Restore %s/%s: %d out of estimated total of %d objects restored %s",
 				restore.Namespace,
 				restore.Name,
-				restore.Status.Phase))
+				itemsRestored,
+				totalItems,
+				getRestoreDuration(restore)))
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
@@ -280,17 +310,27 @@ func (t *Task) hasRestoreCompleted(restore *velero.Restore) (bool, []string) {
 			restore.Namespace,
 			restore.Name)
 		reasons = append(reasons, message)
+		itemsRestored, totalItems := getRestoreStats(restore)
+		message = fmt.Sprintf(
+			"%s %d out of estimated total of %d objects restored %s",
+			message,
+			itemsRestored,
+			totalItems,
+			getRestoreDuration(restore))
 		progress = append(progress, message)
 		progress = append(
 			progress,
 			getPodVolumeRestoresProgress(pvrs)...)
 	case velero.RestorePhasePartiallyFailed:
 		completed = true
+		itemsRestored, totalItems := getRestoreStats(restore)
 		message := fmt.Sprintf(
-			fmt.Sprintf(
-				"Restore %s/%s: partially failed.",
-				restore.Namespace,
-				restore.Name))
+			"Restore %s/%s: partially failed. %d out of estimated total of %d objects restored %s",
+			restore.Namespace,
+			restore.Name,
+			itemsRestored,
+			totalItems,
+			getRestoreDuration(restore))
 		progress = append(progress, message)
 		progress = append(
 			progress,
