@@ -1,11 +1,8 @@
 package directvolumemigration
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
 	random "math/rand"
@@ -15,37 +12,27 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	route_endpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
+	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
+	transfer "github.com/konveyor/crane-lib/state_transfer/transfer"
+	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
+	stunnel_transport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	routev1 "github.com/openshift/api/route/v1"
-	"golang.org/x/crypto/ssh"
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-type pvc struct {
-	Name string
-}
-
-type rsyncConfig struct {
-	SshUser   string
-	Namespace string
-	Password  string
-	PVCList   []pvc
-}
 
 const (
 	TRANSFER_POD_CPU_LIMIT      = "TRANSFER_POD_CPU_LIMIT"
@@ -79,38 +66,358 @@ const (
 	RsyncAttemptLabel = "migration.openshift.io/rsync-attempt"
 )
 
-// TODO: Parameterize this more to support custom
-// user/pass/networking configs from directvolumemigration spec
-const rsyncConfigTemplate = `apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    purpose: rsync
-data:
-  rsyncd.conf: |
-    syslog facility = local7
-    read only = no
-    list = yes
-    log file = /dev/stdout
-    max verbosity = 4
-    auth users = {{ .SshUser }}
-    secrets file = /etc/rsyncd.secrets
-    hosts allow = ::1, 127.0.0.1, localhost
-    uid = root
-    gid = root
-    {{ range $i, $pvc := .PVCList }}
-    [{{ $pvc.Name }}]
-        comment = archive for {{ $pvc.Name }}
-        path = /mnt/{{ $.Namespace }}/{{ $pvc.Name }}
-        use chroot = no
-        munge symlinks = no
-        list = yes
-        hosts allow = ::1, 127.0.0.1, localhost
-        auth users = {{ $.SshUser }}
-        secrets file = /etc/rsyncd.secrets
-        read only = false
-   {{ end }}
-`
+//.ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
+func (t *Task) ensureRsyncEndpoint() error {
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	dvmLabels := t.buildDVMLabels()
+	dvmLabels["purpose"] = DirectVolumeMigrationRsync
+	for bothNs := range t.getPVCNamespaceMap() {
+		ns := getDestNs(bothNs)
+		endpoint := route_endpoint.NewEndpoint(
+			types.NamespacedName{
+				Namespace: ns,
+				Name:      DirectVolumeMigrationRsyncTransferRoute,
+			},
+			route_endpoint.EndpointTypePassthrough,
+			dvmLabels,
+		)
+
+		err := endpoint.Create(destClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+// getRsyncTransferContainerMutation returns container mutation to be applied on Rsync tranfer pods
+func (t *Task) getRsyncTransferContainerMutation(srcClient compat.Client) (*corev1.Container, error) {
+	isPrivileged, err := isRsyncPrivileged(srcClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	runAsUser := int64(0)
+	trueBool := bool(true)
+	customSecurityContext := &corev1.SecurityContext{
+		Privileged:             &isPrivileged,
+		RunAsUser:              &runAsUser,
+		ReadOnlyRootFilesystem: &trueBool,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+		},
+	}
+	return &corev1.Container{
+		SecurityContext: customSecurityContext,
+	}, nil
+}
+
+// getRsyncTransferOptions returns Rsync transfer options
+func (t *Task) getRsyncTransferOptions() ([]rsync_transfer.TransferOption, error) {
+	// prepare rsync command options
+	transferOptions := []rsync_transfer.TransferOption{
+		rsync_transfer.StandardProgress(true),
+	}
+	rsyncPassword, err := t.getRsyncPassword()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	o := settings.Settings.DvmOpts.RsyncOpts
+	if o.BwLimit > 0 {
+		transferOptions = append(transferOptions,
+			RsyncBwLimit(o.BwLimit))
+	}
+	transferOptions = append(transferOptions,
+		rsync_transfer.ArchiveFiles(o.Archive))
+	transferOptions = append(transferOptions,
+		rsync_transfer.DeleteDestination(o.Delete))
+	transferOptions = append(transferOptions,
+		HardLinks(o.HardLinks))
+	transferOptions = append(transferOptions,
+		Partial(o.Partial))
+	transferOptions = append(transferOptions,
+		ExtraOpts(o.Extras))
+	transferOptions = append(transferOptions,
+		rsync_transfer.Username("root"))
+	transferOptions = append(transferOptions,
+		rsync_transfer.Password(rsyncPassword))
+	return transferOptions, nil
+}
+
+// getRsyncContainerMutations get Rsync container mutations
+func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsync_transfer.TransferOption, error) {
+	transferOptions := []rsync_transfer.TransferOption{}
+	// info, exists := pvcSecInfo.Get(
+	// 	pvc.Source().Claim().Name, pvc.Source().Claim().Namespace)
+	// if exists {
+	// 	// TODO: think about multiple fsGroup values in same ns
+	// 	if info.fsGroup != nil {
+	// 		podSecContext.FSGroup = info.fsGroup
+	// 	}
+	// 	if len(info.supplementalGroups) > 0 {
+	// 		podSecContext.SupplementalGroups = info.supplementalGroups
+	// 	}
+	// 	if info.seLinuxOptions != nil {
+	// 		podSecContext.SELinuxOptions = info.seLinuxOptions
+	// 	}
+	// 	podSecMutation := rsync_transfer.SourcePodSpecMutation{
+	// 			Spec: &corev1.PodSpec{SecurityContext: podSecContext}}
+	// 	transferOptions := append(transferOptions, podSecMutation)
+	// 	if info.verify {
+	// 		transferOptions = append(transferOptions,
+	// 			ExtraOpts([]string{"--checksum"}))
+	// 	}
+
+	// }
+	containerMutation, err := t.getRsyncTransferContainerMutation(srcClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	rsyncClientLimits, rsyncClientRequests, err :=
+		t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	containerMutation.Resources.Requests = rsyncClientRequests
+	containerMutation.Resources.Limits = rsyncClientLimits
+	sourceContainerMutation := rsync_transfer.SourceContainerMutation{C: containerMutation}
+	rsyncTransferLimits, rsyncTransferRequests, err :=
+		t.getPodResourceLists(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	containerMutation.Resources.Requests = rsyncTransferRequests
+	containerMutation.Resources.Limits = rsyncTransferLimits
+	destinationContainerMutation := rsync_transfer.DestinationContainerMutation{C: containerMutation}
+	transferOptions = append(transferOptions, sourceContainerMutation)
+	transferOptions = append(transferOptions, destinationContainerMutation)
+	return transferOptions, nil
+}
+
+// ensureRsyncTransferServer ensures that server component of the Transfer is created
+func (t *Task) ensureRsyncTransferServer() error {
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	nsMap, err := t.getNamespacedPVCPairs()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	for bothNs, pvcPairs := range nsMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		nnPair := cranemeta.NewNamespacedPair(
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
+		)
+		endpoint, err := route_endpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferRoute,
+			Namespace: destNs,
+		})
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		stunnelTransport, err := stunnel_transport.GetTransportFromKubeObjects(
+			srcClient, destClient, nnPair, endpoint)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		pvcList, err := transfer.NewPVCPairList(pvcPairs...)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		labels := t.buildDVMLabels()
+		labels["purpose"] = DirectVolumeMigrationRsync
+		rsyncOptions, err := t.getRsyncTransferOptions()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		mutations, err := t.getRsyncContainerMutations(srcClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		rsyncOptions = append(rsyncOptions, mutations...)
+		rsyncOptions = append(rsyncOptions, rsync_transfer.WithDestinationPodLabels(labels))
+		transfer, err := rsync_transfer.NewTransfer(
+			stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = transfer.CreateServer(destClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func (t *Task) createRsyncTransferClients(srcClient compat.Client,
+	destClient compat.Client, nsMap map[string][]transfer.PVCPair) (rsyncClientOperationStatusList, error) {
+	statusList := rsyncClientOperationStatusList{}
+
+	pvcNodeMap, err := t.getPVCNodeNameMap(srcClient)
+	if err != nil {
+		return statusList, liberr.Wrap(err)
+	}
+
+	secInfo, err := t.getSourceSecurityGroupInfo(srcClient, nsMap)
+	if err != nil {
+		return statusList, liberr.Wrap(err)
+	}
+
+	rsyncOptions, err := t.getRsyncTransferOptions()
+	if err != nil {
+		return statusList, liberr.Wrap(err)
+	}
+
+	mutations, err := t.getRsyncContainerMutations(srcClient)
+	if err != nil {
+		return statusList, liberr.Wrap(err)
+	}
+
+	rsyncOptions = append(rsyncOptions, mutations...)
+
+	for bothNs, pvcPairs := range nsMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		nnPair := cranemeta.NewNamespacedPair(
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: srcNs},
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
+		)
+		endpoint, err := route_endpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferRoute,
+			Namespace: destNs,
+		})
+		if err != nil {
+			return statusList, liberr.Wrap(err)
+		}
+		stunnelTransport, err := stunnel_transport.GetTransportFromKubeObjects(
+			srcClient, destClient, nnPair, endpoint)
+		if err != nil {
+			return statusList, liberr.Wrap(err)
+		}
+
+		labels := t.buildDVMLabels()
+
+		for _, pvc := range pvcPairs {
+			// ensure that the Rsync operation for this PVC is not already complete
+			lastObservedOperationStatus := t.Owner.Status.GetRsyncOperationStatusForPVC(
+				&corev1.ObjectReference{
+					Name:      pvc.Source().Claim().Name,
+					Namespace: pvc.Source().Claim().Namespace,
+				},
+			)
+			if lastObservedOperationStatus.IsComplete() {
+				statusList.Add(
+					rsyncClientOperationStatus{
+						failed:    lastObservedOperationStatus.Failed,
+						succeeded: lastObservedOperationStatus.Succeeded,
+						operation: lastObservedOperationStatus,
+					},
+				)
+				continue
+			}
+
+			newOperation := lastObservedOperationStatus
+			currentStatus := rsyncClientOperationStatus{
+				operation: newOperation,
+			}
+			pod, err := t.getLatestPodForOperation(srcClient, *lastObservedOperationStatus)
+			if err != nil {
+				currentStatus.AddError(err)
+				continue
+			}
+
+			pvcList, err := transfer.NewPVCPairList(pvc)
+			if err != nil {
+				currentStatus.AddError(err)
+				continue
+			}
+
+			// Force schedule Rsync Pod on the application node
+			nodeName := pvcNodeMap[fmt.Sprintf("%s/%s", srcNs, pvc.Source().Claim().Name)]
+			clientPodMutation := rsync_transfer.SourcePodSpecMutation{
+				Spec: &corev1.PodSpec{
+					NodeName: nodeName,
+				},
+			}
+			rsyncOptions = append(rsyncOptions, &clientPodMutation)
+			if info, exists := secInfo.Get(
+				pvc.Source().Claim().Name, pvc.Source().Claim().Namespace); exists {
+				if info.verify {
+					rsyncOptions = append(rsyncOptions, ExtraOpts{"--checksum"})
+				}
+			}
+
+			// Add identification label for Rsync Pod that keep them associated with a pvc
+			labels[migapi.RsyncPodIdentityLabel] = pvc.Source().LabelSafeName()
+
+			if pod != nil {
+				newOperation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
+				updateOperationStatus(&currentStatus, pod)
+				if currentStatus.failed && currentStatus.operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
+					labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
+					rsyncOptions = append(rsyncOptions, rsync_transfer.WithSourcePodLabels(labels))
+					transfer, err := rsync_transfer.NewTransfer(
+						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+					if err != nil {
+						currentStatus.AddError(err)
+						continue
+					}
+					err = transfer.CreateClient(srcClient)
+					if err != nil {
+						t.Log.Info("failed creating Rsync Pod for pvc", "pvc", newOperation, "err", err)
+						currentStatus.AddError(err)
+						continue
+					}
+					t.Log.Info("previous attempt of Rsync failed for pvc, created a new pod", "pvc", newOperation)
+				} else {
+					t.Log.Info("previous attempt of Rsync did not fail", "pvc", newOperation)
+					newOperation.Failed = currentStatus.failed
+					newOperation.Succeeded = currentStatus.succeeded
+					if newOperation.IsComplete() {
+						t.Log.Info(
+							fmt.Sprintf("Rsync operation completed after %d attempts", newOperation.CurrentAttempt),
+							"pvc", newOperation, "failed", newOperation.Failed, "succeded", newOperation.Succeeded)
+					} else {
+						t.Log.Info("Rsync operation is still running. Waiting for completion",
+							"pod", path.Join(pod.Namespace, pod.Name),
+							"pvc", newOperation,
+						)
+					}
+				}
+			} else {
+				newOperation.CurrentAttempt = 0
+				labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
+				rsyncOptions = append(rsyncOptions, rsync_transfer.WithSourcePodLabels(labels))
+				transfer, err := rsync_transfer.NewTransfer(
+					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+				if err != nil {
+					currentStatus.AddError(err)
+					continue
+				}
+				err = transfer.CreateClient(srcClient)
+				if err != nil {
+					currentStatus.AddError(err)
+					continue
+				}
+			}
+			statusList.Add(currentStatus)
+			t.Log.Info("adding status of pvc", "pvc", currentStatus.operation, "errors", currentStatus.errors)
+		}
+	}
+	return statusList, nil
+}
 
 func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
 	// Get client for destination
@@ -179,523 +486,16 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 	return true, nil, nil
 }
 
-// Generate SSH keys to be used
-// TODO: Need to determine if this has already been generated and
-// not to regenerate
-func (t *Task) generateSSHKeys() error {
-	// Check if already generated
-	if t.SSHKeys != nil {
-		return nil
-	}
-	// Private Key generation
-	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return err
-	}
-
-	// Validate Private Key
-	err = privateKey.Validate()
-	if err != nil {
-		return err
-	}
-
-	t.SSHKeys = &sshKeys{
-		PublicKey:  &privateKey.PublicKey,
-		PrivateKey: privateKey,
-	}
-	return nil
-}
-
 func (t *Task) createRsyncConfig() error {
-	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-	// Get client for source
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return err
-	}
-
 	password, err := t.getRsyncPassword()
 	if err != nil {
 		return err
 	}
 	if password == "" {
-		password, err = t.createRsyncPassword()
+		_, err = t.createRsyncPassword()
 		if err != nil {
 			return err
 		}
-	}
-
-	// Create rsync configmap/secret on source + destination
-	// Create rsync secret (which contains user/pass for rsync transfer pod) in
-	// each namespace being migrated
-	// Needs to go in every namespace where a PVC is being migrated
-	bothPvcMap := t.getPVCNamespaceMap()
-	for bothNs, vols := range bothPvcMap {
-		srcNs := getSourceNs(bothNs)
-		destNs := getDestNs(bothNs)
-
-		pvcList := []pvc{}
-		for _, vol := range vols {
-			pvcHash := getMD5Hash(vol.Name)
-			pvcList = append(pvcList, pvc{Name: pvcHash})
-		}
-		// Generate template
-		rsyncConf := rsyncConfig{
-			SshUser:   "root",
-			Namespace: destNs,
-			PVCList:   pvcList,
-			Password:  password,
-		}
-		var tpl bytes.Buffer
-		temp, err := template.New("config").Parse(rsyncConfigTemplate)
-		if err != nil {
-			return err
-		}
-		err = temp.Execute(&tpl, rsyncConf)
-		if err != nil {
-			return err
-		}
-
-		configMap := corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: destNs,
-				Name:      DirectVolumeMigrationRsyncConfig,
-			},
-		}
-		configMap.Labels = t.Owner.GetCorrelationLabels()
-		configMap.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		err = yaml.Unmarshal(tpl.Bytes(), &configMap)
-		if err != nil {
-			return err
-		}
-
-		// Create configmap on source + dest
-		// Note: when this configmap changes the rsync pod
-		// needs to restart
-		// Need to launch new pod when configmap changes
-		t.Log.Info("Creating Rsync Transfer Pod ConfigMap on destination cluster",
-			"configMap", path.Join(configMap.Namespace, configMap.Name))
-		err = destClient.Create(context.TODO(), &configMap)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Rsync Transfer Pod ConfigMap already exists on destination",
-				"configMap", path.Join(configMap.Namespace, configMap.Name))
-		} else if err != nil {
-			return err
-		}
-
-		// Before starting rsync transfer pod, must generate rsync password in a
-		// secret and pass it into the transfer pod
-
-		// Format user:password
-		// Put this string into /etc/rsyncd.secrets in rsync transfer pod
-		// Rsyncd configmap references this file as "secrets file":
-		// https://github.com/konveyor/pvc-migrate/blob/master/3_run_rsync/templates/rsyncd.yml.j2#L17
-		// This configmap also takes in the user name as an "auth user". (root)
-		// Make this user configurable on CR spec?
-
-		// For source side, create secret with user/password and
-		// mount as environment variables into rsync client pod
-		srcSecret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: srcNs,
-				Name:      DirectVolumeMigrationRsyncCreds,
-			},
-			Data: map[string][]byte{
-				"RSYNC_PASSWORD": []byte(password),
-			},
-		}
-		srcSecret.Labels = t.Owner.GetCorrelationLabels()
-		srcSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		t.Log.Info("Creating Rsync Password Secret on source cluster",
-			"secret", path.Join(srcSecret.Namespace, srcSecret.Name))
-		err = srcClient.Create(context.TODO(), &srcSecret)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Rsync Password Secret already exists on source cluster", "namespace", srcSecret.Namespace)
-		} else if err != nil {
-			return err
-		}
-		destSecret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: destNs,
-				Name:      DirectVolumeMigrationRsyncCreds,
-			},
-			Data: map[string][]byte{
-				"credentials": []byte("root:" + password),
-			},
-		}
-		destSecret.Labels = t.Owner.GetCorrelationLabels()
-		destSecret.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		t.Log.Info("Creating Rsync Password Secret on destination cluster",
-			"secret", path.Join(destSecret.Namespace, destSecret.Name))
-		err = destClient.Create(context.TODO(), &destSecret)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Secret already exists on destination", "namespace", destSecret.Namespace)
-		} else if err != nil {
-			return err
-		}
-	}
-
-	// One rsync transfer pod per namespace
-	// One rsync client pod per PVC
-
-	// Also in this rsyncd configmap, include all PVC mount paths, see:
-	// https://github.com/konveyor/pvc-migrate/blob/master/3_run_rsync/templates/rsyncd.yml.j2#L23
-
-	return nil
-}
-
-// Create rsync transfer route
-func (t *Task) createRsyncTransferRoute() error {
-	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-	pvcMap := t.getPVCNamespaceMap()
-	dvmLabels := t.buildDVMLabels()
-	dvmLabels["purpose"] = DirectVolumeMigrationRsync
-
-	for bothNs, _ := range pvcMap {
-		ns := getDestNs(bothNs)
-		svc := corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DirectVolumeMigrationRsyncTransferSvc,
-				Namespace: ns,
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:       DirectVolumeMigrationStunnel,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       int32(2222),
-						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
-					},
-				},
-				Selector: dvmLabels,
-				Type:     corev1.ServiceTypeClusterIP,
-			},
-		}
-		svc.Labels = t.Owner.GetCorrelationLabels()
-		svc.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		t.Log.Info("Creating Rsync Transfer Service for Stunnel connection "+
-			"on destination MigCluster ",
-			"service", path.Join(svc.Namespace, svc.Name))
-		err = destClient.Create(context.TODO(), &svc)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Rsync transfer svc already exists on destination",
-				"service", path.Join(svc.Namespace, svc.Name))
-		} else if err != nil {
-			return err
-		}
-		route := routev1.Route{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DirectVolumeMigrationRsyncTransferRoute,
-				Namespace: ns,
-			},
-			Spec: routev1.RouteSpec{
-				To: routev1.RouteTargetReference{
-					Kind: "Service",
-					Name: DirectVolumeMigrationRsyncTransferSvc,
-				},
-				Port: &routev1.RoutePort{
-					TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 2222},
-				},
-				TLS: &routev1.TLSConfig{
-					Termination: routev1.TLSTerminationPassthrough,
-				},
-			},
-		}
-		route.Labels = t.Owner.GetCorrelationLabels()
-		route.Labels["app"] = DirectVolumeMigrationRsyncTransfer
-
-		// Get cluster subdomain if it exists
-		cluster, err := t.Owner.GetDestinationCluster(t.Client)
-		if err != nil {
-			return err
-		}
-		// Ignore error since this is optional config and won't break
-		// anything if it doesn't exist
-		subdomain, _ := cluster.GetClusterSubdomain(t.Client)
-
-		// This is a backdoor setting to help guarantee DVM can still function if a
-		// user is migrating namespaces that are 60+ characters
-		// NOTE: We do no validation of this subdomain value. User is expected to
-		// set this properly and it's only used for the unlikely case a user needs
-		// to migrate namespaces with very long names.
-		if subdomain != "" {
-			// Ensure that route prefix will not exceed 63 chars
-			// Route gen will add `-` between name + ns so need to ensure below is <62 chars
-			// NOTE: only do this if we actually get a configured subdomain,
-			// otherwise just use the name and hope for the best
-			prefix := fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncTransferRoute, getMD5Hash(ns))
-			if len(prefix) > 62 {
-				prefix = prefix[0:62]
-			}
-			host := fmt.Sprintf("%s.%s", prefix, subdomain)
-			route.Spec.Host = host
-		}
-		t.Log.Info("Creating Rsync Transfer Route for Stunnel connection "+
-			"on destination MigCluster ",
-			"route", path.Join(route.Namespace, route.Name))
-		err = destClient.Create(context.TODO(), &route)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Rsync transfer route already exists on destination", "namespace", ns)
-		} else if err != nil {
-			return err
-		}
-		t.RsyncRoutes[ns] = route.Spec.Host
-	}
-	return nil
-}
-
-// Transfer pod which runs rsyncd
-func (t *Task) createRsyncTransferPods() error {
-	// Ensure SSH Keys exist
-	err := t.generateSSHKeys()
-	if err != nil {
-		return err
-	}
-
-	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-
-	// Get transfer image
-	cluster, err := t.Owner.GetDestinationCluster(t.Client)
-	if err != nil {
-		return err
-	}
-	t.Log.Info("Getting Rsync Transfer Pod image from ConfigMap.")
-	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
-	if err != nil {
-		return err
-	}
-	t.Log.Info("Getting Rsync Transfer Pod limits and requests from ConfigMap.")
-	limits, requests, err := t.getPodResourceLists(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
-	if err != nil {
-		return err
-	}
-	// one transfer pod should be created per namespace and should mount all
-	// PVCs that are being written to in that namespace
-
-	// Transfer pod contains 2 containers, this is the stunnel container +
-	// rsyncd
-
-	// Transfer pod should also mount the stunnel configmap, the rsync secret
-	// (contains creds), and add appropiate health checks for both stunnel +
-	// rsyncd containers.
-
-	// Generate pubkey bytes
-	// TODO: Use a secret for this so we aren't regenerating every time
-	t.Log.Info("Generating SSH public key for Rsync Transfer Pod")
-	publicRsaKey, err := ssh.NewPublicKey(t.SSHKeys.PublicKey)
-	if err != nil {
-		return err
-	}
-	pubKeyBytes := ssh.MarshalAuthorizedKey(publicRsaKey)
-	mode := int32(0600)
-
-	isRsyncPrivileged, err := isRsyncPrivileged(destClient)
-	if err != nil {
-		return err
-	}
-	t.Log.Info(fmt.Sprintf("Rsync Transfer Pod will be created with privileged=[%v]",
-		isRsyncPrivileged))
-	// Loop through namespaces and create transfer pod
-	pvcMap := t.getPVCNamespaceMap()
-	for bothNs, vols := range pvcMap {
-		ns := getDestNs(bothNs)
-		volumeMounts := []corev1.VolumeMount{}
-		volumes := []corev1.Volume{
-			{
-				Name: "stunnel-conf",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: DirectVolumeMigrationStunnelConfig,
-						},
-					},
-				},
-			},
-			{
-				Name: "stunnel-certs",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: DirectVolumeMigrationStunnelCerts,
-						Items: []corev1.KeyToPath{
-							{
-								Key:  "tls.crt",
-								Path: "tls.crt",
-							},
-							{
-								Key:  "ca.crt",
-								Path: "ca.crt",
-							},
-							{
-								Key:  "tls.key",
-								Path: "tls.key",
-							},
-						},
-					},
-				},
-			},
-			{
-				Name: "rsync-creds",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName:  DirectVolumeMigrationRsyncCreds,
-						DefaultMode: &mode,
-						Items: []corev1.KeyToPath{
-							{
-								Key:  "credentials",
-								Path: "rsyncd.secrets",
-							},
-						},
-					},
-				},
-			},
-			{
-				Name: "rsyncd-conf",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: DirectVolumeMigrationRsyncConfig,
-						},
-					},
-				},
-			},
-		}
-		trueBool := true
-		runAsUser := int64(0)
-
-		// Add PVC volume mounts
-		for _, vol := range vols {
-			pvcHash := getMD5Hash(vol.Name)
-			volumeMounts = append(volumeMounts, corev1.VolumeMount{
-				Name:      pvcHash,
-				MountPath: fmt.Sprintf("/mnt/%s/%s", ns, pvcHash),
-			})
-			volumes = append(volumes, corev1.Volume{
-				Name: pvcHash,
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: vol.Name,
-					},
-				},
-			})
-		}
-		// Add rsyncd config mount
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "rsyncd-conf",
-			MountPath: "/etc/rsyncd.conf",
-			SubPath:   "rsyncd.conf",
-		})
-		// Add rsync creds to volumeMounts
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "rsync-creds",
-			MountPath: "/etc/rsyncd.secrets",
-			SubPath:   "rsyncd.secrets",
-		})
-
-		dvmLabels := t.buildDVMLabels()
-		dvmLabels["purpose"] = DirectVolumeMigrationRsync
-
-		transferPod := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      DirectVolumeMigrationRsyncTransfer,
-				Namespace: ns,
-				Labels:    dvmLabels,
-			},
-			Spec: corev1.PodSpec{
-				Volumes: volumes,
-				Containers: []corev1.Container{
-					{
-						Name:  "rsyncd",
-						Image: transferImage,
-						Env: []corev1.EnvVar{
-							{
-								Name:  "SSH_PUBLIC_KEY",
-								Value: string(pubKeyBytes),
-							},
-						},
-						Command: []string{"/usr/bin/rsync", "--daemon", "--no-detach", "--port=22", "-vvv"},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          "rsyncd",
-								Protocol:      corev1.ProtocolTCP,
-								ContainerPort: int32(22),
-							},
-						},
-						VolumeMounts: volumeMounts,
-						SecurityContext: &corev1.SecurityContext{
-							Privileged:             &isRsyncPrivileged,
-							RunAsUser:              &runAsUser,
-							ReadOnlyRootFilesystem: &trueBool,
-							Capabilities: &corev1.Capabilities{
-								Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-							},
-						},
-						Resources: corev1.ResourceRequirements{
-							Limits:   limits,
-							Requests: requests,
-						},
-					},
-					{
-						Name:    DirectVolumeMigrationStunnel,
-						Image:   transferImage,
-						Command: []string{"/bin/stunnel", "/etc/stunnel/stunnel.conf"},
-						Ports: []corev1.ContainerPort{
-							{
-								Name:          DirectVolumeMigrationStunnel,
-								Protocol:      corev1.ProtocolTCP,
-								ContainerPort: int32(2222),
-							},
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "stunnel-conf",
-								MountPath: "/etc/stunnel/stunnel.conf",
-								SubPath:   "stunnel.conf",
-							},
-							{
-								Name:      "stunnel-certs",
-								MountPath: "/etc/stunnel/certs",
-							},
-						},
-						SecurityContext: &corev1.SecurityContext{
-							Privileged:             &isRsyncPrivileged,
-							RunAsUser:              &runAsUser,
-							ReadOnlyRootFilesystem: &trueBool,
-							Capabilities: &corev1.Capabilities{
-								Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-							},
-						},
-					},
-				},
-			},
-		}
-		t.Log.Info("Creating Rsync Transfer Pod with containers [rsyncd, stunnel] on destination cluster.",
-			"pod", path.Join(transferPod.Namespace, transferPod.Name))
-		err = destClient.Create(context.TODO(), &transferPod)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("Rsync transfer pod already exists on destination",
-				"pod", path.Join(transferPod.Namespace, transferPod.Name))
-		} else if err != nil {
-			return err
-		}
-		t.Log.Info("Rsync transfer pod created",
-			"pod", path.Join(transferPod.Namespace, transferPod.Name))
-
 	}
 	return nil
 }
@@ -759,6 +559,117 @@ func (t *Task) getPVCNamespaceMap() map[string][]pvcMapElement {
 	return nsMap
 }
 
+type securityContextInfo struct {
+	fsGroup            *int64
+	supplementalGroups []int64
+	seLinuxOptions     *corev1.SELinuxOptions
+	verify             bool
+}
+
+type pvcWithSecurityContextInfo map[string]securityContextInfo
+
+func (p pvcWithSecurityContextInfo) Add(srcClaimName string, srcClaimNamespace string, info securityContextInfo) {
+	if p == nil {
+		p = make(pvcWithSecurityContextInfo)
+	}
+	key := fmt.Sprintf("%s/%s", srcClaimNamespace, srcClaimName)
+	p[key] = info
+}
+
+func (p pvcWithSecurityContextInfo) Get(srcClaimName string, srcClaimNamespace string) (securityContextInfo, bool) {
+	key := fmt.Sprintf("%s/%s", srcClaimNamespace, srcClaimName)
+	val, exists := p[key]
+	return val, exists
+}
+
+// With namespace mapping, the destination cluster namespace may be different than that in the source cluster.
+// This function maps PVCs to the appropriate src:dest namespace pairs.
+func (t *Task) getNamespacedPVCPairs() (map[string][]transfer.PVCPair, error) {
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return nil, err
+	}
+
+	destClient, err := t.getDestinationClient()
+	if err != nil {
+		return nil, err
+	}
+
+	nsMap := map[string][]transfer.PVCPair{}
+	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
+		srcNs := pvc.Namespace
+		destNs := srcNs
+		if pvc.TargetNamespace != "" {
+			destNs = pvc.TargetNamespace
+		}
+		srcPvc := corev1.PersistentVolumeClaim{}
+		err := srcClient.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: srcNs}, &srcPvc)
+		if err != nil {
+			return nil, err
+		}
+		destPvc := corev1.PersistentVolumeClaim{}
+		err = destClient.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: destNs}, &destPvc)
+		if err != nil {
+			return nil, err
+		}
+		newPVCPair := transfer.NewPVCPair(&srcPvc, &destPvc)
+		bothNs := srcNs + ":" + destNs
+		if vols, exists := nsMap[bothNs]; exists {
+			vols = append(vols, newPVCPair)
+			nsMap[bothNs] = vols
+		} else {
+			nsMap[bothNs] = []transfer.PVCPair{newPVCPair}
+		}
+	}
+	return nsMap, nil
+}
+
+func (t *Task) getSourceSecurityGroupInfo(srcClient compat.Client, pvcPairMap map[string][]transfer.PVCPair) (pvcWithSecurityContextInfo, error) {
+	var pvcInfo pvcWithSecurityContextInfo
+
+	for bothNS := range pvcPairMap {
+		srcNs := getSourceNs(bothNS)
+
+		podList := &corev1.PodList{}
+		err := srcClient.List(context.TODO(), podList, &k8sclient.ListOptions{Namespace: srcNs})
+		if err != nil {
+			return nil, err
+		}
+
+		// for each namespace, have a pvc->SCC map to look up in the pvc loop later
+		// we will use the scc of the last pod in the list mounting the pvc
+		for _, pod := range podList.Items {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					info := securityContextInfo{
+						fsGroup:            pod.Spec.SecurityContext.FSGroup,
+						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
+						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
+					}
+					pvcInfo.Add(vol.PersistentVolumeClaim.ClaimName, pod.Namespace, info)
+				}
+			}
+		}
+	}
+
+	// process verify values and PVCs not attached with any pod
+	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
+		secInfo, exists := pvcInfo.Get(pvc.Name, pvc.Namespace)
+		if exists {
+			secInfo.verify = pvc.Verify
+		} else {
+			secInfo = securityContextInfo{
+				fsGroup:            nil,
+				supplementalGroups: nil,
+				seLinuxOptions:     nil,
+				verify:             pvc.Verify,
+			}
+			pvcInfo.Add(pvc.Name, pvc.Namespace, secInfo)
+		}
+	}
+	return pvcInfo, nil
+}
+
 func getSourceNs(bothNs string) string {
 	nsNames := strings.Split(bothNs, ":")
 	return nsNames[0]
@@ -771,22 +682,6 @@ func getDestNs(bothNs string) string {
 	} else {
 		return nsNames[0]
 	}
-}
-
-func (t *Task) getRsyncRoute(namespace string) (string, error) {
-	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return "", err
-	}
-	route := routev1.Route{}
-
-	key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
-	err = destClient.Get(context.TODO(), key, &route)
-	if err != nil {
-		return "", err
-	}
-	return route.Spec.Host, nil
 }
 
 func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
@@ -917,20 +812,15 @@ func (t *Task) deleteRsyncPassword() error {
 }
 
 //Returns a map of PVCNamespacedName to the pod.NodeName
-func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
+func (t *Task) getPVCNodeNameMap(srcClient compat.Client) (map[string]string, error) {
 	nodeNameMap := map[string]string{}
 	pvcMap := t.getPVCNamespaceMap()
-
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return nil, err
-	}
 
 	for bothNs, _ := range pvcMap {
 		ns := getSourceNs(bothNs)
 
 		nsPodList := corev1.PodList{}
-		err = srcClient.List(context.TODO(), &nsPodList, k8sclient.InNamespace(ns))
+		err := srcClient.List(context.TODO(), &nsPodList, k8sclient.InNamespace(ns))
 		if err != nil {
 			return nil, err
 		}
@@ -948,150 +838,6 @@ func (t *Task) getPVCNodeNameMap() (map[string]string, error) {
 	}
 
 	return nodeNameMap, nil
-}
-
-// validates extra Rsync options set by user
-// only returns options identified as valid
-func (t *Task) filterRsyncExtraOptions(options []string) (validatedOptions []string) {
-	for _, opt := range options {
-		if valid, _ := regexp.Match(`^\-{1,2}[\w-]+?\w$`, []byte(opt)); valid {
-			validatedOptions = append(validatedOptions, opt)
-		} else {
-			t.Log.Info(fmt.Sprintf("Invalid Rsync extra option passed: %s", opt))
-		}
-	}
-	return
-}
-
-// generates Rsync options based on custom options provided by the user in MigrationController CR
-func (t *Task) getRsyncOptions() []string {
-	var rsyncOpts []string
-	defaultInfoOpts := "COPY2,DEL2,REMOVE2,SKIP2,FLIST2,PROGRESS2,STATS2"
-	defaultExtraOpts := []string{
-		"--human-readable",
-		"--port", "2222",
-		"--log-file", "/dev/stdout",
-	}
-	rsyncOptions := settings.Settings.DvmOpts.RsyncOpts
-	if rsyncOptions.BwLimit != -1 {
-		rsyncOpts = append(rsyncOpts,
-			fmt.Sprintf("--bwlimit=%d", rsyncOptions.BwLimit))
-	}
-	if rsyncOptions.Archive {
-		rsyncOpts = append(rsyncOpts, "--archive")
-	}
-	if rsyncOptions.Delete {
-		rsyncOpts = append(rsyncOpts, "--delete")
-		// --delete option does not work without --recursive
-		rsyncOpts = append(rsyncOpts, "--recursive")
-	}
-	if rsyncOptions.HardLinks {
-		rsyncOpts = append(rsyncOpts, "--hard-links")
-	}
-	if rsyncOptions.Partial {
-		rsyncOpts = append(rsyncOpts, "--partial")
-	}
-	if valid, _ := regexp.Match(`^\w[\w,]*?\w$`, []byte(rsyncOptions.Info)); valid {
-		rsyncOpts = append(rsyncOpts,
-			fmt.Sprintf("--info=%s", rsyncOptions.Info))
-	} else {
-		rsyncOpts = append(rsyncOpts,
-			fmt.Sprintf("--info=%s", defaultInfoOpts))
-	}
-	rsyncOpts = append(rsyncOpts, defaultExtraOpts...)
-	rsyncOpts = append(rsyncOpts,
-		t.filterRsyncExtraOptions(rsyncOptions.Extras)...)
-	return rsyncOpts
-}
-
-type PVCWithSecurityContext struct {
-	name               string
-	pvcHash            string
-	fsGroup            *int64
-	supplementalGroups []int64
-	seLinuxOptions     *corev1.SELinuxOptions
-	verify             bool
-
-	// TODO:
-	// add capabilities for dvm controller to handle case the source
-	// application pods is privileged with the following flags from
-	// PodSecurityContext and Containers' SecurityContext
-	// We need to
-	// 1. go through the pod's volume.
-	// 2. find the container where it is volume mounted.
-	//    i. if the container's fields are non-nil, use that
-	//    ii. if the container's fields are nil, use the pods fields.
-
-	// RunAsUser  *int64
-	// RunAsGroup *int64
-}
-
-// Get fsGroup per PVC
-func (t *Task) getfsGroupMapForNamespace() (map[string][]PVCWithSecurityContext, error) {
-	pvcMap := t.getPVCNamespaceMap()
-	pvcSecurityContextMap := map[string][]PVCWithSecurityContext{}
-	for ns, _ := range pvcMap {
-		pvcSecurityContextMap[ns] = []PVCWithSecurityContext{}
-	}
-	for bothNs, pvcs := range pvcMap {
-		ns := getSourceNs(bothNs)
-		srcClient, err := t.getSourceClient()
-		if err != nil {
-			return nil, err
-		}
-		podList := &corev1.PodList{}
-		err = srcClient.List(context.TODO(), podList, &k8sclient.ListOptions{Namespace: ns})
-		if err != nil {
-			return nil, err
-		}
-
-		// for each namespace, have a pvc->SCC map to look up in the pvc loop later
-		// we will use the scc of the last pod in the list mounting the pvc
-		pvcSecurityContextMapForNamespace := map[string]PVCWithSecurityContext{}
-		for _, pod := range podList.Items {
-			for _, vol := range pod.Spec.Volumes {
-				if vol.PersistentVolumeClaim != nil {
-					pvcHash := getMD5Hash(vol.PersistentVolumeClaim.ClaimName)
-					pvcSecurityContextMapForNamespace[vol.PersistentVolumeClaim.ClaimName] = PVCWithSecurityContext{
-						name:               vol.PersistentVolumeClaim.ClaimName,
-						pvcHash:            pvcHash,
-						fsGroup:            pod.Spec.SecurityContext.FSGroup,
-						supplementalGroups: pod.Spec.SecurityContext.SupplementalGroups,
-						seLinuxOptions:     pod.Spec.SecurityContext.SELinuxOptions,
-					}
-				}
-			}
-		}
-
-		for _, claim := range pvcs {
-			pss, exists := pvcSecurityContextMapForNamespace[claim.Name]
-			if exists {
-				pss.verify = claim.Verify
-				pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], pss)
-				continue
-			}
-			pvcHash := getMD5Hash(claim.Name)
-			// pvc not used by any pod
-			pvcSecurityContextMap[ns] = append(pvcSecurityContextMap[ns], PVCWithSecurityContext{
-				name:               claim.Name,
-				pvcHash:            pvcHash,
-				fsGroup:            nil,
-				supplementalGroups: nil,
-				seLinuxOptions:     nil,
-				verify:             claim.Verify,
-			})
-		}
-	}
-	return pvcSecurityContextMap, nil
-}
-
-func isClaimUsedByPod(claimName string, p *corev1.Pod) bool {
-	for _, vol := range p.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil && vol.PersistentVolumeClaim.ClaimName == claimName {
-			return true
-		}
-	}
-	return false
 }
 
 func isRsyncPrivileged(client compat.Client) (bool, error) {
@@ -1534,6 +1280,7 @@ func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMa
 	}
 	return nil
 }
+
 func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selector labels.Selector) error {
 	podList := corev1.PodList{}
 	cmList := corev1.ConfigMapList{}
@@ -1675,309 +1422,6 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 	return nil
 }
 
-// rsyncClientPodRequirements represents information required to create a client Rsync Pod
-type rsyncClientPodRequirements struct {
-	// pvInfo stuctured PVC info for which Pod will be created
-	pvInfo PVCWithSecurityContext
-	// namespace ns in which Rsync Pod will be created
-	namespace string
-	// image image used by the Rsync Pod
-	image string
-	// password password used by startup Rsync command
-	password string
-	// privileged whether Rsync Pod will run privileged
-	privileged bool
-	// rsyncResourceReq resource requirements for the rsync container
-	rsyncResourceReq corev1.ResourceRequirements
-	// stunnelResourceReq resource requirements for the stunnel container
-	stunnelResourceReq corev1.ResourceRequirements
-	// nodeName node on which Rsync Pod will be launched
-	nodeName string
-	// destIP destination IP address for Stunnel route
-	destIP string
-	// rsyncOptions rsync command to execute
-	rsyncOptions []string
-}
-
-// getRsyncClientPodTemplate given RsyncClientPodRequirements, returns a Pod template
-func (req rsyncClientPodRequirements) getRsyncClientPodTemplate() corev1.Pod {
-	runAsUser := int64(0)
-	trueBool := true
-	isPrivileged := req.privileged
-	volumes := []corev1.Volume{}
-	rsyncVolumeMounts := []corev1.VolumeMount{}
-	containers := []corev1.Container{}
-	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
-		Name:      req.pvInfo.pvcHash,
-		MountPath: fmt.Sprintf("/mnt/%s/%s", req.namespace, req.pvInfo.pvcHash),
-	})
-
-	// shared volumeMount for inter-process communication between rsync and stunnel
-	rsyncVolumeMounts = append(rsyncVolumeMounts, corev1.VolumeMount{
-		Name:      "rsync-stunnel-ipc",
-		MountPath: "/usr/share/rsync-stunnel-mgmt",
-	})
-
-	stunnelVolumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "stunnel-conf",
-			MountPath: "/etc/stunnel/stunnel.conf",
-			SubPath:   "stunnel.conf",
-		},
-		{
-			Name:      "stunnel-certs",
-			MountPath: "/etc/stunnel/certs",
-		},
-		{
-			Name:      "rsync-stunnel-ipc",
-			MountPath: "/usr/share/rsync-stunnel-mgmt",
-		},
-	}
-
-	volumes = append(volumes, corev1.Volume{
-		Name: req.pvInfo.pvcHash,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: req.pvInfo.name,
-			},
-		},
-	})
-
-	// append stunnel config volume
-	volumes = append(volumes, corev1.Volume{
-		Name: "stunnel-conf",
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: DirectVolumeMigrationStunnelConfig,
-				},
-			},
-		},
-	})
-
-	// append stunnel certs
-	volumes = append(volumes, corev1.Volume{
-		Name: "stunnel-certs",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: DirectVolumeMigrationStunnelCerts,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  "tls.crt",
-						Path: "tls.crt",
-					},
-					{
-						Key:  "ca.crt",
-						Path: "ca.crt",
-					},
-					{
-						Key:  "tls.key",
-						Path: "tls.key",
-					},
-				},
-			},
-		},
-	})
-
-	// append shared volume
-	volumes = append(volumes, corev1.Volume{
-		Name: "rsync-stunnel-ipc",
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		},
-	})
-
-	rsyncCommand := []string{"rsync"}
-	rsyncCommand = append(rsyncCommand, req.rsyncOptions...)
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("/mnt/%s/%s/", req.namespace, req.pvInfo.pvcHash))
-	rsyncCommand = append(rsyncCommand, fmt.Sprintf("rsync://root@%s/%s", req.destIP, req.pvInfo.pvcHash))
-
-	rsyncCommandStr := strings.Join(rsyncCommand, " ")
-	rsyncCommandBashScript := fmt.Sprintf("trap \"touch /usr/share/rsync-stunnel-mgmt/rsync-client-container-done\" EXIT SIGINT SIGTERM; timeout=600; SECONDS=0; while [ $SECONDS -lt $timeout ]; do nc -z localhost 2222; rc=$?; if [ $rc -eq 0 ]; then %s; rc=$?; break; fi; done; exit $rc;", rsyncCommandStr)
-	rsyncContainerCommand := []string{
-		"/bin/bash",
-		"-c",
-		rsyncCommandBashScript,
-	}
-
-	stunnelContainerCommand := []string{
-		"/bin/bash",
-		"-c",
-		`/bin/stunnel /etc/stunnel/stunnel.conf
-         while true
-         do test -f /usr/share/rsync-stunnel-mgmt/rsync-client-container-done
-         if [ $? -eq 0 ]
-         then
-         break
-         fi
-         done
-         exit 0`,
-	}
-
-	labels := map[string]string{
-		"app":                   DirectVolumeMigrationRsyncTransfer,
-		"directvolumemigration": DirectVolumeMigrationRsyncClient,
-		migapi.PartOfLabel:      migapi.Application,
-	}
-	labels = Union(labels, GetRsyncPodSelector(req.pvInfo.name))
-	containers = append(containers, corev1.Container{
-		Name:  DirectVolumeMigrationRsyncClient,
-		Image: req.image,
-		Env: []corev1.EnvVar{
-			{
-				Name:  "RSYNC_PASSWORD",
-				Value: req.password,
-			},
-		},
-		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-		Command:                  rsyncContainerCommand,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          DirectVolumeMigrationRsyncClient,
-				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: int32(22),
-			},
-		},
-		VolumeMounts: rsyncVolumeMounts,
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:             &isPrivileged,
-			RunAsUser:              &runAsUser,
-			ReadOnlyRootFilesystem: &trueBool,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-			},
-		},
-		Resources: req.rsyncResourceReq,
-	})
-
-	// append stunnel container
-	containers = append(containers, corev1.Container{
-		Name:                     DirectVolumeMigrationStunnel,
-		Image:                    req.image,
-		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-		Command:                  stunnelContainerCommand,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          DirectVolumeMigrationStunnel,
-				Protocol:      corev1.ProtocolTCP,
-				ContainerPort: int32(2222),
-			},
-		},
-		VolumeMounts: stunnelVolumeMounts,
-		SecurityContext: &corev1.SecurityContext{
-			Privileged:             &isPrivileged,
-			RunAsUser:              &runAsUser,
-			ReadOnlyRootFilesystem: &trueBool,
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-			},
-		},
-		Resources: req.stunnelResourceReq,
-	})
-
-	clientPod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "dvm-rsync-",
-			Namespace:    req.namespace,
-			Labels:       labels,
-			Annotations:  map[string]string{migapi.RsyncPodIdentityLabel: req.pvInfo.name},
-		},
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyNever,
-			Volumes:       volumes,
-			Containers:    containers,
-			NodeName:      req.nodeName,
-			SecurityContext: &corev1.PodSecurityContext{
-				SupplementalGroups: req.pvInfo.supplementalGroups,
-				FSGroup:            req.pvInfo.fsGroup,
-				SELinuxOptions:     req.pvInfo.seLinuxOptions,
-			},
-		},
-	}
-	return clientPod
-}
-
-func (t *Task) prepareRsyncPodRequirements(srcClient compat.Client) ([]rsyncClientPodRequirements, error) {
-	req := []rsyncClientPodRequirements{}
-	cluster, err := t.Owner.GetSourceCluster(t.Client)
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting image for Rsync client Pods that will be created on source MigCluster")
-	transferImage, err := cluster.GetRsyncTransferImage(t.Client)
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting [NS => PVCWithSecurityContext] mappings for PVCs to be migrated")
-	pvcMap, err := t.getfsGroupMapForNamespace()
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting Rsync password for Rsync client Pods")
-	password, err := t.getRsyncPassword()
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting [PVC => NodeName] mapping for PVCs to be migrated")
-	pvcNodeMap, err := t.getPVCNodeNameMap()
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting limits and requests for Rsync client container")
-	rsyncLimits, rsyncRequests, err := t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	t.Log.V(4).Info("Getting limits and requests for Stunnel client container")
-	stunnelLimits, stunnelRequests, err := t.getPodResourceLists(STUNNEL_POD_CPU_LIMIT, STUNNEL_POD_MEMORY_LIMIT, STUNNEL_POD_CPU_REQUEST, STUNNEL_POD_MEMORY_REQUEST)
-	if err != nil {
-		return req, liberr.Wrap(err)
-	}
-	isPrivileged, _ := isRsyncPrivileged(srcClient)
-	t.Log.V(4).Info(fmt.Sprintf("Rsync client Pods will be created with privileged=[%v]", isPrivileged))
-	for ns, vols := range pvcMap {
-		// Add PVC volume mounts
-		for _, vol := range vols {
-			rsyncOptions := t.getRsyncOptions()
-			if vol.verify {
-				rsyncOptions = append(rsyncOptions, "--checksum")
-			}
-			podRequirements := rsyncClientPodRequirements{
-				pvInfo:    vol,
-				namespace: ns,
-				image:     transferImage,
-				password:  password,
-				rsyncResourceReq: corev1.ResourceRequirements{
-					Limits:   rsyncLimits,
-					Requests: rsyncRequests,
-				},
-				stunnelResourceReq: corev1.ResourceRequirements{
-					Limits:   stunnelLimits,
-					Requests: stunnelRequests,
-				},
-				privileged:   isPrivileged,
-				nodeName:     pvcNodeMap[ns+"/"+vol.name],
-				destIP:       "localhost",
-				rsyncOptions: rsyncOptions,
-			}
-			req = append(req, podRequirements)
-		}
-	}
-	return req, nil
-}
-
-func (t *Task) getRsyncOperationsRequirements() (compat.Client, []rsyncClientPodRequirements, error) {
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return nil, nil, liberr.Wrap(err)
-	}
-	podRequirements, err := t.prepareRsyncPodRequirements(srcClient)
-	if err != nil {
-		return nil, nil, liberr.Wrap(err)
-	}
-	return srcClient, podRequirements, nil
-}
-
 func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
 	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
 	// when both the spec and the overridden backoff limits are not set, use default
@@ -1996,11 +1440,19 @@ func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
 // returns whether or not all operations are completed, whether any of the operation is failed, and a list of failure reasons
 func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 	var failureReasons []string
-	srcClient, podRequirements, err := t.getRsyncOperationsRequirements()
+	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
-	status, garbageCollectionErrors := t.ensureRsyncOperations(srcClient, podRequirements)
+	srcClient, err := t.getSourceClient()
+	if err != nil {
+		return false, false, failureReasons, liberr.Wrap(err)
+	}
+	pvcMap, err := t.getNamespacedPVCPairs()
+	if err != nil {
+		return false, false, failureReasons, liberr.Wrap(err)
+	}
+	status, err := t.createRsyncTransferClients(srcClient, destClient, pvcMap)
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
@@ -2009,7 +1461,7 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
-	operationsCompleted, anyFailed, failureReasons, err := t.processRsyncOperationStatus(status, garbageCollectionErrors)
+	operationsCompleted, anyFailed, failureReasons, err := t.processRsyncOperationStatus(status, []error{})
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
@@ -2224,79 +1676,6 @@ func (r *rsyncClientOperationStatusList) Running() int {
 	return i
 }
 
-// ensureRsyncOperations orchestrates all attempts of Rsync, updates owner status with observed state of all ongoing Rsync operations
-// returns structured status of all operations, the return value should be used to make decisions about whether to retry in next reconcile
-func (t *Task) ensureRsyncOperations(client compat.Client, podRequirements []rsyncClientPodRequirements) (rsyncClientOperationStatusList, []error) {
-	statusList := rsyncClientOperationStatusList{}
-	// rateLimiter defines maximum concurrent operations that can be reconciled in one go
-	operationsRateLimiter, garbageCollectionRateLimiter := make(chan bool, DefaultRsyncOperationConcurrency), make(chan bool, 2)
-	// outputChan streamlines output of concurrent reconcile operations
-	operationOutputChan := make(chan rsyncClientOperationStatus, DefaultRsyncOperationConcurrency)
-	garbageCollectionOutputChan := make(chan []error, 2)
-	finishOperationChan, finishGarbageCollectionChan := make(chan bool), make(chan bool)
-	garbageCollectionErrors := []error{}
-	waitGroup := &sync.WaitGroup{}
-	mutex := &sync.Mutex{}
-	for i := range podRequirements {
-		req := &podRequirements[i]
-		lastObservedOperationStatus := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
-			Name:      req.pvInfo.name,
-			Namespace: req.namespace,
-		})
-		// if the Rsync operation is already completed, do nothing
-		if lastObservedOperationStatus.IsComplete() {
-			statusList.Add(rsyncClientOperationStatus{
-				failed:    lastObservedOperationStatus.Failed,
-				succeeded: lastObservedOperationStatus.Succeeded,
-				operation: lastObservedOperationStatus,
-			})
-			continue
-		}
-		// from this point onwards, do not mutate the original reference, create a copy and use it
-		threadSafeOperationStatus := *lastObservedOperationStatus.DeepCopy()
-		t.garbageCollectPodsForRequirements(
-			client,
-			threadSafeOperationStatus,
-			garbageCollectionRateLimiter,
-			garbageCollectionOutputChan,
-			waitGroup)
-		t.reconcileRsyncOperationState(
-			client,
-			req,
-			threadSafeOperationStatus,
-			operationsRateLimiter,
-			operationOutputChan,
-			waitGroup)
-	}
-	// consume output from concurrent operations
-	go func() {
-		for incomingOutput := range operationOutputChan {
-			mutex.Lock()
-			statusList.Add(incomingOutput)
-			t.Owner.Status.AddRsyncOperation(incomingOutput.operation)
-			mutex.Unlock()
-		}
-		finishOperationChan <- true
-	}()
-	// consume output from garbage collector
-	go func() {
-		for incomingOutput := range garbageCollectionOutputChan {
-			mutex.Lock()
-			garbageCollectionErrors = append(garbageCollectionErrors, incomingOutput...)
-			mutex.Unlock()
-		}
-		finishGarbageCollectionChan <- true
-	}()
-	waitGroup.Wait()
-	close(operationsRateLimiter)
-	close(garbageCollectionRateLimiter)
-	close(operationOutputChan)
-	close(garbageCollectionOutputChan)
-	<-finishOperationChan
-	<-finishGarbageCollectionChan
-	return statusList, garbageCollectionErrors
-}
-
 // garbageCollectRsyncPods garbage collection routine
 // will run in background, sends list of errors on a channel, logs deletion
 func (t *Task) garbageCollectPodsForRequirements(client compat.Client, op migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- []error, wg *sync.WaitGroup) {
@@ -2338,73 +1717,6 @@ func (t *Task) garbageCollectPodsForRequirements(client compat.Client, op migapi
 			}
 		}
 		outputChan <- errors
-		<-rateLimiter
-	}()
-}
-
-// reconcileRsyncOperationState reconciles observed state of 1 Rsync operation
-// takes relevant actions wherever required such as launching a new pod when previous one fails
-func (t *Task) reconcileRsyncOperationState(client compat.Client, req *rsyncClientPodRequirements,
-	operation migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- rsyncClientOperationStatus, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rateLimiter <- true
-		currentStatus := rsyncClientOperationStatus{
-			operation: &operation,
-		}
-		t.Log.Info("Reconciling Rsync operation for PVC", "pvc", operation)
-		pod, err := t.getLatestPodForOperation(client, operation)
-		if err != nil {
-			currentStatus.AddError(err)
-			outputChan <- currentStatus
-			<-rateLimiter
-			return
-		}
-		// when pod exists, analyze its status
-		// when pod doesn't exist, start fresh
-		if pod != nil {
-			operation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
-			currentStatus.failed, currentStatus.succeeded, currentStatus.running, currentStatus.pending = t.analyzeRsyncPodStatus(pod)
-			// when pod failed and backoff limit is not reached, create a new pod
-			if currentStatus.failed && operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
-				err := t.createNewPodForOperation(client, req, operation)
-				if err != nil {
-					currentStatus.AddError(err)
-				}
-				// increment current attempt
-				operation.CurrentAttempt += 1
-				// indicate that the operation is not yet completely failed, we will retry
-				currentStatus.pending = true
-				t.Log.Info("Previous attempt of Rsync failed, created a new Rsync Pod", "pvc", operation, "attempt", operation.CurrentAttempt)
-			} else {
-				operation.Failed = currentStatus.failed
-				operation.Succeeded = currentStatus.succeeded
-				if operation.IsComplete() {
-					t.Log.Info(
-						fmt.Sprintf("Rsync operation completed after %d attempts", operation.CurrentAttempt),
-						"pvc", operation, "failed", operation.Failed, "succeded", operation.Succeeded)
-				} else {
-					t.Log.Info("Rsync operation is still running. Waiting for completion",
-						"pod", path.Join(pod.Namespace, pod.Name),
-						"pvc", operation,
-					)
-				}
-			}
-		} else {
-			operation.CurrentAttempt = 0
-			err := t.createNewPodForOperation(client, req, operation)
-			if err != nil {
-				currentStatus.AddError(err)
-			} else {
-				// increment current attempt
-				operation.CurrentAttempt += 1
-				// indicate that pod is being created in this round of reconcile, need to come back
-				currentStatus.pending = true
-			}
-			t.Log.Info("Started a new Rsync operation", "pvc", operation, "attempt", operation.CurrentAttempt)
-		}
-		outputChan <- currentStatus
 		<-rateLimiter
 	}()
 }
@@ -2456,45 +1768,18 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 	return mostRecentPod, nil
 }
 
-// createNewPodForOperation creates a new pod for given RsyncOperation
-func (t *Task) createNewPodForOperation(client compat.Client, req *rsyncClientPodRequirements, operation migapi.RsyncOperation) error {
-	podTemplate := req.getRsyncClientPodTemplate()
-	nextAttempt := operation.CurrentAttempt + 1
-	existingLabels := podTemplate.Labels
-	attemptLabel := map[string]string{
-		RsyncAttemptLabel: fmt.Sprintf("%d", nextAttempt)}
-	podTemplate.Labels = Union(existingLabels, attemptLabel)
-	if len(podTemplate.Spec.Containers) > 0 {
-		t.Log.Info(
-			"creating new Pod with Rsync command", "cmd", strings.Join(podTemplate.Spec.Containers[0].Command, " "))
-	}
-	err := client.Create(context.TODO(), podTemplate.DeepCopy())
-	if k8serror.IsAlreadyExists(err) {
-		t.Log.Info(
-			"Rsync Pod for given attempt already exists", "pvc", operation, "attempt", nextAttempt)
-	} else if err != nil {
-		t.Log.Error(err,
-			"failed creating a new Rsync Pod for pvc", "pvc", operation, "attempt", nextAttempt)
-		return err
-	}
-	operation.CurrentAttempt = nextAttempt
-	return nil
-}
-
-// analyzeRsyncPodStatus looks at Rsync Pod and determines whether the Rsync attempt was successful, failed or the pod is pending
-// returns whether running, succeeded, failed, pending
-func (t *Task) analyzeRsyncPodStatus(pod *corev1.Pod) (failed bool, succeeded bool, running bool, pending bool) {
+// updateOperationStatus given a Rsync Pod and operation status, updates operation status with pod status
+func updateOperationStatus(status *rsyncClientOperationStatus, pod *corev1.Pod) {
 	switch pod.Status.Phase {
 	case corev1.PodFailed:
-		failed = true
+		status.failed = true
 	case corev1.PodSucceeded:
-		succeeded = true
+		status.succeeded = true
 	case corev1.PodRunning:
-		running = true
+		status.running = true
 	case corev1.PodPending, corev1.PodUnknown:
-		pending = true
+		status.pending = true
 	}
-	return
 }
 
 // GetRsyncPodSelector returns pod selector used to identify sibling Rsync pods
@@ -2513,4 +1798,43 @@ func Union(m1 map[string]string, m2 map[string]string) map[string]string {
 		m3[k] = v
 	}
 	return m3
+}
+
+type RsyncBwLimit int
+
+func (r RsyncBwLimit) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+	val := int(r)
+	if val < 0 {
+		opts.BwLimit = nil
+	}
+	opts.BwLimit = &val
+	return nil
+}
+
+type HardLinks bool
+
+func (h HardLinks) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+	opts.HardLinks = bool(h)
+	return nil
+}
+
+type Partial bool
+
+func (p Partial) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+	opts.Partial = bool(p)
+	return nil
+}
+
+type ExtraOpts []string
+
+func (e ExtraOpts) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+	validatedOptions := []string{}
+	for _, opt := range e {
+		r := regexp.MustCompile(`^\-{1,2}([a-z]+\-)?[a-z]+$`)
+		if r.MatchString(opt) {
+			validatedOptions = append(validatedOptions, opt)
+		}
+	}
+	opts.Extras = append(opts.Extras, validatedOptions...)
+	return nil
 }

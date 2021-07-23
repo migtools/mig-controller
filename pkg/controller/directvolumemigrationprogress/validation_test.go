@@ -5,10 +5,25 @@ import (
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
-	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
+	"github.com/konveyor/mig-controller/pkg/compat/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func getFakeCompatClient(obj ...k8sclient.Object) compat.Client {
+	clusterConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "migration-cluster-config", Namespace: migapi.OpenshiftMigrationNamespace},
+		Data:       map[string]string{"RSYNC_PRIVILEGED": "false"},
+	}
+	controllerConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace},
+	}
+	obj = append(obj, clusterConfig)
+	obj = append(obj, controllerConfig)
+	client, _ := fake.NewFakeClient(obj...)
+	return client
+}
 
 func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 	type args struct {
@@ -25,7 +40,7 @@ func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 		{
 			name: "when podRef is set and podselector is not set, should not have blocker condition",
 			args: args{
-				srcClient: fakecompat.NewFakeClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
+				srcClient: getFakeCompatClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
 				pvProgress: &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{Name: "dvmp", Namespace: "openshift-migration"},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -40,7 +55,7 @@ func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 		{
 			name: "when podRef is not set and podselector is set but podNamespace is not set, should have blocker condition",
 			args: args{
-				srcClient: fakecompat.NewFakeClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
+				srcClient: getFakeCompatClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
 				pvProgress: &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{Name: "dvmp", Namespace: "openshift-migration"},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -55,7 +70,7 @@ func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 		{
 			name: "when podRef is not set and podselector and podNamespace are set, should not have blocker condition",
 			args: args{
-				srcClient: fakecompat.NewFakeClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
+				srcClient: getFakeCompatClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
 				pvProgress: &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{Name: "dvmp", Namespace: "openshift-migration"},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -70,7 +85,7 @@ func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 		{
 			name: "when required specs are missing, should have blocker condition",
 			args: args{
-				srcClient: fakecompat.NewFakeClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
+				srcClient: getFakeCompatClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
 				pvProgress: &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{Name: "dvmp", Namespace: "openshift-migration"},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{
@@ -86,7 +101,7 @@ func TestReconcileDirectVolumeMigrationProgress_validateSpec(t *testing.T) {
 		{
 			name: "when podselector is set but doesn't have pod identity label in it, should have blocker condition",
 			args: args{
-				srcClient: fakecompat.NewFakeClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
+				srcClient: getFakeCompatClient(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns-1"}, Status: corev1.PodStatus{Phase: corev1.PodSucceeded}}),
 				pvProgress: &migapi.DirectVolumeMigrationProgress{
 					ObjectMeta: metav1.ObjectMeta{Name: "dvmp", Namespace: "openshift-migration"},
 					Spec: migapi.DirectVolumeMigrationProgressSpec{
