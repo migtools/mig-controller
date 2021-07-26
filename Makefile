@@ -126,3 +126,7 @@ CONVERSION_GEN=$(GOBIN)/conversion-gen
 else
 CONVERSION_GEN=$(shell which conversion-gen)
 endif
+
+# run e2e test suite
+e2e-test:
+	ginkgo tests/

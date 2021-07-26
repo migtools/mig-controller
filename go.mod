@@ -23,7 +23,8 @@ require (
 	github.com/konveyor/controller v0.4.1
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210517181250-38239ed63b97
 	github.com/mattn/go-sqlite3 v1.14.4
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.13.0
 	github.com/openshift/api v0.0.0-20210105115604-44119421ec6b
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
 	github.com/opentracing/opentracing-go v1.2.0
@@ -36,11 +37,11 @@ require (
 	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/zap v1.15.0
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	google.golang.org/api v0.35.0
 	google.golang.org/genproto v0.0.0-20201106154455-f9bfe239b0ba // indirect
 	google.golang.org/grpc v1.33.2 // indirect
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.0
 	k8s.io/apimachinery v0.20.0
 	k8s.io/client-go v0.20.0
