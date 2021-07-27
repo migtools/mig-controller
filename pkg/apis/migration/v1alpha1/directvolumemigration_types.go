@@ -29,6 +29,7 @@ type PVCToMigrate struct {
 	TargetStorageClass    string                            `json:"targetStorageClass"`
 	TargetAccessModes     []kapi.PersistentVolumeAccessMode `json:"targetAccessModes"`
 	TargetNamespace       string                            `json:"targetNamespace,omitempty"`
+	TargetName            string                            `json:"targetName,omitempty"`
 	Verify                bool                              `json:"verify,omitempty"`
 }
 

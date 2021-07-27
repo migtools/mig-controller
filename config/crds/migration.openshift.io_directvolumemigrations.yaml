@@ -144,6 +144,8 @@ spec:
                     items:
                       type: string
                     type: array
+                  targetName:
+                    type: string
                   targetNamespace:
                     type: string
                   targetStorageClass:
