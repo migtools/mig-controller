@@ -278,7 +278,6 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim m
 	}
 	// TODO: Consider adding Cinder to this default list
 	if pv.Spec.NFS != nil ||
-		pv.Spec.Glusterfs != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
 		return append(supportedActions,
 			migapi.PvCopyAction,
