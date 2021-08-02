@@ -838,9 +838,11 @@ func (m *MigCluster) GetRegistryPath(c k8sclient.Client) (string, error) {
 	if len(m.Spec.ExposedRegistryPath) > 0 {
 		splitPath := strings.Split(m.Spec.ExposedRegistryPath, "//")
 		if len(splitPath) == 2 {
-			return splitPath[1], nil
+			// Return the splitPath[1], without any trailer "/"
+			return strings.TrimRight(splitPath[1], "/"), nil
 		}
-		return m.Spec.ExposedRegistryPath, nil
+		// Return the ExposedRegistryPath, without any trailer "/"
+		return strings.TrimRight(m.Spec.ExposedRegistryPath, "/"), nil
 	} else if !m.Spec.IsHostCluster {
 		// not host cluster and no path specified, return empty path
 		return "", nil
