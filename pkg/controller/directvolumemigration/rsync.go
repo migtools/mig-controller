@@ -769,7 +769,7 @@ func getDestNs(bothNs string) string {
 	if len(nsNames) > 1 {
 		return nsNames[1]
 	} else {
-		return nsNames[1]
+		return nsNames[0]
 	}
 }
 
