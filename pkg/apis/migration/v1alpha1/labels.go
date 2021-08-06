@@ -68,4 +68,6 @@ const (
 	StagePodLabel = "migration.openshift.io/is-stage-pod"
 	// RsyncPodIdentityLabel identifies sibling Rsync attempts/pods
 	RsyncPodIdentityLabel = "migration.openshift.io/created-for-pvc"
+	// Identifies if the pod is application pod or not
+	ApplicationPodLabel = "migration.openshift.io/is-application-pod"
 )
