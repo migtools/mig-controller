@@ -4,6 +4,10 @@
 
 See [devguide.md](https://github.com/konveyor/mig-controller/blob/master/docs/devguide.md)
 
+## Running and extending e2e test-suite
+
+See [testguide.md](/docs/testguide.md) 
+
 ## Building and running mig-controller with `make run`
 
 __1. Install prerequisites__
