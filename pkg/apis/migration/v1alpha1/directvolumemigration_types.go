@@ -26,10 +26,17 @@ import (
 
 type PVCToMigrate struct {
 	*kapi.ObjectReference `json:",inline"`
-	TargetStorageClass    string                            `json:"targetStorageClass"`
-	TargetAccessModes     []kapi.PersistentVolumeAccessMode `json:"targetAccessModes"`
-	TargetNamespace       string                            `json:"targetNamespace,omitempty"`
-	Verify                bool                              `json:"verify,omitempty"`
+	// TargetStorageClass storage class of the migrated PVC in the target cluster
+	TargetStorageClass string `json:"targetStorageClass"`
+	// TargetAccessModes access modes of the migrated PVC in the target cluster
+	TargetAccessModes []kapi.PersistentVolumeAccessMode `json:"targetAccessModes"`
+	// TargetNamespace namespace of the migrated PVC in the target cluster
+	TargetNamespace string `json:"targetNamespace,omitempty"`
+	// TargetName name of the migrated PVC in the target cluster
+	// +kubebuilder:validation:Optional
+	TargetName string `json:"targetName,omitempty"`
+	// Verify set true to verify integrity of the data post migration
+	Verify bool `json:"verify,omitempty"`
 }
 
 // DirectVolumeMigrationSpec defines the desired state of DirectVolumeMigration

@@ -90,6 +90,15 @@ type MigPlanSpec struct {
 
 	// If set True, disables direct volume migrations.
 	IndirectVolumeMigration bool `json:"indirectVolumeMigration,omitempty"`
+
+	// IncludedResources optional list of included resources in Velero Backup
+	// When not set, all the resources are included in the backup
+	// +kubebuilder:validation:Optional
+	IncludedResources []*metav1.GroupKind `json:"includedResources,omitempty"`
+
+	// LabelSelector optional label selector on the included resources in Velero Backup
+	// +kubebuilder:validation:Optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
@@ -760,6 +769,27 @@ type PVC struct {
 	Name         string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	HasReference bool                              `json:"hasReference,omitempty"`
+}
+
+// GetTargetName returns name of the target PVC
+func (p PVC) GetTargetName() string {
+	names := strings.Split(p.Name, ":")
+	if len(names) > 1 {
+		return names[1]
+	}
+	if len(names) > 0 {
+		return names[0]
+	}
+	return p.Name
+}
+
+// GetSourceName returns name of the source PVC
+func (p PVC) GetSourceName() string {
+	names := strings.Split(p.Name, ":")
+	if len(names) > 0 {
+		return names[0]
+	}
+	return p.Name
 }
 
 // Supported
