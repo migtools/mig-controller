@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -439,9 +440,12 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(ctx context.Cont
 		return nil
 	}
 
+	// Check for exact operator version match
 	operatorVersionMatchesHost := clusterOperatorVersion == hostOperatorVersion
+	// Check for known supported inexact version mix, e.g. 1.5.1+ and 1.6.x
+	isCrossCompatible, _ := r.isCrossVersionCompatible(clusterOperatorVersion, hostOperatorVersion)
 
-	if !operatorVersionMatchesHost {
+	if !operatorVersionMatchesHost && !isCrossCompatible {
 		cluster.Status.SetCondition(migapi.Condition{
 			Type:     OperatorVersionMismatch,
 			Status:   True,
@@ -452,4 +456,55 @@ func (r ReconcileMigCluster) validateOperatorVersionMatchesHost(ctx context.Cont
 	}
 
 	return nil
+}
+
+// Checks if this combination of versions is a known working set that works despite not being exactly equal, e.g. 1.5.1+ and 1.6.x
+func (r ReconcileMigCluster) isCrossVersionCompatible(semverA string, semverB string) (isCompatible bool, err error) {
+	isCompatible = false
+	majorA, minorA, bugfixA, err := r.parseOperatorSemVer(semverA)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	majorB, minorB, bugfixB, err := r.parseOperatorSemVer(semverB)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+
+	// Verify major version matches
+	if majorA != 1 || majorB != 1 {
+		return false, nil
+	}
+	// Allow one cluster on 1.5.1+, one on 1.6.x+
+	if minorA == 5 && bugfixA >= 1 && minorB >= 6 {
+		return true, nil
+	}
+	if minorB == 5 && bugfixB >= 1 && minorA >= 6 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (r ReconcileMigCluster) parseOperatorSemVer(version string) (major int, minor int, bugfix int, err error) {
+	tokens := strings.Split(version, ".")
+	if len(tokens) != 3 {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("version string was not in semver format, != 3 tokens"))
+	}
+
+	major, err = strconv.Atoi(tokens[0])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("major version could not be parsed as integer"))
+	}
+
+	minor, err = strconv.Atoi(tokens[1])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("minor version could not be parsed as integer"))
+	}
+
+	bugfix, err = strconv.Atoi(tokens[2])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("bugfix version could not be parsed as integer"))
+	}
+
+	return major, minor, bugfix, nil
 }
