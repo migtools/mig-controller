@@ -253,6 +253,9 @@ func (t *Task) ensureRsyncTransferServer() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		if transfer == nil {
+			return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
+		}
 		err = transfer.CreateServer(destClient)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -374,6 +377,11 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 						currentStatus.AddError(err)
 						continue
 					}
+					if transfer == nil {
+						currentStatus.AddError(
+							fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
+						continue
+					}
 					err = transfer.CreateClient(srcClient)
 					if err != nil {
 						t.Log.Info("failed creating Rsync Pod for pvc", "pvc", newOperation, "err", err)
@@ -404,6 +412,11 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 				if err != nil {
 					currentStatus.AddError(err)
+					continue
+				}
+				if transfer == nil {
+					currentStatus.AddError(
+						fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
 					continue
 				}
 				err = transfer.CreateClient(srcClient)
