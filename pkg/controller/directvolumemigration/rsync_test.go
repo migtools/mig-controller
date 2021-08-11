@@ -1113,7 +1113,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				Client: tt.fields.Client,
 				Owner:  tt.fields.Owner,
 			}
-			gotAllCompleted, gotAnyFailed, _, err := tr.processRsyncOperationStatus(tt.args.status, tt.args.garbageCollectionErrors)
+			gotAllCompleted, gotAnyFailed, _, err := tr.processRsyncOperationStatus(&tt.args.status, tt.args.garbageCollectionErrors)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Task.processRsyncOperationStatus() error = %v, wantErr %v", err, tt.wantErr)
 				return

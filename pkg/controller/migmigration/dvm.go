@@ -213,12 +213,13 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 		}
 		pvcList = append(pvcList, migapi.PVCToMigrate{
 			ObjectReference: &kapi.ObjectReference{
-				Name:      pv.PVC.Name,
+				Name:      pv.PVC.GetSourceName(),
 				Namespace: pv.PVC.Namespace,
 			},
 			TargetStorageClass: pv.Selection.StorageClass,
 			TargetAccessModes:  accessModes,
 			TargetNamespace:    nsMapping[pv.PVC.Namespace],
+			TargetName:         pv.PVC.GetTargetName(),
 			Verify:             pv.Selection.Verify,
 		})
 	}

@@ -280,12 +280,14 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim m
 	if pv.Spec.NFS != nil ||
 		pv.Spec.AWSElasticBlockStore != nil {
 		return append(supportedActions,
+			migapi.PvSkipAction,
 			migapi.PvCopyAction,
 			migapi.PvMoveAction)
 	}
 	for _, sc := range Settings.Plan.MoveStorageClasses {
 		if pv.Spec.StorageClassName == sc {
 			return append(supportedActions,
+				migapi.PvSkipAction,
 				migapi.PvCopyAction,
 				migapi.PvMoveAction)
 		}

@@ -265,8 +265,8 @@ func (t *Task) ensureRsyncTransferServer() error {
 }
 
 func (t *Task) createRsyncTransferClients(srcClient compat.Client,
-	destClient compat.Client, nsMap map[string][]transfer.PVCPair) (rsyncClientOperationStatusList, error) {
-	statusList := rsyncClientOperationStatusList{}
+	destClient compat.Client, nsMap map[string][]transfer.PVCPair) (*rsyncClientOperationStatusList, error) {
+	statusList := &rsyncClientOperationStatusList{}
 
 	pvcNodeMap, err := t.getPVCNodeNameMap(srcClient)
 	if err != nil {
@@ -1483,7 +1483,7 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 
 // processRsyncOperationStatus processes status of Rsync operations by reading the status list
 // returns whether all operations are completed and whether any of the operation is failed
-func (t *Task) processRsyncOperationStatus(status rsyncClientOperationStatusList, garbageCollectionErrors []error) (bool, bool, []string, error) {
+func (t *Task) processRsyncOperationStatus(status *rsyncClientOperationStatusList, garbageCollectionErrors []error) (bool, bool, []string, error) {
 	isComplete, anyFailed, failureReasons := false, false, make([]string, 0)
 	if status.AllCompleted() {
 		isComplete = true
