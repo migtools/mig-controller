@@ -97,10 +97,14 @@ func (t *Task) createDestinationPVCs() error {
 		if pvc.TargetNamespace != "" {
 			destNs = pvc.TargetNamespace
 		}
+		destName := pvc.Name
+		if pvc.TargetName != "" {
+			destName = pvc.TargetName
+		}
 		// Create pvc on destination with same metadata + spec
 		destPVC := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      pvc.Name,
+				Name:      destName,
 				Namespace: destNs,
 				Labels:    pvcLabels,
 			},

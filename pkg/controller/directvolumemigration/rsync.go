@@ -15,11 +15,11 @@ import (
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
-	route_endpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
+	routeendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	transfer "github.com/konveyor/crane-lib/state_transfer/transfer"
-	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
-	stunnel_transport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
+	rsynctransfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
+	stunneltransport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	migevent "github.com/konveyor/mig-controller/pkg/event"
@@ -76,12 +76,12 @@ func (t *Task) ensureRsyncEndpoint() error {
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	for bothNs := range t.getPVCNamespaceMap() {
 		ns := getDestNs(bothNs)
-		endpoint := route_endpoint.NewEndpoint(
+		endpoint := routeendpoint.NewEndpoint(
 			types.NamespacedName{
 				Namespace: ns,
 				Name:      DirectVolumeMigrationRsyncTransferRoute,
 			},
-			route_endpoint.EndpointTypePassthrough,
+			routeendpoint.EndpointTypePassthrough,
 			dvmLabels,
 		)
 
@@ -115,40 +115,33 @@ func (t *Task) getRsyncTransferContainerMutation(srcClient compat.Client) (*core
 }
 
 // getRsyncTransferOptions returns Rsync transfer options
-func (t *Task) getRsyncTransferOptions() ([]rsync_transfer.TransferOption, error) {
+func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error) {
 	// prepare rsync command options
-	transferOptions := []rsync_transfer.TransferOption{
-		rsync_transfer.StandardProgress(true),
-	}
+	o := settings.Settings.DvmOpts.RsyncOpts
 	rsyncPassword, err := t.getRsyncPassword()
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	o := settings.Settings.DvmOpts.RsyncOpts
+	transferOptions := []rsynctransfer.TransferOption{
+		rsynctransfer.StandardProgress(true),
+		rsynctransfer.ArchiveFiles(o.Archive),
+		rsynctransfer.DeleteDestination(o.Delete),
+		HardLinks(o.HardLinks),
+		Partial(o.Partial),
+		ExtraOpts(o.Extras),
+		rsynctransfer.Username("root"),
+		rsynctransfer.Password(rsyncPassword),
+	}
 	if o.BwLimit > 0 {
 		transferOptions = append(transferOptions,
 			RsyncBwLimit(o.BwLimit))
 	}
-	transferOptions = append(transferOptions,
-		rsync_transfer.ArchiveFiles(o.Archive))
-	transferOptions = append(transferOptions,
-		rsync_transfer.DeleteDestination(o.Delete))
-	transferOptions = append(transferOptions,
-		HardLinks(o.HardLinks))
-	transferOptions = append(transferOptions,
-		Partial(o.Partial))
-	transferOptions = append(transferOptions,
-		ExtraOpts(o.Extras))
-	transferOptions = append(transferOptions,
-		rsync_transfer.Username("root"))
-	transferOptions = append(transferOptions,
-		rsync_transfer.Password(rsyncPassword))
 	return transferOptions, nil
 }
 
 // getRsyncContainerMutations get Rsync container mutations
-func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsync_transfer.TransferOption, error) {
-	transferOptions := []rsync_transfer.TransferOption{}
+func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsynctransfer.TransferOption, error) {
+	transferOptions := []rsynctransfer.TransferOption{}
 	// info, exists := pvcSecInfo.Get(
 	// 	pvc.Source().Claim().Name, pvc.Source().Claim().Namespace)
 	// if exists {
@@ -182,7 +175,7 @@ func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsync_tran
 	}
 	containerMutation.Resources.Requests = rsyncClientRequests
 	containerMutation.Resources.Limits = rsyncClientLimits
-	sourceContainerMutation := rsync_transfer.SourceContainerMutation{C: containerMutation}
+	sourceContainerMutation := rsynctransfer.SourceContainerMutation{C: containerMutation}
 	rsyncTransferLimits, rsyncTransferRequests, err :=
 		t.getPodResourceLists(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
 	if err != nil {
@@ -190,7 +183,7 @@ func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsync_tran
 	}
 	containerMutation.Resources.Requests = rsyncTransferRequests
 	containerMutation.Resources.Limits = rsyncTransferLimits
-	destinationContainerMutation := rsync_transfer.DestinationContainerMutation{C: containerMutation}
+	destinationContainerMutation := rsynctransfer.DestinationContainerMutation{C: containerMutation}
 	transferOptions = append(transferOptions, sourceContainerMutation)
 	transferOptions = append(transferOptions, destinationContainerMutation)
 	return transferOptions, nil
@@ -220,14 +213,14 @@ func (t *Task) ensureRsyncTransferServer() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
 		)
-		endpoint, err := route_endpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
+		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
 			Name:      DirectVolumeMigrationRsyncTransferRoute,
 			Namespace: destNs,
 		})
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		stunnelTransport, err := stunnel_transport.GetTransportFromKubeObjects(
+		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
 			srcClient, destClient, nnPair, endpoint)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -247,8 +240,8 @@ func (t *Task) ensureRsyncTransferServer() error {
 			return liberr.Wrap(err)
 		}
 		rsyncOptions = append(rsyncOptions, mutations...)
-		rsyncOptions = append(rsyncOptions, rsync_transfer.WithDestinationPodLabels(labels))
-		transfer, err := rsync_transfer.NewTransfer(
+		rsyncOptions = append(rsyncOptions, rsynctransfer.WithDestinationPodLabels(labels))
+		transfer, err := rsynctransfer.NewTransfer(
 			stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 		if err != nil {
 			return liberr.Wrap(err)
@@ -297,14 +290,14 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
-		endpoint, err := route_endpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
+		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
 			Name:      DirectVolumeMigrationRsyncTransferRoute,
 			Namespace: destNs,
 		})
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
-		stunnelTransport, err := stunnel_transport.GetTransportFromKubeObjects(
+		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
 			srcClient, destClient, nnPair, endpoint)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
@@ -349,7 +342,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 
 			// Force schedule Rsync Pod on the application node
 			nodeName := pvcNodeMap[fmt.Sprintf("%s/%s", srcNs, pvc.Source().Claim().Name)]
-			clientPodMutation := rsync_transfer.SourcePodSpecMutation{
+			clientPodMutation := rsynctransfer.SourcePodSpecMutation{
 				Spec: &corev1.PodSpec{
 					NodeName: nodeName,
 				},
@@ -370,8 +363,8 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				updateOperationStatus(&currentStatus, pod)
 				if currentStatus.failed && currentStatus.operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
 					labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
-					rsyncOptions = append(rsyncOptions, rsync_transfer.WithSourcePodLabels(labels))
-					transfer, err := rsync_transfer.NewTransfer(
+					rsyncOptions = append(rsyncOptions, rsynctransfer.WithSourcePodLabels(labels))
+					transfer, err := rsynctransfer.NewTransfer(
 						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 					if err != nil {
 						currentStatus.AddError(err)
@@ -407,8 +400,8 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			} else {
 				newOperation.CurrentAttempt = 0
 				labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
-				rsyncOptions = append(rsyncOptions, rsync_transfer.WithSourcePodLabels(labels))
-				transfer, err := rsync_transfer.NewTransfer(
+				rsyncOptions = append(rsyncOptions, rsynctransfer.WithSourcePodLabels(labels))
+				transfer, err := rsynctransfer.NewTransfer(
 					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 				if err != nil {
 					currentStatus.AddError(err)
@@ -621,7 +614,7 @@ func (t *Task) getNamespacedPVCPairs() (map[string][]transfer.PVCPair, error) {
 			return nil, err
 		}
 		destPvc := corev1.PersistentVolumeClaim{}
-		err = destClient.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: destNs}, &destPvc)
+		err = destClient.Get(context.TODO(), types.NamespacedName{Name: pvc.TargetName, Namespace: destNs}, &destPvc)
 		if err != nil {
 			return nil, err
 		}
@@ -1815,7 +1808,7 @@ func Union(m1 map[string]string, m2 map[string]string) map[string]string {
 
 type RsyncBwLimit int
 
-func (r RsyncBwLimit) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+func (r RsyncBwLimit) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	val := int(r)
 	if val < 0 {
 		opts.BwLimit = nil
@@ -1826,21 +1819,21 @@ func (r RsyncBwLimit) ApplyTo(opts *rsync_transfer.TransferOptions) error {
 
 type HardLinks bool
 
-func (h HardLinks) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+func (h HardLinks) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	opts.HardLinks = bool(h)
 	return nil
 }
 
 type Partial bool
 
-func (p Partial) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+func (p Partial) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	opts.Partial = bool(p)
 	return nil
 }
 
 type ExtraOpts []string
 
-func (e ExtraOpts) ApplyTo(opts *rsync_transfer.TransferOptions) error {
+func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	validatedOptions := []string{}
 	for _, opt := range e {
 		r := regexp.MustCompile(`^\-{1,2}([a-z]+\-)?[a-z]+$`)
