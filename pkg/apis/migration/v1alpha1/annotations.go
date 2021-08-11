@@ -15,6 +15,7 @@ const (
 	ReplicasAnnotation              = "migration.openshift.io/preQuiesceReplicas"
 	NodeSelectorAnnotation          = "migration.openshift.io/preQuiesceNodeSelector"
 	StagePodImageAnnotation         = "migration.openshift.io/stage-pod-image"
+	ExcludePVCPodAnnotation         = "migration.openshift.io/exclude-pvcs" // Exclude PVCs if marked "move" or "snapshot" in the plan
 )
 
 // Restic Annotations

@@ -56,7 +56,6 @@ func BuildStagePods(labels map[string]string,
 	pvcMapping map[k8sclient.ObjectKey]migapi.PV,
 	list *[]corev1.Pod, stagePodImage string,
 	resourceLimitMapping map[string]map[string]resource.Quantity) StagePodList {
-
 	stagePods := StagePodList{}
 	for _, pod := range *list {
 		volumes := []corev1.Volume{}
@@ -89,6 +88,47 @@ func BuildStagePods(labels map[string]string,
 		}
 	}
 	return stagePods
+}
+
+// get the running application pods with attached PVC
+func GetApplicationPodsWithStageLabels(labels map[string]string, pvcMapping map[k8sclient.ObjectKey]migapi.PV, list *[]corev1.Pod) []corev1.Pod {
+	applicationPodsWithStageLabel := []corev1.Pod{}
+	for _, pod := range *list {
+		foundVolume := true
+		excludePVC := []string{}
+		for _, volume := range pod.Spec.Volumes {
+			if volume.PersistentVolumeClaim == nil {
+				continue
+			}
+			claimKey := k8sclient.ObjectKey{
+				Name:      volume.PersistentVolumeClaim.ClaimName,
+				Namespace: pod.Namespace,
+			}
+			pv, found := pvcMapping[claimKey]
+			if !found {
+				excludePVC = append(excludePVC, volume.Name)
+				continue
+			}
+			if pv.Selection.Action != migapi.PvCopyAction ||
+				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				excludePVC = append(excludePVC, volume.Name)
+				continue
+			}
+			foundVolume = false
+		}
+		if foundVolume {
+			continue
+		}
+		if len(excludePVC) > 0 {
+			pod.Annotations[migapi.ExcludePVCPodAnnotation] = strings.Join(excludePVC, ",")
+		}
+		for key, value := range labels {
+			pod.Labels[key] = value
+		}
+		pod.Labels[migapi.ApplicationPodLabel] = migapi.True
+		applicationPodsWithStageLabel = append(applicationPodsWithStageLabel, pod)
+	}
+	return applicationPodsWithStageLabel
 }
 
 func (p StagePod) volumesContained(pod StagePod) bool {
@@ -126,6 +166,53 @@ func (l *StagePodList) merge(list ...StagePod) {
 			*l = append(*l, pod)
 		}
 	}
+}
+
+func (t *Task) listApplicationPodsWithStageLabel(client k8sclient.Client) ([]corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	options := k8sclient.MatchingLabels(t.stagePodLabels())
+	err := client.List(context.TODO(), podList, options)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return podList.Items, nil
+}
+
+func (t *Task) updateApplicationPodWithStageLabel(client k8sclient.Client, stagePods []corev1.Pod) (int, error) {
+	counter := 0
+	existingPods, err := t.listApplicationPodsWithStageLabel(client)
+	if err != nil {
+		return counter, liberr.Wrap(err)
+	}
+	updatedPodNames := []string{}
+
+	for _, pod := range existingPods {
+		updatedPodNames = append(updatedPodNames, pod.Name)
+	}
+	contains := func(name string) bool {
+		for _, v := range updatedPodNames {
+			if v == name {
+				return true
+			}
+		}
+		return false
+	}
+	for _, stagePod := range stagePods {
+		if contains(stagePod.Name) {
+			t.Log.Info("Found existing Stage application pod, skipping",
+				"pod", path.Join(stagePod.Namespace, stagePod.Name),
+				"podPhase", stagePod.Status.Phase)
+			continue
+		}
+		t.Log.Info("Updating application Pod.",
+			"pod", path.Join(stagePod.Namespace, stagePod.Name))
+		err := client.Update(context.TODO(), &stagePod)
+		if err != nil {
+			return 0, liberr.Wrap(err)
+		}
+		counter++
+	}
+	return counter + len(existingPods), nil
 }
 
 func (t *Task) createStagePods(client k8sclient.Client, stagePods StagePodList) (int, error) {
@@ -313,7 +400,6 @@ func (t *Task) ensureStagePodsFromTemplates() error {
 	t.Log.Info("Building Stage Pod definitions for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	stagePods := BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podTemplates, stagePodImage, resourceLimitMapping)
-
 	t.Log.Info("Creating Stage Pods for DeploymentConfigs, Deployments, " +
 		"Daemonsets, ReplicaSets, CronJobs, Jobs on source cluster")
 	created, err := t.createStagePods(client, stagePods)
@@ -394,17 +480,8 @@ func (t *Task) ensureStagePodsFromRunning() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	stagePods := StagePodList{}
-	t.Log.Info("Building resource limit mapping for stage pods")
-	resourceLimitMapping, err := buildResourceLimitMapping(t.sourceNamespaces(), client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	t.Log.Info("Retrieving stage pod image")
-	stagePodImage, err := t.getStagePodImage(client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
+	updated := 0
+	pods := []corev1.Pod{}
 	for _, ns := range t.sourceNamespaces() {
 		t.Log.Info("Building list of stage pods for src cluster namespace", "namespace", ns)
 		podList := corev1.PodList{}
@@ -412,23 +489,22 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		stagePods.merge(BuildStagePods(t.stagePodLabels(), t.getPVCs(), &podList.Items, stagePodImage, resourceLimitMapping)...)
+		pods = append(pods, GetApplicationPodsWithStageLabels(t.stagePodLabels(), t.getPVCs(), &podList.Items)...)
 	}
-
-	t.Log.Info("Creating stage pods on source cluster")
-	created, err := t.createStagePods(client, stagePods)
+	t.Log.Info("Updating application pods on source cluster")
+	updated, err = t.updateApplicationPodWithStageLabel(client, pods)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	if created > 0 {
+	if updated > 0 {
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     StagePodsCreated,
 			Status:   True,
 			Reason:   Created,
 			Category: Advisory,
-			Message:  "[] Stage pods created.",
-			Items:    []string{strconv.Itoa(created)},
+			Message:  "[] Stage labels added to application pod.",
+			Items:    []string{strconv.Itoa(updated)},
 			Durable:  true,
 		})
 	}
@@ -723,14 +799,30 @@ func (t *Task) ensureStagePodsDeleted() error {
 			return err
 		}
 		for _, pod := range podList.Items {
-			t.Log.Info("Deleting Stage Pod on source cluster",
-				"pod", path.Join(pod.Namespace, pod.Name))
-			err := srcClient.Delete(context.TODO(), &pod)
-			if err != nil && !k8serr.IsNotFound(err) {
-				return liberr.Wrap(err)
+			if pod.Labels[migapi.ApplicationPodLabel] == migapi.True {
+				for key, _ := range t.stagePodLabels() {
+					delete(pod.Labels, key)
+				}
+				delete(pod.Labels, migapi.ApplicationPodLabel)
+				if len(pod.Annotations[migapi.ExcludePVCPodAnnotation]) > 0 {
+					delete(pod.Annotations, migapi.ExcludePVCPodAnnotation)
+				}
+				t.Log.Info("Updating application Pod on source cluster",
+					"pod", path.Join(pod.Namespace, pod.Name))
+				err = srcClient.Update(context.TODO(), &pod)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			} else {
+				t.Log.Info("Deleting Stage Pod on source cluster",
+					"pod", path.Join(pod.Namespace, pod.Name))
+				err := srcClient.Delete(context.TODO(), &pod)
+				if err != nil && !k8serr.IsNotFound(err) {
+					return liberr.Wrap(err)
+				}
+				log.Info("Stage Pod deletion requested on source cluster.",
+					"pod", path.Join(pod.Namespace, pod.Name))
 			}
-			log.Info("Stage Pod deletion requested on source cluster.",
-				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}
 
