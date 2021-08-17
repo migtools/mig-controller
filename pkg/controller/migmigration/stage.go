@@ -120,7 +120,13 @@ func GetApplicationPodsWithStageLabels(labels map[string]string, pvcMapping map[
 			continue
 		}
 		if len(excludePVC) > 0 {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
 			pod.Annotations[migapi.ExcludePVCPodAnnotation] = strings.Join(excludePVC, ",")
+		}
+		if pod.Labels == nil {
+			pod.Labels = map[string]string{}
 		}
 		for key, value := range labels {
 			pod.Labels[key] = value
