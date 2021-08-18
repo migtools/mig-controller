@@ -620,7 +620,12 @@ func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]StorageClass,
 			AccessModes: r.accessModesForProvisioner(clusterStorageClass.Provisioner),
 		}
 		if clusterStorageClass.Annotations != nil {
-			storageClass.Default, _ = strconv.ParseBool(clusterStorageClass.Annotations["storageclass.kubernetes.io/is-default-class"])
+			isDefault, _ := strconv.ParseBool(clusterStorageClass.Annotations["storageclass.kubernetes.io/is-default-class"])
+			if isDefault {
+				storageClass.Default = true
+			} else {
+				storageClass.Default, _ = strconv.ParseBool(clusterStorageClass.Annotations["storageclass.beta.kubernetes.io/is-default-class"])
+			}
 		}
 		storageClasses = append(storageClasses, storageClass)
 	}
