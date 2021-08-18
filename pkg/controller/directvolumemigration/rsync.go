@@ -382,6 +382,12 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 						continue
 					}
 					t.Log.Info("previous attempt of Rsync failed for pvc, created a new pod", "pvc", newOperation)
+					err = srcClient.Delete(context.TODO(), pod)
+					if err != nil {
+						t.Log.Info("failed deleting Rsync Pod of previous attempt for pvc", "pvc", newOperation)
+						currentStatus.AddError(err)
+						continue
+					}
 				} else {
 					t.Log.Info("previous attempt of Rsync did not fail", "pvc", newOperation)
 					newOperation.Failed = currentStatus.failed

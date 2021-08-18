@@ -11,12 +11,14 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -42,6 +44,10 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	userIncludedResources, err := t.getUserIncludedResourceList(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
 
 	newBackup.Labels[migapi.InitialBackupLabel] = t.UID()
 	newBackup.Labels[migapi.MigMigrationDebugLabel] = t.Owner.Name
@@ -49,7 +55,9 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	newBackup.Labels[migapi.MigMigrationLabel] = string(t.Owner.UID)
 	newBackup.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	newBackup.Spec.IncludedResources = toStringSlice(settings.IncludedInitialResources.Difference(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.IncludedResources = append(newBackup.Spec.IncludedResources, userIncludedResources...)
 	newBackup.Spec.ExcludedResources = toStringSlice(settings.ExcludedInitialResources.Union(toSet(t.PlanResources.MigPlan.Status.ExcludedResources)))
+	newBackup.Spec.LabelSelector = t.PlanResources.MigPlan.Spec.LabelSelector
 	delete(newBackup.Annotations, migapi.QuiesceAnnotation)
 
 	if Settings.DisImgCopy {
@@ -89,6 +97,19 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 	return t.getBackup(labels)
 }
 
+func (t *Task) getUserIncludedResourceList(srcClient compat.Client) ([]string, error) {
+	resources := []string{}
+	includedResources := t.PlanResources.MigPlan.Spec.IncludedResources
+	for _, res := range includedResources {
+		resMapper, err := srcClient.RESTMapper().RESTMapping(schema.GroupKind{Group: res.Group, Kind: res.Kind})
+		if err != nil {
+			return resources, err
+		}
+		resources = append(resources, resMapper.Resource.Resource)
+	}
+	return resources, nil
+}
+
 // Ensure the second backup on the source cluster has been created and
 // has the proper settings.
 func (t *Task) ensureStageBackup() (*velero.Backup, error) {
@@ -121,7 +142,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	var includedResources mapset.Set
 
-	if t.indirectImageMigration() || Settings.DisImgCopy {
+	if (t.indirectImageMigration() || Settings.DisImgCopy) && !t.Owner.IsStateMigration() {
 		includedResources = settings.IncludedStageResources
 	} else {
 		includedResources = settings.IncludedStageResources.Difference(mapset.NewSetFromSlice([]interface{}{settings.ISResource}))
