@@ -313,7 +313,7 @@ func (r ReconcileMigPlan) validateNamespaceLengthForDVM(plan *migapi.MigPlan) []
 	if plan.Spec.IndirectVolumeMigration || subdomain != "" {
 		return items
 	}
-	for _, ns := range plan.Spec.Namespaces {
+	for _, ns := range plan.GetDestinationNamespaces() {
 		// If length of namespace is 60+ characters, route creation will fail as
 		// the route generator will attempt to create a route with:
 		// dvm-<namespace> and this cannot exceed 63 characters
@@ -695,6 +695,23 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 			Category: Critical,
 			Message:  "Duplicate destination cluster namespaces [] in migplan.",
 			Items:    duplicates,
+		})
+		return nil
+	}
+	longNamespaceNames := []string{}
+	for _, ns := range namespaces {
+		if len(ns) > 63 {
+			longNamespaceNames = append(longNamespaceNames, ns)
+		}
+	}
+	if len(longNamespaceNames) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     NsLengthExceeded,
+			Status:   True,
+			Reason:   LengthExceeded,
+			Category: Critical,
+			Message:  fmt.Sprintf("Destination Namespaces [] exceed 63 characters and are invalid."),
+			Items:    longNamespaceNames,
 		})
 		return nil
 	}
