@@ -5,14 +5,13 @@ go 1.14
 require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/Azure/azure-sdk-for-go v48.1.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.10
+	github.com/Azure/go-autorest/autorest v0.11.12
 	github.com/Azure/go-autorest/autorest/adal v0.9.5
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
 	github.com/containers/image/v5 v5.7.0
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dnaeon/go-vcr v1.1.0 // indirect
-	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/goproxy v0.0.0-20201021153353-00ad82a08272 // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
@@ -23,12 +22,13 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/konveyor/controller v0.4.1
+	github.com/konveyor/crane-lib v0.0.0-20210803165702-e077c6bf9b66
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
-	github.com/openshift/api v0.0.0-20210105115604-44119421ec6b
+	github.com/openshift/api v0.0.0-20210625082935-ad54d363d274
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -40,17 +40,18 @@ require (
 	github.com/vmware-tanzu/velero v1.6.2
 	go.opencensus.io v0.22.5 // indirect
 	go.uber.org/zap v1.15.0
-	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449 // indirect
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+	golang.org/x/tools v0.1.0 // indirect
 	google.golang.org/api v0.35.0
 	google.golang.org/grpc v1.33.2 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.7
-	k8s.io/apimachinery v0.20.7
-	k8s.io/client-go v0.20.7
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
+	k8s.io/api v0.21.3
+	k8s.io/apimachinery v0.21.3
+	k8s.io/client-go v0.21.3
+	k8s.io/component-base v0.21.3 // indirect
+	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
+	sigs.k8s.io/controller-runtime v0.9.2
 )
 
 // CVE-2020-28483
@@ -80,9 +81,9 @@ replace github.com/vmware-tanzu/velero => github.com/openshift/velero v0.10.2-0.
 
 //replace k8s.io/client-go => k8s.io/client-go v0.0.0-20181213151034-8d9ed539ba31
 
-//replace k8s.io/api => k8s.io/api v0.0.0-20181213150558-05914d821849
-
 //replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20181213153335-0fe22c71c476
 
 //openshift deps pinning
 replace github.com/openshift/api => github.com/openshift/api v0.0.0-20190716152234-9ea19f9dd578
+
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091

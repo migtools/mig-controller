@@ -27,5 +27,6 @@ const (
 // Migration Annotations
 const (
 	// Disables the internal image copy
-	DisableImageCopy = "migration.openshift.io/disable-image-copy"
+	DisableImageCopy         = "migration.openshift.io/disable-image-copy"
+	StateMigrationAnnotation = "migration.openshift.io/state-transfer"
 )

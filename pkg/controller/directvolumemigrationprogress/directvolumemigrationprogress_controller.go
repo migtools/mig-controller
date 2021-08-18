@@ -35,6 +35,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
+	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +58,7 @@ const (
 
 const (
 	DefaultReconcileConcurrency = 5
-	RsyncContainerName          = "rsync-client"
+	RsyncContainerName          = rsync_transfer.RsyncContainer
 )
 
 type GetPodLogger interface {

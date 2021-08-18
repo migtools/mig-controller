@@ -904,6 +904,17 @@ func (r *PersistentVolumes) FindPv(pv PV) *PV {
 	return nil
 }
 
+// Find a PVC
+func (r *PersistentVolumes) FindPVC(namespace string, name string) *PVC {
+	for i := range r.List {
+		pv := &r.List[i]
+		if pv.PVC.GetSourceName() == name && pv.PVC.Namespace == namespace {
+			return &pv.PVC
+		}
+	}
+	return nil
+}
+
 // Add (or update) Pv to the collection.
 func (r *PersistentVolumes) AddPv(pv PV) {
 	r.init()

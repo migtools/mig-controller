@@ -107,7 +107,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 		return nil
 	}
 	// Build PV map.
-	pvMap, err := r.getPvMap(srcClient)
+	pvMap, err := r.getPvMap(srcClient, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -192,7 +192,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 }
 
 // Get a table (map) of PVs keyed by PVC namespaced name.
-func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
+func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPlan) (PvMap, error) {
 	pvMap := PvMap{}
 	list := core.PersistentVolumeList{}
 	err := client.List(context.TODO(), &list, &k8sclient.ListOptions{})
@@ -207,13 +207,22 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client) (PvMap, error) {
 		if migref.RefSet(claim) {
 			key := k8sclient.ObjectKey{
 				Namespace: claim.Namespace,
-				Name:      claim.Name,
+				Name:      getMappedNameForPVC(claim, plan),
 			}
 			pvMap[key] = pv
 		}
 	}
 
 	return pvMap, nil
+}
+
+func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) string {
+	pvcName := pvcRef.Name
+	existingPVC := plan.Spec.FindPVC(pvcRef.Namespace, pvcRef.Name)
+	if existingPVC != nil {
+		pvcName = fmt.Sprintf("%s:%s", pvcRef.Name, existingPVC.GetTargetName())
+	}
+	return pvcName
 }
 
 // Get a list of PVCs found within the specified namespaces.
@@ -255,24 +264,25 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		if !inNamespaces(pvc.Namespace, plan.GetSourceNamespaces()) {
 			continue
 		}
+
 		claims = append(
 			claims, migapi.PVC{
-				Namespace:    pvc.Namespace,
-				Name:         pvc.Name,
+				Namespace: pvc.Namespace,
+				Name: getMappedNameForPVC(&core.ObjectReference{
+					Name:      pvc.Name,
+					Namespace: pvc.Namespace,
+				}, plan),
 				AccessModes:  pvc.Spec.AccessModes,
 				HasReference: pvcInPodVolumes(pvc, podList),
 			})
 	}
-
 	return claims, nil
 }
 
 // Determine the supported PV actions.
 func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim migapi.PVC) []string {
 	supportedActions := []string{}
-	if !claim.HasReference {
-		supportedActions = append(supportedActions, migapi.PvSkipAction)
-	}
+	supportedActions = append(supportedActions, migapi.PvSkipAction)
 	if pv.Spec.HostPath != nil {
 		return supportedActions
 	}

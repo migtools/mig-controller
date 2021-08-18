@@ -53,8 +53,8 @@ const (
 	DirectVolumeMigrationRsyncCreds         = "directvolumemigration-rsync-creds"
 	DirectVolumeMigrationRsyncTransferSvc   = "directvolumemigration-rsync-transfer-svc"
 	DirectVolumeMigrationRsyncTransferRoute = "dvm"
-	DirectVolumeMigrationStunnelConfig      = "directvolumemigration-stunnel-config"
-	DirectVolumeMigrationStunnelCerts       = "directvolumemigration-stunnel-certs"
+	DirectVolumeMigrationStunnelConfig      = "crane2-stunnel-config"
+	DirectVolumeMigrationStunnelCerts       = "crane2-stunnel-secret"
 	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
 	DirectVolumeMigrationStunnelTransfer    = "directvolumemigration-stunnel-transfer"
 	DirectVolumeMigrationRsync              = "rsync"
@@ -260,7 +260,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case CreateRsyncRoute:
-		err := t.createRsyncTransferRoute()
+		err := t.ensureRsyncEndpoint()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -312,7 +312,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case CreateStunnelConfig:
-		err := t.createStunnelConfig()
+		err := t.ensureStunnelTransport()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -321,7 +321,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case CreateRsyncTransferPods:
-		err := t.createRsyncTransferPods()
+		err := t.ensureRsyncTransferServer()
 		if err != nil {
 			return liberr.Wrap(err)
 		}

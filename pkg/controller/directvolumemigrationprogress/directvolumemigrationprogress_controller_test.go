@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/compat"
-	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
 	kapi "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"
@@ -391,7 +391,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a ready and running Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -427,7 +427,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -442,7 +442,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: true,
 								State: kapi.ContainerState{
 									Running: &kapi.ContainerStateRunning{
@@ -471,7 +471,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a non ready Pod but rsync container is terminated successfully.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -507,7 +507,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -522,7 +522,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: false,
 								LastTerminationState: kapi.ContainerState{
 									Terminated: &kapi.ContainerStateTerminated{
@@ -553,7 +553,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a succeeded Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -589,7 +589,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -607,7 +607,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: false,
 								LastTerminationState: kapi.ContainerState{
 									Terminated: &kapi.ContainerStateTerminated{
@@ -638,7 +638,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a failed reference Pod.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -674,7 +674,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -690,7 +690,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: false,
 								LastTerminationState: kapi.ContainerState{
 									Terminated: &kapi.ContainerStateTerminated{
@@ -720,7 +720,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a non ready and failed rsync container.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -756,7 +756,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -773,7 +773,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: false,
 								LastTerminationState: kapi.ContainerState{
 									Terminated: &kapi.ContainerStateTerminated{
@@ -803,7 +803,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 			name: "Given a non ready rsync container and refPod in pending state.",
 			fields: fields{
 				Client:    fake.NewFakeClient(),
-				SrcClient: fakecompat.NewFakeClient(),
+				SrcClient: getFakeCompatClient(),
 				Cluster: &migapi.MigCluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "migcluster-host",
@@ -839,7 +839,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								Name: "stunnel",
 							},
 							{
-								Name: "rsync-client",
+								Name: rsync_transfer.RsyncContainer,
 							},
 						},
 					},
@@ -856,7 +856,7 @@ func TestRsyncPodProgressTask_getRsyncClientContainerStatus(t *testing.T) {
 								},
 							},
 							{
-								Name:  "rsync-client",
+								Name:  rsync_transfer.RsyncContainer,
 								Ready: false,
 								State: kapi.ContainerState{
 									Waiting: &kapi.ContainerStateWaiting{
