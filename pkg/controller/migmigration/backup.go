@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -100,14 +101,15 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 func (t *Task) getUserIncludedResourceList(srcClient compat.Client) ([]string, error) {
 	resources := []string{}
 	includedResources := t.PlanResources.MigPlan.Spec.IncludedResources
+	errs := []error{}
 	for _, res := range includedResources {
 		resMapper, err := srcClient.RESTMapper().RESTMapping(schema.GroupKind{Group: res.Group, Kind: res.Kind})
 		if err != nil {
-			return resources, err
+			errs = append(errs, err)
 		}
 		resources = append(resources, resMapper.Resource.Resource)
 	}
-	return resources, nil
+	return resources, errorsutil.NewAggregate(errs)
 }
 
 // Ensure the second backup on the source cluster has been created and
