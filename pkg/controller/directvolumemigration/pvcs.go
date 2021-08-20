@@ -135,7 +135,7 @@ func (t *Task) findMatchingPV(plan *migapi.MigPlan, pvcName string, pvcNamespace
 	if plan != nil {
 		for i := range plan.Spec.PersistentVolumes.List {
 			planVol := &plan.Spec.PersistentVolumes.List[i]
-			if planVol.PVC.Name == pvcName && planVol.PVC.Namespace == pvcNamespace {
+			if planVol.PVC.GetSourceName() == pvcName && planVol.PVC.Namespace == pvcNamespace {
 				return planVol
 			}
 		}
