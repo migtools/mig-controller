@@ -168,3 +168,11 @@ func (r *MigMigration) AddErrors(errors []string) {
 func (r *MigMigration) HasErrors() bool {
 	return len(r.Status.Errors) > 0
 }
+
+// IsStateMigration checks whether state migration annotation is present
+func (r *MigMigration) IsStateMigration() bool {
+	if _, exists := r.Annotations[StateMigrationAnnotation]; exists {
+		return true
+	}
+	return false
+}
