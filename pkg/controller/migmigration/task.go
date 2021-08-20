@@ -1542,7 +1542,7 @@ func (t *Task) getPVCs() map[k8sclient.ObjectKey]migapi.PV {
 	claims := map[k8sclient.ObjectKey]migapi.PV{}
 	for _, pv := range t.getStagePVs().List {
 		claimKey := k8sclient.ObjectKey{
-			Name:      pv.PVC.Name,
+			Name:      pv.PVC.GetSourceName(),
 			Namespace: pv.PVC.Namespace,
 		}
 		claims[claimKey] = pv

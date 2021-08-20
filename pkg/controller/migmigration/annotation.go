@@ -273,7 +273,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			context.TODO(),
 			k8sclient.ObjectKey{
 				Namespace: pv.PVC.Namespace,
-				Name:      pv.PVC.Name,
+				Name:      pv.PVC.GetSourceName(),
 			},
 			&pvcResource)
 		if err != nil {
@@ -304,7 +304,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		}
 		// Update
 		log.Info("Adding annotations/labels to source cluster PersistentVolumeClaim.",
-			"persistentVolumeClaim", path.Join(pv.PVC.Namespace, pv.PVC.Name))
+			"persistentVolumeClaim", path.Join(pv.PVC.Namespace, pv.PVC.GetSourceName()))
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
 			return itemsUpdated, liberr.Wrap(err)

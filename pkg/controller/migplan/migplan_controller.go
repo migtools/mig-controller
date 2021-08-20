@@ -589,7 +589,7 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 		for _, analyticNS := range analytic.Status.Analytics.Namespaces {
 			if planVol.PVC.Namespace == analyticNS.Namespace {
 				for _, analyticNSVol := range analyticNS.PersistentVolumes {
-					if planVol.PVC.Name == analyticNSVol.Name {
+					if planVol.PVC.GetSourceName() == analyticNSVol.Name {
 						// If new proposed capacity is greater than previous proposed capacity, set confirmed to False
 						if planVol.ProposedCapacity.Cmp(analyticNSVol.ProposedCapacity) > 0 {
 							planVol.CapacityConfirmed = false
