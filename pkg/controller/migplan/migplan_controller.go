@@ -110,6 +110,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for changes to Mighooks referenced by MigPlans
+	err = c.Watch(
+		&source.Kind{Type: &migapi.MigHook{}},
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigPlan{})
+		}),
+		&HookPredicate{})
+	if err != nil {
+		return err
+	}
+
 	// Watch for changes to MigMigrations.
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigMigration{}},

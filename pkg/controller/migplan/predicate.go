@@ -85,6 +85,19 @@ func (r PlanPredicate) mapRefs(plan *migapi.MigPlan) {
 			Name:      ref.Name,
 		})
 	}
+
+	// hooks
+	for _, hook := range plan.Spec.Hooks {
+		ref = hook.Reference
+		if migref.RefSet(ref) {
+			refMap.Add(refOwner, migref.RefTarget{
+				Kind:      migref.ToKind(migapi.MigHook{}),
+				Namespace: ref.Namespace,
+				Name:      ref.Name,
+			})
+		}
+	}
+
 }
 
 func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
@@ -125,6 +138,18 @@ func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 			Name:      ref.Name,
 		})
 	}
+
+	// hooks
+	for _, hook := range plan.Spec.Hooks {
+		ref = hook.Reference
+		if migref.RefSet(ref) {
+			refMap.Delete(refOwner, migref.RefTarget{
+				Kind:      migref.ToKind(migapi.MigHook{}),
+				Namespace: ref.Namespace,
+				Name:      ref.Name,
+			})
+		}
+	}
 }
 
 type ClusterPredicate struct {
@@ -137,6 +162,23 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
+	if !cast {
+		return false
+	}
+	// Reconciled by the controller.
+	return new.HasReconciled()
+}
+
+type HookPredicate struct {
+	predicate.Funcs
+}
+
+func (r HookPredicate) Create(e event.CreateEvent) bool {
+	return false
+}
+
+func (r HookPredicate) Update(e event.UpdateEvent) bool {
+	new, cast := e.ObjectNew.(*migapi.MigHook)
 	if !cast {
 		return false
 	}
