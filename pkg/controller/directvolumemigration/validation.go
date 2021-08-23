@@ -2,7 +2,6 @@ package directvolumemigration
 
 import (
 	"context"
-	"reflect"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -161,18 +160,6 @@ func (r ReconcileDirectVolumeMigration) validateDestCluster(ctx context.Context,
 			Reason:   NotSet,
 			Category: Critical,
 			Message:  InvalidDestinationClusterReferenceMessage,
-		})
-		return nil
-	}
-
-	// Check if clusters are unique
-	if reflect.DeepEqual(ref, direct.Spec.SrcMigClusterRef) {
-		direct.Status.SetCondition(migapi.Condition{
-			Type:     InvalidDestinationCluster,
-			Status:   True,
-			Reason:   NotDistinct,
-			Category: Critical,
-			Message:  InvalidDestinationClusterMessage,
 		})
 		return nil
 	}

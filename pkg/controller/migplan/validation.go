@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"path"
-	"reflect"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -506,18 +505,6 @@ func (r ReconcileMigPlan) validateDestinationCluster(ctx context.Context, plan *
 			Reason:   NotSet,
 			Category: Critical,
 			Message:  "The `dstMigClusterRef` must reference a valid `migcluster`.",
-		})
-		return nil
-	}
-
-	// NotDistinct
-	if reflect.DeepEqual(ref, plan.Spec.SrcMigClusterRef) {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     InvalidDestinationCluster,
-			Status:   True,
-			Reason:   NotDistinct,
-			Category: Critical,
-			Message:  "The `srcMigClusterRef` and `dstMigClusterRef` cannot be the same.",
 		})
 		return nil
 	}
