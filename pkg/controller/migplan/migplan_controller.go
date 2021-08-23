@@ -554,6 +554,17 @@ func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(ctx context.Context, plan *m
 			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
 				return migAnalytic, nil
 			}
+			if migAnalytic.Status.HasCondition(migapi.ReconcileFailed) {
+				plan.Status.SetCondition(migapi.Condition{
+					Type:     PvUsageAnalysisFailed,
+					Status:   True,
+					Category: Warn,
+					Reason:   NotDone,
+					Message:  "Failed to gather PV usage data, MigAnalytic reconcilliation failed.",
+				})
+				plan.Status.DeleteCondition(PvCapacityAdjustmentRequired)
+				return nil, nil
+			}
 			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(migapi.ExtendedPVAnalysisStarted)
 			if pvAnalysisStartedCondition != nil {
 				if time.Now().Sub(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
