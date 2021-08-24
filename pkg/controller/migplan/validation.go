@@ -2,6 +2,7 @@ package migplan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"path"
@@ -80,6 +81,7 @@ const (
 	InvalidHookSAName                          = "InvalidHookSAName"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
+	IntraClusterMigration                      = "IntraClusterMigration"
 )
 
 // Categories
@@ -92,24 +94,33 @@ const (
 
 // Reasons
 const (
-	NotSet                = "NotSet"
-	NotFound              = "NotFound"
-	KeyNotFound           = "KeyNotFound"
-	NotDistinct           = "NotDistinct"
-	LimitExceeded         = "LimitExceeded"
-	LengthExceeded        = "LengthExceeded"
-	NotDone               = "NotDone"
-	Done                  = "Done"
-	Conflict              = "Conflict"
-	NotHealthy            = "NotHealthy"
-	NodeSelectorsDetected = "NodeSelectorsDetected"
-	DuplicateNs           = "DuplicateNamespaces"
+	NotSet                 = "NotSet"
+	NotFound               = "NotFound"
+	KeyNotFound            = "KeyNotFound"
+	NotDistinct            = "NotDistinct"
+	LimitExceeded          = "LimitExceeded"
+	LengthExceeded         = "LengthExceeded"
+	NotDone                = "NotDone"
+	Done                   = "Done"
+	Conflict               = "Conflict"
+	NotHealthy             = "NotHealthy"
+	NodeSelectorsDetected  = "NodeSelectorsDetected"
+	DuplicateNs            = "DuplicateNamespaces"
+	ConflictingNamespaces  = "ConflictingNamespaces"
+	ConflictingPermissions = "ConflictingPermissions"
 )
 
 // Statuses
 const (
 	True  = migapi.True
 	False = migapi.False
+)
+
+// OpenShift NS annotations
+const (
+	openShiftMCSAnnotation       = "openshift.io/sa.scc.mcs"
+	openShiftSuppGroupAnnotation = "openshift.io/sa.scc.supplemental-groups"
+	openShiftUIDRangeAnnotation  = "openshift.io/sa.scc.uid-range"
 )
 
 // Valid AccessMode values
@@ -195,7 +206,127 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
+	// Intra-cluster migrations
+	err = r.validateIntraClusterMigPlan(ctx, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
+}
+
+// validateIntraClusterMigPlan runs intra-cluster migration validatations
+func (r ReconcileMigPlan) validateIntraClusterMigPlan(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateIntraClusterMigPlan")
+		defer span.Finish()
+	}
+
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// these validations only apply to intra-cluster migrations
+	if !isIntraCluster {
+		return nil
+	}
+	conflictingNamespaces := []string{}
+	for srcNs, destNs := range plan.GetNamespaceMapping() {
+		if srcNs == destNs {
+			conflictingNamespaces = append(conflictingNamespaces, srcNs)
+		}
+	}
+	if len(conflictingNamespaces) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     IntraClusterMigration,
+			Status:   True,
+			Reason:   ConflictingNamespaces,
+			Category: Warn,
+			Message:  "This plan migrates resources within the same cluster and it appears that the namespaces [] are mapped to the same source and destination namespaces. Stage & Final migration types will be blocked as Kubernetes resources cannot be migrated within the same namespaces. The plan can only be used for State Migration.",
+			Items:    conflictingNamespaces,
+		})
+	}
+	filePermissionIssues, err := r.getPotentialFilePermissionConflictNamespaces(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if len(filePermissionIssues) > 0 {
+		plan.Status.SetCondition(
+			migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   ConflictingPermissions,
+				Category: Warn,
+				Message:  "Destination namespaces [] already exist in the target cluster with different values of UID/Supplemental Groups/SELinux Labels. Migrating PV data into these namespaces may result in file permission issues. It is recommended that the values should be equal to their respective source namespaces.",
+				Items:    filePermissionIssues,
+			},
+		)
+	}
+	return nil
+}
+
+// getPotentialFilePermissionConflictNamespaces iterates over source and destination namespaces and checks whether
+// the destination namespaces already exist. If they do, further checks whether the source and destination ns'es
+// have the same UID, Supp Groups and SELinux labels set. Returns all namespaces which have conflict in that info
+func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *migapi.MigPlan) ([]string, error) {
+	srcCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	srcClient, err := srcCluster.GetClient(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	destCluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	destClient, err := destCluster.GetClient(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	erroredNs := []string{}
+	potentiallyProblematicNs := []string{}
+	for srcNs, destNs := range plan.GetNamespaceMapping() {
+		if srcNs == destNs {
+			continue
+		}
+		srcNsDef := &kapi.Namespace{}
+		err = srcClient.Get(context.TODO(), types.NamespacedName{Name: srcNs}, srcNsDef)
+		if err != nil {
+			erroredNs = append(erroredNs, destNs)
+			continue
+		}
+		destNsDef := &kapi.Namespace{}
+		err = destClient.Get(context.TODO(), types.NamespacedName{Name: destNs}, destNsDef)
+		if err != nil {
+			if !k8serror.IsNotFound(err) {
+				erroredNs = append(erroredNs, destNs)
+			}
+			continue
+		}
+		if !areNamespaceAnnotationValuesEqual(openShiftUIDRangeAnnotation, srcNsDef, destNsDef) ||
+			!areNamespaceAnnotationValuesEqual(openShiftSuppGroupAnnotation, srcNsDef, destNsDef) ||
+			!areNamespaceAnnotationValuesEqual(openShiftMCSAnnotation, srcNsDef, destNsDef) {
+			potentiallyProblematicNs = append(potentiallyProblematicNs, destNs)
+		}
+	}
+	if len(erroredNs) > 0 {
+		log.V(4).Error(
+			errors.New("failed to gather UID/GID/Selinux Labels information"),
+			fmt.Sprintf("namespaces [%s]", strings.Join(erroredNs, ",")))
+	}
+	return potentiallyProblematicNs, nil
+}
+
+func areNamespaceAnnotationValuesEqual(annotation string, srcNs *kapi.Namespace, destNs *kapi.Namespace) bool {
+	if sourceVal, exists := srcNs.Annotations[annotation]; exists {
+		if destVal, exists := destNs.Annotations[annotation]; exists {
+			if sourceVal != destVal {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // Validate the referenced storage.

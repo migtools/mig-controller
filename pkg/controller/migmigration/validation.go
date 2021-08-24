@@ -41,6 +41,7 @@ const (
 	StaleDestVeleroCRsDeleted          = "StaleDestVeleroCRsDeleted"
 	StaleResticCRsDeleted              = "StaleResticCRsDeleted"
 	DirectVolumeMigrationBlocked       = "DirectVolumeMigrationBlocked"
+	IntraClusterMigration              = "IntraClusterMigration"
 )
 
 // Categories
@@ -55,6 +56,7 @@ const (
 	NotFound       = "NotFound"
 	Cancel         = "Cancel"
 	ErrorsDetected = "ErrorsDetected"
+	NotSupported   = "NotSupported"
 )
 
 // Statuses
@@ -93,6 +95,61 @@ func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.M
 		err = liberr.Wrap(err)
 	}
 
+	err = r.validateIntraClusterMigration(ctx, plan, migration)
+	if err != nil {
+		log.V(4).Error(err, "Validation of intra-cluster migration failed")
+		err = liberr.Wrap(err)
+	}
+	return nil
+}
+
+// validateIntraClusterMigration runs validations for intra-cluster migrations
+func (r ReconcileMigMigration) validateIntraClusterMigration(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateIntraClusterMigration")
+		defer span.Finish()
+	}
+	// this validation only applies to intra-cluster migrations
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if !isIntraCluster {
+		return nil
+	}
+	conflictingNamespaces := []string{}
+	for srcNs, destNs := range plan.GetNamespaceMapping() {
+		if srcNs == destNs {
+			conflictingNamespaces = append(conflictingNamespaces, srcNs)
+		}
+	}
+	if len(conflictingNamespaces) > 0 {
+		conflictingPVCMappings := []string{}
+		plan.Spec.PersistentVolumes.BeginPvStaging()
+		for _, pv := range plan.Spec.PersistentVolumes.List {
+			if pv.PVC.GetSourceName() == pv.PVC.GetTargetName() {
+				conflictingPVCMappings = append(conflictingPVCMappings, pv.PVC.GetSourceName())
+			}
+		}
+		if len(conflictingPVCMappings) > 0 {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message:  "This migration plan migrates resources within the same cluster and same namespace. One or more PVC names are mapped to the same source and destination names. Please provide distinct source & destination names for all PVCs and try again.",
+			})
+		}
+		if migration.Spec.Stage || !migration.IsStateMigration() {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message:  "This migration plan migrates resources within the same cluster and one or more namespaces in the plan are mapped to the same source and destination namespaces. Only state migrations can be performed within the same namespace.",
+			})
+		}
+	}
 	return nil
 }
 
