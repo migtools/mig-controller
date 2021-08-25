@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
+
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,6 +55,7 @@ const (
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
 	PlanConflict                               = "PlanConflict"
+	PvNameConflict                             = "PvNameConflict"
 	PvInvalidAction                            = "PvInvalidAction"
 	PvNoSupportedAction                        = "PvNoSupportedAction"
 	PvInvalidStorageClass                      = "PvInvalidStorageClass"
@@ -229,39 +232,60 @@ func (r ReconcileMigPlan) validateIntraClusterMigPlan(ctx context.Context, plan 
 	if !isIntraCluster {
 		return nil
 	}
-	conflictingNamespaces := []string{}
-	for srcNs, destNs := range plan.GetNamespaceMapping() {
-		if srcNs == destNs {
-			conflictingNamespaces = append(conflictingNamespaces, srcNs)
-		}
-	}
+	// find conflicts between source and destination namespaces
+	srcNses := toSet(plan.GetSourceNamespaces())
+	destNses := toSet(plan.GetDestinationNamespaces())
+	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
 	if len(conflictingNamespaces) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     IntraClusterMigration,
 			Status:   True,
 			Reason:   ConflictingNamespaces,
 			Category: Warn,
-			Message:  "This plan migrates resources within the same cluster and it appears that the namespaces [] are mapped to the same source and destination namespaces. Stage & Final migration types will be blocked as Kubernetes resources cannot be migrated within the same namespaces. The plan can only be used for State Migration.",
+			Message:  "Source namespaces [] are mapped to namespaces which result in conflicts. Stage/Final migrations will be blocked on this migration plan. Only state migrations are possible provided there are no conflicts in the PVC names.",
 			Items:    conflictingNamespaces,
 		})
 	}
-	filePermissionIssues, err := r.getPotentialFilePermissionConflictNamespaces(plan)
-	if err != nil {
-		return liberr.Wrap(err)
+	// find conflicts between PVC names
+	nsMap := plan.GetNamespaceMapping()
+	srcPVCs := []string{}
+	destPVCs := []string{}
+	for _, pv := range plan.Spec.PersistentVolumes.List {
+		srcPVCs = append(srcPVCs,
+			fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
+		destPVCs = append(destPVCs,
+			fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
 	}
-	if len(filePermissionIssues) > 0 {
-		plan.Status.SetCondition(
-			migapi.Condition{
-				Type:     IntraClusterMigration,
-				Status:   True,
-				Reason:   ConflictingPermissions,
-				Category: Warn,
-				Message:  "Destination namespaces [] already exist in the target cluster with different values of UID/Supplemental Groups/SELinux Labels. Migrating PV data into these namespaces may result in file permission issues. It is recommended that the values should be equal to their respective source namespaces.",
-				Items:    filePermissionIssues,
-			},
-		)
+	conflictingPVCs := toStringSlice(
+		toSet(srcPVCs).Intersect(toSet(destPVCs)))
+	if len(conflictingPVCs) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNameConflict,
+			Status:   True,
+			Reason:   NotDistinct,
+			Category: Critical,
+			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC and try again.",
+			Items:    conflictingPVCs,
+		})
 	}
 	return nil
+}
+
+func toStringSlice(set mapset.Set) []string {
+	interfaceSlice := set.ToSlice()
+	var strSlice []string = make([]string, len(interfaceSlice))
+	for i, s := range interfaceSlice {
+		strSlice[i] = s.(string)
+	}
+	return strSlice
+}
+
+func toSet(strSlice []string) mapset.Set {
+	var interfaceSlice []interface{} = make([]interface{}, len(strSlice))
+	for i, s := range strSlice {
+		interfaceSlice[i] = s
+	}
+	return mapset.NewSetFromSlice(interfaceSlice)
 }
 
 // getPotentialFilePermissionConflictNamespaces iterates over source and destination namespaces and checks whether
@@ -319,14 +343,16 @@ func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *mig
 }
 
 func areNamespaceAnnotationValuesEqual(annotation string, srcNs *kapi.Namespace, destNs *kapi.Namespace) bool {
-	if sourceVal, exists := srcNs.Annotations[annotation]; exists {
-		if destVal, exists := destNs.Annotations[annotation]; exists {
-			if sourceVal != destVal {
-				return false
-			}
-		}
+	isEqual := false
+	sourceVal, srcExists := srcNs.Annotations[annotation]
+	destVal, destExists := destNs.Annotations[annotation]
+	if srcExists && destExists && (sourceVal == destVal) {
+		isEqual = true
 	}
-	return true
+	if !srcExists && !destExists {
+		isEqual = true
+	}
+	return isEqual
 }
 
 // Validate the referenced storage.
@@ -417,12 +443,27 @@ func (r ReconcileMigPlan) validateNamespaces(ctx context.Context, plan *migapi.M
 			Status:   True,
 			Reason:   LengthExceeded,
 			Category: Warn,
-			Message:  fmt.Sprintf("Namespaces [] exceed 59 characters and no destination cluster route subdomain was configured. Direct Volume Migration may fail if you do not set `cluster_subdomain` value on the `MigrationController` CR."),
+			Message:  "Namespaces [] exceed 59 characters and no destination cluster route subdomain was configured. Direct Volume Migration may fail if you do not set `cluster_subdomain` value on the `MigrationController` CR.",
 			Items:    namespaces,
 		})
 		return nil
 	}
-
+	filePermissionIssues, err := r.getPotentialFilePermissionConflictNamespaces(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if len(filePermissionIssues) > 0 {
+		plan.Status.SetCondition(
+			migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   ConflictingPermissions,
+				Category: Warn,
+				Message:  "Destination namespaces [] already exist in the target cluster with different values of UID/Supplemental Groups/SELinux Labels. Migrating PV data into these namespaces may result in file permission issues. Either delete the destination namespaces or map to different namespaces to avoid file permission issues.",
+				Items:    filePermissionIssues,
+			},
+		)
+	}
 	return nil
 }
 

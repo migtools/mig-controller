@@ -550,13 +550,13 @@ func (r *ReconcileMigPlan) checkIfMigAnalyticsReady(ctx context.Context, plan *m
 	}
 	for i := range migAnalytics.Items {
 		migAnalytic := &migAnalytics.Items[i]
-		if migAnalytic.Spec.AnalyzeExtendedPVCapacity == true {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
 			if migAnalytic.Status.IsReady() && !migAnalytic.Spec.Refresh {
 				return migAnalytic, nil
 			}
 			pvAnalysisStartedCondition := migAnalytic.Status.FindCondition(migapi.ExtendedPVAnalysisStarted)
 			if pvAnalysisStartedCondition != nil {
-				if time.Now().Sub(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
+				if time.Since(pvAnalysisStartedCondition.LastTransitionTime.Time) > migAnalyticsTimeout {
 					plan.Status.SetCondition(migapi.Condition{
 						Type:     PvUsageAnalysisFailed,
 						Status:   True,
@@ -595,7 +595,7 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 							planVol.CapacityConfirmed = false
 						}
 						if analyticNSVol.Comment != migapi.VolumeAdjustmentNoOp {
-							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.Name)
+							pvResizingRequiredVolumes = append(pvResizingRequiredVolumes, planVol.PVC.GetSourceName())
 						}
 						planVol.ProposedCapacity = analyticNSVol.ProposedCapacity
 						found = true
@@ -604,7 +604,7 @@ func (r *ReconcileMigPlan) processProposedPVCapacities(ctx context.Context, plan
 			}
 		}
 		if !found {
-			pvResizingInformationMissingVolumes = append(pvResizingInformationMissingVolumes, planVol.Name)
+			pvResizingInformationMissingVolumes = append(pvResizingInformationMissingVolumes, planVol.PVC.GetSourceName())
 		}
 		plan.Spec.AddPv(*planVol)
 	}

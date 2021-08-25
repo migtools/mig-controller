@@ -582,7 +582,7 @@ func TestReconcileMigPlan_processProposedPVCapacities(t *testing.T) {
 			wantConditions: []migapi.Condition{{
 				Type:     PvUsageAnalysisFailed,
 				Category: Warn,
-				Message:  "Failed to compute PV resizing data for the following volumes. PV resizing will be disabled for these volumes and the migration may fail if the volumes are full or their requested and actual capacities differ in the source cluster. Please ensure that the volumes are attached to one or more running Pods for PV resizing to work correctly: [pv-0]",
+				Message:  "Failed to compute PV resizing data for the following volumes. PV resizing will be disabled for these volumes and the migration may fail if the volumes are full or their requested and actual capacities differ in the source cluster. Please ensure that the volumes are attached to one or more running Pods for PV resizing to work correctly: [pvc-0]",
 			}},
 			dontWantConditions: []migapi.Condition{},
 			assertMessage:      true,
