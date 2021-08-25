@@ -1845,6 +1845,8 @@ func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 		r := regexp.MustCompile(`^\-{1,2}([a-z]+\-)?[a-z]+$`)
 		if r.MatchString(opt) {
 			validatedOptions = append(validatedOptions, opt)
+		} else {
+			log.Info("Invalid Rsync extra option passed", "option", opt)
 		}
 	}
 	opts.Extras = append(opts.Extras, validatedOptions...)
