@@ -14,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -179,11 +180,6 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			dc.Spec.Paused, err = strconv.ParseBool(dc.Annotations[migapi.PausedAnnotation])
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			delete(dc.Annotations, migapi.PausedAnnotation)
 			delete(dc.Annotations, migapi.ReplicasAnnotation)
 			currentReplicas := dc.Spec.Replicas
 			// Only set replica count if currently 0
@@ -196,6 +192,23 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 				currentReplicas, number,
 				migapi.ReplicasAnnotation),
 				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+			err = client.Update(context.TODO(), &dc)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+
+			// For Deployment Configs we have to set paused separately or pods wont launch
+			// We have to get the updated resource otherwise we just produce a conflict
+			ref := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
+			err = client.Get(context.TODO(), ref, &dc)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			dc.Spec.Paused, err = strconv.ParseBool(dc.Annotations[migapi.PausedAnnotation])
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			delete(dc.Annotations, migapi.PausedAnnotation)
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				return liberr.Wrap(err)
