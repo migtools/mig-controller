@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"regexp"
 	"sort"
@@ -159,6 +160,38 @@ func (r *MigPlan) GetDestinationCluster(client k8sclient.Client) (*MigCluster, e
 // Returns `nil` when the reference cannot be resolved.
 func (r *MigPlan) GetStorage(client k8sclient.Client) (*MigStorage, error) {
 	return GetStorage(client, r.Spec.MigStorageRef)
+}
+
+// IsIntraCluster tells whether source and destination in the plan point to the same cluster
+func (r *MigPlan) IsIntraCluster(client k8sclient.Client) (bool, error) {
+	srcMigCluster, err := r.GetSourceCluster(client)
+	if err != nil {
+		return false, err
+	}
+	if srcMigCluster == nil {
+		return false, errors.New("source cluster not found")
+	}
+
+	destMigCluster, err := r.GetDestinationCluster(client)
+	if err != nil {
+		return false, err
+	}
+	if destMigCluster == nil {
+		return false, errors.New("destination cluster not found")
+	}
+
+	sourceUrl, err := url.Parse(srcMigCluster.Spec.URL)
+	if err != nil {
+		return false, errors.New("failed to parse source cluster URL")
+	}
+	destUrl, err := url.Parse(destMigCluster.Spec.URL)
+	if err != nil {
+		return false, errors.New("failed to parse destination cluster URL")
+	}
+	if sourceUrl.Host == destUrl.Host {
+		return true, nil
+	}
+	return false, nil
 }
 
 // Resources referenced by the plan.

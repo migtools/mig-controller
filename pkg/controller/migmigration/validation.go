@@ -41,6 +41,7 @@ const (
 	StaleDestVeleroCRsDeleted          = "StaleDestVeleroCRsDeleted"
 	StaleResticCRsDeleted              = "StaleResticCRsDeleted"
 	DirectVolumeMigrationBlocked       = "DirectVolumeMigrationBlocked"
+	IntraClusterMigration              = "IntraClusterMigration"
 )
 
 // Categories
@@ -55,6 +56,7 @@ const (
 	NotFound       = "NotFound"
 	Cancel         = "Cancel"
 	ErrorsDetected = "ErrorsDetected"
+	NotSupported   = "NotSupported"
 )
 
 // Statuses
@@ -93,6 +95,34 @@ func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.M
 		err = liberr.Wrap(err)
 	}
 
+	err = r.validateConflictingNamespaces(ctx, plan, migration)
+	if err != nil {
+		log.V(4).Error(err, "Validation of intra-cluster migration failed")
+		err = liberr.Wrap(err)
+	}
+	return nil
+}
+
+// validateConflictingNamespaces runs validations for intra-cluster migrations
+func (r ReconcileMigMigration) validateConflictingNamespaces(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateConflictingNamespaces")
+		defer span.Finish()
+	}
+
+	// find conflicts between source and destination namespaces
+	srcNses := toSet(plan.GetSourceNamespaces())
+	destNses := toSet(plan.GetDestinationNamespaces())
+	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
+	if len(conflictingNamespaces) > 0 && !migration.IsStateMigration() {
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     IntraClusterMigration,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Critical,
+			Message:  "This migration plan has conflicts in source and destination namespace mappings. The migration plan can only be used for State Migrations provided that there are no conflicts in PVC names. Stage/Final migrations are not supported.",
+		})
+	}
 	return nil
 }
 

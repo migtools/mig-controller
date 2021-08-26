@@ -2,11 +2,13 @@ package migplan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"path"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
@@ -24,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
+
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -52,6 +55,7 @@ const (
 	SourceClusterProxySecretMisconfigured      = "SourceClusterProxySecretMisconfigured"
 	DestinationClusterProxySecretMisconfigured = "DestinationClusterProxySecretMisconfigured"
 	PlanConflict                               = "PlanConflict"
+	PvNameConflict                             = "PvNameConflict"
 	PvInvalidAction                            = "PvInvalidAction"
 	PvNoSupportedAction                        = "PvNoSupportedAction"
 	PvInvalidStorageClass                      = "PvInvalidStorageClass"
@@ -80,6 +84,7 @@ const (
 	InvalidHookSAName                          = "InvalidHookSAName"
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
+	IntraClusterMigration                      = "IntraClusterMigration"
 )
 
 // Categories
@@ -92,24 +97,33 @@ const (
 
 // Reasons
 const (
-	NotSet                = "NotSet"
-	NotFound              = "NotFound"
-	KeyNotFound           = "KeyNotFound"
-	NotDistinct           = "NotDistinct"
-	LimitExceeded         = "LimitExceeded"
-	LengthExceeded        = "LengthExceeded"
-	NotDone               = "NotDone"
-	Done                  = "Done"
-	Conflict              = "Conflict"
-	NotHealthy            = "NotHealthy"
-	NodeSelectorsDetected = "NodeSelectorsDetected"
-	DuplicateNs           = "DuplicateNamespaces"
+	NotSet                 = "NotSet"
+	NotFound               = "NotFound"
+	KeyNotFound            = "KeyNotFound"
+	NotDistinct            = "NotDistinct"
+	LimitExceeded          = "LimitExceeded"
+	LengthExceeded         = "LengthExceeded"
+	NotDone                = "NotDone"
+	Done                   = "Done"
+	Conflict               = "Conflict"
+	NotHealthy             = "NotHealthy"
+	NodeSelectorsDetected  = "NodeSelectorsDetected"
+	DuplicateNs            = "DuplicateNamespaces"
+	ConflictingNamespaces  = "ConflictingNamespaces"
+	ConflictingPermissions = "ConflictingPermissions"
 )
 
 // Statuses
 const (
 	True  = migapi.True
 	False = migapi.False
+)
+
+// OpenShift NS annotations
+const (
+	openShiftMCSAnnotation       = "openshift.io/sa.scc.mcs"
+	openShiftSuppGroupAnnotation = "openshift.io/sa.scc.supplemental-groups"
+	openShiftUIDRangeAnnotation  = "openshift.io/sa.scc.uid-range"
 )
 
 // Valid AccessMode values
@@ -195,7 +209,150 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
+	// Intra-cluster migrations
+	err = r.validateIntraClusterMigPlan(ctx, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
+}
+
+// validateIntraClusterMigPlan runs intra-cluster migration validatations
+func (r ReconcileMigPlan) validateIntraClusterMigPlan(ctx context.Context, plan *migapi.MigPlan) error {
+	if opentracing.SpanFromContext(ctx) != nil {
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateIntraClusterMigPlan")
+		defer span.Finish()
+	}
+
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// these validations only apply to intra-cluster migrations
+	if !isIntraCluster {
+		return nil
+	}
+	// find conflicts between source and destination namespaces
+	srcNses := toSet(plan.GetSourceNamespaces())
+	destNses := toSet(plan.GetDestinationNamespaces())
+	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
+	if len(conflictingNamespaces) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     IntraClusterMigration,
+			Status:   True,
+			Reason:   ConflictingNamespaces,
+			Category: Warn,
+			Message:  "Source namespaces [] are mapped to namespaces which result in conflicts. Stage/Final migrations will be blocked on this migration plan. Only state migrations are possible provided there are no conflicts in the PVC names.",
+			Items:    conflictingNamespaces,
+		})
+	}
+	// find conflicts between PVC names
+	nsMap := plan.GetNamespaceMapping()
+	srcPVCs := []string{}
+	destPVCs := []string{}
+	for _, pv := range plan.Spec.PersistentVolumes.List {
+		srcPVCs = append(srcPVCs,
+			fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
+		destPVCs = append(destPVCs,
+			fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
+	}
+	conflictingPVCs := toStringSlice(
+		toSet(srcPVCs).Intersect(toSet(destPVCs)))
+	if len(conflictingPVCs) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNameConflict,
+			Status:   True,
+			Reason:   NotDistinct,
+			Category: Critical,
+			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC and try again.",
+			Items:    conflictingPVCs,
+		})
+	}
+	return nil
+}
+
+func toStringSlice(set mapset.Set) []string {
+	interfaceSlice := set.ToSlice()
+	var strSlice []string = make([]string, len(interfaceSlice))
+	for i, s := range interfaceSlice {
+		strSlice[i] = s.(string)
+	}
+	return strSlice
+}
+
+func toSet(strSlice []string) mapset.Set {
+	var interfaceSlice []interface{} = make([]interface{}, len(strSlice))
+	for i, s := range strSlice {
+		interfaceSlice[i] = s
+	}
+	return mapset.NewSetFromSlice(interfaceSlice)
+}
+
+// getPotentialFilePermissionConflictNamespaces iterates over source and destination namespaces and checks whether
+// the destination namespaces already exist. If they do, further checks whether the source and destination ns'es
+// have the same UID, Supp Groups and SELinux labels set. Returns all namespaces which have conflict in that info
+func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *migapi.MigPlan) ([]string, error) {
+	srcCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	srcClient, err := srcCluster.GetClient(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	destCluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	destClient, err := destCluster.GetClient(r)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	erroredNs := []string{}
+	potentiallyProblematicNs := []string{}
+	for srcNs, destNs := range plan.GetNamespaceMapping() {
+		if srcNs == destNs {
+			continue
+		}
+		srcNsDef := &kapi.Namespace{}
+		err = srcClient.Get(context.TODO(), types.NamespacedName{Name: srcNs}, srcNsDef)
+		if err != nil {
+			erroredNs = append(erroredNs, destNs)
+			continue
+		}
+		destNsDef := &kapi.Namespace{}
+		err = destClient.Get(context.TODO(), types.NamespacedName{Name: destNs}, destNsDef)
+		if err != nil {
+			if !k8serror.IsNotFound(err) {
+				erroredNs = append(erroredNs, destNs)
+			}
+			continue
+		}
+		if !areNamespaceAnnotationValuesEqual(openShiftUIDRangeAnnotation, srcNsDef, destNsDef) ||
+			!areNamespaceAnnotationValuesEqual(openShiftSuppGroupAnnotation, srcNsDef, destNsDef) ||
+			!areNamespaceAnnotationValuesEqual(openShiftMCSAnnotation, srcNsDef, destNsDef) {
+			potentiallyProblematicNs = append(potentiallyProblematicNs, destNs)
+		}
+	}
+	if len(erroredNs) > 0 {
+		log.V(4).Error(
+			errors.New("failed to gather UID/GID/Selinux Labels information"),
+			fmt.Sprintf("namespaces [%s]", strings.Join(erroredNs, ",")))
+	}
+	return potentiallyProblematicNs, nil
+}
+
+func areNamespaceAnnotationValuesEqual(annotation string, srcNs *kapi.Namespace, destNs *kapi.Namespace) bool {
+	isEqual := false
+	sourceVal, srcExists := srcNs.Annotations[annotation]
+	destVal, destExists := destNs.Annotations[annotation]
+	if srcExists && destExists && (sourceVal == destVal) {
+		isEqual = true
+	}
+	if !srcExists && !destExists {
+		isEqual = true
+	}
+	return isEqual
 }
 
 // Validate the referenced storage.
@@ -286,12 +443,27 @@ func (r ReconcileMigPlan) validateNamespaces(ctx context.Context, plan *migapi.M
 			Status:   True,
 			Reason:   LengthExceeded,
 			Category: Warn,
-			Message:  fmt.Sprintf("Namespaces [] exceed 59 characters and no destination cluster route subdomain was configured. Direct Volume Migration may fail if you do not set `cluster_subdomain` value on the `MigrationController` CR."),
+			Message:  "Namespaces [] exceed 59 characters and no destination cluster route subdomain was configured. Direct Volume Migration may fail if you do not set `cluster_subdomain` value on the `MigrationController` CR.",
 			Items:    namespaces,
 		})
 		return nil
 	}
-
+	filePermissionIssues, err := r.getPotentialFilePermissionConflictNamespaces(plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if len(filePermissionIssues) > 0 {
+		plan.Status.SetCondition(
+			migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   ConflictingPermissions,
+				Category: Warn,
+				Message:  "Destination namespaces [] already exist in the target cluster with different values of UID/Supplemental Groups/SELinux Labels. Migrating PV data into these namespaces may result in file permission issues. Either delete the destination namespaces or map to different namespaces to avoid file permission issues.",
+				Items:    filePermissionIssues,
+			},
+		)
+	}
 	return nil
 }
 
