@@ -109,7 +109,14 @@ func (r ReconcileMigMigration) validateConflictingNamespaces(ctx context.Context
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateConflictingNamespaces")
 		defer span.Finish()
 	}
-
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	// these validations only apply to intra-cluster migrations
+	if !isIntraCluster {
+		return nil
+	}
 	// find conflicts between source and destination namespaces
 	srcNses := toSet(plan.GetSourceNamespaces())
 	destNses := toSet(plan.GetDestinationNamespaces())
