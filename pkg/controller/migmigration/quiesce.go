@@ -14,6 +14,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -136,6 +137,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 				continue
 			}
 			dc.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
+			dc.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(dc.Spec.Paused)
 			t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig. "+
 				"Changing .Spec.Replicas from [%v->0]. "+
 				"Annotating with [%v: %v]",
@@ -143,6 +145,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
 				migapi.ReplicasAnnotation, dc.Spec.Replicas),
 				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
 			dc.Spec.Replicas = 0
+			dc.Spec.Paused = false
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -193,6 +196,23 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if err != nil {
 				return liberr.Wrap(err)
 			}
+
+			// For Deployment Configs we have to set paused separately or pods wont launch
+			// We have to get the updated resource otherwise we just produce a conflict
+			ref := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
+			err = client.Get(context.TODO(), ref, &dc)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			dc.Spec.Paused, err = strconv.ParseBool(dc.Annotations[migapi.PausedAnnotation])
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			delete(dc.Annotations, migapi.PausedAnnotation)
+			err = client.Update(context.TODO(), &dc)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	}
 
@@ -226,7 +246,9 @@ func (t *Task) quiesceDeployments(client k8sclient.Client) error {
 				migapi.ReplicasAnnotation, deployment.Spec.Replicas),
 				"deployment", path.Join(deployment.Namespace, deployment.Name))
 			deployment.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
+			deployment.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(deployment.Spec.Paused)
 			deployment.Spec.Replicas = &zero
+			deployment.Spec.Paused = false
 			err = client.Update(context.TODO(), &deployment)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -261,6 +283,11 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			if err != nil {
 				return liberr.Wrap(err)
 			}
+			deployment.Spec.Paused, err = strconv.ParseBool(deployment.Annotations[migapi.PausedAnnotation])
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			delete(deployment.Annotations, migapi.PausedAnnotation)
 			delete(deployment.Annotations, migapi.ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			currentReplicas := deployment.Spec.Replicas

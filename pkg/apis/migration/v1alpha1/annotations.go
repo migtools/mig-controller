@@ -13,6 +13,7 @@ const (
 	QuiesceNodeSelector             = "migration.openshift.io/quiesceDaemonSet"
 	SuspendAnnotation               = "migration.openshift.io/preQuiesceSuspend"
 	ReplicasAnnotation              = "migration.openshift.io/preQuiesceReplicas"
+	PausedAnnotation                = "migration.openshift.io/preQuiescePaused"
 	NodeSelectorAnnotation          = "migration.openshift.io/preQuiesceNodeSelector"
 	StagePodImageAnnotation         = "migration.openshift.io/stage-pod-image"
 	ExcludePVCPodAnnotation         = "migration.openshift.io/exclude-pvcs" // Exclude PVCs if marked "move" or "snapshot" in the plan

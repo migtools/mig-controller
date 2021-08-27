@@ -102,6 +102,26 @@ func (t *Task) deleteDeploymentConfigLeftoverPods() error {
 					return liberr.Wrap(err)
 				}
 			}
+			// Pods belonging to Paused DCs dont get automatically removed either.
+			if dc.Spec.Paused {
+				pausedPodList := corev1.PodList{}
+				err = destClient.List(
+					context.TODO(),
+					&pausedPodList,
+					k8sclient.InNamespace(ns),
+					k8sclient.MatchingLabels(map[string]string{"deploymentconfig": dc.Name}),
+				)
+				for _, pod := range pausedPodList.Items {
+					t.Log.Info(
+						"Rollback: Deleting Pod associated with migrated paused DeploymentConfig.",
+						"pod", path.Join(pod.Namespace, pod.Name),
+						"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+					err = destClient.Delete(context.TODO(), &pod)
+					if err != nil {
+						return liberr.Wrap(err)
+					}
+				}
+			}
 		}
 	}
 	return nil
