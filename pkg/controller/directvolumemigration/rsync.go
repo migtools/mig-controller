@@ -362,6 +362,10 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				newOperation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
 				updateOperationStatus(&currentStatus, pod)
 				if currentStatus.failed && currentStatus.operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
+					// since we have not yet attempted all retries,
+					// reset the failed status and set the pending status
+					currentStatus.failed = false
+					currentStatus.pending = true
 					labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
 					rsyncOptions = append(rsyncOptions, rsynctransfer.WithSourcePodLabels(labels))
 					transfer, err := rsynctransfer.NewTransfer(
