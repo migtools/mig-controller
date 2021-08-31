@@ -132,6 +132,30 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 		rsynctransfer.Username("root"),
 		rsynctransfer.Password(rsyncPassword),
 	}
+	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if srcCluster != nil {
+		srcTransferImage, err := srcCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		transferOptions = append(transferOptions,
+			rsynctransfer.RsyncClientImage(srcTransferImage))
+	}
+	destCluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if destCluster != nil {
+		destTransferImage, err := destCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		transferOptions = append(transferOptions,
+			rsynctransfer.RsyncServerImage(destTransferImage))
+	}
 	if o.BwLimit > 0 {
 		transferOptions = append(transferOptions,
 			RsyncBwLimit(o.BwLimit))
