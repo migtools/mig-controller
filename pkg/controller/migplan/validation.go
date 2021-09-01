@@ -296,6 +296,9 @@ func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *mig
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	if srcCluster == nil {
+		return nil, nil
+	}
 	srcClient, err := srcCluster.GetClient(r)
 	if err != nil {
 		return nil, liberr.Wrap(err)
@@ -303,6 +306,9 @@ func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *mig
 	destCluster, err := plan.GetDestinationCluster(r)
 	if err != nil {
 		return nil, liberr.Wrap(err)
+	}
+	if destCluster == nil {
+		return nil, nil
 	}
 	destClient, err := destCluster.GetClient(r)
 	if err != nil {
