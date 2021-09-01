@@ -263,8 +263,8 @@ func (r ReconcileMigPlan) validateIntraClusterMigPlan(ctx context.Context, plan 
 			Type:     PvNameConflict,
 			Status:   True,
 			Reason:   NotDistinct,
-			Category: Critical,
-			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC and try again.",
+			Category: Warn,
+			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please map each source PVC to a distinct destination PVC before running a State Migration.",
 			Items:    conflictingPVCs,
 		})
 	}
