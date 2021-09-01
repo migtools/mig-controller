@@ -1163,20 +1163,37 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		}
 		deps = append(deps, route)
 		stunnelConf := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-config", Namespace: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-server-config", Namespace: ns},
 		}
 		deps = append(deps, stunnelConf)
 		rsyncConf := &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-config", Namespace: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-server-config", Namespace: ns},
 		}
 		deps = append(deps, rsyncConf)
 		stunnelSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-secret", Namespace: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-server-secret", Namespace: ns},
 			Data:       map[string][]byte{"tls.key": []byte{}, "tls.crt": []byte{}},
 		}
 		deps = append(deps, stunnelSecret)
 		rsyncSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-secret", Namespace: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-server-secret", Namespace: ns},
+			Data:       map[string][]byte{"tls.key": []byte{}, "tls.crt": []byte{}},
+		}
+		stunnelConf = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-client-config", Namespace: ns},
+		}
+		deps = append(deps, stunnelConf)
+		rsyncConf = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-client-config", Namespace: ns},
+		}
+		deps = append(deps, rsyncConf)
+		stunnelSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-stunnel-client-secret", Namespace: ns},
+			Data:       map[string][]byte{"tls.key": []byte{}, "tls.crt": []byte{}},
+		}
+		deps = append(deps, stunnelSecret)
+		rsyncSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "crane2-rsync-client-secret", Namespace: ns},
 			Data:       map[string][]byte{"tls.key": []byte{}, "tls.crt": []byte{}},
 		}
 		deps = append(deps, rsyncSecret)

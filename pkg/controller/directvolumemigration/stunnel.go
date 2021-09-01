@@ -47,6 +47,43 @@ func (t *Task) ensureStunnelTransport() error {
 		return err
 	}
 
+	proxyConfig, err := t.generateStunnelProxyConfig()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	transportOptions := &cranetransport.Options{
+		ProxyURL:      proxyConfig.ProxyHost,
+		ProxyUsername: proxyConfig.ProxyUsername,
+		ProxyPassword: proxyConfig.ProxyPassword,
+		NoVerifyCA:    settings.Settings.StunnelVerifyCA,
+		CAVerifyLevel: settings.Settings.StunnelVerifyCALevel,
+	}
+	// retrieve transfer image from source cluster
+	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if srcCluster != nil {
+		srcTransferImage, err := srcCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		transportOptions.StunnelClientImage = srcTransferImage
+	}
+	// retrieve transfer image from destination cluster
+	destCluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if destCluster != nil {
+		destTransferImage, err := destCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		transportOptions.StunnelServerImage = destTransferImage
+	}
+
 	for ns := range t.getPVCNamespaceMap() {
 		sourceNs := getSourceNs(ns)
 		destNs := getDestNs(ns)
@@ -77,7 +114,7 @@ func (t *Task) ensureStunnelTransport() error {
 				types.NamespacedName{Namespace: sourceNs},
 				types.NamespacedName{Namespace: destNs},
 			)
-			stunnelTransport = stunnel_transport.NewTransport(nsPair, &cranetransport.Options{})
+			stunnelTransport = stunnel_transport.NewTransport(nsPair, transportOptions)
 
 			err = stunnelTransport.CreateServer(destClient, endpoint)
 			if err != nil {
