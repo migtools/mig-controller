@@ -535,7 +535,18 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
-			return errors.New("Backup not found")
+			t.Owner.Status.StageCondition(migapi.Running)
+			cond := t.Owner.Status.FindCondition(migapi.Running)
+			if cond == nil {
+				return fmt.Errorf("'Running' condition not found on migmigration [%v/%v]", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > time.Minute {
+				return fmt.Errorf("Backup not found after a minute")
+			}
+			t.Log.Info(fmt.Sprintf("Backup not found. Waiting up to a minute for backup to exist"))
+			t.Requeue = PollReQ
+			return nil
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
@@ -760,7 +771,18 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 		if backup == nil {
-			return errors.New("Backup not found")
+			t.Owner.Status.StageCondition(migapi.Running)
+			cond := t.Owner.Status.FindCondition(migapi.Running)
+			if cond == nil {
+				return fmt.Errorf("'Running' condition not found on migmigration [%v/%v]", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > time.Minute {
+				return fmt.Errorf("Stage backup not found after a minute")
+			}
+			t.Log.Info(fmt.Sprintf("Stage backup not found. Waiting up to a minute for backup to exist"))
+			t.Requeue = PollReQ
+			return nil
 		}
 		completed, reasons := t.hasBackupCompleted(backup)
 		if completed {
@@ -855,7 +877,18 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
-			return errors.New("Restore not found")
+			t.Owner.Status.StageCondition(migapi.Running)
+			cond := t.Owner.Status.FindCondition(migapi.Running)
+			if cond == nil {
+				return fmt.Errorf("'Running' condition not found on migmigration [%v/%v]", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > time.Minute {
+				return fmt.Errorf("Stage restore not found after a minute")
+			}
+			t.Log.Info(fmt.Sprintf("Stage restore not found. Waiting up to a minute for restore to exist"))
+			t.Requeue = PollReQ
+			return nil
 		}
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
@@ -952,7 +985,18 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 		if restore == nil {
-			return errors.New("Restore not found")
+			t.Owner.Status.StageCondition(migapi.Running)
+			cond := t.Owner.Status.FindCondition(migapi.Running)
+			if cond == nil {
+				return fmt.Errorf("'Running' condition not found on migmigration [%v/%v]", t.Owner.Namespace, t.Owner.Name)
+			}
+			now := time.Now().UTC()
+			if now.Sub(cond.LastTransitionTime.Time.UTC()) > time.Minute {
+				return fmt.Errorf("Final restore not found after a minute")
+			}
+			t.Log.Info(fmt.Sprintf("Final restore not found. Waiting up to a minute for restore to exist"))
+			t.Requeue = PollReQ
+			return nil
 		}
 		completed, reasons := t.hasRestoreCompleted(restore)
 		if completed {
