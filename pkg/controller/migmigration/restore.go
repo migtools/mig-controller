@@ -529,15 +529,13 @@ func (t *Task) deleteStaleRestoresOnCluster(cluster *migapi.MigCluster) (int, in
 			continue
 		}
 		// Skip if missing a migmigration correlation label (only delete our own CRs)
-		// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
-		corrKey, _ := t.Owner.GetCorrelationLabel()
-		migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
+		migMigrationUID, ok := restore.ObjectMeta.Labels[migapi.MigMigrationLabel]
 		if !ok {
 			t.Log.V(4).Info("Restore does not have an attached label "+
 				"associating it with a MigMigration. Skipping deletion.",
 				"restore", path.Join(restore.Namespace, restore.Name),
 				"restorePhase", restore.Status.Phase,
-				"associationLabel", corrKey)
+				"associationLabel", migapi.MigMigrationLabel)
 			continue
 		}
 		// Skip if correlation label points to an existing, running migration
@@ -624,14 +622,13 @@ func (t *Task) deleteStalePVRsOnCluster(cluster *migapi.MigCluster) (int, error)
 			}
 			// Skip delete if missing a migmigration correlation label (only delete our own CRs)
 			// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
-			corrKey, _ := t.Owner.GetCorrelationLabel()
-			migMigrationUID, ok := restore.ObjectMeta.Labels[corrKey]
+			migMigrationUID, ok := restore.ObjectMeta.Labels[migapi.MigMigrationLabel]
 			if !ok {
 				t.Log.V(4).Info("PodVolumeRestore does not have an attached label "+
 					"associating it with a MigMigration. Skipping deletion.",
 					"podVolumeRestore", path.Join(pvr.Namespace, pvr.Name),
 					"podVolumeRestoreStatus", pvr.Status.Phase,
-					"associationLabel", corrKey)
+					"associationLabel", migapi.MigMigrationLabel)
 				continue
 			}
 			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
