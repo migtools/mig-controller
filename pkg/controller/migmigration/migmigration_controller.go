@@ -186,8 +186,8 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 		defer reconcileSpan.Finish()
 	}
 
-	// Ensure debugging labels are present on migmigration
-	err = r.ensureDebugLabels(migration)
+	// Ensure required labels are present on migmigration
+	err = r.ensureLabels(migration)
 	if err != nil {
 		log.Info("Error setting debug labels, requeueing.")
 		log.Trace(err)
@@ -385,18 +385,22 @@ func (r *ReconcileMigMigration) setOwnerReference(migration *migapi.MigMigration
 	return nil
 }
 
-// Ensures that the labels required to assist debugging are present on migmigration
-func (r *ReconcileMigMigration) ensureDebugLabels(migration *migapi.MigMigration) error {
+// Ensures that required labels and debug labels are present on migmigration
+func (r *ReconcileMigMigration) ensureLabels(migration *migapi.MigMigration) error {
+	if migration.Labels == nil {
+		migration.Labels = make(map[string]string)
+	}
+
+	// Required labels
+	migration.Labels[migapi.MigMigrationUIDLabel] = string(migration.UID)
+
+	// Debug labels
 	if migration.Spec.MigPlanRef == nil {
 		return nil
 	}
-	if migration.Labels == nil {
-		migration.Labels = make(map[string]string)
-	} else {
-		if value, exists := migration.Labels[migapi.MigPlanDebugLabel]; exists {
-			if value == migration.Spec.MigPlanRef.Name {
-				return nil
-			}
+	if value, exists := migration.Labels[migapi.MigPlanDebugLabel]; exists {
+		if value == migration.Spec.MigPlanRef.Name {
+			return nil
 		}
 	}
 	migration.Labels[migapi.MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
