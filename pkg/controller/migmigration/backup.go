@@ -637,8 +637,7 @@ func (t *Task) deleteStaleResticCRs() error {
 func (t *Task) migrationUIDisRunning(migrationUID string) (bool, error) {
 	t.Log.Info("Checking if migration with UID is running",
 		"migrationUID", migrationUID)
-	corrKey, _ := t.Owner.GetCorrelationLabel()
-	corrLabel := map[string]string{corrKey: migrationUID}
+	corrLabel := map[string]string{migapi.MigMigrationUIDLabel: migrationUID}
 	migrationList := migapi.MigMigrationList{}
 	err := t.Client.List(
 		context.TODO(),
@@ -699,15 +698,13 @@ func (t *Task) deleteStaleBackupsOnCluster(cluster *migapi.MigCluster) (int, int
 			continue
 		}
 		// Skip if missing a migmigration correlation label (only delete our own CRs)
-		// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
-		corrKey, _ := t.Owner.GetCorrelationLabel()
-		migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
+		migMigrationUID, ok := backup.ObjectMeta.Labels[migapi.MigMigrationLabel]
 		if !ok {
 			t.Log.V(4).Info("Backup  does not have an attached label "+
 				"associating it with a MigMigration. Skipping deletion.",
 				"backup", path.Join(backup.Namespace, backup.Name),
 				"backupPhase", backup.Status.Phase,
-				"associationLabel", corrKey)
+				"associationLabel", migapi.MigMigrationLabel)
 			continue
 		}
 		// Skip if correlation label points to an existing, running migration
@@ -812,15 +809,13 @@ func (t *Task) deleteStalePVBsOnCluster(cluster *migapi.MigCluster) (int, error)
 				return nDeleted, liberr.Wrap(err)
 			}
 			// Skip delete if missing a migmigration correlation label (only delete our own CRs)
-			// Example 'migmigration: 4c9d317f-f410-430b-af8f-4ecd7d17a7de'
-			corrKey, _ := t.Owner.GetCorrelationLabel()
-			migMigrationUID, ok := backup.ObjectMeta.Labels[corrKey]
+			migMigrationUID, ok := backup.ObjectMeta.Labels[migapi.MigMigrationLabel]
 			if !ok {
 				t.Log.V(4).Info("PodVolumeBackup does not have an attached label "+
 					"associating it with a MigMigration. Skipping deletion.",
 					"podVolumeBackup", path.Join(pvb.Namespace, pvb.Name),
 					"podVolumeBackupPhase", pvb.Status.Phase,
-					"associationLabel", corrKey)
+					"associationLabel", migapi.MigMigrationLabel)
 				continue
 			}
 			isRunning, err := t.migrationUIDisRunning(migMigrationUID)
