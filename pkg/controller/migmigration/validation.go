@@ -57,6 +57,8 @@ const (
 	Cancel         = "Cancel"
 	ErrorsDetected = "ErrorsDetected"
 	NotSupported   = "NotSupported"
+	PvNameConflict = "PvNameConflict"
+	NotDistinct    = "NotDistinct"
 )
 
 // Statuses
@@ -95,7 +97,7 @@ func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.M
 		err = liberr.Wrap(err)
 	}
 
-	err = r.validateConflictingNamespaces(ctx, plan, migration)
+	err = r.validateIntraClusterMigration(ctx, plan, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation of intra-cluster migration failed")
 		err = liberr.Wrap(err)
@@ -103,8 +105,8 @@ func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.M
 	return nil
 }
 
-// validateConflictingNamespaces runs validations for intra-cluster migrations
-func (r ReconcileMigMigration) validateConflictingNamespaces(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+// validateIntraClusterMigration runs validations for intra-cluster migrations
+func (r ReconcileMigMigration) validateIntraClusterMigration(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateConflictingNamespaces")
 		defer span.Finish()
@@ -123,11 +125,33 @@ func (r ReconcileMigMigration) validateConflictingNamespaces(ctx context.Context
 	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
 	if len(conflictingNamespaces) > 0 && !migration.IsStateMigration() {
 		migration.Status.SetCondition(migapi.Condition{
-			Type:     IntraClusterMigration,
+			Type:     migapi.Failed,
 			Status:   True,
 			Reason:   NotSupported,
 			Category: Critical,
 			Message:  "This migration plan has conflicts in source and destination namespace mappings. The migration plan can only be used for State Migrations provided that there are no conflicts in PVC names. Stage/Final migrations are not supported.",
+		})
+	}
+	// find conflicts between PVC names
+	nsMap := plan.GetNamespaceMapping()
+	srcPVCs := []string{}
+	destPVCs := []string{}
+	for _, pv := range plan.Spec.PersistentVolumes.List {
+		srcPVCs = append(srcPVCs,
+			fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
+		destPVCs = append(destPVCs,
+			fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
+	}
+	conflictingPVCs := toStringSlice(
+		toSet(srcPVCs).Intersect(toSet(destPVCs)))
+	if len(conflictingPVCs) > 0 {
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     migapi.Failed,
+			Status:   True,
+			Reason:   PvNameConflict,
+			Category: Critical,
+			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC and try again.",
+			Items:    conflictingPVCs,
 		})
 	}
 	return nil
