@@ -48,6 +48,11 @@ const (
 	// for easy search or application rollback.
 	// The value is the Task.UID().
 	MigMigrationLabel = "migration.openshift.io/migrated-by-migmigration" // (migmigration UID)
+	// Mirrors the UID on a migmigration to the labels
+	// field for easy search. Distinct from migrated-by-migmigration
+	// since this shouldn't be used for rollback.
+	// The value is the migration.UID().
+	MigMigrationUIDLabel = "migration.openshift.io/migration-uid" // (migmigration UID)
 	// Identifies associated migmigration
 	// to assist manual debugging
 	// The value is Task.Owner.Name
