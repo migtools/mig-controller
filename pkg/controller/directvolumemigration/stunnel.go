@@ -56,8 +56,6 @@ func (t *Task) ensureStunnelTransport() error {
 		ProxyURL:      proxyConfig.ProxyHost,
 		ProxyUsername: proxyConfig.ProxyUsername,
 		ProxyPassword: proxyConfig.ProxyPassword,
-		NoVerifyCA:    settings.Settings.StunnelVerifyCA,
-		CAVerifyLevel: settings.Settings.StunnelVerifyCALevel,
 	}
 	// retrieve transfer image from source cluster
 	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
