@@ -21,12 +21,6 @@ import (
 
 var log = logging.WithName("gvk")
 
-var crdGVR = schema.GroupVersionResource{
-	Group:    "apiextensions.k8s.io",
-	Version:  "v1beta1", // Should become v1 after 1.17, needs downscaling
-	Resource: "customresourcedefinitions",
-}
-
 type CohabitatingResource struct {
 	resource       string
 	groupResource1 schema.GroupResource
@@ -59,7 +53,21 @@ type Compare struct {
 	SrcDiscovery          discovery.DiscoveryInterface
 	DstDiscovery          discovery.DiscoveryInterface
 	SrcClient             dynamic.Interface
+	DstClient             dynamic.Interface
 	CohabitatingResources map[string]*CohabitatingResource
+}
+
+// Merge the namespace/gvr mappings from the built-in and CRD validation results
+func MergeGVRMaps(map1, map2 map[string][]schema.GroupVersionResource) map[string][]schema.GroupVersionResource {
+	for key, gvrList2 := range map2 {
+		gvrList1, ok := map1[key]
+		if !ok {
+			map1[key] = gvrList2
+		} else {
+			map1[key] = append(gvrList1, gvrList2...)
+		}
+	}
+	return map1
 }
 
 // Compare GVKs on both clusters, find incompatible GVKs
@@ -69,13 +77,17 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	if err != nil {
 		return nil, err
 	}
+	srcCRDResource, err := collectPreferredCRDResource(r.SrcDiscovery)
+	if err != nil {
+		return nil, err
+	}
 
 	dstResourceList, err := collectNamespacedResources(r.DstDiscovery)
 	if err != nil {
 		return nil, err
 	}
 
-	preferredSrcResourceList, err = r.excludeCRDs(preferredSrcResourceList)
+	preferredSrcResourceList, err = r.excludeCRDs(preferredSrcResourceList, srcCRDResource, r.SrcClient)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +114,64 @@ func (r *Compare) Compare() (map[string][]schema.GroupVersionResource, error) {
 	}
 
 	return r.collectIncompatibleMapping(filteredGVKs)
+}
+
+// Compare CRDs on both clusters, find incompatible ones
+// and check each plan source namespace for existence of incompatible CRDs.
+// CRDs will be incompatible if the apiextensions CRD APIs (i.e. v1beta1 from 3.11 vs. v1
+// from 4.9) are incompatible and there are CRs for the CRD in the source cluster and the CRD
+// does not exist in the destination cluster.
+func (r *Compare) CompareCRDs() (map[string][]schema.GroupVersionResource, error) {
+	srcCRDResource, err := collectPreferredCRDResource(r.SrcDiscovery)
+	if err != nil {
+		return nil, err
+	}
+
+	dstCRDResourceList, err := collectCRDResources(r.DstDiscovery)
+	if err != nil {
+		return nil, err
+	}
+
+	crdGVDiff := r.compareResources(srcCRDResource, dstCRDResourceList)
+	// if len(crdGVDiff)>0, then CRD APIVersion is incompatible between src and dest
+	if len(crdGVDiff) > 0 {
+		srcCRDs, err := collectPreferredResources(r.SrcDiscovery)
+		if err != nil {
+			return nil, err
+		}
+		srcCRDs, err = r.includeCRDsOnly(srcCRDs, srcCRDResource, r.SrcClient)
+
+		dstCRDs, err := collectNamespacedResources(r.DstDiscovery)
+		if err != nil {
+			return nil, err
+		}
+		dstCRDs, err = r.includeCRDsOnly(dstCRDs, dstCRDResourceList, r.DstClient)
+		if err != nil {
+			return nil, err
+		}
+		crdsDiff := r.compareResources(srcCRDs, dstCRDs)
+		incompatibleGVKs, err := convertToGVRList(crdsDiff)
+		if err != nil {
+			return nil, err
+		}
+		// Don't report an incompatibleGVK if user settings will skip resource anyways
+		excludedResources := toStringSlice(settings.ExcludedInitialResources.Union(toSet(r.Plan.Status.ExcludedResources)))
+		filteredGVKs := []schema.GroupVersionResource{}
+		for _, gvr := range incompatibleGVKs {
+			skip := false
+			for _, resource := range excludedResources {
+				if strings.EqualFold(gvr.Resource, resource) {
+					skip = true
+				}
+			}
+			if !skip {
+				filteredGVKs = append(filteredGVKs, gvr)
+			}
+		}
+
+		return r.collectIncompatibleMapping(filteredGVKs)
+	}
+	return nil, nil
 }
 
 func toStringSlice(set mapset.Set) []string {
@@ -153,6 +223,59 @@ func collectPreferredResources(discovery discovery.DiscoveryInterface) ([]*metav
 	return resources, nil
 }
 
+// collectPreferredResources collects all preferred namespaced scoped apiResources from the cluster
+func collectPreferredCRDResource(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+	resources, err := discovery.ServerPreferredResources()
+	crdResource := []*metav1.APIResourceList{}
+	if err != nil {
+		return nil, err
+	}
+
+	for _, res := range resources {
+		gv, err := schema.ParseGroupVersion(res.GroupVersion)
+		if err != nil {
+			continue
+		}
+		if gv.Group != "apiextensions.k8s.io" {
+			continue
+		}
+		emptyAPIResourceList := metav1.APIResourceList{
+			GroupVersion: res.GroupVersion,
+		}
+		emptyAPIResourceList.APIResources = findCRDGVRs(res.APIResources)
+		crdResource = append(crdResource, &emptyAPIResourceList)
+		break
+	}
+
+	return crdResource, nil
+}
+
+// collectNamespacedResources collects all namespace-scoped apiResources from the cluster
+func collectCRDResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
+	resources, err := discovery.ServerResources()
+	crdResources := []*metav1.APIResourceList{}
+	if err != nil {
+		return nil, err
+	}
+
+	for _, res := range resources {
+		gv, err := schema.ParseGroupVersion(res.GroupVersion)
+		if err != nil {
+			continue
+		}
+		if gv.Group != "apiextensions.k8s.io" {
+			continue
+		}
+		emptyAPIResourceList := metav1.APIResourceList{
+			GroupVersion: res.GroupVersion,
+		}
+		emptyAPIResourceList.APIResources = findCRDGVRs(res.APIResources)
+		crdResources = append(crdResources, &emptyAPIResourceList)
+	}
+
+	return crdResources, nil
+}
+
 // convertToGVRList converts provided apiResourceList to list of GroupVersionResources from the server
 func convertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVersionResource, error) {
 	GVRs := []schema.GroupVersionResource{}
@@ -163,8 +286,8 @@ func convertToGVRList(resourceList []*metav1.APIResourceList) ([]schema.GroupVer
 		}
 
 		for _, resource := range resourceList.APIResources {
-			gvk := gv.WithResource(resource.Name)
-			GVRs = append(GVRs, gvk)
+			gvr := gv.WithResource(resource.Name)
+			GVRs = append(GVRs, gvr)
 		}
 	}
 
@@ -228,6 +351,18 @@ func listAllowed(resources []metav1.APIResource) []metav1.APIResource {
 	return filteredList
 }
 
+func findCRDGVRs(resources []metav1.APIResource) []metav1.APIResource {
+	CRDList := []metav1.APIResource{}
+	for _, res := range resources {
+		if res.Name == "customresourcedefinitions" {
+			CRDList = append(CRDList, res)
+		}
+		break
+	}
+
+	return CRDList
+}
+
 func (r *Compare) collectIncompatibleMapping(incompatibleResources []schema.GroupVersionResource) (map[string][]schema.GroupVersionResource, error) {
 	incompatibleNamespaces := map[string][]schema.GroupVersionResource{}
 	for _, gvk := range incompatibleResources {
@@ -268,26 +403,44 @@ func (r *Compare) occurIn(gvr schema.GroupVersionResource) ([]string, error) {
 	return namespacesOccurred, nil
 }
 
-func (r *Compare) excludeCRDs(resources []*metav1.APIResourceList) ([]*metav1.APIResourceList, error) {
-	options := metav1.ListOptions{}
-	crdList, err := r.SrcClient.Resource(crdGVR).List(context.Background(), options)
+func (r *Compare) excludeCRDs(resources, crdResources []*metav1.APIResourceList, client dynamic.Interface) ([]*metav1.APIResourceList, error) {
+	return r.includeExcludeCRDs(resources, crdResources, client, true)
+}
+
+func (r *Compare) includeCRDsOnly(resources, crdResources []*metav1.APIResourceList, client dynamic.Interface) ([]*metav1.APIResourceList, error) {
+	return r.includeExcludeCRDs(resources, crdResources, client, false)
+}
+
+func (r *Compare) includeExcludeCRDs(resources, crdResources []*metav1.APIResourceList, client dynamic.Interface, exclude bool) ([]*metav1.APIResourceList, error) {
+	crdGVRs, err := convertToGVRList(crdResources)
 	if err != nil {
 		return nil, err
 	}
 
-	crdGroups := []string{}
+	options := metav1.ListOptions{}
+	crdList := []unstructured.Unstructured{}
+	for _, crdGVR := range crdGVRs {
+		crds, err := client.Resource(crdGVR).List(context.Background(), options)
+		if err != nil {
+			return nil, err
+		}
+		crdList = append(crdList, crds.Items...)
+	}
+
+	crdGroups := mapset.NewSet()
 	groupPath := []string{"spec", "group"}
-	for _, crd := range crdList.Items {
+	for _, crd := range crdList {
 		group, _, err := unstructured.NestedString(crd.Object, groupPath...)
 		if err != nil {
 			return nil, err
 		}
-		crdGroups = append(crdGroups, group)
+		crdGroups.Add(group)
 	}
 
 	updatedLists := []*metav1.APIResourceList{}
 	for _, resourceList := range resources {
-		if !isCRDGroup(resourceList.GroupVersion, crdGroups) {
+		isCRD := isCRDGroup(resourceList.GroupVersion, crdGroups)
+		if !isCRD && exclude || isCRD && !exclude {
 			updatedLists = append(updatedLists, resourceList)
 		}
 	}
@@ -300,14 +453,19 @@ func (r *Compare) compareResources(src []*metav1.APIResourceList, dst []*metav1.
 	SortResources(src)
 	for _, srcList := range src {
 		missing := []metav1.APIResource{}
+		matchingDstResourceList := findResourceList(srcList.GroupVersion, dst)
 		for _, resource := range srcList.APIResources {
 			if cohabitator, found := r.CohabitatingResources[resource.Name]; found {
-				if cohabitator.Seen {
-					continue
+				gv, err := schema.ParseGroupVersion(srcList.GroupVersion)
+				if err == nil &&
+					(gv.Group == cohabitator.groupResource1.Group || gv.Group == cohabitator.groupResource2.Group) {
+					if cohabitator.Seen {
+						continue
+					}
+					cohabitator.Seen = true
 				}
-				cohabitator.Seen = true
 			}
-			if !resourceExist(resource, findResourceList(srcList.GroupVersion, dst)) {
+			if !resourceExist(resource, matchingDstResourceList) {
 				missing = append(missing, resource)
 			}
 		}
@@ -354,8 +512,8 @@ func inNamespaces(item string, namespaces []string) bool {
 	return false
 }
 
-func isCRDGroup(group string, crdGroups []string) bool {
-	for _, crdGroup := range crdGroups {
+func isCRDGroup(group string, crdGroups mapset.Set) bool {
+	for _, crdGroup := range toStringSlice(crdGroups) {
 		if strings.HasPrefix(group, crdGroup) {
 			return true
 		}
