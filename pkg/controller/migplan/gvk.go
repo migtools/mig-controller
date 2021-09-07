@@ -32,8 +32,12 @@ func (r ReconcileMigPlan) compareGVK(ctx context.Context, plan *migapi.MigPlan) 
 	if err != nil {
 		err = liberr.Wrap(err)
 	}
+	incompatibleCRDMapping, err := gvkCompare.CompareCRDs()
+	if err != nil {
+		err = liberr.Wrap(err)
+	}
 
-	reportGVK(plan, incompatibleMapping)
+	reportGVK(plan, gvk.MergeGVRMaps(incompatibleMapping, incompatibleCRDMapping))
 
 	return nil
 }
@@ -56,14 +60,19 @@ func (r ReconcileMigPlan) newGVKCompare(plan *migapi.MigPlan) (*gvk.Compare, err
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	dynamicClient, err := dynamic.NewForConfig(srcClient.RestConfig())
+	srcDynamicClient, err := dynamic.NewForConfig(srcClient.RestConfig())
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	dstDynamicClient, err := dynamic.NewForConfig(dstClient.RestConfig())
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 
 	return &gvk.Compare{
 		Plan:                  plan,
-		SrcClient:             dynamicClient,
+		SrcClient:             srcDynamicClient,
+		DstClient:             dstDynamicClient,
 		DstDiscovery:          dstClient,
 		SrcDiscovery:          srcClient,
 		CohabitatingResources: gvk.NewCohabitatingResources(),
