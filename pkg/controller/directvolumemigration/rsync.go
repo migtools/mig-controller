@@ -230,6 +230,11 @@ func (t *Task) ensureRsyncTransferServer() error {
 		return liberr.Wrap(err)
 	}
 
+	transportOptions, err := t.getStunnelOptions()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -245,7 +250,7 @@ func (t *Task) ensureRsyncTransferServer() error {
 			return liberr.Wrap(err)
 		}
 		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint)
+			srcClient, destClient, nnPair, endpoint, transportOptions)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -305,6 +310,11 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
+	transportOptions, err := t.getStunnelOptions()
+	if err != nil {
+		return statusList, liberr.Wrap(err)
+	}
+
 	rsyncOptions = append(rsyncOptions, mutations...)
 
 	for bothNs, pvcPairs := range nsMap {
@@ -322,7 +332,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			return statusList, liberr.Wrap(err)
 		}
 		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint)
+			srcClient, destClient, nnPair, endpoint, transportOptions)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
