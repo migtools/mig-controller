@@ -149,7 +149,7 @@ func Test_compareResources(t *testing.T) {
 							{
 								Name:       "deployments",
 								Namespaced: true,
-								Group:      "apps",
+								Group:      "extensions",
 								Version:    "v1beta1",
 								Kind:       "Deployment",
 								ShortNames: []string{"deploy"},
@@ -204,6 +204,101 @@ func Test_compareResources(t *testing.T) {
 				},
 			},
 			want: []*metav1.APIResourceList{},
+		},
+		{
+			name: "test deployment with apps and non-cohabiting group",
+			args: args{
+				src: []*metav1.APIResourceList{
+					{
+						GroupVersion: "apps/v1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "apps",
+								Version:    "v1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
+					{
+						GroupVersion: "custom/v1beta1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "custom",
+								Version:    "v1beta1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
+				},
+				dst: []*metav1.APIResourceList{
+					{
+						GroupVersion: "apps/v1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "apps",
+								Version:    "v1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
+					{
+						GroupVersion: "apps/v1beta1",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "apps",
+								Version:    "v1beta1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
+					{
+						GroupVersion: "apps/v1beta2",
+						APIResources: []metav1.APIResource{
+							{
+								Name:       "deployments",
+								Namespaced: true,
+								Group:      "apps",
+								Version:    "v1",
+								Kind:       "Deployment",
+								ShortNames: []string{"deploy"},
+								Verbs:      []string{"create", "update", "list", "delete"},
+							},
+						},
+					},
+				},
+			},
+			want: []*metav1.APIResourceList{
+				{
+					GroupVersion: "custom/v1beta1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "deployments",
+							Namespaced: true,
+							Group:      "custom",
+							Version:    "v1beta1",
+							Kind:       "Deployment",
+							ShortNames: []string{"deploy"},
+							Verbs:      []string{"create", "update", "list", "delete"},
+						},
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
