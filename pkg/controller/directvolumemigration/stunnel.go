@@ -10,10 +10,10 @@ import (
 	//"encoding/asn1"
 
 	//"k8s.io/apimachinery/pkg/types"
-	route_endpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
+	routeendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	cranetransport "github.com/konveyor/crane-lib/state_transfer/transport"
-	stunnel_transport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
+	stunneltransport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -38,48 +38,18 @@ type stunnelProxyConfig struct {
 func (t *Task) ensureStunnelTransport() error {
 	destClient, err := t.getDestinationClient()
 	if err != nil {
-		return err
+		return liberr.Wrap(err)
 	}
 
 	// Get client for source
 	srcClient, err := t.getSourceClient()
 	if err != nil {
-		return err
-	}
-
-	proxyConfig, err := t.generateStunnelProxyConfig()
-	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	transportOptions := &cranetransport.Options{
-		ProxyURL:      proxyConfig.ProxyHost,
-		ProxyUsername: proxyConfig.ProxyUsername,
-		ProxyPassword: proxyConfig.ProxyPassword,
-	}
-	// retrieve transfer image from source cluster
-	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
+	transportOptions, err := t.getStunnelOptions()
 	if err != nil {
 		return liberr.Wrap(err)
-	}
-	if srcCluster != nil {
-		srcTransferImage, err := srcCluster.GetRsyncTransferImage(t.Client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		transportOptions.StunnelClientImage = srcTransferImage
-	}
-	// retrieve transfer image from destination cluster
-	destCluster, err := t.Owner.GetDestinationCluster(t.Client)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	if destCluster != nil {
-		destTransferImage, err := destCluster.GetRsyncTransferImage(t.Client)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		transportOptions.StunnelServerImage = destTransferImage
 	}
 
 	for ns := range t.getPVCNamespaceMap() {
@@ -90,7 +60,7 @@ func (t *Task) ensureStunnelTransport() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
 
-		endpoint, _ := route_endpoint.GetEndpointFromKubeObjects(
+		endpoint, _ := routeendpoint.GetEndpointFromKubeObjects(
 			destClient,
 			types.NamespacedName{
 				Namespace: destNs,
@@ -101,8 +71,8 @@ func (t *Task) ensureStunnelTransport() error {
 			continue
 		}
 
-		stunnelTransport, err := stunnel_transport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint)
+		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, nnPair, endpoint, transportOptions)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
@@ -112,7 +82,7 @@ func (t *Task) ensureStunnelTransport() error {
 				types.NamespacedName{Namespace: sourceNs},
 				types.NamespacedName{Namespace: destNs},
 			)
-			stunnelTransport = stunnel_transport.NewTransport(nsPair, transportOptions)
+			stunnelTransport = stunneltransport.NewTransport(nsPair, transportOptions)
 
 			err = stunnelTransport.CreateServer(destClient, endpoint)
 			if err != nil {
@@ -127,6 +97,43 @@ func (t *Task) ensureStunnelTransport() error {
 	}
 
 	return nil
+}
+
+func (t *Task) getStunnelOptions() (*cranetransport.Options, error) {
+	proxyConfig, err := t.generateStunnelProxyConfig()
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	transportOptions := &cranetransport.Options{
+		ProxyURL:      proxyConfig.ProxyHost,
+		ProxyUsername: proxyConfig.ProxyUsername,
+		ProxyPassword: proxyConfig.ProxyPassword,
+	}
+	// retrieve transfer image from source cluster
+	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if srcCluster != nil {
+		srcTransferImage, err := srcCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		transportOptions.StunnelClientImage = srcTransferImage
+	}
+	// retrieve transfer image from destination cluster
+	destCluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if destCluster != nil {
+		destTransferImage, err := destCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		transportOptions.StunnelServerImage = destTransferImage
+	}
+	return transportOptions, nil
 }
 
 // generateStunnelProxyConfig loads stunnel proxy configuration from app settings
