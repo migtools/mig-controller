@@ -97,7 +97,7 @@ func GetApplicationPodsWithStageLabels(labels map[string]string, pvcMapping map[
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
-		if pod.DeletionTimestamp == nil {
+		if pod.DeletionTimestamp != nil {
 			continue
 		}
 		foundVolume := true
