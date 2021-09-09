@@ -94,6 +94,12 @@ func BuildStagePods(labels map[string]string,
 func GetApplicationPodsWithStageLabels(labels map[string]string, pvcMapping map[k8sclient.ObjectKey]migapi.PV, list *[]corev1.Pod) []corev1.Pod {
 	applicationPodsWithStageLabel := []corev1.Pod{}
 	for _, pod := range *list {
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		foundVolume := true
 		excludePVC := []string{}
 		for _, volume := range pod.Spec.Volumes {
@@ -497,10 +503,12 @@ func (t *Task) ensureStagePodsFromRunning() error {
 		}
 		pods = append(pods, GetApplicationPodsWithStageLabels(t.stagePodLabels(), t.getPVCs(), &podList.Items)...)
 	}
-	t.Log.Info("Updating application pods on source cluster")
-	updated, err = t.updateApplicationPodWithStageLabel(client, pods)
-	if err != nil {
-		return liberr.Wrap(err)
+	if len(pods) > 0 {
+		t.Log.Info("Updating application pods on source cluster")
+		updated, err = t.updateApplicationPodWithStageLabel(client, pods)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 
 	if updated > 0 {
