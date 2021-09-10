@@ -150,6 +150,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 				"namespace", ns,
 				"gvk", gvkCombined,
 				"label", fmt.Sprintf("%v:%v", migapi.MigPlanLabel, string(t.PlanResources.MigPlan.UID)))
+			deletePropagationPolicy := metav1.DeletePropagationBackground
 			err = client.Resource(gvr).DeleteCollection(context.Background(), metav1.DeleteOptions{}, *listOptions)
 			if err == nil {
 				continue
@@ -162,7 +163,8 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 				return liberr.Wrap(err)
 			}
 			for _, r := range list.Items {
-				err = client.Resource(gvr).Namespace(ns).Delete(context.Background(), r.GetName(), metav1.DeleteOptions{})
+				// delete any dependent resources
+				err = client.Resource(gvr).Namespace(ns).Delete(context.Background(), r.GetName(), metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy})
 				if err != nil {
 					// Will ignore the ones that were removed, or for some reason are not supported
 					// Assuming that main resources will be removed, such as pods and pvcs
