@@ -598,13 +598,16 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 		return
 	}
 	podList := corev1.PodList{}
+	labels := t.Owner.GetCorrelationLabels()
+	labels[migapi.StagePodLabel] = migapi.True
 	// Following line still uses MigMigration-based correlation labels since it is not part of rollback process
-	options := k8sclient.MatchingLabels(t.Owner.GetCorrelationLabels())
+	options := k8sclient.MatchingLabels(labels)
 	err = client.List(context.TODO(), &podList, options)
 	if err != nil {
 		return
 	}
 	report.started = false
+	startedPods := 0
 	for _, pod := range podList.Items {
 		t.Log.V(4).Info("Checking if Stage Pod is healthy.",
 			"pod", path.Join(pod.Namespace, pod.Name))
@@ -674,9 +677,7 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 					"Pod %s/%s: Running",
 					pod.Namespace,
 					pod.Name))
-			report.started = true
-
-			return
+			startedPods += 1
 		}
 
 		// handle pod pending status
@@ -721,6 +722,9 @@ func (t *Task) stagePodReport(client k8sclient.Client) (report PodStartReport, e
 			report.failed = true
 			report.progress = append(report.progress, report.reasons...)
 		}
+	}
+	if startedPods >= len(podList.Items) {
+		report.started = true
 	}
 	return
 }
