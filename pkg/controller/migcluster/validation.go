@@ -17,6 +17,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Types
@@ -272,59 +273,68 @@ func (r ReconcileMigCluster) validateRegistryRoute(ctx context.Context, cluster 
 	}
 
 	if cluster.Spec.ExposedRegistryPath != "" {
-		url := "https://" + cluster.Spec.ExposedRegistryPath + "/v2/"
-		restConfig, err := cluster.BuildRestConfig(r.Client)
-		token := restConfig.BearerToken
-
-		// Construct transport using default values from http lib
-		defaultTransport := http.DefaultTransport.(*http.Transport)
-		transport := &http.Transport{
-			Proxy:                 defaultTransport.Proxy,
-			DialContext:           defaultTransport.DialContext,
-			MaxIdleConns:          defaultTransport.MaxIdleConns,
-			IdleConnTimeout:       defaultTransport.IdleConnTimeout,
-			TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
-			ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		}
-
-		client := &http.Client{Transport: transport}
-
-		req, err := http.NewRequest("GET", url, nil)
-
+		statusCode, regErr, err := checkRegistryConnection(cluster, r.Client)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-
-		req.Header.Set("Authorization", "bearer "+token)
-
-		res, err := client.Do(req)
-		if err != nil {
+		if regErr != nil {
 			cluster.Status.SetCondition(migapi.Condition{
 				Type:     InvalidRegistryRoute,
 				Status:   True,
 				Reason:   RouteTestFailed,
 				Category: Critical,
-				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", err.Error()),
+				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", regErr.Error()),
 				Items:    []string{err.Error()},
 			})
 			return nil
 		}
 
-		if res.StatusCode != 200 {
+		if statusCode != 200 {
 			cluster.Status.SetCondition(migapi.Condition{
 				Type:     InvalidRegistryRoute,
 				Status:   True,
 				Reason:   RouteTestFailed,
 				Category: Critical,
-				Message:  fmt.Sprintf("Exposed registry route connection test failed, Response code received: %#v", res.StatusCode),
+				Message:  fmt.Sprintf("Exposed registry route connection test failed, Response code received: %#v", statusCode),
 			})
 			return nil
 		}
 	}
 	return nil
+}
+
+func checkRegistryConnection(cluster *migapi.MigCluster, kclient k8sclient.Client) (int, error, error) {
+	var statusCode int
+
+	url := "https://" + cluster.Spec.ExposedRegistryPath + "/v2/"
+	restConfig, err := cluster.BuildRestConfig(kclient)
+	token := restConfig.BearerToken
+	// Construct transport using default values from http lib
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+	transport := &http.Transport{
+		Proxy:                 defaultTransport.Proxy,
+		DialContext:           defaultTransport.DialContext,
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return statusCode, nil, err
+	}
+
+	req.Header.Set("Authorization", "bearer "+token)
+	res, regErr := client.Do(req)
+	if regErr == nil && res != nil {
+		statusCode = res.StatusCode
+	}
+	return statusCode, regErr, nil
 }
 
 func (r *ReconcileMigCluster) validateSaTokenPrivileges(ctx context.Context, cluster *migapi.MigCluster) error {
