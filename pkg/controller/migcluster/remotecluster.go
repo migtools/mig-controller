@@ -67,6 +67,18 @@ func (r *RemoteClusterSource) run() {
 				continue
 			}
 
+			// Enqueue if our view of the cluster disagrees with the result of the registry status test
+			registryOK := true
+			if cluster.Spec.ExposedRegistryPath != "" {
+				statusCode, registryErr, err := checkRegistryConnection(&cluster, r.Client)
+				registryOK = err == nil && registryErr == nil && statusCode == 200
+			}
+			if (cluster.Status.HasCondition(InvalidRegistryRoute) && registryOK) ||
+				(!cluster.Status.HasCondition(TestConnectFailed) && !registryOK) {
+				r.enqueue(cluster)
+				continue
+			}
+
 			// Enqueue if MigCluster configmap OPERATOR_VERSION disagrees with
 			// MigCluster.Status.OperatorVersion
 			versionsMatched, err := cluster.OperatorVersionMatchesConfigmap(r.Client)
