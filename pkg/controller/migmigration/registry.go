@@ -25,11 +25,11 @@ const (
 // Returns the right backup/restore annotations including registry-specific ones
 func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error) {
 	annotations := t.Annotations
-	hasImageStreams, err := t.hasImageStreams()
+	isIndirectImageMigrationApplicable, err := t.isIndirectImageMigrationApplicable()
 	if err != nil {
-		return nil, err
+		return nil, liberr.Wrap(err)
 	}
-	if t.PlanResources.MigPlan.Spec.IndirectImageMigration && !t.PlanResources.MigPlan.IsImageMigrationDisabled() && hasImageStreams {
+	if isIndirectImageMigrationApplicable {
 		registryService, err := t.PlanResources.MigPlan.GetRegistryService(client)
 		if err != nil {
 			return nil, err
@@ -66,6 +66,18 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 		annotations[migapi.QuiesceAnnotation] = "true"
 	}
 	return annotations, nil
+}
+
+// isIndirectImageMigrationApplicable tells whether indirectImageMigration is applicable for Backup
+func (t *Task) isIndirectImageMigrationApplicable() (bool, error) {
+	hasImageStreams, err := t.hasImageStreams()
+	if err != nil {
+		return false, err
+	}
+	applicable := t.PlanResources.MigPlan.Spec.IndirectImageMigration &&
+		!t.PlanResources.MigPlan.IsImageMigrationDisabled() && hasImageStreams &&
+		!t.Owner.IsStateMigration()
+	return applicable, nil
 }
 
 // Ensure the migration registries on both source and dest clusters have been created
