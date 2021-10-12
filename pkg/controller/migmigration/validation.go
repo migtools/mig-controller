@@ -116,7 +116,8 @@ func (r ReconcileMigMigration) validateIntraClusterMigration(ctx context.Context
 		return liberr.Wrap(err)
 	}
 	// these validations only apply to intra-cluster migrations
-	if !isIntraCluster {
+	// validations should not apply to rollback either
+	if !isIntraCluster || migration.Spec.Rollback {
 		return nil
 	}
 	// find conflicts between source and destination namespaces
