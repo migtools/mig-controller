@@ -1325,7 +1325,7 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&EnableImage != 0 && t.PlanResources.MigPlan.IsImageMigrationDisabled() {
 		return false, nil
 	}
-	if phase.all&EnableImage != 0 && t.Owner.IsStateMigration() {
+	if phase.all&EnableImage != 0 && t.Owner.Spec.MigrateState {
 		return false, nil
 	}
 	if phase.all&DirectVolume != 0 && !t.directVolumeMigration() {

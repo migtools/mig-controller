@@ -41,7 +41,8 @@ const (
 	StaleDestVeleroCRsDeleted          = "StaleDestVeleroCRsDeleted"
 	StaleResticCRsDeleted              = "StaleResticCRsDeleted"
 	DirectVolumeMigrationBlocked       = "DirectVolumeMigrationBlocked"
-	IntraClusterMigration              = "IntraClusterMigration"
+	InvalidSpec                        = "InvalidSpec"
+	ConflictingPVCMappings             = "ConflictingPVCMappings"
 )
 
 // Categories
@@ -80,82 +81,136 @@ func (r ReconcileMigMigration) validate(ctx context.Context, migration *migapi.M
 	plan, err := r.validatePlan(ctx, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation check for attached plan failed")
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
+	}
+
+	// Validate spec fields
+	err = r.validateMigrationType(ctx, plan, migration)
+	if err != nil {
+		log.V(4).Error(err, "Validation of migration spec fields failed")
+		return liberr.Wrap(err)
 	}
 
 	// Final migration.
 	err = r.validateFinalMigration(ctx, plan, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation check for existing final migration failed")
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
+
 	}
 
 	// Validate registries running.
 	err = r.validateRegistriesRunning(ctx, migration)
 	if err != nil {
 		log.V(4).Error(err, "Validation of running registries failed")
-		err = liberr.Wrap(err)
+		return liberr.Wrap(err)
 	}
 
-	err = r.validateIntraClusterMigration(ctx, plan, migration)
-	if err != nil {
-		log.V(4).Error(err, "Validation of intra-cluster migration failed")
-		err = liberr.Wrap(err)
-	}
 	return nil
 }
 
-// validateIntraClusterMigration runs validations for intra-cluster migrations
-func (r ReconcileMigMigration) validateIntraClusterMigration(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
+// validateMigrationType validates migration spec fields and input based on type of migration being performed
+func (r ReconcileMigMigration) validateMigrationType(ctx context.Context, plan *migapi.MigPlan, migration *migapi.MigMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
-		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateConflictingNamespaces")
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateMigrationSpec")
 		defer span.Finish()
 	}
+
+	// make sure only one of the three booleans is set to True
+	if booleansCoexist(migration.Spec.Stage, migration.Spec.MigrateState, migration.Spec.Rollback) {
+		migration.Status.SetCondition(migapi.Condition{
+			Type:     InvalidSpec,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Critical,
+			Message:  "Only one of the stage/migrateState/rollback options can be set at a time",
+		})
+		return nil
+	}
+
+	// if this is a stage or final migration, PVCs cannot be mapped to different destination namespaces
+	if !migration.Spec.MigrateState && !migration.Spec.Rollback {
+		isMapped := false
+		for _, pv := range plan.Spec.PersistentVolumes.List {
+			if pv.PVC.GetSourceName() != pv.PVC.GetTargetName() {
+				isMapped = true
+				break
+			}
+		}
+		if isMapped {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     InvalidSpec,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message:  "One or more source PVCs are mapped to different destination PVCs. Stage/Final migrations are not possible. Please remove PVC mappings.",
+			})
+			return nil
+		}
+	}
+
+	// run validations specific to intra-cluster migrations
 	isIntraCluster, err := plan.IsIntraCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	// these validations only apply to intra-cluster migrations
-	// validations should not apply to rollback either
-	if !isIntraCluster || migration.Spec.Rollback {
-		return nil
-	}
-	// find conflicts between source and destination namespaces
-	srcNses := toSet(plan.GetSourceNamespaces())
-	destNses := toSet(plan.GetDestinationNamespaces())
-	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
-	if len(conflictingNamespaces) > 0 && !migration.IsStateMigration() {
-		migration.Status.SetCondition(migapi.Condition{
-			Type:     migapi.Failed,
-			Status:   True,
-			Reason:   NotSupported,
-			Category: Critical,
-			Message:  "This migration plan has conflicts in source and destination namespace mappings. The migration plan can only be used for State Migrations provided that there are no conflicts in PVC names. Stage/Final migrations are not supported.",
-		})
-	}
-	// find conflicts between PVC names
-	nsMap := plan.GetNamespaceMapping()
-	srcPVCs := []string{}
-	destPVCs := []string{}
-	for _, pv := range plan.Spec.PersistentVolumes.List {
-		srcPVCs = append(srcPVCs,
-			fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
-		destPVCs = append(destPVCs,
-			fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
-	}
-	conflictingPVCs := toStringSlice(
-		toSet(srcPVCs).Intersect(toSet(destPVCs)))
-	if len(conflictingPVCs) > 0 {
-		migration.Status.SetCondition(migapi.Condition{
-			Type:     migapi.Failed,
-			Status:   True,
-			Reason:   PvNameConflict,
-			Category: Critical,
-			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC and try again.",
-			Items:    conflictingPVCs,
-		})
+	if isIntraCluster {
+		// find conflicts between source and destination namespaces
+		srcNses := toSet(plan.GetSourceNamespaces())
+		destNses := toSet(plan.GetDestinationNamespaces())
+		conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
+		// if there are conflicts in the namespaces and this is a stage/final migration
+		// then the migration is not possible
+		if len(conflictingNamespaces) > 0 && !migration.Spec.MigrateState && !migration.Spec.Rollback {
+			message := "This migration plan migrates resources within the same cluster and it has conflicts in source and destination namespace mappings. Stage/Final are not possible with this migration plan."
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     migapi.Failed,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message:  message,
+			})
+			migration.Status.Phase = Completed
+			migration.Status.Errors = append(migration.Status.Errors, message)
+		}
+		// find conflicts between PVC names
+		nsMap := plan.GetNamespaceMapping()
+		srcPVCs := []string{}
+		destPVCs := []string{}
+		for _, pv := range plan.Spec.PersistentVolumes.List {
+			srcPVCs = append(srcPVCs,
+				fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
+			destPVCs = append(destPVCs,
+				fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
+		}
+		conflictingPVCs := toStringSlice(
+			toSet(srcPVCs).Intersect(toSet(destPVCs)))
+		if len(conflictingPVCs) > 0 || toSet(srcPVCs).Cardinality() != toSet(destPVCs).Cardinality() {
+			migration.Status.SetCondition(migapi.Condition{
+				Type:     ConflictingPVCMappings,
+				Status:   True,
+				Reason:   PvNameConflict,
+				Category: Critical,
+				Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please ensure that each source PVC is mapped to a distinct destination PVC in the Migration Plan.",
+				Items:    conflictingPVCs,
+			})
+		}
 	}
 	return nil
+}
+
+// booleansCoexist checks whether two or more booleans are set to True
+func booleansCoexist(bools ...bool) bool {
+	i := 0
+	for _, boolVar := range bools {
+		if boolVar {
+			i += 1
+		}
+		if i > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate the referenced plan.
@@ -256,8 +311,8 @@ func (r ReconcileMigMigration) validateFinalMigration(ctx context.Context, plan 
 
 	hasCondition := false
 	for _, m := range migrations {
-		// Ignore self, stage migrations, canceled migrations
-		if m.UID == migration.UID || m.Spec.Stage || m.Spec.Canceled {
+		// Ignore self, stage migrations, state migrations, canceled migrations
+		if m.UID == migration.UID || m.Spec.Stage || m.Spec.MigrateState || m.Spec.Canceled {
 			continue
 		}
 
