@@ -34,6 +34,9 @@ type MigMigrationSpec struct {
 	// Invokes the stage operation, when set to true the migration controller switches to stage itinerary. This is a required field.
 	Stage bool `json:"stage"`
 
+	// Invokes the state migration operation
+	MigrateState bool `json:"migrateState,omitempty"`
+
 	// Specifies whether to quiesce the application Pods before migrating Persistent Volume data.
 	QuiescePods bool `json:"quiescePods,omitempty"`
 

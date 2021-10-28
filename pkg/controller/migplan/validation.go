@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"sort"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
@@ -85,6 +85,7 @@ const (
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 	IntraClusterMigration                      = "IntraClusterMigration"
+	MigrationTypeIdentified                    = "MigrationTypeIdentified"
 )
 
 // Categories
@@ -111,6 +112,8 @@ const (
 	DuplicateNs            = "DuplicateNamespaces"
 	ConflictingNamespaces  = "ConflictingNamespaces"
 	ConflictingPermissions = "ConflictingPermissions"
+	StorageConversionPlan  = "StorageConversionPlan"
+	StateMigrationPlan     = "StateMigrationPlan"
 )
 
 // Statuses
@@ -209,83 +212,135 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
-	// Intra-cluster migrations
-	err = r.validateIntraClusterMigPlan(ctx, plan)
+	// validates possible migration options available for this plan
+	err = r.validatePossibleMigrationTypes(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	return nil
 }
 
-// validateIntraClusterMigPlan runs intra-cluster migration validatations
-func (r ReconcileMigPlan) validateIntraClusterMigPlan(ctx context.Context, plan *migapi.MigPlan) error {
+// validatePossibleMigrationTypes looks at various migplan fields and determines what kind of migration is possible
+// based on the type of the migration, validates user selections specific to each type
+func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, plan *migapi.MigPlan) error {
 	if opentracing.SpanFromContext(ctx) != nil {
-		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateIntraClusterMigPlan")
+		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePossibleMigrationTypes")
 		defer span.Finish()
 	}
-
 	isIntraCluster, err := plan.IsIntraCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	// these validations only apply to intra-cluster migrations
-	if !isIntraCluster {
-		return nil
+	migrations, err := plan.ListMigrations(r)
+	if err != nil {
+		return liberr.Wrap(err)
 	}
-	// find conflicts between source and destination namespaces
-	srcNses := toSet(plan.GetSourceNamespaces())
-	destNses := toSet(plan.GetDestinationNamespaces())
-	conflictingNamespaces := toStringSlice(srcNses.Intersect(destNses))
-	if len(conflictingNamespaces) > 0 {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     IntraClusterMigration,
-			Status:   True,
-			Reason:   ConflictingNamespaces,
-			Category: Warn,
-			Message:  "Source namespaces [] are mapped to namespaces which result in conflicts. Stage/Final migrations will be blocked on this migration plan. Only state migrations are possible provided there are no conflicts in the PVC names.",
-			Items:    conflictingNamespaces,
-		})
+	// find out whether any of the source namespaces are mapped to destination namespaces
+	mappedNamespaces := 0
+	for srcNs, destNs := range plan.GetNamespaceMapping() {
+		if srcNs != destNs {
+			mappedNamespaces += 1
+		}
 	}
-	// find conflicts between PVC names
-	nsMap := plan.GetNamespaceMapping()
-	srcPVCs := []string{}
-	destPVCs := []string{}
-	for _, pv := range plan.Spec.PersistentVolumes.List {
-		srcPVCs = append(srcPVCs,
-			fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
-		destPVCs = append(destPVCs,
-			fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
+	// try to infer migration type based on existing migrations created for the plan
+	if len(migrations) > 0 {
+		sort.Slice(
+			migrations, func(i, j int) bool {
+				a := migrations[i].ObjectMeta.CreationTimestamp
+				b := migrations[j].ObjectMeta.CreationTimestamp
+				return b.Before(&a)
+			})
+		successfulRollbackExists := migrations[0].Spec.Rollback &&
+			migrations[0].Status.HasAnyCondition(migapi.Succeeded)
+		// if the last migration was a successful rollback, the plan is reset and new types of migrations are possible
+		if successfulRollbackExists {
+			plan.Status.DeleteCondition(MigrationTypeIdentified)
+		} else {
+			for _, migration := range migrations {
+				if migration.Spec.MigrateState {
+					// if plan is intra-cluster and all the source namespaces are mapped to themselves
+					// the migration has to be used for storage conversion
+					if isIntraCluster && mappedNamespaces == len(plan.GetSourceNamespaces()) {
+						plan.Status.SetCondition(migapi.Condition{
+							Type:     MigrationTypeIdentified,
+							Status:   True,
+							Reason:   StorageConversionPlan,
+							Category: migapi.Advisory,
+							Message:  "The migration plan was previously used for Storage Conversion. It can only be used for further Storage Conversions. Other migrations will be possible only after a successful rollback is performed.",
+							Durable:  true,
+						})
+					} else {
+						plan.Status.SetCondition(migapi.Condition{
+							Type:     MigrationTypeIdentified,
+							Status:   True,
+							Reason:   StateMigrationPlan,
+							Category: migapi.Advisory,
+							Message:  "The migration plan was previously used for State Migrations. This plan can only be used for further State Migrations. Other migrations are possible only after a successful rollback is performed.",
+							Durable:  true,
+						})
+					}
+					break
+				}
+			}
+		}
 	}
-	conflictingPVCs := toStringSlice(
-		toSet(srcPVCs).Intersect(toSet(destPVCs)))
-	if len(conflictingPVCs) > 0 {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     PvNameConflict,
-			Status:   True,
-			Reason:   NotDistinct,
-			Category: Warn,
-			Message:  "Source PVCs [] are mapped to destination PVCs which result in conflicts. Please map each source PVC to a distinct destination PVC before running a State Migration.",
-			Items:    conflictingPVCs,
-		})
+	// when there are no migrations for the plan, use migration plan information
+	// and user inputs to determine possible types of migrations
+	// if the plan is intra-cluster, normal migrations are not possible
+	// plan can only be used either for state migrations or storage conversions
+	if isIntraCluster {
+		// if some namespaces are mapped and some are not, then we cannot determine the possible migration types
+		if mappedNamespaces > 0 && mappedNamespaces < len(plan.GetSourceNamespaces()) {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   ConflictingNamespaces,
+				Category: Critical,
+				Message:  "This is an intra-cluster migration plan. Either all or none of the source namespaces should be mapped to distinct destination namespaces.",
+			})
+			return nil
+		}
+		// if all source namespaces are mapped to themselves, the plan can only be used
+		// for storage conversion
+		if mappedNamespaces == 0 {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     MigrationTypeIdentified,
+				Status:   True,
+				Reason:   StorageConversionPlan,
+				Category: migapi.Advisory,
+				Message:  "This is an intra-cluster migration plan and none of the source namespaces are mapped to different destination namespaces. This plan can only be used for Storage Conversion.",
+			})
+			return nil
+		}
+		// if all source namespaces are mapped to different destination namespaces, the
+		// plan can only be used for state migrations
+		if mappedNamespaces == len(plan.GetSourceNamespaces()) {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     MigrationTypeIdentified,
+				Status:   True,
+				Reason:   StateMigrationPlan,
+				Category: migapi.Advisory,
+				Message:  "This is an intra-cluster migration plan and all of the source namespaces are mapped to different destination namespaces. This plan can only be used for State Migration.",
+			})
+			return nil
+		}
+	} else {
+		// if any of the PVC names are mapped to different destination PVCs, the plan can only be used for State Migrations
+		for _, pv := range plan.Spec.PersistentVolumes.List {
+			if pv.PVC.GetSourceName() != pv.PVC.GetTargetName() {
+				plan.Status.SetCondition(migapi.Condition{
+					Type:     MigrationTypeIdentified,
+					Status:   True,
+					Reason:   StateMigrationPlan,
+					Category: migapi.Advisory,
+					Message:  "One or more source PVCs are mapped to different destination PVCs. This plan can only be used for State Migration.",
+				})
+				return nil
+			}
+		}
 	}
 	return nil
-}
-
-func toStringSlice(set mapset.Set) []string {
-	interfaceSlice := set.ToSlice()
-	var strSlice []string = make([]string, len(interfaceSlice))
-	for i, s := range interfaceSlice {
-		strSlice[i] = s.(string)
-	}
-	return strSlice
-}
-
-func toSet(strSlice []string) mapset.Set {
-	var interfaceSlice []interface{} = make([]interface{}, len(strSlice))
-	for i, s := range strSlice {
-		interfaceSlice[i] = s
-	}
-	return mapset.NewSetFromSlice(interfaceSlice)
 }
 
 // getPotentialFilePermissionConflictNamespaces iterates over source and destination namespaces and checks whether
