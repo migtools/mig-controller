@@ -151,6 +151,12 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
+	// validates possible migration options available for this plan
+	err = r.validatePossibleMigrationTypes(ctx, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	// Storage
 	err = r.validateStorage(ctx, plan)
 	if err != nil {
@@ -211,13 +217,6 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	// validates possible migration options available for this plan
-	err = r.validatePossibleMigrationTypes(ctx, plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	return nil
 }
 
@@ -425,7 +424,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
-	if !migref.RefSet(ref) {
+	if !isStorageConversionPlan(plan) && !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     InvalidStorageRef,
 			Status:   True,
@@ -442,7 +441,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	}
 
 	// NotFound
-	if storage == nil {
+	if !isStorageConversionPlan(plan) && storage == nil {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     InvalidStorageRef,
 			Status:   True,
@@ -455,7 +454,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	}
 
 	// NotReady
-	if !storage.Status.IsReady() {
+	if !isStorageConversionPlan(plan) && !storage.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageNotReady,
 			Status:   True,
@@ -1053,6 +1052,7 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 	missingCopyMethod := make([]string, 0)
 	invalidCopyMethod := make([]string, 0)
 	warnCopyMethodSnapshot := make([]string, 0)
+	invalidPVCNameMappings := make([]string, 0)
 
 	if plan.Status.HasAnyCondition(Suspended) {
 		return nil
@@ -1122,6 +1122,12 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 			}
 		}
 
+		// if the plan is for Storage Conversion, also ensure that the pvc names are mapped correctly
+		if isStorageConversionPlan(plan) {
+			if pv.PVC.GetSourceName() == pv.PVC.GetTargetName() {
+				invalidPVCNameMappings = append(invalidPVCNameMappings, pv.PVC.Name)
+			}
+		}
 	}
 	if len(invalidAction) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -1208,6 +1214,15 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 			Message: "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen " +
 				"storage class is compatible with the source volume's storage type for Snapshot support.",
 			Items: warnCopyMethodSnapshot,
+		})
+	}
+	if len(invalidPVCNameMappings) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNameConflict,
+			Status:   True,
+			Category: Error,
+			Message:  "This is a storage migration plan and source PVCs [] are not mapped to distinct destination PVCs. This either indicates a problem in user input or controller failing to automatically add a prefix to destination PVC name. Please map the PVC names correctly.",
+			Items:    invalidPVCNameMappings,
 		})
 	}
 

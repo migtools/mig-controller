@@ -309,9 +309,15 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 		}
 	}
 
+	planReadyCondition := false
+	if !isStorageConversionPlan(plan) {
+		planReadyCondition = plan.Status.HasCondition(StorageEnsured, PvsDiscovered)
+	} else {
+		planReadyCondition = plan.Status.HasCondition(PvsDiscovered)
+	}
 	// Ready
 	plan.Status.SetReady(
-		plan.Status.HasCondition(StorageEnsured, PvsDiscovered) &&
+		planReadyCondition &&
 			!plan.Status.HasBlockerCondition(),
 		"The migration plan is ready.")
 

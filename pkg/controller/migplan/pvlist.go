@@ -219,10 +219,39 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPla
 func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) string {
 	pvcName := pvcRef.Name
 	existingPVC := plan.Spec.FindPVC(pvcRef.Namespace, pvcRef.Name)
-	if existingPVC != nil {
+	if existingPVC != nil &&
+		(existingPVC.GetSourceName() != existingPVC.GetTargetName()) {
 		pvcName = fmt.Sprintf("%s:%s", pvcRef.Name, existingPVC.GetTargetName())
 	}
+	// if plan is for storage conversion, create a new unique name for the destination PVC
+	if isStorageConversionPlan(plan) &&
+		(existingPVC == nil || existingPVC.GetSourceName() == existingPVC.GetTargetName()) {
+		// we cannot append a prefix when pvcName itself is 252 characters or more because:
+		// 1. total length of new pvc name cannot exceed 253 characters
+		// 2. we append a '-' char before prefix and pvc names cannot end with '-'
+		if len(pvcName) > 251 {
+			return pvcName
+		} else {
+			destName := fmt.Sprintf("%s:%s-%s", pvcName, pvcName, migapi.StorageConversionPVCNamePrefix)
+			if len(destName) > 253 {
+				return destName[:253]
+			} else {
+				return destName
+			}
+		}
+	}
 	return pvcName
+}
+
+// isStorageConversionPlan tells whether the migration plan is for storage conversion
+func isStorageConversionPlan(plan *migapi.MigPlan) bool {
+	migrationTypeCond := plan.Status.FindCondition(MigrationTypeIdentified)
+	if migrationTypeCond != nil {
+		if migrationTypeCond.Reason == StorageConversionPlan {
+			return true
+		}
+	}
+	return false
 }
 
 // Get a list of PVCs found within the specified namespaces.
@@ -254,6 +283,13 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return false
 	}
 
+	alreadyMigrated := func(pvc core.PersistentVolumeClaim) bool {
+		if _, exists := pvc.Labels[migapi.MigMigrationLabel]; exists {
+			return true
+		}
+		return false
+	}
+
 	for _, pod := range runningPods.Items {
 		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
 			podList = append(podList, pod)
@@ -262,6 +298,10 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 
 	for _, pvc := range list.Items {
 		if !inNamespaces(pvc.Namespace, plan.GetSourceNamespaces()) {
+			continue
+		}
+
+		if alreadyMigrated(pvc) {
 			continue
 		}
 
