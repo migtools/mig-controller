@@ -116,6 +116,10 @@ func (r ReconcileMigMigration) validateMigrationType(ctx context.Context, plan *
 		defer span.Finish()
 	}
 
+	if plan == nil {
+		return nil
+	}
+
 	// make sure only one of the three booleans is set to True
 	if booleansCoexist(migration.Spec.Stage, migration.Spec.MigrateState, migration.Spec.Rollback) {
 		migration.Status.SetCondition(migapi.Condition{

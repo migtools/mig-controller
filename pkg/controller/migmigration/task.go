@@ -170,7 +170,7 @@ var StageItinerary = Itinerary{
 		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: WaitForResticReady, Step: StepStageBackup, all: HasPVs | HasStagePods},
 		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage | EnableImage | HasISs},
-		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup, any: IndirectImage | IndirectVolume},
+		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup, any: HasStageBackup},
 		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
 		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
@@ -1432,8 +1432,8 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&IndirectImage != 0 && t.indirectImageMigration() {
 		return true, nil
 	}
-	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() && t.migrateState() {
-		return false, nil
+	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() && !t.migrateState() {
+		return true, nil
 	}
 	if phase.any&DirectVolume != 0 && t.directVolumeMigration() {
 		return true, nil
@@ -1442,7 +1442,7 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 		return true, nil
 	}
 	if phase.any&EnableVolume != 0 && !t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
-		return false, nil
+		return true, nil
 	}
 	if phase.any&HasStageBackup != 0 {
 		hasImageStream, err := t.hasImageStreams()

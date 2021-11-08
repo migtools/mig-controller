@@ -213,18 +213,18 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 	if err != nil {
 		return nil, err
 	}
-	mappedNamespaces := 0
+	mappedNamespaces := false
 	for srcNs, destNs := range r.GetNamespaceMapping() {
 		if srcNs != destNs {
-			mappedNamespaces += 1
+			mappedNamespaces = true
 			break
 		}
 	}
-	isStorageConversionPlan := (mappedNamespaces == 0 && isIntraCluster)
+	isStorageConversionPlan := (!mappedNamespaces && isIntraCluster)
 	storage := &MigStorage{}
 	if !isStorageConversionPlan {
 		// MigStorage
-		storage, err := r.GetStorage(client)
+		storage, err = r.GetStorage(client)
 		if err != nil {
 			return nil, err
 		}

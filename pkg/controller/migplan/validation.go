@@ -114,6 +114,7 @@ const (
 	ConflictingPermissions = "ConflictingPermissions"
 	StorageConversionPlan  = "StorageConversionPlan"
 	StateMigrationPlan     = "StateMigrationPlan"
+	NamespaceMigrationPlan = "NamespaceMigrationPlan"
 )
 
 // Statuses
@@ -260,7 +261,7 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 				if migration.Spec.MigrateState {
 					// if plan is intra-cluster and all the source namespaces are mapped to themselves
 					// the migration has to be used for storage conversion
-					if isIntraCluster && mappedNamespaces == len(plan.GetSourceNamespaces()) {
+					if isIntraCluster && mappedNamespaces == 0 {
 						plan.Status.SetCondition(migapi.Condition{
 							Type:     MigrationTypeIdentified,
 							Status:   True,
@@ -269,6 +270,7 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 							Message:  "The migration plan was previously used for Storage Conversion. It can only be used for further Storage Conversions. Other migrations will be possible only after a successful rollback is performed.",
 							Durable:  true,
 						})
+						return nil
 					} else {
 						plan.Status.SetCondition(migapi.Condition{
 							Type:     MigrationTypeIdentified,
@@ -278,10 +280,18 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 							Message:  "The migration plan was previously used for State Migrations. This plan can only be used for further State Migrations. Other migrations are possible only after a successful rollback is performed.",
 							Durable:  true,
 						})
+						return nil
 					}
-					break
 				}
 			}
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     MigrationTypeIdentified,
+				Status:   True,
+				Reason:   NamespaceMigrationPlan,
+				Category: migapi.Advisory,
+				Message:  "This migration plan was previously used for migrating namespaces. This plan can only be used for further Stage/Final Migration. Other migrations are possible only after a successful rollback is performed.",
+				Durable:  true,
+			})
 		}
 	}
 	// when there are no migrations for the plan, use migration plan information
