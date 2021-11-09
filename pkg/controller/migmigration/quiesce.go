@@ -204,11 +204,13 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			dc.Spec.Paused, err = strconv.ParseBool(dc.Annotations[migapi.PausedAnnotation])
-			if err != nil {
-				return liberr.Wrap(err)
+			if val, exists := dc.Annotations[migapi.PausedAnnotation]; exists {
+				dc.Spec.Paused, err = strconv.ParseBool(val)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				delete(dc.Annotations, migapi.PausedAnnotation)
 			}
-			delete(dc.Annotations, migapi.PausedAnnotation)
 			err = client.Update(context.TODO(), &dc)
 			if err != nil {
 				return liberr.Wrap(err)
@@ -283,11 +285,13 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			deployment.Spec.Paused, err = strconv.ParseBool(deployment.Annotations[migapi.PausedAnnotation])
-			if err != nil {
-				return liberr.Wrap(err)
+			if val, exists := deployment.Annotations[migapi.PausedAnnotation]; exists {
+				deployment.Spec.Paused, err = strconv.ParseBool(val)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				delete(deployment.Annotations, migapi.PausedAnnotation)
 			}
-			delete(deployment.Annotations, migapi.PausedAnnotation)
 			delete(deployment.Annotations, migapi.ReplicasAnnotation)
 			restoredReplicas := int32(number)
 			currentReplicas := deployment.Spec.Replicas
