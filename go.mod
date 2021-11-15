@@ -9,8 +9,9 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.5
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
-	github.com/containerd/containerd v1.4.11 // indirect
+	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/containers/image/v5 v5.7.0
+	github.com/containers/storage v1.28.1 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dnaeon/go-vcr v1.1.0 // indirect
 	github.com/elazarl/goproxy v0.0.0-20201021153353-00ad82a08272 // indirect
@@ -19,7 +20,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/go-logr/zapr v0.3.0
 	github.com/go-playground/validator/v10 v10.8.0 // indirect
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.2.0
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/konveyor/controller v0.4.1
@@ -34,7 +35,6 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ugorji/go v1.2.6 // indirect
@@ -45,7 +45,6 @@ require (
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/tools v0.1.0 // indirect
 	google.golang.org/api v0.35.0
-	google.golang.org/grpc v1.33.2 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	k8s.io/api v0.21.3
 	k8s.io/apimachinery v0.21.3
