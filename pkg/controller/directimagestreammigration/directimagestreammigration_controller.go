@@ -39,14 +39,15 @@ var log = logging.WithName("directimagestream")
 
 // Add creates a new DirectImageStreamMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDirectImageStreamMigration{
-		Client:        mgr.GetClient(),
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetEventRecorderFor("directimagestreammigration_controller"),
 	}
@@ -85,6 +86,7 @@ var _ reconcile.Reconciler = &ReconcileDirectImageStreamMigration{}
 // ReconcileDirectImageStreamMigration reconciles a DirectImageStreamMigration object
 type ReconcileDirectImageStreamMigration struct {
 	client.Client
+	watchClient client.Client
 	record.EventRecorder
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -101,7 +103,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	log = logging.WithName("directimagestream", "dism", request.Name)
 	// Fetch the DirectImageStreamMigration instance
 	imageStreamMigration := &migapi.DirectImageStreamMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, imageStreamMigration)
+	err := r.watchClient.Get(context.TODO(), request.NamespacedName, imageStreamMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -162,7 +164,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 
 	// Apply changes
 	imageStreamMigration.MarkReconciled()
-	err = r.Update(context.TODO(), imageStreamMigration)
+	err = r.watchClient.Update(context.TODO(), imageStreamMigration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

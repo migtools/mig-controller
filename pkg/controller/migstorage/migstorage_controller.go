@@ -42,17 +42,21 @@ var log = logging.WithName("storage")
 
 // Add creates a new MigStorage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, unscopedMgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigStorage{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migstorage_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileMigStorage{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("migstorage_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, unscopedMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migstorage-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -89,6 +93,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(
+		source.NewKindWithCache(&kapi.Secret{}, unscopedMgr.GetCache()),
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigStorage{})
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -98,6 +112,7 @@ var _ reconcile.Reconciler = &ReconcileMigStorage{}
 type ReconcileMigStorage struct {
 	client.Client
 	record.EventRecorder
+	watchClient client.Client
 
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -109,7 +124,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
-	err = r.Get(context.TODO(), request.NamespacedName, storage)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, storage)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -133,7 +148,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 			return
 		}
 		storage.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), storage)
+		err := r.watchClient.Update(context.TODO(), storage)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -163,7 +178,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	// Apply changes.
 	storage.MarkReconciled()
-	err = r.Update(context.TODO(), storage)
+	err = r.watchClient.Update(context.TODO(), storage)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

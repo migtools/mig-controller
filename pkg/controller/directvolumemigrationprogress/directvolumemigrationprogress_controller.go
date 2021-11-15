@@ -67,13 +67,16 @@ type GetPodLogger interface {
 
 // Add creates a new DirectVolumeMigrationProgress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileDirectVolumeMigrationProgress{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileDirectVolumeMigrationProgress{
+		Client:      unscopedMgr.GetClient(),
+		watchClient: mgr.GetClient(),
+		scheme:      mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -98,8 +101,9 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigrationProgress{}
 // ReconcileDirectVolumeMigrationProgress reconciles a DirectVolumeMigrationProgress object
 type ReconcileDirectVolumeMigrationProgress struct {
 	client.Client
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	watchClient client.Client
+	scheme      *runtime.Scheme
+	tracer      opentracing.Tracer
 }
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigrationProgress object and makes changes based on the state read
@@ -113,7 +117,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(ctx context.Context, 
 	log = logging.WithName("pvmigrationprogress", "dvmp", request.Name)
 	// Fetch the DirectVolumeMigrationProgress instance
 	pvProgress := &migapi.DirectVolumeMigrationProgress{}
-	err = r.Get(context.TODO(), request.NamespacedName, pvProgress)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, pvProgress)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -139,7 +143,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(ctx context.Context, 
 			return
 		}
 		pvProgress.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), pvProgress)
+		err := r.watchClient.Update(context.TODO(), pvProgress)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -176,7 +180,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(ctx context.Context, 
 	pvProgress.Status.EndStagingConditions()
 
 	pvProgress.MarkReconciled()
-	err = r.Update(context.TODO(), pvProgress)
+	err = r.watchClient.Update(context.TODO(), pvProgress)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

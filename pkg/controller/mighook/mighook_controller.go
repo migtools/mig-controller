@@ -39,13 +39,17 @@ var log = logging.WithName("hook")
 
 // Add creates a new MigHook Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigHook{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("mighook_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileMigHook{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("mighook_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -74,6 +78,7 @@ var _ reconcile.Reconciler = &ReconcileMigHook{}
 type ReconcileMigHook struct {
 	client.Client
 	record.EventRecorder
+	watchClient client.Client
 
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -85,7 +90,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 
 	// Fetch the MigHook instance
 	hook := &migapi.MigHook{}
-	err = r.Get(context.TODO(), request.NamespacedName, hook)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, hook)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -109,7 +114,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 			return
 		}
 		hook.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), hook)
+		err := r.watchClient.Update(context.TODO(), hook)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -136,7 +141,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 
 	// Apply changes.
 	hook.MarkReconciled()
-	err = r.Update(context.TODO(), hook)
+	err = r.watchClient.Update(context.TODO(), hook)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

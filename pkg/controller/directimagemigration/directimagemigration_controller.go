@@ -39,14 +39,15 @@ var log = logging.WithName("directimage")
 
 // Add creates a new DirectImageMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileDirectImageMigration{
-		Client:        mgr.GetClient(),
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
 		scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetEventRecorderFor("directimagemigration_controller"),
 	}
@@ -94,6 +95,7 @@ var _ reconcile.Reconciler = &ReconcileDirectImageMigration{}
 // ReconcileDirectImageMigration reconciles a DirectImageMigration object
 type ReconcileDirectImageMigration struct {
 	client.Client
+	watchClient client.Client
 	record.EventRecorder
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -110,7 +112,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 	// Fetch the DirectImageMigration instance
 	log = logging.WithName("directimage", "dim", request.Name)
 	imageMigration := &migapi.DirectImageMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, imageMigration)
+	err := r.watchClient.Get(context.TODO(), request.NamespacedName, imageMigration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -171,7 +173,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 
 	// Apply changes
 	imageMigration.MarkReconciled()
-	err = r.Update(context.TODO(), imageMigration)
+	err = r.watchClient.Update(context.TODO(), imageMigration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

@@ -50,17 +50,21 @@ var log = logging.WithName("cluster")
 
 // Add creates a new MigCluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, unscopedMgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) *ReconcileMigCluster {
-	return &ReconcileMigCluster{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migcluster_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) *ReconcileMigCluster {
+	return &ReconcileMigCluster{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("migcluster_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileMigCluster) error {
+func add(mgr manager.Manager, unscopedMgr manager.Manager, r *ReconcileMigCluster) error {
 	// Create a new controller
 	c, err := controller.New("migcluster-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -97,6 +101,17 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		return err
 	}
 
+	// Watch for changes to Secrets referenced by MigClusters
+	err = c.Watch(
+		source.NewKindWithCache(&kapi.Secret{}, unscopedMgr.GetCache()),
+		handler.EnqueueRequestsFromMapFunc(func(a k8sclient.Object) []reconcile.Request {
+			return migref.GetRequests(a, migapi.MigCluster{})
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -106,6 +121,7 @@ var _ reconcile.Reconciler = &ReconcileMigCluster{}
 type ReconcileMigCluster struct {
 	k8sclient.Client
 	record.EventRecorder
+	watchClient k8sclient.Client
 
 	scheme     *runtime.Scheme
 	Controller controller.Controller
@@ -118,7 +134,7 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 
 	// Fetch the MigCluster
 	cluster := &migapi.MigCluster{}
-	err = r.Get(context.TODO(), request.NamespacedName, cluster)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, cluster)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -142,7 +158,7 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 			return
 		}
 		cluster.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), cluster)
+		err := r.watchClient.Update(context.TODO(), cluster)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -199,7 +215,7 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 
 	// Apply changes.
 	cluster.MarkReconciled()
-	err = r.Update(context.TODO(), cluster)
+	err = r.watchClient.Update(context.TODO(), cluster)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

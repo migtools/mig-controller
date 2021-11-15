@@ -33,9 +33,13 @@ import (
 )
 
 //
-// Function provided by controller packages to add
-// them self to the manager.
-type AddFunction func(manager.Manager) error
+// Function provided by controller packages to add them selves to provider
+// It takes two managers - first is used to watch the  resources owned by
+// the controllers and is scoped to the migration namespace
+// second is unscoped and provides cache, client to list resources not
+// necessarily owned by the controller but involved in the migration which
+// are outside of the migration namespace
+type AddFunction func(manager.Manager, manager.Manager) error
 
 //
 // List of controller add functions for the CAM role.
@@ -60,14 +64,14 @@ var DiscoveryControllers = []AddFunction{
 
 //
 // Add controllers to the manager based on role.
-func AddToManager(m manager.Manager) error {
+func AddToManager(m manager.Manager, unscopedMgr manager.Manager) error {
 	err := settings.Settings.Load()
 	if err != nil {
 		return err
 	}
 	load := func(functions []AddFunction) error {
 		for _, f := range functions {
-			if err := f(m); err != nil {
+			if err := f(m, unscopedMgr); err != nil {
 				return err
 			}
 		}

@@ -61,17 +61,21 @@ var Settings = &settings.Settings
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, unscopedMgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigPlan{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migplan_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileMigPlan{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("migplan_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, unscopedMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migplan-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -131,7 +135,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Indexes
-	indexer := mgr.GetFieldIndexer()
+	indexer := unscopedMgr.GetFieldIndexer()
 
 	// Plan
 	err = indexer.IndexField(
@@ -177,6 +181,7 @@ var _ reconcile.Reconciler = &ReconcileMigPlan{}
 type ReconcileMigPlan struct {
 	client.Client
 	record.EventRecorder
+	watchClient client.Client
 
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -188,7 +193,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
-	err = r.Get(context.TODO(), request.NamespacedName, plan)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, plan)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -214,7 +219,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 			return
 		}
 		plan.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), plan)
+		err := r.watchClient.Update(context.TODO(), plan)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -323,7 +328,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 
 	// Apply changes.
 	plan.MarkReconciled()
-	err = r.Update(context.TODO(), plan)
+	err = r.watchClient.Update(context.TODO(), plan)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -353,7 +358,7 @@ func (r *ReconcileMigPlan) handleClosed(ctx context.Context, plan *migapi.MigPla
 
 	plan.MarkReconciled()
 	plan.Status.SetReady(false, "The migration plan is ready.")
-	err := r.Update(context.TODO(), plan)
+	err := r.watchClient.Update(context.TODO(), plan)
 	if err != nil {
 		return closed, err
 	}
@@ -386,7 +391,7 @@ func (r *ReconcileMigPlan) ensureClosed(plan *migapi.MigPlan) error {
 	})
 	// Apply changes.
 	plan.MarkReconciled()
-	err = r.Update(context.TODO(), plan)
+	err = r.watchClient.Update(context.TODO(), plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -521,7 +526,7 @@ func (r *ReconcileMigPlan) ensureMigAnalytics(ctx context.Context, plan *migapi.
 		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
 			if !migAnalytic.Spec.Refresh && (plan.Spec.Refresh || !plan.HasReconciled()) {
 				migAnalytic.Spec.Refresh = true
-				err := r.Update(context.TODO(), &migAnalytic)
+				err := r.watchClient.Update(context.TODO(), &migAnalytic)
 				if err != nil {
 					return liberr.Wrap(err)
 				}

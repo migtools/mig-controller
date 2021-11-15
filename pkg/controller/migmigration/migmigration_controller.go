@@ -46,17 +46,21 @@ var log = logging.WithName("migration")
 
 // Add creates a new MigMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, unscopedMgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("migmigration_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileMigMigration{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("migmigration_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, unscopedMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("migmigration-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -102,7 +106,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Indexes
-	indexer := mgr.GetFieldIndexer()
+	indexer := unscopedMgr.GetFieldIndexer()
 
 	// Plan
 	err = indexer.IndexField(
@@ -156,6 +160,7 @@ var _ reconcile.Reconciler = &ReconcileMigMigration{}
 type ReconcileMigMigration struct {
 	client.Client
 	record.EventRecorder
+	watchClient client.Client
 
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -169,7 +174,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 
 	// Retrieve the MigMigration being reconciled
 	migration := &migapi.MigMigration{}
-	err = r.Get(context.TODO(), request.NamespacedName, migration)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, migration)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = r.deleted()
@@ -206,7 +211,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 			return
 		}
 		migration.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), migration)
+		err := r.watchClient.Update(context.TODO(), migration)
 		if err != nil {
 			log.Error(err, "Error updating resource on reconcile exit.")
 			log.Trace(err)
@@ -273,7 +278,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 
 	// Apply changes.
 	migration.MarkReconciled()
-	err = r.Update(context.TODO(), migration)
+	err = r.watchClient.Update(context.TODO(), migration)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -346,7 +351,7 @@ func (r *ReconcileMigMigration) deleted() error {
 			continue
 		}
 		m.Status.DeleteCondition(HasFinalMigration)
-		err := r.Update(context.TODO(), &m)
+		err := r.watchClient.Update(context.TODO(), &m)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -404,7 +409,7 @@ func (r *ReconcileMigMigration) ensureLabels(migration *migapi.MigMigration) err
 		}
 	}
 	migration.Labels[migapi.MigPlanDebugLabel] = migration.Spec.MigPlanRef.Name
-	err := r.Update(context.TODO(), migration)
+	err := r.watchClient.Update(context.TODO(), migration)
 	if err != nil {
 		return liberr.Wrap(err)
 	}

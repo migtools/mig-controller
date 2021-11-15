@@ -37,13 +37,16 @@ var log = logging.WithName("directvolume")
 
 // Add creates a new DirectVolumeMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileDirectVolumeMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileDirectVolumeMigration{
+		Client:      unscopedMgr.GetClient(),
+		watchClient: mgr.GetClient(),
+		scheme:      mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -79,8 +82,9 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 // ReconcileDirectVolumeMigration reconciles a DirectVolumeMigration object
 type ReconcileDirectVolumeMigration struct {
 	client.Client
-	scheme *runtime.Scheme
-	tracer opentracing.Tracer
+	watchClient client.Client
+	scheme      *runtime.Scheme
+	tracer      opentracing.Tracer
 }
 
 // Reconcile reads that state of the cluster for a DirectVolumeMigration object and makes changes based on the state read
@@ -98,7 +102,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 
 	// Fetch the DirectVolumeMigration instance
 	direct := &migapi.DirectVolumeMigration{}
-	err := r.Get(context.TODO(), request.NamespacedName, direct)
+	err := r.watchClient.Get(context.TODO(), request.NamespacedName, direct)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -159,7 +163,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 
 	// Apply changes
 	direct.MarkReconciled()
-	err = r.Update(context.TODO(), direct)
+	err = r.watchClient.Update(context.TODO(), direct)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil

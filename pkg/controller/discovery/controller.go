@@ -52,8 +52,8 @@ func init() {
 	web.Log = logging.WithName("discovery")
 }
 
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(unscopedMgr))
 }
 
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {

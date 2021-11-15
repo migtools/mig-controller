@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -35,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 func main() {
@@ -57,9 +57,19 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	// watchMgr is namespace scoped. it is used by the controllers to watch the resources owned by
+	// the controllers present in the migration namespace
+	watchMgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0", Namespace: "openshift-migration"})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
+		os.Exit(1)
+	}
+
+	// unscopedMgr is not namespace scoped. it is used by controllers to list resources
+	// outside of the migration namespace
+	unscopedMgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	if err != nil {
+		log.Error(err, "unable to set up unscoped manager")
 		os.Exit(1)
 	}
 
@@ -67,48 +77,61 @@ func main() {
 
 	// Setup Scheme for all resources
 	log.Info("setting up scheme")
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := apis.AddToScheme(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add K8s APIs to scheme")
 		os.Exit(1)
 	}
-	if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := velerov1.AddToScheme(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add Velero APIs to scheme")
 		os.Exit(1)
 	}
-	if err := imagescheme.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := imagescheme.AddToScheme(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add OpenShift image APIs to scheme")
 		os.Exit(1)
 	}
-	if err := appsv1.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := appsv1.AddToScheme(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add OpenShift apps APIs to scheme")
 		os.Exit(1)
 	}
-	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := routev1.AddToScheme(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to add OpenShift route APIs to scheme")
 		os.Exit(1)
 	}
-	if err := conversion.RegisterConversions(mgr.GetScheme()); err != nil {
+	if err := conversion.RegisterConversions(watchMgr.GetScheme()); err != nil {
 		log.Error(err, "unable to register nessesary conversions")
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
 	log.Info("Setting up controller")
-	if err := controller.AddToManager(mgr); err != nil {
+	if err := controller.AddToManager(watchMgr, unscopedMgr); err != nil {
 		log.Error(err, "unable to register controllers to the manager")
 		os.Exit(1)
 	}
 
 	log.Info("setting up webhooks")
-	if err := webhook.AddToManager(mgr); err != nil {
+	if err := webhook.AddToManager(watchMgr); err != nil {
 		log.Error(err, "unable to register webhooks to the manager")
 		os.Exit(1)
 	}
 
 	// Start the Cmd
 	log.Info("Starting the Cmd.")
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Error(err, "unable to run the manager")
-		os.Exit(1)
+	ctx, stopFunc := context.WithCancel(context.TODO())
+	stopChan := make(chan error)
+	go func() {
+		stopChan <- unscopedMgr.Start(ctx)
+	}()
+	go func() {
+		stopChan <- watchMgr.Start(ctx)
+	}()
+
+	for {
+		err := <-stopChan
+		if err != nil {
+			log.Error(err, "unable to run the manager")
+			stopFunc()
+			os.Exit(1)
+		}
 	}
 }

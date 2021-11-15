@@ -67,13 +67,17 @@ var Settings = &settings.Settings
 
 // Add creates a new MigAnalytic Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+func Add(mgr manager.Manager, unscopedMgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr, unscopedMgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMigAnalytic{Client: mgr.GetClient(), scheme: mgr.GetScheme(), EventRecorder: mgr.GetEventRecorderFor("miganalytic_controller")}
+func newReconciler(mgr manager.Manager, unscopedMgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileMigAnalytic{
+		Client:        unscopedMgr.GetClient(),
+		watchClient:   mgr.GetClient(),
+		scheme:        mgr.GetScheme(),
+		EventRecorder: mgr.GetEventRecorderFor("miganalytic_controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -107,6 +111,7 @@ var _ reconcile.Reconciler = &ReconcileMigAnalytic{}
 type ReconcileMigAnalytic struct {
 	client.Client
 	record.EventRecorder
+	watchClient client.Client
 
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -130,7 +135,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 	// Fetch the MigAnalytic instance
 	analytic := &migapi.MigAnalytic{}
 
-	err = r.Get(context.TODO(), request.NamespacedName, analytic)
+	err = r.watchClient.Get(context.TODO(), request.NamespacedName, analytic)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
@@ -160,7 +165,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 			return
 		}
 		analytic.Status.SetReconcileFailed(err)
-		err := r.Update(context.TODO(), analytic)
+		err := r.watchClient.Update(context.TODO(), analytic)
 		if err != nil {
 			log.Trace(err)
 			return
@@ -182,7 +187,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// Update Validation Status
-	err = r.Update(context.TODO(), analytic)
+	err = r.watchClient.Update(context.TODO(), analytic)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -212,7 +217,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 
 	// Apply changes.
 	analytic.MarkReconciled()
-	err = r.Update(context.TODO(), analytic)
+	err = r.watchClient.Update(context.TODO(), analytic)
 	if err != nil {
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
@@ -336,7 +341,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 		analytic.Status.Analytics.PVCount += ns.PVCount
 		analytic.Status.Analytics.PercentComplete = (i + 1) * 100 / len(plan.Spec.Namespaces)
 
-		err = r.Update(context.TODO(), analytic)
+		err = r.watchClient.Update(context.TODO(), analytic)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -348,7 +353,7 @@ func (r *ReconcileMigAnalytic) analyze(analytic *migapi.MigAnalytic) error {
 			return liberr.Wrap(err)
 		}
 		analytic.Status.DeleteCondition(migapi.ExtendedPVAnalysisStarted)
-		err = r.Update(context.TODO(), analytic)
+		err = r.watchClient.Update(context.TODO(), analytic)
 		if err != nil {
 			return liberr.Wrap(err)
 		}

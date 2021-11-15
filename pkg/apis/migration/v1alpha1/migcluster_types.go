@@ -39,7 +39,6 @@ import (
 	"github.com/openshift/library-go/pkg/image/reference"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -278,8 +277,8 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	return compatClient, nil
 }
 
-func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*corev1.ConfigMap, error) {
-	clusterConfig := &corev1.ConfigMap{}
+func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*kapi.ConfigMap, error) {
+	clusterConfig := &kapi.ConfigMap{}
 	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
 	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
 	if err != nil {
