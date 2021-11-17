@@ -82,7 +82,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{
 		Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestForObject{},
-		&PlanPredicate{},
+		&PlanPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		},
 	)
 	if err != nil {
 		return err
@@ -92,9 +94,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigPlan{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
-		&ClusterPredicate{})
+		&ClusterPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -103,9 +107,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStorage{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigPlan{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
-		&StoragePredicate{})
+		&StoragePredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -114,9 +120,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigHook{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigPlan{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
-		&HookPredicate{})
+		&HookPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -124,8 +132,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigMigrations.
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigMigration{}},
-		handler.EnqueueRequestsFromMapFunc(MigrationRequests),
-		&MigrationPredicate{})
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			return MigrationRequests(a, migapi.OpenshiftMigrationNamespace)
+		}),
+		&MigrationPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}

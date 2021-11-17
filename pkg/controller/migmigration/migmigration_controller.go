@@ -67,7 +67,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigMigration{}},
 		&handler.EnqueueRequestForObject{},
-		&MigrationPredicate{})
+		&MigrationPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -76,9 +78,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigPlan{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigMigration{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigMigration{})
 		}),
-		&PlanPredicate{})
+		&PlanPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -87,7 +91,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &migapi.DirectImageMigration{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &migapi.MigMigration{},
-	})
+	},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
@@ -96,7 +101,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &migapi.MigMigration{},
-	})
+	},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}

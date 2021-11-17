@@ -60,7 +60,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigHook{}},
 		&handler.EnqueueRequestForObject{},
-		&HookPredicate{})
+		&HookPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}

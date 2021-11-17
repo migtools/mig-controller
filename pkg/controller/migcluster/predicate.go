@@ -1,19 +1,24 @@
 package migcluster
 
 import (
+	"reflect"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type ClusterPredicate struct {
 	predicate.Funcs
+	InNamespace string
 }
 
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
+	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+		return false
+	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
 		r.mapRefs(cluster)
@@ -22,6 +27,9 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
+	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigCluster)
 	if !cast {
 		return true
@@ -40,6 +48,9 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
+	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+		return false
+	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
 	if cast {
 		r.unmapRefs(cluster)

@@ -63,7 +63,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigStorage{}},
 		&handler.EnqueueRequestForObject{},
-		&StoragePredicate{})
+		&StoragePredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -71,9 +73,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to cloud providers.
 	err = c.Watch(
 		&ProviderSource{
-			Client:   mgr.GetClient(),
-			Interval: time.Second * 30},
-		&handler.EnqueueRequestForObject{})
+			Client:    mgr.GetClient(),
+			Namespace: migapi.OpenshiftMigrationNamespace,
+			Interval:  time.Second * 30},
+		&handler.EnqueueRequestForObject{},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
@@ -82,7 +86,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigStorage{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigStorage{})
 		}),
 	)
 	if err != nil {

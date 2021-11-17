@@ -92,7 +92,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigAnalytic{}},
 		&handler.EnqueueRequestForObject{},
-		&AnalyticPredicate{})
+		&AnalyticPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		log.Trace(err)
 		return err

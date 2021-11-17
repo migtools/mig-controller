@@ -71,7 +71,9 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestForObject{},
-		&ClusterPredicate{})
+		&ClusterPredicate{
+			InNamespace: migapi.OpenshiftMigrationNamespace,
+		})
 	if err != nil {
 		return err
 	}
@@ -79,9 +81,11 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Watch remote clusters for connection problems
 	err = c.Watch(
 		&RemoteClusterSource{
-			Client:   mgr.GetClient(),
-			Interval: time.Second * 60},
-		&handler.EnqueueRequestForObject{})
+			Client:    mgr.GetClient(),
+			Namespace: migapi.OpenshiftMigrationNamespace,
+			Interval:  time.Second * 60},
+		&handler.EnqueueRequestForObject{},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
@@ -90,9 +94,8 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	err = c.Watch(
 		&source.Kind{Type: &kapi.Secret{}},
 		handler.EnqueueRequestsFromMapFunc(func(a k8sclient.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.MigCluster{})
-		}),
-	)
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigCluster{})
+		}))
 	if err != nil {
 		return err
 	}
