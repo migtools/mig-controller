@@ -12,11 +12,11 @@ import (
 
 type StoragePredicate struct {
 	predicate.Funcs
-	InNamespace string
+	Namespace string
 }
 
 func (r StoragePredicate) Create(e event.CreateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	storage, cast := e.Object.(*migapi.MigStorage)
@@ -27,7 +27,7 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
 		return false
 	}
 	old, cast := e.ObjectOld.(*migapi.MigStorage)
@@ -47,7 +47,7 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	storage, cast := e.Object.(*migapi.MigStorage)

@@ -11,11 +11,11 @@ import (
 
 type MigrationPredicate struct {
 	predicate.Funcs
-	InNamespace string
+	Namespace string
 }
 
 func (r MigrationPredicate) Create(e event.CreateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	migration, cast := e.Object.(*migapi.MigMigration)
@@ -26,7 +26,7 @@ func (r MigrationPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
 		return false
 	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
@@ -48,7 +48,7 @@ func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r MigrationPredicate) Delete(e event.DeleteEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	migration, cast := e.Object.(*migapi.MigMigration)
@@ -100,18 +100,18 @@ func (r MigrationPredicate) unmapRefs(migration *migapi.MigMigration) {
 
 type PlanPredicate struct {
 	predicate.Funcs
-	InNamespace string
+	Namespace string
 }
 
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	return false
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
 		return false
 	}
 	new, cast := e.ObjectNew.(*migapi.MigPlan)

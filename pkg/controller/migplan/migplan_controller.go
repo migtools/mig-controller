@@ -83,7 +83,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		Type: &migapi.MigPlan{}},
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		},
 	)
 	if err != nil {
@@ -97,7 +97,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&ClusterPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&StoragePredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&HookPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return MigrationRequests(a, migapi.OpenshiftMigrationNamespace)
 		}),
 		&MigrationPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err

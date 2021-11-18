@@ -72,7 +72,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 		&source.Kind{Type: &migapi.MigCluster{}},
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err

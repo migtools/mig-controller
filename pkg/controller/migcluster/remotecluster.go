@@ -51,9 +51,6 @@ func (r *RemoteClusterSource) run() {
 		}
 
 		for _, cluster := range list {
-			if r.Namespace != "" && cluster.Namespace != r.Namespace {
-				continue
-			}
 			if cluster.Status.HasAnyCondition(
 				InvalidURL,
 				InvalidSaSecretRef,

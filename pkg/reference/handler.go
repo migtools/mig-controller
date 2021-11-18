@@ -7,7 +7,7 @@ import (
 )
 
 //
-func GetRequests(a client.Object, ownerNamespace string, source interface{}) []reconcile.Request {
+func GetRequests(a client.Object, migrationNamespace string, source interface{}) []reconcile.Request {
 	requests := []reconcile.Request{}
 	refMap := GetMap()
 	refTarget := RefTarget{
@@ -18,7 +18,7 @@ func GetRequests(a client.Object, ownerNamespace string, source interface{}) []r
 	owners := refMap.Find(refTarget, RefOwner{Kind: ToKind(source)})
 	for i := range owners {
 		refOwner := owners[i]
-		if refOwner.Namespace == ownerNamespace {
+		if refOwner.Namespace == migrationNamespace {
 			r := reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: refOwner.Namespace,

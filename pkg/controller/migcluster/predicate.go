@@ -12,11 +12,11 @@ import (
 
 type ClusterPredicate struct {
 	predicate.Funcs
-	InNamespace string
+	Namespace string
 }
 
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	cluster, cast := e.Object.(*migapi.MigCluster)
@@ -27,7 +27,7 @@ func (r ClusterPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
 		return false
 	}
 	old, cast := e.ObjectOld.(*migapi.MigCluster)
@@ -48,7 +48,7 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r ClusterPredicate) Delete(e event.DeleteEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	cluster, cast := e.Object.(*migapi.MigCluster)

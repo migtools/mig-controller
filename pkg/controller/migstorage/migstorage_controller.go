@@ -64,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&source.Kind{Type: &migapi.MigStorage{}},
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err

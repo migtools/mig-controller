@@ -10,18 +10,18 @@ import (
 
 type AnalyticPredicate struct {
 	predicate.Funcs
-	InNamespace string
+	Namespace string
 }
 
 func (r AnalyticPredicate) Create(e event.CreateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	return true
 }
 
 func (r AnalyticPredicate) Update(e event.UpdateEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.ObjectNew.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
 		return false
 	}
 	old, cast := e.ObjectOld.(*migapi.MigAnalytic)
@@ -37,7 +37,7 @@ func (r AnalyticPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r AnalyticPredicate) Delete(e event.DeleteEvent) bool {
-	if r.InNamespace != "" && r.InNamespace != e.Object.GetNamespace() {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
 		return false
 	}
 	return true

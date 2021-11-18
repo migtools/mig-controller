@@ -68,7 +68,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&source.Kind{Type: &migapi.MigMigration{}},
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigMigration{})
 		}),
 		&PlanPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		return err

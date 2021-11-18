@@ -93,7 +93,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&source.Kind{Type: &migapi.MigAnalytic{}},
 		&handler.EnqueueRequestForObject{},
 		&AnalyticPredicate{
-			InNamespace: migapi.OpenshiftMigrationNamespace,
+			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
 		log.Trace(err)
