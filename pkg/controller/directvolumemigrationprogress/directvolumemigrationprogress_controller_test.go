@@ -43,7 +43,7 @@ import (
 
 var c client.Client
 
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
+var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: v1alpha1.OpenshiftMigrationNamespace}}
 
 //var depKey = types.NamespacedName{Name: "foo-deployment", Namespace: "default"}
 
@@ -51,7 +51,7 @@ const timeout = time.Second * 5
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
-	instance := &migapi.DirectVolumeMigrationProgress{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
+	instance := &migapi.DirectVolumeMigrationProgress{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: v1alpha1.OpenshiftMigrationNamespace}}
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
@@ -65,6 +65,16 @@ func TestReconcile(t *testing.T) {
 	stopFunc := StartTestManager(mgr, g)
 
 	defer stopFunc()
+
+	err = c.Create(context.TODO(), &kapi.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: v1alpha1.OpenshiftMigrationNamespace,
+		},
+	})
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
 
 	// Create the DirectVolumeMigrationProgress object and expect the Reconcile
 	err = c.Create(context.TODO(), instance)

@@ -1,19 +1,24 @@
 package migstorage
 
 import (
+	"reflect"
+
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type StoragePredicate struct {
 	predicate.Funcs
+	Namespace string
 }
 
 func (r StoragePredicate) Create(e event.CreateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
 		r.mapRefs(storage)
@@ -22,6 +27,9 @@ func (r StoragePredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigStorage)
 	if !cast {
 		return true
@@ -39,6 +47,9 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r StoragePredicate) Delete(e event.DeleteEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	storage, cast := e.Object.(*migapi.MigStorage)
 	if cast {
 		r.unmapRefs(storage)
