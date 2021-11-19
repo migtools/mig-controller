@@ -61,7 +61,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageMigration{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &migapi.DirectImageMigration{}},
+		&handler.EnqueueRequestForObject{},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
+	)
 	if err != nil {
 		return err
 	}
@@ -70,18 +73,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.DirectImageMigration{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageMigration{})
 		}),
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
 	)
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to DirectImageStreamMigrations
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &migapi.DirectImageMigration{},
-	})
+	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}},
+		&handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &migapi.DirectImageMigration{},
+		}, &migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}

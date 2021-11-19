@@ -11,9 +11,13 @@ import (
 
 type PlanPredicate struct {
 	predicate.Funcs
+	Namespace string
 }
 
 func (r PlanPredicate) Create(e event.CreateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
 		r.mapRefs(plan)
@@ -22,6 +26,9 @@ func (r PlanPredicate) Create(e event.CreateEvent) bool {
 }
 
 func (r PlanPredicate) Update(e event.UpdateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigPlan)
 	if !cast {
 		return true
@@ -40,6 +47,9 @@ func (r PlanPredicate) Update(e event.UpdateEvent) bool {
 }
 
 func (r PlanPredicate) Delete(e event.DeleteEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	plan, cast := e.Object.(*migapi.MigPlan)
 	if cast {
 		r.unmapRefs(plan)
@@ -129,13 +139,20 @@ func (r PlanPredicate) unmapRefs(plan *migapi.MigPlan) {
 
 type ClusterPredicate struct {
 	predicate.Funcs
+	Namespace string
 }
 
 func (r ClusterPredicate) Create(e event.CreateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	return false
 }
 
 func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	new, cast := e.ObjectNew.(*migapi.MigCluster)
 	if !cast {
 		return false
@@ -146,13 +163,20 @@ func (r ClusterPredicate) Update(e event.UpdateEvent) bool {
 
 type StoragePredicate struct {
 	predicate.Funcs
+	Namespace string
 }
 
 func (r StoragePredicate) Create(e event.CreateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	return false
 }
 
 func (r StoragePredicate) Update(e event.UpdateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	new, cast := e.ObjectNew.(*migapi.MigStorage)
 	if !cast {
 		return false
@@ -163,13 +187,20 @@ func (r StoragePredicate) Update(e event.UpdateEvent) bool {
 
 type MigrationPredicate struct {
 	predicate.Funcs
+	Namespace string
 }
 
 func (r MigrationPredicate) Create(e event.CreateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.Object.GetNamespace() {
+		return false
+	}
 	return false
 }
 
 func (r MigrationPredicate) Update(e event.UpdateEvent) bool {
+	if r.Namespace != "" && r.Namespace != e.ObjectNew.GetNamespace() {
+		return false
+	}
 	old, cast := e.ObjectOld.(*migapi.MigMigration)
 	if !cast {
 		return false

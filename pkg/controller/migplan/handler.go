@@ -8,13 +8,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func MigrationRequests(a client.Object) []reconcile.Request {
+func MigrationRequests(a client.Object, inNamespace string) []reconcile.Request {
 	requests := []reconcile.Request{}
 	migration, cast := a.(*migapi.MigMigration)
 	if !cast {
 		return requests
 	}
 	ref := migration.Spec.MigPlanRef
+	if ref.Namespace != inNamespace {
+		return requests
+	}
 	if migref.RefSet(ref) {
 		requests = append(
 			requests, reconcile.Request{

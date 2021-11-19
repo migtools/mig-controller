@@ -36,6 +36,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	migref "github.com/konveyor/mig-controller/pkg/reference"
 	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +85,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectVolumeMigrationProgress
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}},
+		&handler.EnqueueRequestForObject{},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}

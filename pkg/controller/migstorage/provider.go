@@ -15,9 +15,11 @@ import (
 // A cloud provider `watch` source used to routinely run provider tests.
 //   Client - A controller-runtime client.
 //   Interval - The connection test interval.
+//   Namespace - Only objects in this namespace are queued
 type ProviderSource struct {
 	Client     client.Client
 	Interval   time.Duration
+	Namespace  string
 	handler    handler.EventHandler
 	queue      workqueue.RateLimitingInterface
 	predicates []predicate.Predicate
@@ -48,6 +50,9 @@ func (p *ProviderSource) run() {
 			return
 		}
 		for _, storage := range list {
+			if p.Namespace != "" && p.Namespace != storage.Namespace {
+				continue
+			}
 			if storage.Status.HasAnyCondition(
 				InvalidBSProvider,
 				InvalidBSCredsSecretRef,

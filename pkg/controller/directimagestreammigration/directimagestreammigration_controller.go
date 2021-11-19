@@ -61,7 +61,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageStreamMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}},
+		&handler.EnqueueRequestForObject{},
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
@@ -70,8 +72,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &migapi.MigCluster{}},
 		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
-			return migref.GetRequests(a, migapi.DirectImageStreamMigration{})
+			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageStreamMigration{})
 		}),
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
 	)
 	if err != nil {
 		return err
