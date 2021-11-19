@@ -2,9 +2,10 @@ package v1alpha1
 
 import (
 	"context"
+	"strconv"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
 
 	imagev1 "github.com/openshift/api/image/v1"
 	kapi "k8s.io/api/core/v1"
@@ -27,8 +28,9 @@ const (
 // Returns and empty list when none found.
 func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 	list := MigPlanList{}
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
 	options := k8sclient.MatchingFields{ClosedIndexField: strconv.FormatBool(false)}
-	err := client.List(context.TODO(), &list, options)
+	err := client.List(context.TODO(), &list, inNamespace, options)
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +42,11 @@ func ListPlans(client k8sclient.Client) ([]MigPlan, error) {
 // Returns and empty list when none found.
 func ListPlansWithLabels(client k8sclient.Client, labels map[string]string) ([]MigPlan, error) {
 	list := MigPlanList{}
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
 	err := client.List(
 		context.TODO(),
 		&list,
+		inNamespace,
 		&k8sclient.ListOptions{
 			LabelSelector: k8sLabels.SelectorFromSet(labels),
 		},
@@ -54,7 +58,8 @@ func ListPlansWithLabels(client k8sclient.Client, labels map[string]string) ([]M
 // Returns and empty list when none found.
 func ListClusters(client k8sclient.Client) ([]MigCluster, error) {
 	list := MigClusterList{}
-	err := client.List(context.TODO(), &list)
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
+	err := client.List(context.TODO(), &list, inNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +171,8 @@ func GetMigrationForDVM(client k8sclient.Client, owners []metav1.OwnerReference)
 // Returns and empty list when none found.
 func ListStorage(client k8sclient.Client) ([]MigStorage, error) {
 	list := MigStorageList{}
-	err := client.List(context.TODO(), &list)
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
+	err := client.List(context.TODO(), &list, inNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +184,8 @@ func ListStorage(client k8sclient.Client) ([]MigStorage, error) {
 // Returns and empty list when none found.
 func ListHook(client k8sclient.Client) ([]MigHook, error) {
 	list := MigHookList{}
-	err := client.List(context.TODO(), &list)
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
+	err := client.List(context.TODO(), &list, inNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +197,8 @@ func ListHook(client k8sclient.Client) ([]MigHook, error) {
 // Returns and empty list when none found.
 func ListMigrations(client k8sclient.Client) ([]MigMigration, error) {
 	list := MigMigrationList{}
-	err := client.List(context.TODO(), &list)
+	inNamespace := k8sclient.InNamespace(OpenshiftMigrationNamespace)
+	err := client.List(context.TODO(), &list, inNamespace)
 	if err != nil {
 		return nil, err
 	}
