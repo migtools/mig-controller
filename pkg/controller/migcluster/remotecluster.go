@@ -22,6 +22,7 @@ type RemoteClusterSource struct {
 	handler    handler.EventHandler
 	queue      workqueue.RateLimitingInterface
 	predicates []predicate.Predicate
+	Namespace  string
 }
 
 // Start the source.
