@@ -72,7 +72,6 @@ const (
 	EnsureInitialBackupReplicated          = "EnsureInitialBackupReplicated"
 	EnsureStageBackupReplicated            = "EnsureStageBackupReplicated"
 	EnsureStageRestore                     = "EnsureStageRestore"
-	RolloutSrcApplications                 = "RolloutSrcApplications"
 	StageRestoreCreated                    = "StageRestoreCreated"
 	StageRestoreFailed                     = "StageRestoreFailed"
 	CreateDirectVolumeMigration            = "CreateDirectVolumeMigration"
@@ -158,8 +157,8 @@ var StageItinerary = Itinerary{
 		{Name: WaitForStaleStagePodsTerminated, Step: StepPrepare},
 		{Name: CreateRegistries, Step: StepPrepare, all: IndirectImage | EnableImage | HasISs},
 		{Name: CreateDirectImageMigration, Step: StepStageBackup, all: DirectImage | EnableImage},
-		{Name: QuiesceApplications, Step: StepStageBackup, any: Quiesce | StorageConversion},
-		{Name: EnsureQuiesced, Step: StepStageBackup, any: Quiesce | StorageConversion},
+		{Name: QuiesceApplications, Step: StepStageBackup, all: Quiesce},
+		{Name: EnsureQuiesced, Step: StepStageBackup, all: Quiesce},
 		{Name: CreateDirectVolumeMigration, Step: StepStageBackup, all: DirectVolume | EnableVolume},
 		{Name: EnsureStagePodsFromRunning, Step: StepStageBackup, all: HasPVs | IndirectVolume},
 		{Name: EnsureStagePodsFromTemplates, Step: StepStageBackup, all: HasPVs | IndirectVolume},
@@ -178,7 +177,7 @@ var StageItinerary = Itinerary{
 		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage | EnableImage},
 		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
-		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion},
+		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion | Quiesce},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepCleanup, all: HasStagePods},
@@ -235,7 +234,7 @@ var FinalItinerary = Itinerary{
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
 		{Name: PostRestoreHooks, Step: PostRestoreHooks, all: HasPostRestoreHooks},
-		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion},
+		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion | Quiesce},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: Verification, Step: StepCleanup, all: HasVerify},
 		{Name: Completed, Step: StepCleanup},
@@ -1368,7 +1367,11 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
-		if !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if isStorageConversion || !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
 			return false, nil
 		}
 	}
@@ -1449,7 +1452,11 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
-		if t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !isStorageConversion && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
 			return true, nil
 		}
 	}
@@ -1613,7 +1620,8 @@ func (t *Task) hasPVs() (bool, bool) {
 	var anyPVs bool
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
 		if pv.Selection.Action == migapi.PvMoveAction ||
-			pv.Selection.Action == migapi.PvCopyAction && pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
+			pv.Selection.Action == migapi.PvCopyAction &&
+				pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
 			return true, true
 		}
 		if pv.Selection.Action != migapi.PvSkipAction {

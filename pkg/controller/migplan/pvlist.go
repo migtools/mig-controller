@@ -290,6 +290,8 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 		return false
 	}
 
+	isStorageConversionPlan := isStorageConversionPlan(plan)
+
 	for _, pod := range runningPods.Items {
 		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
 			podList = append(podList, pod)
@@ -301,7 +303,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 			continue
 		}
 
-		if alreadyMigrated(pvc) {
+		if isStorageConversionPlan && alreadyMigrated(pvc) {
 			continue
 		}
 

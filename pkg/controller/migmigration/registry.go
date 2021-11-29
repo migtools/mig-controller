@@ -62,11 +62,7 @@ func (t *Task) getAnnotations(client k8sclient.Client) (map[string]string, error
 			}
 		}
 	}
-	shouldQuiesceForStorageMigration, err := t.isStorageConversionMigration()
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	if shouldQuiesceForStorageMigration || t.quiesce() {
+	if t.quiesce() {
 		annotations[migapi.QuiesceAnnotation] = "true"
 	}
 	return annotations, nil
