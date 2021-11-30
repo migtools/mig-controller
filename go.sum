@@ -87,6 +87,7 @@ github.com/BurntSushi/toml v0.4.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbi
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/HdrHistogram/hdrhistogram-go v1.1.0 h1:6dpdDPTRoo78HxAJ6T1HfMiKSnqhgRRqzCuPshRkQ7I=
 github.com/HdrHistogram/hdrhistogram-go v1.1.0/go.mod h1:yDgFjdqOqDEKOvasDdhWNXYg9BVp4O+o5f6V/ehm6Oo=
+github.com/Luzifer/go-dhparam v1.1.0/go.mod h1:3Kuj59C67/G2EzQHjUzAryaAa70K5fqvStR2VkFLszU=
 github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd/go.mod h1:64YHyfSL2R96J44Nlwm39UHepQbyR5q10x7iYa1ks2E=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Microsoft/go-winio v0.4.11/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
@@ -655,6 +656,8 @@ github.com/konveyor/controller v0.4.1 h1:0LiBaAIrXScOqb6OoIGOIqpK9dxBAQotPWEhP4J
 github.com/konveyor/controller v0.4.1/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
 github.com/konveyor/crane-lib v0.0.0-20210917133823-602ae5a06b3d h1:59SUIpkqWHjol7mZkTZtaSsGwdX/EQ0eXZqaWxPTCoY=
 github.com/konveyor/crane-lib v0.0.0-20210917133823-602ae5a06b3d/go.mod h1:7xlMNVE0ZgbAThr9+R7G3zZ88TOD7d4br50URQnv5U8=
+github.com/konveyor/crane-lib v0.0.4 h1:CWGBC5MTmdlrEqu1F5eBSR0HRYBlo2QV/Y/bHguJPvM=
+github.com/konveyor/crane-lib v0.0.4/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d h1:tETgPq+JxXhVhnrcLc7rcW9BURax36VUsix8DAU0wuY=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d/go.mod h1:Yk0xQ4N5rwE1+NWLSFQUQLgNT1/8p4Uor60LlgQfymg=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
