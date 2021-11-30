@@ -24,6 +24,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/compat"
 	migevent "github.com/konveyor/mig-controller/pkg/event"
 	"github.com/konveyor/mig-controller/pkg/settings"
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -76,6 +77,27 @@ func (t *Task) ensureRsyncEndpoint() error {
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	for bothNs := range t.getPVCNamespaceMap() {
 		ns := getDestNs(bothNs)
+
+		// Get cluster subdomain if it exists
+		cluster, err := t.Owner.GetDestinationCluster(t.Client)
+		if err != nil {
+			return err
+		}
+
+		// Get the user provided subdomain, if empty we'll attempt to
+		// get the cluster's subdomain from destination client directly
+		subdomain, err := cluster.GetClusterSubdomain(t.Client)
+		if err != nil {
+			t.Log.Info("failed to get cluster_subdomain" + err.Error() + "attempting to get cluster's ingress domain")
+			ingressConfig := &configv1.Ingress{}
+			err = destClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
+			if err != nil {
+				t.Log.Error(err, "failed to retrieve cluster's ingress domain, extremely long namespace names will cause route creation failure")
+			} else {
+				subdomain = ingressConfig.Spec.Domain
+			}
+		}
+
 		endpoint := routeendpoint.NewEndpoint(
 			types.NamespacedName{
 				Namespace: ns,
@@ -83,9 +105,10 @@ func (t *Task) ensureRsyncEndpoint() error {
 			},
 			routeendpoint.EndpointTypePassthrough,
 			dvmLabels,
+			subdomain,
 		)
 
-		err := endpoint.Create(destClient)
+		err = endpoint.Create(destClient)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
