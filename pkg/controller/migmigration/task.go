@@ -64,6 +64,7 @@ const (
 	EnsureQuiesced                         = "EnsureQuiesced"
 	UnQuiesceSrcApplications               = "UnQuiesceSrcApplications"
 	UnQuiesceDestApplications              = "UnQuiesceDestApplications"
+	SwapPVCReferences                      = "SwapPVCReferences"
 	WaitForRegistriesReady                 = "WaitForRegistriesReady"
 	EnsureStageBackup                      = "EnsureStageBackup"
 	StageBackupCreated                     = "StageBackupCreated"
@@ -100,22 +101,23 @@ const (
 
 // Flags
 const (
-	Quiesce             = 0x001  // Only when QuiescePods (true).
-	HasStagePods        = 0x002  // Only when stage pods created.
-	HasPVs              = 0x004  // Only when PVs migrated.
-	HasVerify           = 0x008  // Only when the plan has enabled verification
-	HasISs              = 0x010  // Only when ISs migrated
-	DirectImage         = 0x020  // Only when using direct image migration
-	IndirectImage       = 0x040  // Only when using indirect image migration
-	DirectVolume        = 0x080  // Only when using direct volume migration
-	IndirectVolume      = 0x100  // Only when using indirect volume migration
-	HasStageBackup      = 0x200  // True when stage backup is needed
-	EnableImage         = 0x400  // True when disable_image_migration is unset
-	EnableVolume        = 0x800  // True when disable_volume is unset
-	HasPreBackupHooks   = 0x1000 // True when prebackup hooks exist
-	HasPostBackupHooks  = 0x2000 // True when postbackup hooks exist
-	HasPreRestoreHooks  = 0x4000 // True when postbackup hooks exist
-	HasPostRestoreHooks = 0x8000 // True when postbackup hooks exist
+	Quiesce             = 0x001   // Only when QuiescePods (true).
+	HasStagePods        = 0x002   // Only when stage pods created.
+	HasPVs              = 0x004   // Only when PVs migrated.
+	HasVerify           = 0x008   // Only when the plan has enabled verification
+	HasISs              = 0x010   // Only when ISs migrated
+	DirectImage         = 0x020   // Only when using direct image migration
+	IndirectImage       = 0x040   // Only when using indirect image migration
+	DirectVolume        = 0x080   // Only when using direct volume migration
+	IndirectVolume      = 0x100   // Only when using indirect volume migration
+	HasStageBackup      = 0x200   // True when stage backup is needed
+	EnableImage         = 0x400   // True when disable_image_migration is unset
+	EnableVolume        = 0x800   // True when disable_volume is unset
+	HasPreBackupHooks   = 0x1000  // True when prebackup hooks exist
+	HasPostBackupHooks  = 0x2000  // True when postbackup hooks exist
+	HasPreRestoreHooks  = 0x4000  // True when postbackup hooks exist
+	HasPostRestoreHooks = 0x8000  // True when postbackup hooks exist
+	StorageConversion   = 0x10000 // True when the migration is a storage conversion
 )
 
 // Migration steps
@@ -167,7 +169,7 @@ var StageItinerary = Itinerary{
 		{Name: WaitForVeleroReady, Step: StepStageBackup},
 		{Name: WaitForResticReady, Step: StepStageBackup, all: HasPVs | HasStagePods},
 		{Name: WaitForRegistriesReady, Step: StepStageBackup, all: IndirectImage | EnableImage | HasISs},
-		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup},
+		{Name: EnsureCloudSecretPropagated, Step: StepStageBackup, any: HasStageBackup},
 		{Name: EnsureStageBackup, Step: StepStageBackup, all: HasStageBackup},
 		{Name: StageBackupCreated, Step: StepStageBackup, all: HasStageBackup},
 		{Name: EnsureStageBackupReplicated, Step: StepStageBackup, all: HasStageBackup},
@@ -175,6 +177,7 @@ var StageItinerary = Itinerary{
 		{Name: StageRestoreCreated, Step: StepStageRestore, all: HasStageBackup},
 		{Name: WaitForDirectImageMigrationToComplete, Step: StepDirectImage, all: DirectImage | EnableImage},
 		{Name: WaitForDirectVolumeMigrationToComplete, Step: StepDirectVolume, all: DirectVolume | EnableVolume},
+		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion | Quiesce},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanup, all: HasStagePods},
 		{Name: EnsureStagePodsTerminated, Step: StepCleanup, all: HasStagePods},
@@ -231,6 +234,7 @@ var FinalItinerary = Itinerary{
 		{Name: FinalRestoreCreated, Step: StepRestore},
 		{Name: UnQuiesceDestApplications, Step: StepRestore},
 		{Name: PostRestoreHooks, Step: PostRestoreHooks, all: HasPostRestoreHooks},
+		{Name: SwapPVCReferences, Step: StepCleanup, all: StorageConversion | Quiesce},
 		{Name: DeleteRegistries, Step: StepCleanup},
 		{Name: Verification, Step: StepCleanup, all: HasVerify},
 		{Name: Completed, Step: StepCleanup},
@@ -287,9 +291,9 @@ type Phase struct {
 	// High level Step this phase belongs to
 	Step string
 	// Step included when ALL flags evaluate true.
-	all uint16
+	all uint32
 	// Step included when ANY flag evaluates true.
-	any uint16
+	any uint32
 }
 
 // Get a progress report.
@@ -693,6 +697,18 @@ func (t *Task) Run(ctx context.Context) error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case SwapPVCReferences:
+		reasons, err := t.swapPVCReferences()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if len(reasons) > 0 {
+			t.fail(MigrationFailed, reasons)
+		} else {
+			if err = t.next(); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
 	case UnQuiesceDestApplications:
 		err := t.unQuiesceDestApplications()
 		if err != nil {
@@ -824,7 +840,7 @@ func (t *Task) Run(ctx context.Context) error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("PostBackupHook(s) are incomplete. Waiting."))
+			t.Log.Info("PostBackupHook(s) are incomplete. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case PreRestoreHooks:
@@ -838,7 +854,7 @@ func (t *Task) Run(ctx context.Context) error {
 				return liberr.Wrap(err)
 			}
 		} else {
-			t.Log.Info(fmt.Sprintf("PreRestoreHooks(s) are incomplete. Waiting."))
+			t.Log.Info("PreRestoreHooks(s) are incomplete. Waiting.")
 			t.Requeue = PollReQ
 		}
 	case EnsureStageRestore:
@@ -1124,7 +1140,7 @@ func (t *Task) init() error {
 		t.Itinerary = CancelItinerary
 	} else if t.rollback() {
 		t.Itinerary = RollbackItinerary
-	} else if t.stage() {
+	} else if t.stage() || t.migrateState() {
 		t.Itinerary = StageItinerary
 	} else {
 		t.Itinerary = FinalItinerary
@@ -1304,6 +1320,15 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&Quiesce != 0 && !t.quiesce() {
 		return false, nil
 	}
+	if phase.all&StorageConversion != 0 {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !isStorageConversion {
+			return false, nil
+		}
+	}
 	if phase.all&HasVerify != 0 && !t.hasVerify() {
 		return false, nil
 	}
@@ -1342,7 +1367,11 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
-		if !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if isStorageConversion || !t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
 			return false, nil
 		}
 	}
@@ -1379,6 +1408,15 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&Quiesce != 0 && t.quiesce() {
 		return true, nil
 	}
+	if phase.any&StorageConversion != 0 {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if isStorageConversion {
+			return true, nil
+		}
+	}
 	if phase.any&HasVerify != 0 && t.hasVerify() {
 		return true, nil
 	}
@@ -1397,8 +1435,8 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&IndirectImage != 0 && t.indirectImageMigration() {
 		return true, nil
 	}
-	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() {
-		return false, nil
+	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() && !t.migrateState() {
+		return true, nil
 	}
 	if phase.any&DirectVolume != 0 && t.directVolumeMigration() {
 		return true, nil
@@ -1407,18 +1445,22 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 		return true, nil
 	}
 	if phase.any&EnableVolume != 0 && !t.PlanResources.MigPlan.IsVolumeMigrationDisabled() {
-		return false, nil
+		return true, nil
 	}
 	if phase.any&HasStageBackup != 0 {
 		hasImageStream, err := t.hasImageStreams()
 		if err != nil {
 			return false, liberr.Wrap(err)
 		}
-		if t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
+		isStorageConversion, err := t.isStorageConversionMigration()
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !isStorageConversion && t.hasStageBackup(hasImageStream, anyPVs, moveSnapshotPVs) {
 			return true, nil
 		}
 	}
-	return phase.any == uint16(0), nil
+	return phase.any == uint32(0), nil
 }
 
 // Phase fail.
@@ -1480,6 +1522,11 @@ func (t *Task) stage() bool {
 	return t.Owner.Spec.Stage
 }
 
+// Get whether the migration is state transfer
+func (t *Task) migrateState() bool {
+	return t.Owner.Spec.MigrateState
+}
+
 // Get the migration namespaces with mapping.
 func (t *Task) namespaces() []string {
 	return t.PlanResources.MigPlan.Spec.Namespaces
@@ -1498,6 +1545,23 @@ func (t *Task) destinationNamespaces() []string {
 // Get whether to quiesce pods.
 func (t *Task) quiesce() bool {
 	return t.Owner.Spec.QuiescePods
+}
+
+// isStorageConversionMigration tells whether the migratoin is for storage conversion
+func (t *Task) isStorageConversionMigration() (bool, error) {
+	isIntraCluster, err := t.PlanResources.MigPlan.IsIntraCluster(t.Client)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	if isIntraCluster && t.migrateState() {
+		for srcNs, destNs := range t.PlanResources.MigPlan.GetNamespaceMapping() {
+			if srcNs != destNs {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 // Get whether to retain annotations
@@ -1556,7 +1620,8 @@ func (t *Task) hasPVs() (bool, bool) {
 	var anyPVs bool
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
 		if pv.Selection.Action == migapi.PvMoveAction ||
-			pv.Selection.Action == migapi.PvCopyAction && pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
+			pv.Selection.Action == migapi.PvCopyAction &&
+				pv.Selection.CopyMethod == migapi.PvSnapshotCopyMethod {
 			return true, true
 		}
 		if pv.Selection.Action != migapi.PvSkipAction {

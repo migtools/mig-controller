@@ -48,6 +48,10 @@ const (
 	ClosedIndexField = "closed"
 )
 
+const (
+	StorageConversionPVCNamePrefix = "new"
+)
+
 // MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
 type MigPlanHook struct {
 	Reference *kapi.ObjectReference `json:"reference"`
@@ -205,13 +209,28 @@ type PlanResources struct {
 
 // GetRefResources gets referenced resources from a MigPlan.
 func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, error) {
-	// MigStorage
-	storage, err := r.GetStorage(client)
+	isIntraCluster, err := r.IsIntraCluster(client)
 	if err != nil {
 		return nil, err
 	}
-	if storage == nil {
-		return nil, errors.New("storage not found")
+	mappedNamespaces := false
+	for srcNs, destNs := range r.GetNamespaceMapping() {
+		if srcNs != destNs {
+			mappedNamespaces = true
+			break
+		}
+	}
+	isStorageConversionPlan := (!mappedNamespaces && isIntraCluster)
+	storage := &MigStorage{}
+	if !isStorageConversionPlan {
+		// MigStorage
+		storage, err = r.GetStorage(client)
+		if err != nil {
+			return nil, err
+		}
+		if storage == nil {
+			return nil, errors.New("storage not found")
+		}
 	}
 
 	// SrcMigCluster

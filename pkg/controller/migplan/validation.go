@@ -114,6 +114,7 @@ const (
 	ConflictingPermissions = "ConflictingPermissions"
 	StorageConversionPlan  = "StorageConversionPlan"
 	StateMigrationPlan     = "StateMigrationPlan"
+	NamespaceMigrationPlan = "NamespaceMigrationPlan"
 )
 
 // Statuses
@@ -147,6 +148,12 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 
 	// Destination cluster
 	err = r.validateDestinationCluster(ctx, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	// validates possible migration options available for this plan
+	err = r.validatePossibleMigrationTypes(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -211,13 +218,6 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-
-	// validates possible migration options available for this plan
-	err = r.validatePossibleMigrationTypes(ctx, plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	return nil
 }
 
@@ -261,7 +261,7 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 				if migration.Spec.MigrateState {
 					// if plan is intra-cluster and all the source namespaces are mapped to themselves
 					// the migration has to be used for storage conversion
-					if isIntraCluster && mappedNamespaces == len(plan.GetSourceNamespaces()) {
+					if isIntraCluster && mappedNamespaces == 0 {
 						plan.Status.SetCondition(migapi.Condition{
 							Type:     MigrationTypeIdentified,
 							Status:   True,
@@ -270,6 +270,7 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 							Message:  "The migration plan was previously used for Storage Conversion. It can only be used for further Storage Conversions. Other migrations will be possible only after a successful rollback is performed.",
 							Durable:  true,
 						})
+						return nil
 					} else {
 						plan.Status.SetCondition(migapi.Condition{
 							Type:     MigrationTypeIdentified,
@@ -279,10 +280,18 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 							Message:  "The migration plan was previously used for State Migrations. This plan can only be used for further State Migrations. Other migrations are possible only after a successful rollback is performed.",
 							Durable:  true,
 						})
+						return nil
 					}
-					break
 				}
 			}
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     MigrationTypeIdentified,
+				Status:   True,
+				Reason:   NamespaceMigrationPlan,
+				Category: migapi.Advisory,
+				Message:  "This migration plan was previously used for migrating namespaces. This plan can only be used for further Stage/Final Migration. Other migrations are possible only after a successful rollback is performed.",
+				Durable:  true,
+			})
 		}
 	}
 	// when there are no migrations for the plan, use migration plan information
@@ -425,7 +434,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	ref := plan.Spec.MigStorageRef
 
 	// NotSet
-	if !migref.RefSet(ref) {
+	if !isStorageConversionPlan(plan) && !migref.RefSet(ref) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     InvalidStorageRef,
 			Status:   True,
@@ -442,7 +451,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	}
 
 	// NotFound
-	if storage == nil {
+	if !isStorageConversionPlan(plan) && storage == nil {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     InvalidStorageRef,
 			Status:   True,
@@ -455,7 +464,7 @@ func (r ReconcileMigPlan) validateStorage(ctx context.Context, plan *migapi.MigP
 	}
 
 	// NotReady
-	if !storage.Status.IsReady() {
+	if !isStorageConversionPlan(plan) && !storage.Status.IsReady() {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     StorageNotReady,
 			Status:   True,
@@ -1053,6 +1062,7 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 	missingCopyMethod := make([]string, 0)
 	invalidCopyMethod := make([]string, 0)
 	warnCopyMethodSnapshot := make([]string, 0)
+	invalidPVCNameMappings := make([]string, 0)
 
 	if plan.Status.HasAnyCondition(Suspended) {
 		return nil
@@ -1122,6 +1132,12 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 			}
 		}
 
+		// if the plan is for Storage Conversion, also ensure that the pvc names are mapped correctly
+		if isStorageConversionPlan(plan) {
+			if pv.PVC.GetSourceName() == pv.PVC.GetTargetName() {
+				invalidPVCNameMappings = append(invalidPVCNameMappings, pv.PVC.Name)
+			}
+		}
 	}
 	if len(invalidAction) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
@@ -1208,6 +1224,15 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 			Message: "CopyMethod for PV in `persistentVolumes` [] is set to `snapshot`. Make sure that the chosen " +
 				"storage class is compatible with the source volume's storage type for Snapshot support.",
 			Items: warnCopyMethodSnapshot,
+		})
+	}
+	if len(invalidPVCNameMappings) > 0 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     PvNameConflict,
+			Status:   True,
+			Category: Error,
+			Message:  "This is a storage migration plan and source PVCs [] are not mapped to distinct destination PVCs. This either indicates a problem in user input or controller failing to automatically add a prefix to destination PVC name. Please map the PVC names correctly.",
+			Items:    invalidPVCNameMappings,
 		})
 	}
 
