@@ -284,7 +284,7 @@ func (r ReconcileMigCluster) validateRegistryRoute(ctx context.Context, cluster 
 				Reason:   RouteTestFailed,
 				Category: Critical,
 				Message:  fmt.Sprintf("Exposed registry route is invalid, Error : %#v", regErr.Error()),
-				Items:    []string{err.Error()},
+				Items:    []string{regErr.Error()},
 			})
 			return nil
 		}
