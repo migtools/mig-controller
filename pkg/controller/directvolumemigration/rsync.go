@@ -1903,7 +1903,7 @@ type ExtraOpts []string
 func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	validatedOptions := []string{}
 	for _, opt := range e {
-		r := regexp.MustCompile(`^\-{1,2}([a-z]+\-)?[a-z]+$`)
+		r := regexp.MustCompile(`^\-{1,2}([a-z0-9]+\-){0,}?[a-z0-9]+$`)
 		if r.MatchString(opt) {
 			validatedOptions = append(validatedOptions, opt)
 		} else {
