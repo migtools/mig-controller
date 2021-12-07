@@ -116,27 +116,6 @@ func (t *Task) ensureRsyncEndpoint() error {
 	return nil
 }
 
-// getRsyncTransferContainerMutation returns container mutation to be applied on Rsync tranfer pods
-func (t *Task) getRsyncTransferContainerMutation(client compat.Client) (*corev1.Container, error) {
-	isPrivileged, err := isRsyncPrivileged(client)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-	runAsUser := int64(0)
-	trueBool := bool(true)
-	customSecurityContext := &corev1.SecurityContext{
-		Privileged:             &isPrivileged,
-		RunAsUser:              &runAsUser,
-		ReadOnlyRootFilesystem: &trueBool,
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-		},
-	}
-	return &corev1.Container{
-		SecurityContext: customSecurityContext,
-	}, nil
-}
-
 // getRsyncTransferOptions returns Rsync transfer options
 func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error) {
 	// prepare rsync command options
@@ -186,35 +165,25 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 	return transferOptions, nil
 }
 
-// getRsyncContainerMutations get Rsync container mutations
-func (t *Task) getRsyncContainerMutations(client compat.Client) ([]rsynctransfer.TransferOption, error) {
+// getRsyncClientMutations get Rsync container mutations for source Rsync Pod
+func (t *Task) getRsyncClientMutations(client compat.Client) ([]rsynctransfer.TransferOption, error) {
 	transferOptions := []rsynctransfer.TransferOption{}
-	// info, exists := pvcSecInfo.Get(
-	// 	pvc.Source().Claim().Name, pvc.Source().Claim().Namespace)
-	// if exists {
-	// 	// TODO: think about multiple fsGroup values in same ns
-	// 	if info.fsGroup != nil {
-	// 		podSecContext.FSGroup = info.fsGroup
-	// 	}
-	// 	if len(info.supplementalGroups) > 0 {
-	// 		podSecContext.SupplementalGroups = info.supplementalGroups
-	// 	}
-	// 	if info.seLinuxOptions != nil {
-	// 		podSecContext.SELinuxOptions = info.seLinuxOptions
-	// 	}
-	// 	podSecMutation := rsync_transfer.SourcePodSpecMutation{
-	// 			Spec: &corev1.PodSpec{SecurityContext: podSecContext}}
-	// 	transferOptions := append(transferOptions, podSecMutation)
-	// 	if info.verify {
-	// 		transferOptions = append(transferOptions,
-	// 			ExtraOpts([]string{"--checksum"}))
-	// 	}
-
-	// }
-	containerMutation, err := t.getRsyncTransferContainerMutation(client)
+	containerMutation := &corev1.Container{}
+	isPrivileged, err := isRsyncPrivileged(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	runAsUser := int64(0)
+	trueBool := bool(true)
+	customSecurityContext := &corev1.SecurityContext{
+		Privileged:             &isPrivileged,
+		RunAsUser:              &runAsUser,
+		ReadOnlyRootFilesystem: &trueBool,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+		},
+	}
+	containerMutation.SecurityContext = customSecurityContext
 	rsyncClientLimits, rsyncClientRequests, err :=
 		t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
 	if err != nil {
@@ -222,7 +191,21 @@ func (t *Task) getRsyncContainerMutations(client compat.Client) ([]rsynctransfer
 	}
 	containerMutation.Resources.Requests = rsyncClientRequests
 	containerMutation.Resources.Limits = rsyncClientLimits
-	sourceContainerMutation := rsynctransfer.SourceContainerMutation{C: containerMutation}
+	transferOptions = append(transferOptions,
+		rsynctransfer.SourceContainerMutation{
+			C: containerMutation,
+		})
+	return transferOptions, nil
+}
+
+// getRsyncTransferServerMutations get Rsync container & pod mutations for target rsync pod
+func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace string) ([]rsynctransfer.TransferOption, error) {
+	transferOptions := []rsynctransfer.TransferOption{}
+	containerMutation := &corev1.Container{}
+	isPrivileged, err := isRsyncPrivileged(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
 	rsyncTransferLimits, rsyncTransferRequests, err :=
 		t.getPodResourceLists(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
 	if err != nil {
@@ -230,9 +213,31 @@ func (t *Task) getRsyncContainerMutations(client compat.Client) ([]rsynctransfer
 	}
 	containerMutation.Resources.Requests = rsyncTransferRequests
 	containerMutation.Resources.Limits = rsyncTransferLimits
-	destinationContainerMutation := rsynctransfer.DestinationContainerMutation{C: containerMutation}
-	transferOptions = append(transferOptions, sourceContainerMutation)
-	transferOptions = append(transferOptions, destinationContainerMutation)
+	trueBool := bool(true)
+	runAsUser := int64(0)
+	securityContext := &corev1.SecurityContext{
+		Privileged:             &isPrivileged,
+		ReadOnlyRootFilesystem: &trueBool,
+		RunAsUser:              &runAsUser,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+		},
+	}
+	containerMutation.SecurityContext = securityContext
+	transferOptions = append(transferOptions,
+		rsynctransfer.DestinationContainerMutation{
+			C: containerMutation,
+		})
+	// add supplemental groups for the rsync transfer server pod
+	podSecurityContext := &rsynctransfer.DestinationPodSpecMutation{}
+	if len(settings.Settings.DvmOpts.DestinationSupplementalGroups) > 0 {
+		podSecurityContext.Spec = &corev1.PodSpec{
+			SecurityContext: &corev1.PodSecurityContext{
+				SupplementalGroups: settings.Settings.DvmOpts.DestinationSupplementalGroups,
+			},
+		}
+	}
+	transferOptions = append(transferOptions, podSecurityContext)
 	return transferOptions, nil
 }
 
@@ -287,7 +292,7 @@ func (t *Task) ensureRsyncTransferServer() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		mutations, err := t.getRsyncContainerMutations(destClient)
+		mutations, err := t.getRsyncTransferServerMutations(destClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -328,7 +333,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
-	mutations, err := t.getRsyncContainerMutations(srcClient)
+	mutations, err := t.getRsyncClientMutations(srcClient)
 	if err != nil {
 		return statusList, liberr.Wrap(err)
 	}
@@ -397,13 +402,17 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				currentStatus.AddError(err)
 				continue
 			}
-
 			// Force schedule Rsync Pod on the application node
 			nodeName := pvcNodeMap[fmt.Sprintf("%s/%s", srcNs, pvc.Source().Claim().Name)]
 			clientPodMutation := rsynctransfer.SourcePodSpecMutation{
 				Spec: &corev1.PodSpec{
 					NodeName: nodeName,
 				},
+			}
+			if len(settings.Settings.DvmOpts.SourceSupplementalGroups) > 0 {
+				clientPodMutation.Spec.SecurityContext = &corev1.PodSecurityContext{
+					SupplementalGroups: settings.Settings.DvmOpts.SourceSupplementalGroups,
+				}
 			}
 			optionsForPvc = append(optionsForPvc, &clientPodMutation)
 			if info, exists := secInfo.Get(

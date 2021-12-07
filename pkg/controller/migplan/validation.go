@@ -419,9 +419,6 @@ func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *mig
 	erroredNs := []string{}
 	potentiallyProblematicNs := []string{}
 	for srcNs, destNs := range plan.GetNamespaceMapping() {
-		if srcNs == destNs {
-			continue
-		}
 		srcNsDef := &kapi.Namespace{}
 		err = srcClient.Get(context.TODO(), types.NamespacedName{Name: srcNs}, srcNsDef)
 		if err != nil {
