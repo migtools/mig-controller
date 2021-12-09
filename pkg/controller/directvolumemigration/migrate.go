@@ -7,6 +7,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +17,11 @@ import (
 func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *migapi.DirectVolumeMigration) (time.Duration, error) {
 
 	planResources, err := r.getDVMPlanResources(direct)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+
+	sparseFilePVCMap, err := r.getSparseFilePVCMap(planResources.MigPlan)
 	if err != nil {
 		return 0, liberr.Wrap(err)
 	}
@@ -34,6 +40,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 		Phase:            direct.Status.Phase,
 		PhaseDescription: direct.Status.PhaseDescription,
 		PlanResources:    planResources,
+		SparseFileMap:    sparseFilePVCMap,
 		Tracer:           r.tracer,
 	}
 	err = task.Run(ctx)
@@ -123,4 +130,34 @@ func (r *ReconcileDirectVolumeMigration) getDVMPlanResources(direct *migapi.Dire
 		return planResources, nil
 	}
 	return &migapi.PlanResources{}, nil
+}
+
+type sparseFilePVCMap map[string]bool
+
+func (r *ReconcileDirectVolumeMigration) getSparseFilePVCMap(plan *migapi.MigPlan) (sparseFilePVCMap, error) {
+	sparseFilesMap := make(sparseFilePVCMap)
+	if plan == nil {
+		return sparseFilesMap, nil
+	}
+	analytics := &migapi.MigAnalyticList{}
+	err := r.List(context.TODO(),
+		analytics, k8sclient.MatchingLabels(
+			map[string]string{
+				"migplan": plan.Name}))
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	for _, migAnalytic := range analytics.Items {
+		if migAnalytic.Spec.AnalyzeExtendedPVCapacity {
+			for _, ns := range migAnalytic.Status.Analytics.Namespaces {
+				for _, pv := range ns.PersistentVolumes {
+					if pv.SparseFilesFound {
+						sparseFilesMap[fmt.Sprintf(
+							"%s/%s", ns.Namespace, pv.Name)] = true
+					}
+				}
+			}
+		}
+	}
+	return sparseFilesMap, nil
 }

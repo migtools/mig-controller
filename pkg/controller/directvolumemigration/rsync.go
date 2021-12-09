@@ -363,6 +363,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		labels := t.buildDVMLabels()
 
 		for _, pvc := range pvcPairs {
+			optionsForPvc := []rsynctransfer.TransferOption{}
 			// ensure that the Rsync operation for this PVC is not already complete
 			lastObservedOperationStatus := t.Owner.Status.GetRsyncOperationStatusForPVC(
 				&corev1.ObjectReference{
@@ -404,12 +405,21 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					NodeName: nodeName,
 				},
 			}
-			rsyncOptions = append(rsyncOptions, &clientPodMutation)
+			optionsForPvc = append(optionsForPvc, &clientPodMutation)
 			if info, exists := secInfo.Get(
 				pvc.Source().Claim().Name, pvc.Source().Claim().Namespace); exists {
 				if info.verify {
-					rsyncOptions = append(rsyncOptions, ExtraOpts{"--checksum"})
+					optionsForPvc = append(optionsForPvc, ExtraOpts{"--checksum"})
 				}
+			}
+
+			val, exists := t.SparseFileMap[fmt.Sprintf("%s/%s", pvc.Source().Claim().Namespace, pvc.Source().Claim().Name)]
+			if exists && val {
+				sparseFileOption := ExtraOpts{
+					"--sparse",
+					"--no-inplace",
+				}
+				optionsForPvc = append(optionsForPvc, sparseFileOption)
 			}
 
 			// Add identification label for Rsync Pod that keep them associated with a pvc
@@ -424,9 +434,9 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					currentStatus.failed = false
 					currentStatus.pending = true
 					labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
-					rsyncOptions = append(rsyncOptions, rsynctransfer.WithSourcePodLabels(labels))
+					optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
 					transfer, err := rsynctransfer.NewTransfer(
-						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, append(rsyncOptions, optionsForPvc...)...)
 					if err != nil {
 						currentStatus.AddError(err)
 						continue
@@ -467,9 +477,9 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			} else {
 				newOperation.CurrentAttempt = 0
 				labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
-				rsyncOptions = append(rsyncOptions, rsynctransfer.WithSourcePodLabels(labels))
+				optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
 				transfer, err := rsynctransfer.NewTransfer(
-					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, append(rsyncOptions, optionsForPvc...)...)
 				if err != nil {
 					currentStatus.AddError(err)
 					continue
