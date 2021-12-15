@@ -208,8 +208,8 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
-	// Hooks
-	err = r.validateInludedResources(ctx, plan)
+	// Included Resources
+	err = r.validateIncludedResources(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -228,7 +228,9 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 	return nil
 }
 
-func (r ReconcileMigPlan) validateInludedResources(ctx context.Context, plan *migapi.MigPlan) error {
+// validateIncludedResources checks spec.IncludedResources field of the plan for presence of
+// invalid resource Group/Kinds, raises critical condition if one or more invalid resources found
+func (r ReconcileMigPlan) validateIncludedResources(ctx context.Context, plan *migapi.MigPlan) error {
 	srcCluster, err := plan.GetSourceCluster(r)
 	if err != nil {
 		return liberr.Wrap(err)

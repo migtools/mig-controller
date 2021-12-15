@@ -777,6 +777,9 @@ func (r *MigPlan) IsVolumeMigrationDisabled() bool {
 	return r.IsResourceExcluded(settings.PVResource)
 }
 
+// GetIncludedResourcesList returns list of string representation of Resource Group/Kinds provided
+// through spec.IncludedResources of the plan, returns list of invalid resources and aggregated
+// errors if one or more resources are invalid in the provided list
 func (r *MigPlan) GetIncludedResourcesList(client k8sclient.Client) (validResources []string, invalidResources []string, err error) {
 	errs := []error{}
 	for _, res := range r.Spec.IncludedResources {
