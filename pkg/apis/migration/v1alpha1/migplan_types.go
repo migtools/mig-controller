@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -754,6 +756,24 @@ func (r *MigPlan) IsImageMigrationDisabled() bool {
 // This will change to an explicit controller boolean env var at some point.
 func (r *MigPlan) IsVolumeMigrationDisabled() bool {
 	return r.IsResourceExcluded(settings.PVResource)
+}
+
+// GetIncludedResourcesList returns list of string representation of Resource Group/Kinds provided
+// through spec.IncludedResources of the plan, returns list of invalid resources and aggregated
+// errors if one or more resources are invalid in the provided list
+func (r *MigPlan) GetIncludedResourcesList(client k8sclient.Client) (validResources []string, invalidResources []string, err error) {
+	errs := []error{}
+	for _, res := range r.Spec.IncludedResources {
+		resMapper, err := client.RESTMapper().RESTMapping(schema.GroupKind{Group: res.Group, Kind: res.Kind})
+		if err != nil {
+			errs = append(errs, err)
+			invalidResources = append(invalidResources, res.String())
+		}
+		if resMapper != nil {
+			validResources = append(validResources, resMapper.Resource.Resource)
+		}
+	}
+	return validResources, invalidResources, errorsutil.NewAggregate(errs)
 }
 
 //

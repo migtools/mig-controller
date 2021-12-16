@@ -79,6 +79,7 @@ const (
 	SourcePodsNotHealthy                       = "SourcePodsNotHealthy"
 	GVKsIncompatible                           = "GVKsIncompatible"
 	InvalidHookRef                             = "InvalidHookRef"
+	InvalidResourceList                        = "InvalidResourceList"
 	HookNotReady                               = "HookNotReady"
 	InvalidHookNSName                          = "InvalidHookNSName"
 	InvalidHookSAName                          = "InvalidHookSAName"
@@ -197,6 +198,12 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 		return liberr.Wrap(err)
 	}
 
+	// Included Resources
+	err = r.validateIncludedResources(ctx, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
 	// GVK
 	err = r.compareGVK(ctx, plan)
 	if err != nil {
@@ -213,6 +220,37 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 	err = r.validateIntraClusterMigPlan(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	return nil
+}
+
+// validateIncludedResources checks spec.IncludedResources field of the plan for presence of
+// invalid resource Group/Kinds, raises critical condition if one or more invalid resources found
+func (r ReconcileMigPlan) validateIncludedResources(ctx context.Context, plan *migapi.MigPlan) error {
+	srcCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	srcClient, err := srcCluster.GetClient(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	_, invalidResources, err := plan.GetIncludedResourcesList(srcClient)
+	if err != nil {
+		log.Error(err,
+			"error creating list of included resources",
+			"failedResources", strings.Join(invalidResources, ","))
+	}
+	if len(invalidResources) > 0 {
+		plan.Status.SetCondition(
+			migapi.Condition{
+				Category: migapi.Critical,
+				Status:   True,
+				Type:     InvalidResourceList,
+				Message:  "Resources [] specified in spec.includedResourceList not found. Resource Group & Kind must be valid. See controller logs for more details.",
+				Items:    invalidResources,
+			},
+		)
 	}
 	return nil
 }
