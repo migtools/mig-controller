@@ -11,16 +11,13 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
-	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/settings"
 	"github.com/pkg/errors"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,7 +42,7 @@ func (t *Task) ensureInitialBackup() (*velero.Backup, error) {
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	userIncludedResources, err := t.getUserIncludedResourceList(client)
+	userIncludedResources, _, err := t.PlanResources.MigPlan.GetIncludedResourcesList(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -96,20 +93,6 @@ func (t *Task) getInitialBackup() (*velero.Backup, error) {
 	labels := t.Owner.GetCorrelationLabels()
 	labels[migapi.InitialBackupLabel] = t.UID()
 	return t.getBackup(labels)
-}
-
-func (t *Task) getUserIncludedResourceList(srcClient compat.Client) ([]string, error) {
-	resources := []string{}
-	includedResources := t.PlanResources.MigPlan.Spec.IncludedResources
-	errs := []error{}
-	for _, res := range includedResources {
-		resMapper, err := srcClient.RESTMapper().RESTMapping(schema.GroupKind{Group: res.Group, Kind: res.Kind})
-		if err != nil {
-			errs = append(errs, err)
-		}
-		resources = append(resources, resMapper.Resource.Resource)
-	}
-	return resources, errorsutil.NewAggregate(errs)
 }
 
 // Ensure the second backup on the source cluster has been created and
