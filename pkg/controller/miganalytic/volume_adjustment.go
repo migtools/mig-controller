@@ -34,7 +34,7 @@ const DEFAULT_PV_USAGE_THRESHOLD = 3
 
 // DFCommandExecutor defines an executor responsible for running DF
 type DFCommandExecutor interface {
-	Execute(map[string][]MigAnalyticPersistentVolumeDetails) ([]DFOutput, error)
+	Execute(map[string][]MigAnalyticPersistentVolumeDetails) ([]DFOutput, []DUOutput, error)
 }
 
 // PersistentVolumeAdjuster defines volume adjustment context
@@ -45,53 +45,72 @@ type PersistentVolumeAdjuster struct {
 	StatusRefCache map[string]*migapi.MigAnalyticNamespace
 }
 
-// DFBaseUnit defines supported sizes for df command
-type DFBaseUnit string
+// BaseUnit defines supported sizes for df command
+type BaseUnit string
 
 // Supported base units used for df command
 const (
-	DecimalSIGiga = DFBaseUnit("GB")
-	DecimalSIMega = DFBaseUnit("MB")
-	BinarySIMega  = DFBaseUnit("M")
-	BinarySIGiga  = DFBaseUnit("G")
+	DecimalSIGiga = BaseUnit("GB")
+	DecimalSIMega = BaseUnit("MB")
+	BinarySIMega  = BaseUnit("M")
+	BinarySIGiga  = BaseUnit("G")
 )
 
-// DFCommand represent a df command
-type DFCommand struct {
+type StorageCommand struct {
 	// stdout from df
 	StdOut string
 	// stderr from df
 	StdErr string
 	// Base unit used for df
-	BlockSize DFBaseUnit
+	BlockSize BaseUnit
 	// BaseLocation defines path where volumes can be found
 	BaseLocation string
 }
 
-// DFDiskPath defines format of expected path of the volume present on Pod
-const DFDiskPath = "%s/%s/volumes/*/%s"
+// DF represent a df command
+type DF struct {
+	StorageCommand
+}
 
-// DFOutput defines structured output of df per PV
-type DFOutput struct {
-	Node            string
-	Name            string
-	Namespace       string
+type DU struct {
+	StorageCommand
+}
+
+// VolumePath defines format of expected path of the volume present on Pod
+const VolumePath = "%s/%s/volumes/*/%s"
+
+type StorageCommandOutput struct {
 	UsagePercentage int64
+	Usage           int64
 	TotalSize       resource.Quantity
 	IsError         bool
 }
 
-// convertDFQuantityToKubernetesResource converts a quantity present in df output to resource.Quantity
-func (cmd *DFCommand) convertDFQuantityToKubernetesResource(quantity string) (resource.Quantity, error) {
+// DFOutput defines structured output of df per PV
+type DFOutput struct {
+	Node      string
+	Name      string
+	Namespace string
+	StorageCommandOutput
+}
+
+type DUOutput struct {
+	Name      string
+	Namespace string
+	StorageCommandOutput
+}
+
+// convertLinuxQuantityToKubernetesQuantity converts a quantity present in df output to resource.Quantity
+func (s *StorageCommand) convertLinuxQuantityToKubernetesQuantity(quantity string) (resource.Quantity, error) {
 	var parsedQuantity resource.Quantity
 	unitMatcher, _ := regexp.Compile(
 		fmt.Sprintf(
-			"(\\d+)%s", cmd.BlockSize))
+			"(\\d+)%s", s.BlockSize))
 	matched := unitMatcher.FindStringSubmatch(quantity)
 	if len(matched) != 2 {
 		return parsedQuantity, errors.Errorf("Invalid quantity or block size unit")
 	}
-	switch cmd.BlockSize {
+	switch s.BlockSize {
 	case DecimalSIGiga, DecimalSIMega:
 		quantity = strings.ReplaceAll(quantity, "B", "")
 		break
@@ -102,15 +121,15 @@ func (cmd *DFCommand) convertDFQuantityToKubernetesResource(quantity string) (re
 	return resource.ParseQuantity(quantity)
 }
 
-// GetDFOutputForPV given a volume name and pod uid, returns structured df ouput for the volume
+// GetOutputForPV given a volume name and pod uid, returns structured df ouput for the volume
 // only works on outputs of commands created by DFCommand.PrepareDFCommand()
-func (cmd *DFCommand) GetDFOutputForPV(volName string, podUID types.UID) (pv DFOutput) {
+func (d *DF) GetOutputForPV(volName string, podUID types.UID) (dfOutput DFOutput) {
 	var err error
-	stdOutLines, stdErrLines := strings.Split(cmd.StdOut, "\n"), strings.Split(cmd.StdErr, "\n")
+	stdOutLines, stdErrLines := strings.Split(d.StdOut, "\n"), strings.Split(d.StdErr, "\n")
 	lineMatcher, _ := regexp.Compile(
 		fmt.Sprintf(
-			strings.Replace(DFDiskPath, "*", ".*", 1),
-			cmd.BaseLocation,
+			strings.Replace(VolumePath, "*", ".*", 1),
+			d.BaseLocation,
 			podUID,
 			volName))
 	percentageMatcher, _ := regexp.Compile("(\\d+)%")
@@ -118,32 +137,36 @@ func (cmd *DFCommand) GetDFOutputForPV(volName string, podUID types.UID) (pv DFO
 		if lineMatcher.MatchString(line) {
 			cols := strings.Fields(line)
 			if len(cols) != 6 {
-				pv.IsError = true
+				dfOutput.IsError = true
 				return
 			}
-			pv.TotalSize, err = cmd.convertDFQuantityToKubernetesResource(cols[1])
-			pv.IsError = (err != nil)
+			dfOutput.TotalSize, err = d.convertLinuxQuantityToKubernetesQuantity(cols[1])
+			dfOutput.IsError = (err != nil)
+			unitMatcher := regexp.MustCompile(string(d.BlockSize))
+			usageString := unitMatcher.ReplaceAllString(cols[2], "")
+			dfOutput.Usage, err = strconv.ParseInt(usageString, 10, 64)
+			dfOutput.IsError = (err != nil)
 			matched := percentageMatcher.FindStringSubmatch(cols[4])
 			if len(matched) > 1 {
-				pv.UsagePercentage, err = strconv.ParseInt(matched[1], 10, 64)
-				pv.IsError = (err != nil)
+				dfOutput.UsagePercentage, err = strconv.ParseInt(matched[1], 10, 64)
+				dfOutput.IsError = (err != nil)
 			}
 			return
 		}
 	}
 	for _, line := range stdErrLines {
 		if lineMatcher.MatchString(line) {
-			pv.IsError = true
+			dfOutput.IsError = true
 			return
 		}
 	}
 	// didn't find the PV in stdout or stderr
-	pv.IsError = true
+	dfOutput.IsError = true
 	return
 }
 
-// PrepareDFCommand given a list of volumes, creates a bulk df command for all volumes
-func (cmd *DFCommand) PrepareDFCommand(pvcs []MigAnalyticPersistentVolumeDetails) []string {
+// PrepareCommand given a list of volumes, creates a bulk df command for all volumes
+func (d *DF) PrepareCommand(pvcs []MigAnalyticPersistentVolumeDetails) []string {
 	command := []string{
 		"/bin/bash",
 		"-c",
@@ -152,16 +175,70 @@ func (cmd *DFCommand) PrepareDFCommand(pvcs []MigAnalyticPersistentVolumeDetails
 	for _, pvc := range pvcs {
 		volPaths = append(volPaths,
 			fmt.Sprintf(
-				DFDiskPath,
-				cmd.BaseLocation,
+				strings.Replace(VolumePath, "*", ".*", 1),
+				d.BaseLocation,
 				pvc.PodUID,
 				pvc.VolumeName))
 	}
-	return append(command, fmt.Sprintf("df -B%s %s", cmd.BlockSize, strings.Join(volPaths, " ")))
+	return append(command, fmt.Sprintf("df -B%s | grep -E \"(%s)\"", d.BlockSize, strings.Join(volPaths, "|")))
+}
+
+// GetOutputForPV given a volume name and pod uid, returns structured df ouput for the volume
+// only works on outputs of commands created by DFCommand.PrepareDFCommand()
+func (d *DU) GetOutputForPV(volName string, podUID types.UID) (duOutput DUOutput) {
+	var err error
+	stdOutLines, stdErrLines := strings.Split(d.StdOut, "\n"), strings.Split(d.StdErr, "\n")
+	lineMatcher, _ := regexp.Compile(
+		fmt.Sprintf(
+			strings.Replace(VolumePath, "*", ".*", 1),
+			d.BaseLocation,
+			podUID,
+			volName))
+	for _, line := range stdOutLines {
+		if lineMatcher.MatchString(line) {
+			cols := strings.Fields(line)
+			if len(cols) != 2 {
+				duOutput.IsError = true
+				return
+			}
+			unitMatcher := regexp.MustCompile(string(d.BlockSize))
+			usageString := unitMatcher.ReplaceAllString(cols[0], "")
+			duOutput.Usage, err = strconv.ParseInt(usageString, 10, 64)
+			duOutput.IsError = (err != nil)
+			return
+		}
+	}
+	for _, line := range stdErrLines {
+		if lineMatcher.MatchString(line) {
+			duOutput.IsError = true
+			return
+		}
+	}
+	// didn't find the PV in stdout or stderr
+	duOutput.IsError = true
+	return
+}
+
+// PrepareCommand given a list of volumes, creates a bulk df command for all volumes
+func (d *DU) PrepareCommand(pvcs []MigAnalyticPersistentVolumeDetails) []string {
+	command := []string{
+		"/bin/bash",
+		"-c",
+	}
+	volPaths := []string{}
+	for _, pvc := range pvcs {
+		volPaths = append(volPaths,
+			fmt.Sprintf(
+				VolumePath,
+				d.BaseLocation,
+				pvc.PodUID,
+				pvc.VolumeName))
+	}
+	return append(command, fmt.Sprintf("du --max-depth=0 --apparent-size --block-size=%s %s", d.BlockSize, strings.Join(volPaths, " ")))
 }
 
 // findOriginalPVDataMatchingDFOutput given a df output for a pv and nested map of nodeName->[]pvc, finds ref to matching object in the map
-func (pva *PersistentVolumeAdjuster) findOriginalPVDataMatchingDFOutput(pvc DFOutput, pvcNodeMap map[string][]MigAnalyticPersistentVolumeDetails) *MigAnalyticPersistentVolumeDetails {
+func (p *PersistentVolumeAdjuster) findOriginalPVDataMatchingDFOutput(pvc DFOutput, pvcNodeMap map[string][]MigAnalyticPersistentVolumeDetails) *MigAnalyticPersistentVolumeDetails {
 	if _, exists := pvcNodeMap[pvc.Node]; exists {
 		for i := range pvcNodeMap[pvc.Node] {
 			pvDetailRef := &pvcNodeMap[pvc.Node][i]
@@ -174,7 +251,7 @@ func (pva *PersistentVolumeAdjuster) findOriginalPVDataMatchingDFOutput(pvc DFOu
 }
 
 // generateWarningForErroredPVs given a list of dfoutputs, generates warnings for associated pvcs
-func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*DFOutput) {
+func (p *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*DFOutput) {
 	warningString := "Failed gathering extended PV usage information for PVs [%s]"
 	pvNames := []string{}
 	for _, dfOutput := range erroredPVs {
@@ -185,7 +262,7 @@ func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*
 	if len(pvNames) > 0 {
 		msg := fmt.Sprintf(warningString, strings.Join(pvNames, " "))
 		log.Info(msg)
-		pva.Owner.Status.Conditions.SetCondition(migapi.Condition{
+		p.Owner.Status.Conditions.SetCondition(migapi.Condition{
 			Category: migapi.Warn,
 			Status:   True,
 			Type:     migapi.ExtendedPVAnalysisFailed,
@@ -195,18 +272,33 @@ func (pva *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*
 	}
 }
 
-// getRefToAnalyticNs given a ns, returns the reference to correspoding ns present within MigAnalytic.Status.Analytics, stores found ones in cache
-func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migapi.MigAnalyticNamespace {
-	if pva.StatusRefCache == nil {
-		pva.StatusRefCache = make(map[string]*migapi.MigAnalyticNamespace)
+func (p *PersistentVolumeAdjuster) generateWarningForSparseFileFailure(erroredPVs []string) {
+	warningString := "Failed identifying whether sparse files exist on PVs [%s]"
+	if len(erroredPVs) > 0 {
+		msg := fmt.Sprintf(warningString, strings.Join(erroredPVs, " "))
+		log.Info(msg)
+		p.Owner.Status.Conditions.SetCondition(migapi.Condition{
+			Category: migapi.Warn,
+			Status:   True,
+			Type:     migapi.ExtendedPVAnalysisFailed,
+			Reason:   migapi.FailedRunningDu,
+			Message:  msg,
+		})
 	}
-	if nsRef, exists := pva.StatusRefCache[namespace]; exists {
+}
+
+// getRefToAnalyticNs given a ns, returns the reference to correspoding ns present within MigAnalytic.Status.Analytics, stores found ones in cache
+func (p *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migapi.MigAnalyticNamespace {
+	if p.StatusRefCache == nil {
+		p.StatusRefCache = make(map[string]*migapi.MigAnalyticNamespace)
+	}
+	if nsRef, exists := p.StatusRefCache[namespace]; exists {
 		return nsRef
 	}
-	for i := range pva.Owner.Status.Analytics.Namespaces {
-		nsRef := &pva.Owner.Status.Analytics.Namespaces[i]
+	for i := range p.Owner.Status.Analytics.Namespaces {
+		nsRef := &p.Owner.Status.Analytics.Namespaces[i]
 		if namespace == nsRef.Namespace {
-			pva.StatusRefCache[namespace] = nsRef
+			p.StatusRefCache[namespace] = nsRef
 			return nsRef
 		}
 	}
@@ -214,19 +306,21 @@ func (pva *PersistentVolumeAdjuster) getRefToAnalyticNs(namespace string) *migap
 }
 
 // Run runs executor, uses df output to calculate adjusted volume sizes, updates owner.status with results
-func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
-	pvDfOutputs, err := pva.DFExecutor.Execute(pvNodeMap)
+func (p *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersistentVolumeDetails) error {
+	pvDfOutputs, pvDuOutputs, err := p.DFExecutor.Execute(pvNodeMap)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 	erroredPVs := []*DFOutput{}
+	erroredDuPVs := []string{}
 	for i, pvDfOutput := range pvDfOutputs {
-		originalData := pva.findOriginalPVDataMatchingDFOutput(pvDfOutput, pvNodeMap)
+		originalData := p.findOriginalPVDataMatchingDFOutput(pvDfOutput, pvNodeMap)
+		duData := p.findDUOutputMatchingDFOutput(pvDfOutput, pvDuOutputs)
 		if originalData == nil {
 			// TODO: handle this case better
 			continue
 		}
-		migAnalyticNSRef := pva.getRefToAnalyticNs(originalData.Namespace)
+		migAnalyticNSRef := p.getRefToAnalyticNs(originalData.Namespace)
 		statusFieldUpdate := migapi.MigAnalyticPersistentVolumeClaim{
 			Name:              originalData.Name,
 			RequestedCapacity: originalData.RequestedCapacity,
@@ -236,7 +330,9 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 			erroredPVs = append(erroredPVs, &pvDfOutputs[i])
 		} else {
 			statusFieldUpdate.ActualCapacity = pvDfOutput.TotalSize
-			proposedCapacity, reason := pva.calculateProposedVolumeSize(pvDfOutput.UsagePercentage, pvDfOutput.TotalSize, originalData.RequestedCapacity)
+			proposedCapacity, reason := p.calculateProposedVolumeSize(
+				pvDfOutput.UsagePercentage, pvDfOutput.TotalSize,
+				originalData.RequestedCapacity, originalData.ProvisionedCapacity)
 			// make sure we never set a value smaller than original provisioned capacity
 			if originalData.ProvisionedCapacity.Cmp(proposedCapacity) >= 1 {
 				statusFieldUpdate.ProposedCapacity = originalData.ProvisionedCapacity
@@ -244,22 +340,44 @@ func (pva *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersi
 				statusFieldUpdate.ProposedCapacity = proposedCapacity
 			}
 			statusFieldUpdate.Comment = reason
+			if duData != nil && !duData.IsError {
+				// apparent file size is more than the block size reported by df
+				// command. this indicates that there could be sparse files in
+				// the volume making apparent size bigger than actual usage
+				if duData.Usage > pvDfOutput.Usage {
+					statusFieldUpdate.SparseFilesFound = true
+					log.Info("Sparse files found in volume",
+						"persistentVolume", fmt.Sprintf("%s/%s", pvDfOutput.Namespace, statusFieldUpdate.Name))
+				}
+			} else {
+				erroredDuPVs = append(erroredDuPVs,
+					fmt.Sprintf("%s/%s", duData.Namespace, duData.Name))
+			}
 		}
 		migAnalyticNSRef.PersistentVolumes = append(migAnalyticNSRef.PersistentVolumes, statusFieldUpdate)
 	}
-	pva.generateWarningForErroredPVs(erroredPVs)
+	p.generateWarningForErroredPVs(erroredPVs)
+	p.generateWarningForSparseFileFailure(erroredDuPVs)
 	return nil
 }
 
-func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage int64, actualCapacity resource.Quantity,
-	requestedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
+func (p *PersistentVolumeAdjuster) findDUOutputMatchingDFOutput(dfOutput DFOutput, duOutputs []DUOutput) *DUOutput {
+	for i, _ := range duOutputs {
+		duOutput := &duOutputs[i]
+		if dfOutput.Namespace == duOutput.Namespace {
+			if dfOutput.Name == duOutput.Name {
+				return duOutput
+			}
+		}
+	}
+	return nil
+}
+
+func (p *PersistentVolumeAdjuster) calculateProposedVolumeSize(
+	usagePercentage int64, actualCapacity resource.Quantity,
+	requestedCapacity resource.Quantity, provisionedCapacity resource.Quantity) (proposedSize resource.Quantity, reason string) {
 
 	defer proposedSize.String()
-
-	volumeSizeWithThreshold := actualCapacity
-	volumeSizeWithThreshold.Set(
-		int64(actualCapacity.Value() *
-			(usagePercentage + int64(pva.getVolumeUsagePercentageThreshold())) / 100))
 
 	maxSize := requestedCapacity
 	reason = migapi.VolumeAdjustmentNoOp
@@ -269,9 +387,18 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 		reason = migapi.VolumeAdjustmentCapacityMismatch
 	}
 
-	if volumeSizeWithThreshold.Cmp(maxSize) == 1 {
-		maxSize = volumeSizeWithThreshold
+	if provisionedCapacity.Cmp(maxSize) == 1 {
+		maxSize = provisionedCapacity
+		reason = migapi.VolumeAdjustmentCapacityMismatch
+	}
+
+	if usagePercentage+int64(p.getVolumeUsagePercentageThreshold()) > 100 {
 		reason = migapi.VolumeAdjustmentUsageExceeded
+		volumeSizeWithThreshold := maxSize
+		volumeSizeWithThreshold.Set(
+			int64(actualCapacity.Value() *
+				(usagePercentage + int64(p.getVolumeUsagePercentageThreshold())) / 100))
+		maxSize = volumeSizeWithThreshold
 	}
 
 	proposedSize = maxSize
@@ -280,7 +407,7 @@ func (pva *PersistentVolumeAdjuster) calculateProposedVolumeSize(usagePercentage
 }
 
 // getVolumeUsagePercentageThreshold returns configured threshold for pv usage
-func (pva *PersistentVolumeAdjuster) getVolumeUsagePercentageThreshold() int {
+func (p *PersistentVolumeAdjuster) getVolumeUsagePercentageThreshold() int {
 	if Settings != nil && Settings.PVResizingVolumeUsageThreshold > 0 && Settings.PVResizingVolumeUsageThreshold < 100 {
 		return Settings.PVResizingVolumeUsageThreshold
 	}

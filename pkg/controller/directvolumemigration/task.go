@@ -154,6 +154,7 @@ type Task struct {
 	Requeue          time.Duration
 	Itinerary        Itinerary
 	Errors           []string
+	SparseFileMap    sparseFilePVCMap
 
 	Tracer        opentracing.Tracer
 	ReconcileSpan opentracing.Span

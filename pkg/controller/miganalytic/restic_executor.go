@@ -45,36 +45,54 @@ type ResticDFCommandExecutor struct {
 	ResticPodReferences map[string]*corev1.Pod
 }
 
-// DF given a podRef and a list of volumes, runs df command, returns with structured command context
+// ExecuteStorageCommands given a podRef and a list of volumes, runs df command, returns with structured command context
 // any errors running the df command are suppressed here. DFCommand.stdErr field should be used to determine failure
-func (r *ResticDFCommandExecutor) DF(podRef *corev1.Pod, persistentVolumes []MigAnalyticPersistentVolumeDetails) DFCommand {
+func (r *ResticDFCommandExecutor) ExecuteStorageCommands(podRef *corev1.Pod, persistentVolumes []MigAnalyticPersistentVolumeDetails) (DF, DU) {
 	// TODO: use the appropriate block size based on PVCs
-	dfCmd := DFCommand{
+	storageCommand := StorageCommand{
 		BaseLocation: "/host_pods",
 		BlockSize:    DecimalSIMega,
 		StdOut:       "",
 		StdErr:       "",
 	}
-	cmdString := dfCmd.PrepareDFCommand(persistentVolumes)
+	dfCmd := DF{StorageCommand: storageCommand}
+	duCmd := DU{StorageCommand: storageCommand}
+	dfCmdString := dfCmd.PrepareCommand(persistentVolumes)
+	duCmdString := duCmd.PrepareCommand(persistentVolumes)
 	restCfg := r.Client.RestConfig()
-	podCommand := pods.PodCommand{
+	podDfCommand := pods.PodCommand{
 		Pod:     podRef,
 		RestCfg: restCfg,
-		Args:    cmdString,
+		Args:    dfCmdString,
+	}
+	podDuCommand := pods.PodCommand{
+		Pod:     podRef,
+		RestCfg: restCfg,
+		Args:    duCmdString,
 	}
 	log.Info("Executing df command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
 		"pod", path.Join(podRef.Namespace, podRef.Name),
-		"command", cmdString)
-
-	err := podCommand.Run()
+		"command", dfCmdString)
+	err := podDfCommand.Run()
 	if err != nil {
 		log.Error(err, "Failed running df command inside Restic Pod",
 			"pod", path.Join(podRef.Namespace, podRef.Name),
-			"command", cmdString)
+			"command", dfCmdString)
 	}
-	dfCmd.StdErr = podCommand.Err.String()
-	dfCmd.StdOut = podCommand.Out.String()
-	return dfCmd
+	dfCmd.StdErr = podDfCommand.Err.String()
+	dfCmd.StdOut = podDfCommand.Out.String()
+	log.Info("Executing du command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
+		"pod", path.Join(podRef.Namespace, podRef.Name),
+		"command", duCmdString)
+	err = podDuCommand.Run()
+	if err != nil {
+		log.Error(err, "Failed running du command inside Restic Pod",
+			"pod", path.Join(podRef.Namespace, podRef.Name),
+			"command", duCmdString)
+	}
+	duCmd.StdErr = podDuCommand.Err.String()
+	duCmd.StdOut = podDuCommand.Out.String()
+	return dfCmd, duCmd
 }
 
 // getResticPodForNode lookup Restic Pod ref in local cache
@@ -108,15 +126,21 @@ func (r *ResticDFCommandExecutor) loadResticPodReferences() error {
 	return nil
 }
 
+type DfDu struct {
+	DF
+	DU
+}
+
 // Execute given a map node->[]pvc, runs Df command for each, returns list of structured df output per pvc
-func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPersistentVolumeDetails) ([]DFOutput, error) {
-	gatheredData := []DFOutput{}
+func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPersistentVolumeDetails) ([]DFOutput, []DUOutput, error) {
+	gatheredDfData := []DFOutput{}
+	gatheredDuData := []DUOutput{}
 	err := r.loadResticPodReferences()
 	if err != nil {
-		return gatheredData, liberr.Wrap(err)
+		return gatheredDfData, gatheredDuData, liberr.Wrap(err)
 	}
 	// dfOutputs for n nodes
-	dfOutputs := make(map[string]DFCommand, len(pvcNodeMap))
+	dfOutputs := make(map[string]DfDu, len(pvcNodeMap))
 	waitGroup := sync.WaitGroup{}
 	mutex := sync.Mutex{}
 	// allows setting a limit on number of concurrent df threads running
@@ -127,12 +151,20 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 		// if no Restic pod is found for this node, all PVCs on this node are skipped
 		if resticPodRef == nil {
 			for _, pvc := range pvcNodeMap[node] {
-				dfOutput := DFOutput{
-					IsError:   true,
-					Name:      pvc.Name,
-					Namespace: pvc.Namespace,
+				StorageCommandOutput := StorageCommandOutput{
+					IsError: true,
 				}
-				gatheredData = append(gatheredData, dfOutput)
+				dfOutput := DFOutput{
+					StorageCommandOutput: StorageCommandOutput,
+					Node:                 node,
+					Name:                 pvc.Name,
+					Namespace:            pvc.Namespace}
+				duOutput := DUOutput{
+					StorageCommandOutput: StorageCommandOutput,
+					Name:                 pvc.Name,
+					Namespace:            pvc.Namespace}
+				gatheredDfData = append(gatheredDfData, dfOutput)
+				gatheredDuData = append(gatheredDuData, duOutput)
 			}
 			continue
 		}
@@ -141,10 +173,13 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 			// block until channel empty
 			bufferedExecutionChannel <- struct{}{}
 			defer waitGroup.Done()
-			output := r.DF(podRef, pvcNodeMap[n])
+			dfOutput, duOutput := r.ExecuteStorageCommands(podRef, pvcNodeMap[n])
 			mutex.Lock()
 			defer mutex.Unlock()
-			dfOutputs[n] = output
+			dfOutputs[n] = DfDu{
+				DF: dfOutput,
+				DU: duOutput,
+			}
 			// free up channel indicating execution finished
 			<-bufferedExecutionChannel
 		}(node, resticPodRef)
@@ -153,12 +188,16 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 	waitGroup.Wait()
 	for node, cmdOutput := range dfOutputs {
 		for _, pvc := range pvcNodeMap[node] {
-			pvcDFInfo := cmdOutput.GetDFOutputForPV(pvc.VolumeName, pvc.PodUID)
+			pvcDFInfo := cmdOutput.DF.GetOutputForPV(pvc.VolumeName, pvc.PodUID)
 			pvcDFInfo.Node = node
 			pvcDFInfo.Name = pvc.Name
 			pvcDFInfo.Namespace = pvc.Namespace
-			gatheredData = append(gatheredData, pvcDFInfo)
-			log.Info("Got DF command output from Restic Pod",
+			pvcDUInfo := cmdOutput.DU.GetOutputForPV(pvc.VolumeName, pvc.PodUID)
+			pvcDUInfo.Name = pvc.Name
+			pvcDUInfo.Namespace = pvc.Namespace
+			gatheredDfData = append(gatheredDfData, pvcDFInfo)
+			gatheredDuData = append(gatheredDuData, pvcDUInfo)
+			log.Info("Got `df` command output from Restic Pod",
 				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
 				"resticPodUID", pvc.PodUID,
 				"pvcStorageClass", pvc.StorageClass,
@@ -166,7 +205,10 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 				"pvcProvisionedCapacity", pvc.ProvisionedCapacity,
 				"usagePercentage", pvcDFInfo.UsagePercentage,
 				"totalSize", pvcDFInfo.TotalSize)
+			log.Info("Got `du` command output from Restic Pod",
+				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
+				"usage", pvcDUInfo.Usage)
 		}
 	}
-	return gatheredData, nil
+	return gatheredDfData, gatheredDuData, nil
 }

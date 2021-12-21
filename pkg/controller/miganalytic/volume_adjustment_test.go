@@ -60,7 +60,7 @@ func TestDFCommand_GetPVUsage(t *testing.T) {
 	type fields struct {
 		StdOut       string
 		StdErr       string
-		BlockSize    DFBaseUnit
+		BlockSize    BaseUnit
 		BaseLocation string
 	}
 	type args struct {
@@ -86,9 +86,12 @@ func TestDFCommand_GetPVUsage(t *testing.T) {
 				podUID:  types.UID("280f7572-6590-11eb-b436-0a916cc7c396"),
 			},
 			wantPv: DFOutput{
-				IsError:         false,
-				TotalSize:       resource.MustParse("7942Mi"),
-				UsagePercentage: 1,
+				StorageCommandOutput: StorageCommandOutput{
+					IsError:         false,
+					TotalSize:       resource.MustParse("7942Mi"),
+					UsagePercentage: 1,
+					Usage:           1,
+				},
 			},
 		},
 		{
@@ -104,7 +107,9 @@ func TestDFCommand_GetPVUsage(t *testing.T) {
 				podUID:  types.UID("280f7572-6590-11eb-b436-0a916cc7c396"),
 			},
 			wantPv: DFOutput{
-				IsError: true,
+				StorageCommandOutput: StorageCommandOutput{
+					IsError: true,
+				},
 			},
 		},
 		{
@@ -120,19 +125,23 @@ func TestDFCommand_GetPVUsage(t *testing.T) {
 				podUID:  types.UID("280f7572-6590-11eb-b436-0a916cc7c396"),
 			},
 			wantPv: DFOutput{
-				IsError: true,
+				StorageCommandOutput: StorageCommandOutput{
+					IsError: true,
+				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &DFCommand{
-				StdOut:       tt.fields.StdOut,
-				StdErr:       tt.fields.StdErr,
-				BlockSize:    tt.fields.BlockSize,
-				BaseLocation: tt.fields.BaseLocation,
+			cmd := &DF{
+				StorageCommand: StorageCommand{
+					StdOut:       tt.fields.StdOut,
+					StdErr:       tt.fields.StdErr,
+					BlockSize:    tt.fields.BlockSize,
+					BaseLocation: tt.fields.BaseLocation,
+				},
 			}
-			if gotPv := cmd.GetDFOutputForPV(tt.args.volName, tt.args.podUID); !reflect.DeepEqual(gotPv, tt.wantPv) {
+			if gotPv := cmd.GetOutputForPV(tt.args.volName, tt.args.podUID); !reflect.DeepEqual(gotPv, tt.wantPv) {
 				t.Errorf("DFCommand.GetPVUsage() = %v, want %v", gotPv, tt.wantPv)
 			}
 		})
@@ -164,7 +173,7 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 		StdOut       string
 		StdErr       string
 		ExitCode     int
-		BlockSize    DFBaseUnit
+		BlockSize    BaseUnit
 		BaseLocation string
 	}
 	type args struct {
@@ -224,13 +233,15 @@ func TestDFCommand_convertDFQuantityToKubernetesResource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &DFCommand{
-				StdOut:       tt.fields.StdOut,
-				StdErr:       tt.fields.StdErr,
-				BlockSize:    tt.fields.BlockSize,
-				BaseLocation: tt.fields.BaseLocation,
+			cmd := &DF{
+				StorageCommand: StorageCommand{
+					StdOut:       tt.fields.StdOut,
+					StdErr:       tt.fields.StdErr,
+					BlockSize:    tt.fields.BlockSize,
+					BaseLocation: tt.fields.BaseLocation,
+				},
 			}
-			got, err := cmd.convertDFQuantityToKubernetesResource(tt.args.quantity)
+			got, err := cmd.convertLinuxQuantityToKubernetesQuantity(tt.args.quantity)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DFCommand.convertDFQuantityToKubernetesResource() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -249,9 +260,10 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 		DFExecutor DFCommandExecutor
 	}
 	type args struct {
-		usagePercentage   int64
-		actualCapacity    resource.Quantity
-		requestedCapacity resource.Quantity
+		usagePercentage     int64
+		actualCapacity      resource.Quantity
+		requestedCapacity   resource.Quantity
+		provisionedCapacity resource.Quantity
 	}
 	tests := []struct {
 		name             string
@@ -266,9 +278,10 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage:   50,
-				actualCapacity:    resource.MustParse("200"),
-				requestedCapacity: resource.MustParse("20"),
+				usagePercentage:     50,
+				actualCapacity:      resource.MustParse("200"),
+				requestedCapacity:   resource.MustParse("20"),
+				provisionedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("200"),
 			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
@@ -279,9 +292,10 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage:   100,
-				actualCapacity:    resource.MustParse("200"),
-				requestedCapacity: resource.MustParse("20"),
+				usagePercentage:     100,
+				actualCapacity:      resource.MustParse("200"),
+				requestedCapacity:   resource.MustParse("20"),
+				provisionedCapacity: resource.MustParse("20"),
 			},
 			wantProposedSize: resource.MustParse("206"),
 			wantReason:       migapi.VolumeAdjustmentUsageExceeded,
@@ -292,12 +306,13 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage:   100,
-				actualCapacity:    resource.MustParse("200"),
-				requestedCapacity: resource.MustParse("250"),
+				usagePercentage:     100,
+				actualCapacity:      resource.MustParse("250"),
+				requestedCapacity:   resource.MustParse("250"),
+				provisionedCapacity: resource.MustParse("250"),
 			},
-			wantProposedSize: resource.MustParse("250"),
-			wantReason:       migapi.VolumeAdjustmentNoOp,
+			wantProposedSize: resource.MustParse("257"),
+			wantReason:       migapi.VolumeAdjustmentUsageExceeded,
 		},
 		{
 			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
@@ -306,9 +321,25 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client: fake.NewFakeClient(),
 			},
 			args: args{
-				usagePercentage:   1,
-				actualCapacity:    resource.MustParse("200"),
-				requestedCapacity: resource.MustParse("150"),
+				usagePercentage:     1,
+				actualCapacity:      resource.MustParse("200"),
+				requestedCapacity:   resource.MustParse("150"),
+				provisionedCapacity: resource.MustParse("150"),
+			},
+			wantProposedSize: resource.MustParse("200"),
+			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
+		},
+		{
+			name: "Given values of usagePercentage, actualCapacity and requestedCapacity, appropriate volume size is returned, here volumeS size with threshold" +
+				"is greater than requested capacity and actual capacity is greater than requested capacity",
+			fields: fields{
+				Client: fake.NewFakeClient(),
+			},
+			args: args{
+				usagePercentage:     1,
+				actualCapacity:      resource.MustParse("200"),
+				requestedCapacity:   resource.MustParse("150"),
+				provisionedCapacity: resource.MustParse("150"),
 			},
 			wantProposedSize: resource.MustParse("200"),
 			wantReason:       migapi.VolumeAdjustmentCapacityMismatch,
@@ -321,7 +352,7 @@ func TestPersistentVolumeAdjuster_calculateProposedVolumeSize(t *testing.T) {
 				Client:     tt.fields.Client,
 				DFExecutor: tt.fields.DFExecutor,
 			}
-			gotProposedSize, gotReason := pva.calculateProposedVolumeSize(tt.args.usagePercentage, tt.args.actualCapacity, tt.args.requestedCapacity)
+			gotProposedSize, gotReason := pva.calculateProposedVolumeSize(tt.args.usagePercentage, tt.args.actualCapacity, tt.args.requestedCapacity, tt.args.provisionedCapacity)
 			if !reflect.DeepEqual(gotProposedSize, tt.wantProposedSize) {
 				t.Errorf("calculateProposedVolumeSize() gotProposedSize = %v, want %v", gotProposedSize, tt.wantProposedSize)
 			}

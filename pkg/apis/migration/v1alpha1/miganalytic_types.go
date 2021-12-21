@@ -32,6 +32,7 @@ const (
 // VolumeAdjuster reasons
 const (
 	FailedRunningDf = "FailedRunningDf"
+	FailedRunningDu = "FailedRunningDu"
 )
 
 // Proposed volume size computation reasons
@@ -133,6 +134,8 @@ type MigAnalyticPersistentVolumeClaim struct {
 	ProposedCapacity resource.Quantity `json:"proposedCapacity,omitempty"`
 	// Human readable reason for proposed adjustment
 	Comment string `json:"comment,omitempty"`
+	// Indicate whether or not sparse files were found in the volume
+	SparseFilesFound bool `json:"sparseFilesFound,omitempty"`
 }
 
 // +genclient
