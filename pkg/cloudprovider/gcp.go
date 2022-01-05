@@ -15,7 +15,7 @@ import (
 // Credentials secret.
 const (
 	GcpCredentials          = "gcp-credentials"
-	GcpCloudSecretName      = "gcp-cloud-credentials"
+	GcpCloudSecretName      = "cloud-credentials-gcp"
 	GcpCloudCredentialsPath = "credentials-gcp/cloud"
 )
 

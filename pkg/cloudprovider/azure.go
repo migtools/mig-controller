@@ -22,7 +22,7 @@ import (
 // Credentials secret.
 const (
 	AzureCredentials          = "azure-credentials"
-	AzureCloudSecretName      = "azure-cloud-credentials"
+	AzureCloudSecretName      = "cloud-credentials-azure"
 	AzureCloudCredentialsPath = "credentials-azure/cloud"
 
 	tenantIDKey             = "AZURE_TENANT_ID"
