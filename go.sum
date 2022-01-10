@@ -498,6 +498,8 @@ github.com/konveyor/crane-lib v0.0.5-0.20211203142954-eea1642546d8 h1:fBz/bO8MRb
 github.com/konveyor/crane-lib v0.0.5-0.20211203142954-eea1642546d8/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
 github.com/konveyor/crane-lib v0.0.6-0.20220107182544-b1d806be326b h1:Ju8FNcrKO4TOLfC3EOPU1ovuaRE7AaMFoa2n+KozLJU=
 github.com/konveyor/crane-lib v0.0.6-0.20220107182544-b1d806be326b/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
+github.com/konveyor/crane-lib v0.0.6-0.20220110140809-e59142d7deab h1:yPllamP9KC3y5X5V3hUv5gNd6zPv1RPk95d3Kgbv4nc=
+github.com/konveyor/crane-lib v0.0.6-0.20220110140809-e59142d7deab/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d h1:tETgPq+JxXhVhnrcLc7rcW9BURax36VUsix8DAU0wuY=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d/go.mod h1:Yk0xQ4N5rwE1+NWLSFQUQLgNT1/8p4Uor60LlgQfymg=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
