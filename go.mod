@@ -22,7 +22,7 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/konveyor/controller v0.4.1
-	github.com/konveyor/crane-lib v0.0.6-0.20220107182544-b1d806be326b
+	github.com/konveyor/crane-lib v0.0.6-0.20220110140809-e59142d7deab
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mattn/go-sqlite3 v1.14.4
