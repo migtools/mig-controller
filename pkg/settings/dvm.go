@@ -1,24 +1,28 @@
 package settings
 
 import (
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
 // DVM options
 const (
-	RsyncOptBwLimit         = "RSYNC_OPT_BWLIMIT"
-	RsyncOptPartial         = "RSYNC_OPT_PARTIAL"
-	RsyncOptArchive         = "RSYNC_OPT_ARCHIVE"
-	RsyncOptDelete          = "RSYNC_OPT_DELETE"
-	RsyncOptHardLinks       = "RSYNC_OPT_HARDLINKS"
-	RsyncOptInfo            = "RSYNC_OPT_INFO"
-	RsyncOptExtras          = "RSYNC_OPT_EXTRAS"
-	RsyncBackOffLimit       = "RSYNC_BACKOFF_LIMIT"
-	EnablePVResizing        = "ENABLE_DVM_PV_RESIZING"
-	TCPProxyKey             = "STUNNEL_TCP_PROXY"
-	StunnelVerifyCAKey      = "STUNNEL_VERIFY_CA"
-	StunnelVerifyCALevelKey = "STUNNEL_VERIFY_CA_LEVEL"
+	RsyncOptBwLimit               = "RSYNC_OPT_BWLIMIT"
+	RsyncOptPartial               = "RSYNC_OPT_PARTIAL"
+	RsyncOptArchive               = "RSYNC_OPT_ARCHIVE"
+	RsyncOptDelete                = "RSYNC_OPT_DELETE"
+	RsyncOptHardLinks             = "RSYNC_OPT_HARDLINKS"
+	RsyncOptInfo                  = "RSYNC_OPT_INFO"
+	RsyncOptExtras                = "RSYNC_OPT_EXTRAS"
+	RsyncBackOffLimit             = "RSYNC_BACKOFF_LIMIT"
+	EnablePVResizing              = "ENABLE_DVM_PV_RESIZING"
+	TCPProxyKey                   = "STUNNEL_TCP_PROXY"
+	StunnelVerifyCAKey            = "STUNNEL_VERIFY_CA"
+	StunnelVerifyCALevelKey       = "STUNNEL_VERIFY_CA_LEVEL"
+	SourceSupplementalGroups      = "SOURCE_SUPPLEMENTAL_GROUPS"
+	DestinationSupplementalGroups = "TARGET_SUPPLEMENTAL_GROUPS"
 )
 
 // RsyncOpts Rsync Options
@@ -40,9 +44,46 @@ type RsyncOpts struct {
 	BackOffLimit int
 }
 
+type FileOwnershipOpts struct {
+	SourceSupplementalGroups      []int64
+	DestinationSupplementalGroups []int64
+}
+
+func (f *FileOwnershipOpts) Load() error {
+	var err error
+	sourceSupplementalGroups := os.Getenv(SourceSupplementalGroups)
+	f.SourceSupplementalGroups, err = parseIntListFromString(sourceSupplementalGroups)
+	if err != nil {
+		return fmt.Errorf("failed to parse source supplemental groups")
+	}
+	destSupplementalGroups := os.Getenv(DestinationSupplementalGroups)
+	f.DestinationSupplementalGroups, err = parseIntListFromString(destSupplementalGroups)
+	if err != nil {
+		return fmt.Errorf("failed to parse target supplemental groups")
+	}
+	return nil
+}
+
+func parseIntListFromString(str string) ([]int64, error) {
+	intList := []int64{}
+	intStringList := strings.Split(str, ",")
+	for _, intStr := range intStringList {
+		if intStr == "" {
+			continue
+		}
+		parsedInt, err := strconv.ParseInt(intStr, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		intList = append(intList, parsedInt)
+	}
+	return intList, nil
+}
+
 // DvmOpts DVM settings
 type DvmOpts struct {
 	RsyncOpts
+	FileOwnershipOpts
 	EnablePVResizing     bool
 	StunnelTCPProxy      string
 	StunnelVerifyCA      bool
@@ -86,6 +127,10 @@ func (r *DvmOpts) Load() error {
 		r.StunnelVerifyCALevel = "2"
 	}
 	err = r.RsyncOpts.Load()
+	if err != nil {
+		return err
+	}
+	err = r.FileOwnershipOpts.Load()
 	if err != nil {
 		return err
 	}
