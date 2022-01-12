@@ -235,6 +235,9 @@ func (r ReconcileMigPlan) validateIncludedResources(ctx context.Context, plan *m
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	if srcCluster == nil || !srcCluster.Status.IsReady() {
+		return nil
+	}
 	srcClient, err := srcCluster.GetClient(r)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -398,7 +401,7 @@ func (r ReconcileMigPlan) getPotentialFilePermissionConflictNamespaces(plan *mig
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	if srcCluster == nil {
+	if srcCluster == nil || !srcCluster.Status.IsReady() {
 		return nil, nil
 	}
 	srcClient, err := srcCluster.GetClient(r)
