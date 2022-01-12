@@ -48,6 +48,7 @@ const (
 	NsNotFoundOnDestinationCluster             = "NamespaceNotFoundOnDestinationCluster"
 	NsLimitExceeded                            = "NamespaceLimitExceeded"
 	NsLengthExceeded                           = "NamespaceLengthExceeded"
+	NsNotDNSCompliant                          = "NamespaceNotDNSCompliant"
 	NsHaveNodeSelectors                        = "NamespacesHaveNodeSelectors"
 	DuplicateNsOnSourceCluster                 = "DuplicateNamespaceOnSourceCluster"
 	DuplicateNsOnDestinationCluster            = "DuplicateNamespaceOnDestinationCluster"
@@ -105,6 +106,7 @@ const (
 	NotDistinct            = "NotDistinct"
 	LimitExceeded          = "LimitExceeded"
 	LengthExceeded         = "LengthExceeded"
+	NotDNSCompliant        = "NotDNSCompliant"
 	NotDone                = "NotDone"
 	Done                   = "Done"
 	Conflict               = "Conflict"
@@ -978,20 +980,21 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 		})
 		return nil
 	}
-	longNamespaceNames := []string{}
+	nonDNSCompliantNames := []string{}
 	for _, ns := range namespaces {
-		if len(ns) > 63 {
-			longNamespaceNames = append(longNamespaceNames, ns)
+		if errs := validation.IsDNS1035Label(ns); len(errs) != 0 {
+			log.Info("Namespace validation failed!!", "namespace", ns, "errors", errs)
+			nonDNSCompliantNames = append(nonDNSCompliantNames, ns)
 		}
 	}
-	if len(longNamespaceNames) > 0 {
+	if len(nonDNSCompliantNames) > 0 {
 		plan.Status.SetCondition(migapi.Condition{
-			Type:     NsLengthExceeded,
+			Type:     NsNotDNSCompliant,
 			Status:   True,
-			Reason:   LengthExceeded,
+			Reason:   NotDNSCompliant,
 			Category: Critical,
-			Message:  fmt.Sprintf("Destination Namespaces [] exceed 63 characters and are invalid."),
-			Items:    longNamespaceNames,
+			Message:  fmt.Sprintf("Destination Namespaces [] are not DNS compliant"),
+			Items:    nonDNSCompliantNames,
 		})
 		return nil
 	}
