@@ -152,7 +152,7 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 }
 
 // getRsyncClientMutations get Rsync container mutations for source Rsync Pod
-func (t *Task) getRsyncClientMutations(client compat.Client) ([]rsynctransfer.TransferOption, error) {
+func (t *Task) getRsyncClientMutations(client compat.Client, namespace string) ([]rsynctransfer.TransferOption, error) {
 	transferOptions := []rsynctransfer.TransferOption{}
 	containerMutation := &corev1.Container{}
 	isPrivileged, err := isRsyncPrivileged(client)
@@ -170,8 +170,7 @@ func (t *Task) getRsyncClientMutations(client compat.Client) ([]rsynctransfer.Tr
 		},
 	}
 	containerMutation.SecurityContext = customSecurityContext
-	resourceRequirements, err :=
-		t.getUserConfiguredResourceRequirements(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUESTS, CLIENT_POD_MEMORY_REQUESTS)
+	resourceRequirements, err := t.getRsyncClientResourceRequirements(namespace, client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -191,8 +190,7 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	resourceRequirements, err :=
-		t.getUserConfiguredResourceRequirements(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUESTS, TRANSFER_POD_MEMORY_REQUESTS)
+	resourceRequirements, err := t.getRsyncServerResourceRequirements(namespace, client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -238,6 +236,11 @@ func (t *Task) ensureRsyncTransferServer() error {
 	}
 
 	nsMap, err := t.getNamespacedPVCPairs()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	err = t.buildDestinationLimitRangeMap(nsMap, destClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -317,21 +320,19 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
-	mutations, err := t.getRsyncClientMutations(srcClient)
-	if err != nil {
-		return statusList, liberr.Wrap(err)
-	}
-
 	transportOptions, err := t.getStunnelOptions()
 	if err != nil {
 		return statusList, liberr.Wrap(err)
 	}
 
-	rsyncOptions = append(rsyncOptions, mutations...)
-
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
+		mutations, err := t.getRsyncClientMutations(srcClient, srcNs)
+		if err != nil {
+			return statusList, liberr.Wrap(err)
+		}
+		rsyncOptions = append(rsyncOptions, mutations...)
 		nnPair := cranemeta.NewNamespacedPair(
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
@@ -1492,6 +1493,10 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}
 	pvcMap, err := t.getNamespacedPVCPairs()
+	if err != nil {
+		return false, false, failureReasons, liberr.Wrap(err)
+	}
+	err = t.buildSourceLimitRangeMap(pvcMap, srcClient)
 	if err != nil {
 		return false, false, failureReasons, liberr.Wrap(err)
 	}

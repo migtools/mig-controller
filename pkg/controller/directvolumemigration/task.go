@@ -156,12 +156,14 @@ type Task struct {
 	Itinerary                    Itinerary
 	Errors                       []string
 	SparseFileMap                sparseFilePVCMap
-	SourceLimitRangeMapping      map[string]corev1.LimitRange
-	DestinationLimitRangeMapping map[string]corev1.LimitRange
+	SourceLimitRangeMapping      limitRangeMap
+	DestinationLimitRangeMapping limitRangeMap
 
 	Tracer        opentracing.Tracer
 	ReconcileSpan opentracing.Span
 }
+
+type limitRangeMap map[string]corev1.LimitRange
 
 type sshKeys struct {
 	PublicKey  *rsa.PublicKey

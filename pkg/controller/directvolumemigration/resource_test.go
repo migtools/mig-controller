@@ -223,10 +223,10 @@ func TestTask_getUserConfiguredResourceRequirements(t *testing.T) {
 				},
 			),
 			args: args{
-				cpuLimit:    STUNNEL_POD_CPU_LIMIT,
-				memoryLimit: STUNNEL_POD_MEMORY_LIMIT,
-				cpuRequests: STUNNEL_POD_CPU_REQUEST,
-				memRequests: STUNNEL_POD_MEMORY_REQUEST,
+				cpuLimit:    TRANSFER_POD_CPU_LIMIT,
+				memoryLimit: TRANSFER_POD_MEMORY_LIMIT,
+				cpuRequests: TRANSFER_POD_CPU_REQUESTS,
+				memRequests: TRANSFER_POD_MEMORY_REQUESTS,
 			},
 			want: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -246,16 +246,16 @@ func TestTask_getUserConfiguredResourceRequirements(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Data: map[string]string{
-						STUNNEL_POD_CPU_LIMIT:      "1",
-						STUNNEL_POD_MEMORY_REQUEST: "256Mi",
+						TRANSFER_POD_CPU_LIMIT:       "1",
+						TRANSFER_POD_MEMORY_REQUESTS: "256Mi",
 					},
 				},
 			),
 			args: args{
-				cpuLimit:    STUNNEL_POD_CPU_LIMIT,
-				memoryLimit: STUNNEL_POD_MEMORY_LIMIT,
-				cpuRequests: STUNNEL_POD_CPU_REQUEST,
-				memRequests: STUNNEL_POD_MEMORY_REQUEST,
+				cpuLimit:    TRANSFER_POD_CPU_LIMIT,
+				memoryLimit: TRANSFER_POD_MEMORY_LIMIT,
+				cpuRequests: TRANSFER_POD_CPU_REQUESTS,
+				memRequests: TRANSFER_POD_MEMORY_REQUESTS,
 			},
 			want: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -277,18 +277,18 @@ func TestTask_getUserConfiguredResourceRequirements(t *testing.T) {
 						Namespace: migapi.OpenshiftMigrationNamespace,
 					},
 					Data: map[string]string{
-						STUNNEL_POD_CPU_LIMIT:      "1",
-						STUNNEL_POD_MEMORY_REQUEST: "128Mi",
-						STUNNEL_POD_CPU_REQUEST:    "100m",
-						STUNNEL_POD_MEMORY_LIMIT:   "512Mi",
+						TRANSFER_POD_CPU_LIMIT:       "1",
+						TRANSFER_POD_MEMORY_REQUESTS: "128Mi",
+						TRANSFER_POD_CPU_REQUESTS:    "100m",
+						TRANSFER_POD_MEMORY_LIMIT:    "512Mi",
 					},
 				},
 			),
 			args: args{
-				cpuLimit:    STUNNEL_POD_CPU_LIMIT,
-				memoryLimit: STUNNEL_POD_MEMORY_LIMIT,
-				cpuRequests: STUNNEL_POD_CPU_REQUEST,
-				memRequests: STUNNEL_POD_MEMORY_REQUEST,
+				cpuLimit:    TRANSFER_POD_CPU_LIMIT,
+				memoryLimit: TRANSFER_POD_MEMORY_LIMIT,
+				cpuRequests: TRANSFER_POD_CPU_REQUESTS,
+				memRequests: TRANSFER_POD_MEMORY_REQUESTS,
 			},
 			want: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
