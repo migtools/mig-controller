@@ -12,6 +12,7 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/opentracing/opentracing-go"
+	corev1 "k8s.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -143,18 +144,20 @@ var FailedItinerary = Itinerary{
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
-	Log              logr.Logger
-	Client           k8sclient.Client
-	Owner            *migapi.DirectVolumeMigration
-	SSHKeys          *sshKeys
-	RsyncRoutes      map[string]string
-	Phase            string
-	PhaseDescription string
-	PlanResources    *migapi.PlanResources
-	Requeue          time.Duration
-	Itinerary        Itinerary
-	Errors           []string
-	SparseFileMap    sparseFilePVCMap
+	Log                          logr.Logger
+	Client                       k8sclient.Client
+	Owner                        *migapi.DirectVolumeMigration
+	SSHKeys                      *sshKeys
+	RsyncRoutes                  map[string]string
+	Phase                        string
+	PhaseDescription             string
+	PlanResources                *migapi.PlanResources
+	Requeue                      time.Duration
+	Itinerary                    Itinerary
+	Errors                       []string
+	SparseFileMap                sparseFilePVCMap
+	SourceLimitRangeMapping      map[string]corev1.LimitRange
+	DestinationLimitRangeMapping map[string]corev1.LimitRange
 
 	Tracer        opentracing.Tracer
 	ReconcileSpan opentracing.Span

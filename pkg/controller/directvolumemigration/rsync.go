@@ -28,7 +28,6 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,19 +35,6 @@ import (
 )
 
 const (
-	TRANSFER_POD_CPU_LIMIT      = "TRANSFER_POD_CPU_LIMIT"
-	TRANSFER_POD_MEMORY_LIMIT   = "TRANSFER_POD_MEMORY_LIMIT"
-	TRANSFER_POD_CPU_REQUEST    = "TRANSFER_POD_CPU_REQUEST"
-	TRANSFER_POD_MEMORY_REQUEST = "TRANSFER_POD_MEMORY_REQUEST"
-	CLIENT_POD_CPU_LIMIT        = "CLIENT_POD_CPU_LIMIT"
-	CLIENT_POD_MEMORY_LIMIT     = "CLIENT_POD_MEMORY_LIMIT"
-	CLIENT_POD_CPU_REQUEST      = "CLIENT_POD_CPU_REQUEST"
-	CLIENT_POD_MEMORY_REQUEST   = "CLIENT_POD_MEMORY_REQUEST"
-	STUNNEL_POD_CPU_LIMIT       = "STUNNEL_POD_CPU_LIMIT"
-	STUNNEL_POD_MEMORY_LIMIT    = "STUNNEL_POD_MEMORY_LIMIT"
-	STUNNEL_POD_CPU_REQUEST     = "STUNNEL_POD_CPU_REQUEST"
-	STUNNEL_POD_MEMORY_REQUEST  = "STUNNEL_POD_MEMORY_REQUEST"
-
 	// DefaultStunnelTimout is when stunnel timesout on establishing connection from source to destination.
 	//  When this timeout is reached, the rsync client will still see "connection reset by peer". It is a red-herring
 	// it does not conclusively mean the destination rsyncd is unhealthy but stunnel is dropping this in between
@@ -184,13 +170,12 @@ func (t *Task) getRsyncClientMutations(client compat.Client) ([]rsynctransfer.Tr
 		},
 	}
 	containerMutation.SecurityContext = customSecurityContext
-	rsyncClientLimits, rsyncClientRequests, err :=
-		t.getPodResourceLists(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUEST, CLIENT_POD_MEMORY_REQUEST)
+	resourceRequirements, err :=
+		t.getUserConfiguredResourceRequirements(CLIENT_POD_CPU_LIMIT, CLIENT_POD_MEMORY_LIMIT, CLIENT_POD_CPU_REQUESTS, CLIENT_POD_MEMORY_REQUESTS)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	containerMutation.Resources.Requests = rsyncClientRequests
-	containerMutation.Resources.Limits = rsyncClientLimits
+	containerMutation.Resources = resourceRequirements
 	transferOptions = append(transferOptions,
 		rsynctransfer.SourceContainerMutation{
 			C: containerMutation,
@@ -206,13 +191,12 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	rsyncTransferLimits, rsyncTransferRequests, err :=
-		t.getPodResourceLists(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUEST, TRANSFER_POD_MEMORY_REQUEST)
+	resourceRequirements, err :=
+		t.getUserConfiguredResourceRequirements(TRANSFER_POD_CPU_LIMIT, TRANSFER_POD_MEMORY_LIMIT, TRANSFER_POD_CPU_REQUESTS, TRANSFER_POD_MEMORY_REQUESTS)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	containerMutation.Resources.Requests = rsyncTransferRequests
-	containerMutation.Resources.Limits = rsyncTransferLimits
+	containerMutation.Resources = resourceRequirements
 	trueBool := bool(true)
 	runAsUser := int64(0)
 	securityContext := &corev1.SecurityContext{
@@ -590,39 +574,6 @@ func (t *Task) createRsyncConfig() error {
 		}
 	}
 	return nil
-}
-
-func (t *Task) getPodResourceLists(cpuLimit string, memoryLimit string, cpuRequests string, memRequests string) (corev1.ResourceList, corev1.ResourceList, error) {
-	podConfigMap := &corev1.ConfigMap{}
-	err := t.Client.Get(context.TODO(), types.NamespacedName{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace}, podConfigMap)
-	if err != nil {
-		return nil, nil, err
-	}
-	limits := corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("1Gi"),
-		corev1.ResourceCPU:    resource.MustParse("1"),
-	}
-	if _, exists := podConfigMap.Data[cpuLimit]; exists {
-		cpu := resource.MustParse(podConfigMap.Data[cpuLimit])
-		limits[corev1.ResourceCPU] = cpu
-	}
-	if _, exists := podConfigMap.Data[memoryLimit]; exists {
-		memory := resource.MustParse(podConfigMap.Data[memoryLimit])
-		limits[corev1.ResourceMemory] = memory
-	}
-	requests := corev1.ResourceList{
-		corev1.ResourceMemory: resource.MustParse("1Gi"),
-		corev1.ResourceCPU:    resource.MustParse("400m"),
-	}
-	if _, exists := podConfigMap.Data[cpuRequests]; exists {
-		cpu := resource.MustParse(podConfigMap.Data[cpuRequests])
-		requests[corev1.ResourceCPU] = cpu
-	}
-	if _, exists := podConfigMap.Data[memRequests]; exists {
-		memory := resource.MustParse(podConfigMap.Data[memRequests])
-		requests[corev1.ResourceMemory] = memory
-	}
-	return limits, requests, nil
 }
 
 type pvcMapElement struct {
