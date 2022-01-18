@@ -782,6 +782,11 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 	return true, []string{}, nil
 }
 
+// getRsyncPasswordSecretName returns a unique name for Secret object created to store Rsync password
+func (t *Task) getRsyncPasswordSecretName() string {
+	return getMD5Hash(fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncPass, t.Owner.Name))
+}
+
 func (t *Task) createRsyncPassword() (string, error) {
 	var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	random.Seed(time.Now().UnixNano())
@@ -793,7 +798,7 @@ func (t *Task) createRsyncPassword() (string, error) {
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
-			Name:      DirectVolumeMigrationRsyncPass,
+			Name:      t.getRsyncPasswordSecretName(),
 		},
 		StringData: map[string]string{
 			corev1.BasicAuthPasswordKey: string(password),
@@ -818,7 +823,10 @@ func (t *Task) createRsyncPassword() (string, error) {
 
 func (t *Task) getRsyncPassword() (string, error) {
 	rsyncSecret := corev1.Secret{}
-	key := types.NamespacedName{Name: DirectVolumeMigrationRsyncPass, Namespace: migapi.OpenshiftMigrationNamespace}
+	key := types.NamespacedName{
+		Name:      t.getRsyncPasswordSecretName(),
+		Namespace: migapi.OpenshiftMigrationNamespace,
+	}
 	t.Log.Info("Getting Rsync Password from Secret on host MigCluster",
 		"secret", path.Join(rsyncSecret.Namespace, rsyncSecret.Name))
 	err := t.Client.Get(context.TODO(), key, &rsyncSecret)
@@ -840,7 +848,7 @@ func (t *Task) deleteRsyncPassword() error {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: migapi.OpenshiftMigrationNamespace,
-			Name:      DirectVolumeMigrationRsyncPass,
+			Name:      t.getRsyncPasswordSecretName(),
 		},
 	}
 	t.Log.Info("Deleting Rsync password Secret on host MigCluster",

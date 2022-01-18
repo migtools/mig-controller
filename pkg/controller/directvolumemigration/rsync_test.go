@@ -735,7 +735,7 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 			nil)
 		return pvcPair
 	}
-	getDependencies := func(ns string) []k8sclient.Object {
+	getDependencies := func(ns string, ownerName string) []k8sclient.Object {
 		deps := []k8sclient.Object{}
 		route := &routev1.Route{
 			ObjectMeta: metav1.ObjectMeta{
@@ -792,7 +792,7 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		}
 		deps = append(deps, rsyncSecret)
 		rsyncPass := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: DirectVolumeMigrationRsyncPass, Namespace: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: getMD5Hash(fmt.Sprintf("%s-%s", DirectVolumeMigrationRsyncPass, ownerName)), Namespace: ns},
 			Data:       map[string][]byte{corev1.BasicAuthPasswordKey: []byte{}},
 		}
 		deps = append(deps, rsyncPass)
@@ -815,8 +815,8 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		{
 			name: "when there are 0 existing Rsync Pods in source and no PVCs to migrate, status list should be empty",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns")...),
-				DestClient: getFakeCompatClient(getDependencies("test-ns")...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
+				DestClient: getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -830,8 +830,8 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		{
 			name: "when there are 0 existing Rsync Pods in source and 1 new PVC is provided as input, 1 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns")...),
-				DestClient: getFakeCompatClient(getDependencies("test-ns")...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
+				DestClient: getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -852,8 +852,8 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		{
 			name: "when there are 0 existing Rsync Pods in source and 1 new PVC is provided as input, 1 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns")...),
-				DestClient: getFakeCompatClient(getDependencies("test-ns")...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
+				DestClient: getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -874,8 +874,8 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		{
 			name: "when there are 0 existing Rsync Pods in source and 3 new PVCs are provided as input, 3 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns")...),
-				DestClient: getFakeCompatClient(getDependencies("test-ns")...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
+				DestClient: getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
