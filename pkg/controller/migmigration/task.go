@@ -277,6 +277,7 @@ var RollbackItinerary = Itinerary{
 		{Name: DeleteRegistries, Step: StepCleanupHelpers},
 		{Name: EnsureStagePodsDeleted, Step: StepCleanupHelpers},
 		{Name: EnsureAnnotationsDeleted, Step: StepCleanupHelpers, any: HasPVs | HasISs},
+		{Name: SwapPVCReferences, Step: StepCleanupMigrated, all: StorageConversion},
 		{Name: DeleteMigrated, Step: StepCleanupMigrated},
 		{Name: EnsureMigratedDeleted, Step: StepCleanupMigrated},
 		{Name: UnQuiesceSrcApplications, Step: StepCleanupUnquiesce},
@@ -1553,7 +1554,7 @@ func (t *Task) isStorageConversionMigration() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	if isIntraCluster && t.migrateState() {
+	if isIntraCluster && (t.migrateState() || t.rollback()) {
 		for srcNs, destNs := range t.PlanResources.MigPlan.GetNamespaceMapping() {
 			if srcNs != destNs {
 				return false, nil

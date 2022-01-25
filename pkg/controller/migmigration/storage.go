@@ -109,7 +109,12 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 func (t *Task) getPVCNameMapping() pvcNameMapping {
 	mapping := make(pvcNameMapping)
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		mapping.Add(pv.PVC.Namespace, pv.PVC.GetSourceName(), pv.PVC.GetTargetName())
+		// If this is a rollback migration, the mapping of PVC names should be Destination -> Source
+		if t.rollback() {
+			mapping.Add(pv.PVC.Namespace, pv.PVC.GetTargetName(), pv.PVC.GetSourceName())
+		} else {
+			mapping.Add(pv.PVC.Namespace, pv.PVC.GetSourceName(), pv.PVC.GetTargetName())
+		}
 	}
 	return mapping
 }
@@ -242,6 +247,11 @@ func (t *Task) swapReplicaSetsPVCRefs(client k8sclient.Client, mapping pvcNameMa
 			return
 		}
 		for _, replicaset := range list.Items {
+			if len(replicaset.OwnerReferences) > 0 {
+				t.Log.Info("Unquiesce skipping ReplicaSet, has OwnerReferences",
+					"namespace", replicaset.Namespace, "replicaset", replicaset.Name)
+				continue
+			}
 			isFailed := false
 			// un-quiesce application
 			if replicas, exist := replicaset.Annotations[migapi.ReplicasAnnotation]; exist {
