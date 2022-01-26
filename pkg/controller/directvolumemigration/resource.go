@@ -176,20 +176,28 @@ func mergeResourceLimitRangeItems(target *corev1.LimitRangeItem, source *corev1.
 	if target != nil && source != nil {
 		if source.Max != nil {
 			// for max limits, the most restrictive value is the one which is the minimum
-			if target.Max.Cpu().Cmp(*source.Max.Cpu()) > 0 {
-				target.Max[corev1.ResourceCPU] = source.Max[corev1.ResourceCPU]
+			if val, exists := source.Max[corev1.ResourceCPU]; exists {
+				if target.Max.Cpu().Cmp(val) > 0 {
+					target.Max[corev1.ResourceCPU] = val
+				}
 			}
-			if target.Max.Memory().Cmp(*source.Max.Memory()) > 0 {
-				target.Max[corev1.ResourceMemory] = source.Max[corev1.ResourceMemory]
+			if val, exists := source.Max[corev1.ResourceMemory]; exists {
+				if target.Max.Memory().Cmp(val) > 0 {
+					target.Max[corev1.ResourceMemory] = val
+				}
 			}
 		}
 		if source.Min != nil {
 			// for min limits, the most restrictive value is the one which is the maximum
-			if target.Min.Cpu().Cmp(*source.Min.Cpu()) < 0 {
-				target.Min[corev1.ResourceCPU] = source.Min[corev1.ResourceCPU]
+			if val, exists := source.Min[corev1.ResourceCPU]; exists {
+				if target.Min.Cpu().Cmp(val) < 0 {
+					target.Min[corev1.ResourceCPU] = val
+				}
 			}
-			if target.Min.Memory().Cmp(*source.Min.Memory()) < 0 {
-				target.Min[corev1.ResourceMemory] = source.Min[corev1.ResourceMemory]
+			if val, exists := source.Min[corev1.ResourceMemory]; exists {
+				if target.Min.Memory().Cmp(val) < 0 {
+					target.Min[corev1.ResourceMemory] = val
+				}
 			}
 		}
 	}
@@ -201,31 +209,44 @@ func applyLimitRangeItemOnRequirements(requirements *corev1.ResourceRequirements
 	if requirements.Requests != nil {
 		if limit.Max != nil {
 			//  apply Max limits on Requests and Limits, none should exceed the Max
-			if requirements.Requests.Cpu().Cmp(*limit.Max.Cpu()) > 0 {
-				requirements.Requests[corev1.ResourceCPU] = *limit.Max.Cpu()
+			if val, exists := limit.Max[corev1.ResourceCPU]; exists {
+				if requirements.Requests.Cpu().Cmp(val) > 0 {
+					requirements.Requests[corev1.ResourceCPU] = val
+				}
 			}
-			if requirements.Requests.Memory().Cmp(*limit.Max.Memory()) > 0 {
-				requirements.Requests[corev1.ResourceMemory] = *limit.Max.Memory()
+
+			if val, exists := limit.Max[corev1.ResourceMemory]; exists {
+				if requirements.Requests.Memory().Cmp(val) > 0 {
+					requirements.Requests[corev1.ResourceMemory] = val
+				}
 			}
 		}
 		if limit.Min != nil {
 			// apply Min limits on Requests and Limits, none should be less than the Min
-			if requirements.Requests.Cpu().Cmp(*limit.Min.Cpu()) < 0 {
-				requirements.Requests[corev1.ResourceCPU] = *limit.Min.Cpu()
+			if val, exists := limit.Min[corev1.ResourceCPU]; exists {
+				if requirements.Requests.Cpu().Cmp(val) < 0 {
+					requirements.Requests[corev1.ResourceCPU] = val
+				}
 			}
-			if requirements.Requests.Memory().Cmp(*limit.Min.Memory()) < 0 {
-				requirements.Requests[corev1.ResourceMemory] = *limit.Min.Memory()
+			if val, exists := limit.Min[corev1.ResourceMemory]; exists {
+				if requirements.Requests.Memory().Cmp(val) < 0 {
+					requirements.Requests[corev1.ResourceMemory] = val
+				}
 			}
 		}
 	}
 	if requirements.Limits != nil {
 		if limit.Max != nil {
 			//  apply Max limits on Requests and Limits, none should exceed the Max
-			if requirements.Limits.Cpu().Cmp(*limit.Max.Cpu()) > 0 {
-				requirements.Limits[corev1.ResourceCPU] = *limit.Max.Cpu()
+			if val, exists := limit.Max[corev1.ResourceCPU]; exists {
+				if requirements.Limits.Cpu().Cmp(val) > 0 {
+					requirements.Limits[corev1.ResourceCPU] = val
+				}
 			}
-			if requirements.Limits.Memory().Cmp(*limit.Max.Memory()) > 0 {
-				requirements.Limits[corev1.ResourceMemory] = *limit.Max.Memory()
+			if val, exists := limit.Max[corev1.ResourceMemory]; exists {
+				if requirements.Limits.Memory().Cmp(val) > 0 {
+					requirements.Limits[corev1.ResourceMemory] = val
+				}
 			}
 		}
 	}
@@ -266,10 +287,10 @@ func getHalvedResourceList(resourceList corev1.ResourceList) corev1.ResourceList
 	var scaledResourceList corev1.ResourceList
 	var scaledCPUResource *resource.Quantity
 	var scaledMemResource *resource.Quantity
-	if resourceList.Cpu() != nil {
+	if _, exists := resourceList[corev1.ResourceCPU]; exists {
 		scaledCPUResource = getScaledDownQuantity(resourceList.Cpu(), 2)
 	}
-	if resourceList.Memory() != nil {
+	if _, exists := resourceList[corev1.ResourceMemory]; exists {
 		scaledMemResource = getScaledDownQuantity(resourceList.Memory(), 2)
 	}
 	if scaledCPUResource != nil {
