@@ -286,6 +286,27 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 			mappedNamespaces += 1
 		}
 	}
+	// Disable state/storage class migrations for indirect migration modes
+	if plan.Spec.IndirectImageMigration || plan.Spec.IndirectVolumeMigration {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     MigrationTypeIdentified,
+			Status:   True,
+			Reason:   NamespaceMigrationPlan,
+			Category: migapi.Advisory,
+			Message:  "Indirect migration modes can only be used for full namespace migrations.",
+		})
+		if isIntraCluster {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     IntraClusterMigration,
+				Status:   True,
+				Reason:   NamespaceMigrationPlan,
+				Category: Critical,
+				Message:  "Indirect migration modes cannot be used in intra-cluster migrations.",
+			})
+		}
+		return nil
+	}
+
 	// try to infer migration type based on existing migrations created for the plan
 	if len(migrations) > 0 {
 		sort.Slice(
