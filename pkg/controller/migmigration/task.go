@@ -1021,9 +1021,10 @@ func (t *Task) Run(ctx context.Context) error {
 			t.Requeue = PollReQ
 		}
 	case Canceling:
-		// Skip directly to Completed if the Cancel was set on a Rollback migration.
+		// Skip directly to Cancel if the Cancel was set on a Rollback migration.
 		if t.rollback() {
-			t.Phase = Completed
+			t.Phase = EnsureAnnotationsDeleted
+			t.Step = StepCleanupHelpers
 		}
 		t.Owner.Status.SetCondition(migapi.Condition{
 			Type:     Canceling,
