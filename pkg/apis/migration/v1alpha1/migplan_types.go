@@ -52,6 +52,15 @@ const (
 
 const (
 	StorageConversionPVCNamePrefix = "new"
+	MigrationTypeIdentified        = "MigrationTypeIdentified"
+)
+
+type MigrationType string
+
+const (
+	StorageConversionPlan  MigrationType = "StorageConversionPlan"
+	StateMigrationPlan     MigrationType = "StateMigrationPlan"
+	NamespaceMigrationPlan MigrationType = "NamespaceMigrationPlan"
 )
 
 // MigPlanHook hold a reference to a MigHook along with the desired phase to run it in
@@ -266,6 +275,15 @@ func (r *MigPlan) GetRefResources(client k8sclient.Client) (*PlanResources, erro
 // Set the MigPlan Status to closed
 func (r *MigPlan) SetClosed() {
 	r.Spec.Closed = true
+}
+
+func (r *MigPlan) GetMigrationType() MigrationType {
+	cond := r.Status.Conditions.FindCondition(MigrationTypeIdentified)
+	if cond == nil {
+		return ""
+	} else {
+		return MigrationType(cond.Reason)
+	}
 }
 
 // Get list of migrations associated with the plan.

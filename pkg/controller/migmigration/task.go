@@ -1352,8 +1352,17 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&EnableImage != 0 && t.PlanResources.MigPlan.IsImageMigrationDisabled() {
 		return false, nil
 	}
-	if phase.all&EnableImage != 0 && t.Owner.Spec.MigrateState {
+	if phase.all&EnableImage != 0 && (t.migrateState() || t.isStorageConversionOrStateMigration()) {
 		return false, nil
+	}
+	if phase.all&EnableImage != 0 {
+		isIntraCluster, err := t.PlanResources.MigPlan.IsIntraCluster(t.Client)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if isIntraCluster {
+			return false, nil
+		}
 	}
 	if phase.all&DirectVolume != 0 && !t.directVolumeMigration() {
 		return false, nil
@@ -1437,8 +1446,15 @@ func (t *Task) anyFlags(phase Phase) (bool, error) {
 	if phase.any&IndirectImage != 0 && t.indirectImageMigration() {
 		return true, nil
 	}
-	if phase.any&EnableImage != 0 && !t.PlanResources.MigPlan.IsImageMigrationDisabled() && !t.migrateState() {
-		return true, nil
+	if phase.any&EnableImage != 0 {
+		isIntraCluster, err := t.PlanResources.MigPlan.IsIntraCluster(t.Client)
+		if err != nil {
+			return false, liberr.Wrap(err)
+		}
+		if !t.PlanResources.MigPlan.IsImageMigrationDisabled() && !isIntraCluster &&
+			!t.migrateState() && !t.isStorageConversionOrStateMigration() {
+			return true, nil
+		}
 	}
 	if phase.any&DirectVolume != 0 && t.directVolumeMigration() {
 		return true, nil
@@ -1527,6 +1543,15 @@ func (t *Task) stage() bool {
 // Get whether the migration is state transfer
 func (t *Task) migrateState() bool {
 	return t.Owner.Spec.MigrateState
+}
+
+func (t *Task) isStorageConversionOrStateMigration() bool {
+	migrationType := t.PlanResources.MigPlan.GetMigrationType()
+	switch migrationType {
+	case migapi.StateMigrationPlan, migapi.StorageConversionPlan:
+		return true
+	}
+	return false
 }
 
 // Get the migration namespaces with mapping.
