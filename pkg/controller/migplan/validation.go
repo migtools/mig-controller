@@ -87,7 +87,6 @@ const (
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 	IntraClusterMigration                      = "IntraClusterMigration"
-	MigrationTypeIdentified                    = "MigrationTypeIdentified"
 )
 
 // Categories
@@ -115,9 +114,6 @@ const (
 	DuplicateNs            = "DuplicateNamespaces"
 	ConflictingNamespaces  = "ConflictingNamespaces"
 	ConflictingPermissions = "ConflictingPermissions"
-	StorageConversionPlan  = "StorageConversionPlan"
-	StateMigrationPlan     = "StateMigrationPlan"
-	NamespaceMigrationPlan = "NamespaceMigrationPlan"
 )
 
 // Statuses
@@ -264,6 +260,23 @@ func (r ReconcileMigPlan) validateIncludedResources(ctx context.Context, plan *m
 	return nil
 }
 
+// setMigrationType given a migration type and a message, sets MigrationTypeIdentified condition
+func setMigrationType(plan *migapi.MigPlan, migrationType migapi.MigrationType, message string, durable bool) {
+	plan.Status.SetCondition(migapi.Condition{
+		Type:     migapi.MigrationTypeIdentified,
+		Status:   True,
+		Reason:   string(migrationType),
+		Category: migapi.Advisory,
+		Message:  message,
+		Durable:  durable,
+	})
+	switch migrationType {
+	case migapi.StateMigrationPlan, migapi.StorageConversionPlan:
+		// state and storage migration plans do not migrate images
+		plan.Status.DeleteCondition(SourceClusterNoRegistryPath)
+	}
+}
+
 // validatePossibleMigrationTypes looks at various migplan fields and determines what kind of migration is possible
 // based on the type of the migration, validates user selections specific to each type
 func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, plan *migapi.MigPlan) error {
@@ -288,18 +301,13 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 	}
 	// Disable state/storage class migrations for indirect migration modes
 	if plan.Spec.IndirectImageMigration || plan.Spec.IndirectVolumeMigration {
-		plan.Status.SetCondition(migapi.Condition{
-			Type:     MigrationTypeIdentified,
-			Status:   True,
-			Reason:   NamespaceMigrationPlan,
-			Category: migapi.Advisory,
-			Message:  "Indirect migration modes can only be used for full namespace migrations.",
-		})
+		msg := "Indirect migration modes can only be used for full namespace migrations."
+		setMigrationType(plan, migapi.NamespaceMigrationPlan, msg, false)
 		if isIntraCluster {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     IntraClusterMigration,
 				Status:   True,
-				Reason:   NamespaceMigrationPlan,
+				Reason:   string(migapi.NamespaceMigrationPlan),
 				Category: Critical,
 				Message:  "Indirect migration modes cannot be used in intra-cluster migrations.",
 			})
@@ -319,43 +327,25 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 			migrations[0].Status.HasAnyCondition(migapi.Succeeded)
 		// if the last migration was a successful rollback, the plan is reset and new types of migrations are possible
 		if successfulRollbackExists {
-			plan.Status.DeleteCondition(MigrationTypeIdentified)
+			plan.Status.DeleteCondition(migapi.MigrationTypeIdentified)
 		} else {
 			for _, migration := range migrations {
 				if migration.Spec.MigrateState {
 					// if plan is intra-cluster and all the source namespaces are mapped to themselves
 					// the migration has to be used for storage conversion
 					if isIntraCluster && mappedNamespaces == 0 {
-						plan.Status.SetCondition(migapi.Condition{
-							Type:     MigrationTypeIdentified,
-							Status:   True,
-							Reason:   StorageConversionPlan,
-							Category: migapi.Advisory,
-							Message:  "The migration plan was previously used for Storage Conversion. It can only be used for further Storage Conversions. Other migrations will be possible only after a successful rollback is performed.",
-							Durable:  true,
-						})
+						msg := "The migration plan was previously used for Storage Conversion. It can only be used for further Storage Conversions. Other migrations will be possible only after a successful rollback is performed."
+						setMigrationType(plan, migapi.StorageConversionPlan, msg, true)
 						return nil
 					} else {
-						plan.Status.SetCondition(migapi.Condition{
-							Type:     MigrationTypeIdentified,
-							Status:   True,
-							Reason:   StateMigrationPlan,
-							Category: migapi.Advisory,
-							Message:  "The migration plan was previously used for State Migrations. This plan can only be used for further State Migrations. Other migrations are possible only after a successful rollback is performed.",
-							Durable:  true,
-						})
+						msg := "The migration plan was previously used for State Migrations. This plan can only be used for further State Migrations. Other migrations are possible only after a successful rollback is performed."
+						setMigrationType(plan, migapi.StateMigrationPlan, msg, true)
 						return nil
 					}
 				}
 			}
-			plan.Status.SetCondition(migapi.Condition{
-				Type:     MigrationTypeIdentified,
-				Status:   True,
-				Reason:   NamespaceMigrationPlan,
-				Category: migapi.Advisory,
-				Message:  "This migration plan was previously used for migrating namespaces. This plan can only be used for further Stage/Final Migration. Other migrations are possible only after a successful rollback is performed.",
-				Durable:  true,
-			})
+			msg := "This migration plan was previously used for migrating namespaces. This plan can only be used for further Stage/Final Migration. Other migrations are possible only after a successful rollback is performed."
+			setMigrationType(plan, migapi.NamespaceMigrationPlan, msg, true)
 		}
 	}
 	// when there are no migrations for the plan, use migration plan information
@@ -377,38 +367,23 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 		// if all source namespaces are mapped to themselves, the plan can only be used
 		// for storage conversion
 		if mappedNamespaces == 0 {
-			plan.Status.SetCondition(migapi.Condition{
-				Type:     MigrationTypeIdentified,
-				Status:   True,
-				Reason:   StorageConversionPlan,
-				Category: migapi.Advisory,
-				Message:  "This is an intra-cluster migration plan and none of the source namespaces are mapped to different destination namespaces. This plan can only be used for Storage Conversion.",
-			})
+			msg := "This is an intra-cluster migration plan and none of the source namespaces are mapped to different destination namespaces. This plan can only be used for Storage Conversion."
+			setMigrationType(plan, migapi.StorageConversionPlan, msg, false)
 			return nil
 		}
 		// if all source namespaces are mapped to different destination namespaces, the
 		// plan can only be used for state migrations
 		if mappedNamespaces == len(plan.GetSourceNamespaces()) {
-			plan.Status.SetCondition(migapi.Condition{
-				Type:     MigrationTypeIdentified,
-				Status:   True,
-				Reason:   StateMigrationPlan,
-				Category: migapi.Advisory,
-				Message:  "This is an intra-cluster migration plan and all of the source namespaces are mapped to different destination namespaces. This plan can only be used for State Migration.",
-			})
+			msg := "This is an intra-cluster migration plan and all of the source namespaces are mapped to different destination namespaces. This plan can only be used for State Migration."
+			setMigrationType(plan, migapi.StateMigrationPlan, msg, false)
 			return nil
 		}
 	} else {
 		// if any of the PVC names are mapped to different destination PVCs, the plan can only be used for State Migrations
 		for _, pv := range plan.Spec.PersistentVolumes.List {
 			if pv.PVC.GetSourceName() != pv.PVC.GetTargetName() {
-				plan.Status.SetCondition(migapi.Condition{
-					Type:     MigrationTypeIdentified,
-					Status:   True,
-					Reason:   StateMigrationPlan,
-					Category: migapi.Advisory,
-					Message:  "One or more source PVCs are mapped to different destination PVCs. This plan can only be used for State Migration.",
-				})
+				msg := "One or more source PVCs are mapped to different destination PVCs. This plan can only be used for State Migration."
+				setMigrationType(plan, migapi.StateMigrationPlan, msg, false)
 				return nil
 			}
 		}

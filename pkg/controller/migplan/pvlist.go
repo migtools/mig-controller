@@ -245,9 +245,9 @@ func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) str
 
 // isStorageConversionPlan tells whether the migration plan is for storage conversion
 func isStorageConversionPlan(plan *migapi.MigPlan) bool {
-	migrationTypeCond := plan.Status.FindCondition(MigrationTypeIdentified)
+	migrationTypeCond := plan.Status.FindCondition(migapi.MigrationTypeIdentified)
 	if migrationTypeCond != nil {
-		if migrationTypeCond.Reason == StorageConversionPlan {
+		if migrationTypeCond.Reason == string(migapi.StorageConversionPlan) {
 			return true
 		}
 	}

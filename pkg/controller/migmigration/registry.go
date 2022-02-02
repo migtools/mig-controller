@@ -76,7 +76,7 @@ func (t *Task) isIndirectImageMigrationApplicable() (bool, error) {
 	}
 	applicable := t.PlanResources.MigPlan.Spec.IndirectImageMigration &&
 		!t.PlanResources.MigPlan.IsImageMigrationDisabled() && hasImageStreams &&
-		!t.Owner.Spec.MigrateState
+		!t.migrateState()
 	return applicable, nil
 }
 

@@ -78,8 +78,8 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 			wantErr: false,
 			wantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StateMigrationPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StateMigrationPlan),
 				},
 			},
 		},
@@ -99,8 +99,8 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 			wantErr: false,
 			wantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StateMigrationPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StateMigrationPlan),
 				},
 			},
 		},
@@ -135,14 +135,14 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 				},
 			),
 			plan: getTestMigPlan("test-cluster", "test-cluster-2", []string{}, []migapi.Condition{{
-				Type:   MigrationTypeIdentified,
-				Reason: StateMigrationPlan,
+				Type:   migapi.MigrationTypeIdentified,
+				Reason: string(migapi.StateMigrationPlan),
 			}}),
 			wantErr: false,
 			dontWantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StateMigrationPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StateMigrationPlan),
 				},
 			},
 		},
@@ -170,8 +170,8 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 			wantErr: false,
 			wantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StateMigrationPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StateMigrationPlan),
 				},
 			},
 		},
@@ -204,8 +204,8 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 			wantErr: false,
 			wantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StorageConversionPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StorageConversionPlan),
 				},
 			},
 		},
@@ -221,8 +221,8 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 			wantErr: false,
 			wantConditions: []migapi.Condition{
 				{
-					Type:   MigrationTypeIdentified,
-					Reason: StateMigrationPlan,
+					Type:   migapi.MigrationTypeIdentified,
+					Reason: string(migapi.StateMigrationPlan),
 				},
 			},
 		},

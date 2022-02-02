@@ -127,7 +127,7 @@ func (t *Task) ensureStageBackup() (*velero.Backup, error) {
 	newBackup.Labels[migapi.MigPlanLabel] = string(t.PlanResources.MigPlan.UID)
 	var includedResources mapset.Set
 
-	if (t.indirectImageMigration() || Settings.DisImgCopy) && !t.Owner.Spec.MigrateState {
+	if (t.indirectImageMigration() || Settings.DisImgCopy) && !t.migrateState() {
 		includedResources = settings.IncludedStageResources
 	} else {
 		includedResources = settings.IncludedStageResources.Difference(mapset.NewSetFromSlice([]interface{}{settings.ISResource}))
