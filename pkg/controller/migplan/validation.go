@@ -274,6 +274,7 @@ func setMigrationType(plan *migapi.MigPlan, migrationType migapi.MigrationType, 
 	case migapi.StateMigrationPlan, migapi.StorageConversionPlan:
 		// state and storage migration plans do not migrate images
 		plan.Status.DeleteCondition(SourceClusterNoRegistryPath)
+		plan.Status.DeleteCondition(DestinationClusterNoRegistryPath)
 	}
 }
 
