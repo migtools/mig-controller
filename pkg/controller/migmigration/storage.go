@@ -99,7 +99,7 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 	}
 	// update pvc refs on cronjobs
 	failedCronJobNames := t.swapCronJobsPVCRefs(client, mapping)
-	if len(failedJobNames) > 0 {
+	if len(failedCronJobNames) > 0 {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on CronJobs [%s]", strings.Join(failedCronJobNames, ",")))
 	}
@@ -337,6 +337,16 @@ func (t *Task) swapDaemonSetsPVCRefs(client k8sclient.Client, mapping pvcNameMap
 	return
 }
 
+func isJobComplete(job *batchv1.Job) bool {
+	for _, condition := range job.Status.Conditions {
+		if condition.Type == batchv1.JobComplete &&
+			condition.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
 // swapJobsPVCRefs
 func (t *Task) swapJobsPVCRefs(client k8sclient.Client, mapping pvcNameMapping) (failedJobs []string) {
 	for _, ns := range t.destinationNamespaces() {
@@ -354,8 +364,34 @@ func (t *Task) swapJobsPVCRefs(client k8sclient.Client, mapping pvcNameMapping) 
 			}
 			continue
 		}
-		for _, job := range list.Items {
+		for i := range list.Items {
+			oldJob := &list.Items[i]
+			// if job is already complete, skip
+			if isJobComplete(oldJob) {
+				continue
+			}
 			isFailed := false
+			job := &batchv1.Job{}
+			job.Namespace = oldJob.Namespace
+			job.ObjectMeta.Labels = oldJob.Labels
+			job.ObjectMeta.Annotations = oldJob.Annotations
+			delete(job.Labels, "job-name")
+			delete(job.Labels, "controller-uid")
+			jobSpec := oldJob.Spec.DeepCopy()
+			if jobSpec != nil {
+				job.Spec = *jobSpec
+				job.Spec.Selector = nil
+				delete(job.Spec.Template.Labels, "job-name")
+				delete(job.Spec.Template.Labels, "controller-uid")
+			} else {
+				continue
+			}
+			job.Name = ""
+			if len(oldJob.Name) > 60 {
+				job.GenerateName = fmt.Sprintf("%s-", oldJob.Name[:60])
+			} else {
+				job.GenerateName = fmt.Sprintf("%s-", oldJob.Name)
+			}
 			if job.Annotations != nil {
 				if replicas, exist := job.Annotations[migapi.ReplicasAnnotation]; exist {
 					number, err := strconv.Atoi(replicas)
@@ -376,15 +412,15 @@ func (t *Task) swapJobsPVCRefs(client k8sclient.Client, mapping pvcNameMapping) 
 			for _, volume := range job.Spec.Template.Spec.Volumes {
 				isFailed = updatePVCRef(volume.PersistentVolumeClaim, job.Namespace, mapping)
 			}
-			err := client.Update(context.TODO(), &job)
+			err := client.Create(context.TODO(), job)
 			if err != nil {
-				t.Log.Error(err, "failed updating jobs",
-					"namespace", job.Namespace, "job", job.Name)
+				t.Log.Error(err, "failed updating job",
+					"namespace", oldJob.Namespace, "job", oldJob.Name)
 				isFailed = true
 			}
 			if isFailed {
 				failedJobs = append(failedJobs,
-					fmt.Sprintf("%s/%s", job.Namespace, job.Name))
+					fmt.Sprintf("%s/%s", oldJob.Namespace, oldJob.Name))
 			}
 		}
 	}
