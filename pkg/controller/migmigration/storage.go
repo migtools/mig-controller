@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,11 @@ import (
 // PVCNameMapping is a mapping for source -> destination pvc names
 // used for convenience to avoid nested lookups to find migrated PVC names
 type pvcNameMapping map[string]string
+
+const (
+	statefulSetUpdateAnnotation = "migration.openshift.io/statefulset-update"
+	statefulSetTempAnnotation   = "migration.openshift.io/statefulset-temporary"
+)
 
 // Add adds a new PVC to mapping
 func (p pvcNameMapping) Add(namespace string, srcName string, destName string) {
@@ -103,6 +109,12 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on CronJobs [%s]", strings.Join(failedCronJobNames, ",")))
 	}
+	// update pvc refs on statefulsets
+	failedStatefulSetNames := t.swapStatefulSetPVCRefs(client, mapping)
+	if len(failedStatefulSetNames) > 0 {
+		reasons = append(reasons,
+			fmt.Sprintf("Failed updating PVC references on StatefulSets [%s]", strings.Join(failedStatefulSetNames, ",")))
+	}
 	return
 }
 
@@ -117,6 +129,131 @@ func (t *Task) getPVCNameMapping() pvcNameMapping {
 		}
 	}
 	return mapping
+}
+
+func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMapping) (failedStatefulSets []string) {
+	for _, ns := range t.destinationNamespaces() {
+		list := appsv1.StatefulSetList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			&list,
+			options)
+		if err != nil {
+			t.Log.Error(err, "failed listing statefulsets", "namespace", ns)
+			continue
+		}
+		for i := range list.Items {
+			set := &list.Items[i]
+			newSet := &appsv1.StatefulSet{}
+			if len(set.Name) >= 60 {
+				failedStatefulSets = append(failedStatefulSets,
+					fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+				continue
+			}
+			set.ResourceVersion = ""
+			set.ManagedFields = nil
+			set.SelfLink = ""
+			newSet.Name = fmt.Sprintf("%s-%s", set.Name, migapi.StorageConversionPVCNamePrefix)
+			newSet.Namespace = set.Namespace
+			newSet.Labels = set.Labels
+			newSet.Annotations = make(map[string]string)
+			for k, v := range set.Annotations {
+				newSet.Annotations[k] = v
+			}
+			newSet.Annotations[statefulSetTempAnnotation] = migapi.True
+			newSet.Spec = *set.Spec.DeepCopy()
+			zero := int32(0)
+			newSet.Spec.Replicas = &zero
+			if set.Annotations == nil {
+				continue
+			}
+			if replicas, exist := set.Annotations[migapi.ReplicasAnnotation]; exist {
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					t.Log.Error(err, "failed finding replica count for statefulset",
+						"namespace", set.Namespace, "statefulset", set.Name)
+					failedStatefulSets = append(failedStatefulSets,
+						fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+				} else {
+					delete(set.Annotations, migapi.ReplicasAnnotation)
+					restoredReplicas := int32(number)
+					// Only change replica count if currently == 0
+					if *set.Spec.Replicas == 0 {
+						set.Spec.Replicas = &restoredReplicas
+					}
+				}
+			}
+			for i := range set.Spec.VolumeClaimTemplates {
+				volumeTemplate := &set.Spec.VolumeClaimTemplates[i]
+				formattedName := volumeTemplate.Name
+				if t.rollback() {
+					if _, exists := set.Annotations[statefulSetUpdateAnnotation]; exists {
+						delete(set.Annotations, statefulSetUpdateAnnotation)
+						matcher := regexp.MustCompile(fmt.Sprintf("-%s$", migapi.StorageConversionPVCNamePrefix))
+						if matcher.MatchString(volumeTemplate.Name) {
+							formattedName = matcher.ReplaceAllString(volumeTemplate.Name, "")
+						}
+					}
+					if _, exists := set.Annotations[statefulSetTempAnnotation]; exists {
+						t.Log.Error(fmt.Errorf("failed rolling back statefulset"),
+							"namespace", set.Namespace, "statefulset", set.Name)
+						failedStatefulSets = append(failedStatefulSets,
+							fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+						continue
+					}
+				} else {
+					if set.Annotations == nil {
+						set.Annotations = make(map[string]string)
+					}
+					set.Annotations[statefulSetUpdateAnnotation] = migapi.True
+					formattedName = fmt.Sprintf("%s-%s", volumeTemplate.Name, migapi.StorageConversionPVCNamePrefix)
+				}
+				for i := range set.Spec.Template.Spec.Containers {
+					container := &set.Spec.Template.Spec.Containers[i]
+					for i := range container.VolumeMounts {
+						volumeMount := &container.VolumeMounts[i]
+						if volumeMount.Name == volumeTemplate.Name {
+							volumeMount.Name = formattedName
+						}
+					}
+				}
+				volumeTemplate.Name = formattedName
+			}
+			err = client.Create(context.TODO(), newSet)
+			if err != nil {
+				t.Log.Error(err, "failed creating temporary statefulset",
+					"namespace", newSet.Namespace, "statefulset", newSet.Name)
+				failedStatefulSets = append(failedStatefulSets,
+					fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+				continue
+			}
+			err = client.Delete(context.TODO(), set)
+			if err != nil {
+				t.Log.Error(err, "failed deleting statefulset",
+					"namespace", set.Namespace, "statefulset", set.Name)
+				failedStatefulSets = append(failedStatefulSets,
+					fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+				continue
+			}
+			err = client.Create(context.TODO(), set)
+			if err != nil {
+				t.Log.Error(err, "failed creating updated statefulset",
+					"namespace", set.Namespace, "statefulset", set.Name)
+				failedStatefulSets = append(failedStatefulSets,
+					fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+				continue
+			}
+			err = client.Delete(context.TODO(), newSet)
+			if err != nil {
+				t.Log.Error(err, "failed deleting temporary statefulset",
+					"namespace", set.Namespace, "statefulset", set.Name)
+				failedStatefulSets = append(failedStatefulSets,
+					fmt.Sprintf("%s/%s", set.Namespace, set.Name))
+			}
+		}
+	}
+	return
 }
 
 // swapDeploymentPVCRefs
