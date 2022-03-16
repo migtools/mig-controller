@@ -68,7 +68,7 @@ const (
 
 // constants
 const (
-	RegistryDefaultProbeTimeout = 3
+	RegistryDefaultProbeTimeout = 300
 )
 
 // MigClusterSpec defines the desired state of MigCluster
