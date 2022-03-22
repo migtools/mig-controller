@@ -27,7 +27,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: docker://quay.io/konveyor/pr-bz-github-action 
+      - uses: docker://quay.io/shawn_hurley/testing-pr-action
         name: update bugzilla with posted pr
         with:
           org_repo: ${{ github.repository }}
