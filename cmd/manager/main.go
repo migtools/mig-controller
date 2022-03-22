@@ -42,6 +42,7 @@ import (
 func main() {
 	logf.SetLogger(zapmod.ZapLogger(false))
 	log := logf.Log.WithName("entrypoint")
+        log.Infof("testing:")
 
 	// Start prometheus metrics HTTP handler
 	log.Info("setting up prometheus endpoint :2112/metrics")
