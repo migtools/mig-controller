@@ -121,8 +121,11 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 func (t *Task) getPVCNameMapping() pvcNameMapping {
 	mapping := make(pvcNameMapping)
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		// If this is a rollback migration, the mapping of PVC names should be Destination -> Source
-		if t.rollback() {
+		if pv.Selection.Action == migapi.PvSkipAction {
+			// for skipped pvcs, there is no need to switch PVC references
+			mapping.Add(pv.PVC.Namespace, pv.PVC.GetSourceName(), pv.PVC.GetSourceName())
+		} else if t.rollback() {
+			// If this is a rollback migration, the mapping of PVC names should be Destination -> Source
 			mapping.Add(pv.PVC.Namespace, pv.PVC.GetTargetName(), pv.PVC.GetSourceName())
 		} else {
 			mapping.Add(pv.PVC.Namespace, pv.PVC.GetSourceName(), pv.PVC.GetTargetName())
