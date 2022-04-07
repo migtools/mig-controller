@@ -698,7 +698,7 @@ func (t *Task) getNamespacedPVCPairs() (map[string][]transfer.PVCPair, error) {
 }
 
 func (t *Task) getSourceSecurityGroupInfo(srcClient compat.Client, pvcPairMap map[string][]transfer.PVCPair) (pvcWithSecurityContextInfo, error) {
-	var pvcInfo pvcWithSecurityContextInfo
+	pvcInfo := make(pvcWithSecurityContextInfo)
 
 	for bothNS := range pvcPairMap {
 		srcNs := getSourceNs(bothNS)
@@ -737,8 +737,8 @@ func (t *Task) getSourceSecurityGroupInfo(srcClient compat.Client, pvcPairMap ma
 				seLinuxOptions:     nil,
 				verify:             pvc.Verify,
 			}
-			pvcInfo.Add(pvc.Name, pvc.Namespace, secInfo)
 		}
+		pvcInfo.Add(pvc.Name, pvc.Namespace, secInfo)
 	}
 	return pvcInfo, nil
 }
