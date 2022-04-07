@@ -110,7 +110,7 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 			fmt.Sprintf("Failed updating PVC references on CronJobs [%s]", strings.Join(failedCronJobNames, ",")))
 	}
 	// update pvc refs on statefulsets
-	failedStatefulSetNames := t.swapStatefulSetPVCRefs(client, mapping)
+	failedStatefulSetNames := t.swapStatefulSetPVCRefs(client)
 	if len(failedStatefulSetNames) > 0 {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on StatefulSets [%s]", strings.Join(failedStatefulSetNames, ",")))
@@ -134,7 +134,7 @@ func (t *Task) getPVCNameMapping() pvcNameMapping {
 	return mapping
 }
 
-func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMapping) (failedStatefulSets []string) {
+func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client) (failedStatefulSets []string) {
 	for _, ns := range t.destinationNamespaces() {
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
