@@ -387,13 +387,17 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			}
 			pod, err := t.getLatestPodForOperation(srcClient, *lastObservedOperationStatus)
 			if err != nil {
+				t.Log.Error(err, "failed getting latest rsync client pod", "pvc", newOperation)
 				currentStatus.AddError(err)
+				statusList.Add(currentStatus)
 				continue
 			}
 
 			pvcList, err := transfer.NewPVCPairList(pvc)
 			if err != nil {
+				t.Log.Error(err, "failed creating PVC pair", "pvc", newOperation)
 				currentStatus.AddError(err)
+				statusList.Add(currentStatus)
 				continue
 			}
 
@@ -428,25 +432,30 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					transfer, err := rsynctransfer.NewTransfer(
 						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 					if err != nil {
+						t.Log.Error(err, "failed creating new rsync transfer", "pvc", newOperation)
 						currentStatus.AddError(err)
+						statusList.Add(currentStatus)
 						continue
 					}
 					if transfer == nil {
 						currentStatus.AddError(
 							fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
+						statusList.Add(currentStatus)
 						continue
 					}
 					err = transfer.CreateClient(srcClient)
 					if err != nil {
-						t.Log.Info("failed creating Rsync Pod for pvc", "pvc", newOperation, "err", err)
+						t.Log.Error(err, "failed creating rsync pod for pvc", "pvc", newOperation)
 						currentStatus.AddError(err)
+						statusList.Add(currentStatus)
 						continue
 					}
 					t.Log.Info("previous attempt of Rsync failed for pvc, created a new pod", "pvc", newOperation)
 					err = srcClient.Delete(context.TODO(), pod)
 					if err != nil {
-						t.Log.Info("failed deleting Rsync Pod of previous attempt for pvc", "pvc", newOperation)
+						t.Log.Error(err, "failed deleting rsync pod of previous attempt for pvc", "pvc", newOperation)
 						currentStatus.AddError(err)
+						statusList.Add(currentStatus)
 						continue
 					}
 				} else {
@@ -471,17 +480,22 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				transfer, err := rsynctransfer.NewTransfer(
 					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
 				if err != nil {
+					t.Log.Error(err, "failed creating rsync transfer", "pvc", newOperation)
 					currentStatus.AddError(err)
+					statusList.Add(currentStatus)
 					continue
 				}
 				if transfer == nil {
 					currentStatus.AddError(
 						fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
+					statusList.Add(currentStatus)
 					continue
 				}
 				err = transfer.CreateClient(srcClient)
 				if err != nil {
+					t.Log.Error(err, "failed creating rsync client", "pvc", newOperation)
 					currentStatus.AddError(err)
+					statusList.Add(currentStatus)
 					continue
 				}
 			}
