@@ -412,6 +412,11 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 	targetStorageClassName := ""
 	warnIfTargetUnavailable := false
 
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return targetStorageClassName, liberr.Wrap(err)
+	}
+
 	// For gluster src volumes, migrate to cephfs or cephrbd (warn if unavailable)
 	// For nfs src volumes, migrate to cephfs or cephrbd (no warning if unavailable)
 	if srcProvisioner == "kubernetes.io/glusterfs" ||
@@ -426,7 +431,8 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 			targetProvisioner = findProvisionerForSuffix("cephfs.csi.ceph.com", destStorageClasses)
 		}
 		// warn for gluster but not NFS
-		if pv.Spec.NFS == nil {
+		// don't warn for intra-cluster migrations
+		if pv.Spec.NFS == nil && !isIntraCluster {
 			warnIfTargetUnavailable = true
 		}
 		// For all other pvs, migrate to storage class with the same provisioner, if available
