@@ -983,7 +983,11 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 	directVolumeProgress *model.DirectVolumeMigrationProgress, parent *TreeNode) error {
 
 	podSelector := directVolumeProgress.DecodeObject().Spec.PodSelector
+	podNamespace := directVolumeProgress.DecodeObject().Spec.PodNamespace
 	if podSelector == nil {
+		return nil
+	}
+	if podNamespace == "" {
 		return nil
 	}
 	collection := model.Pod{
@@ -996,16 +1000,18 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 		Log.Trace(err)
 		return err
 	}
-	for _, m := range list {
-		parent.Children = append(
-			parent.Children,
-			TreeNode{
-				Kind:        migref.ToKind(m),
-				ObjectLink:  PodHandler{}.Link(&cluster, m),
-				Namespace:   m.Namespace,
-				Name:        m.Name,
-				ClusterType: t.clusterType(&cluster),
-			})
+	for i, m := range list {
+		if list[i].Namespace == podNamespace {
+			parent.Children = append(
+				parent.Children,
+				TreeNode{
+					Kind:        migref.ToKind(m),
+					ObjectLink:  PodHandler{}.Link(&cluster, m),
+					Namespace:   m.Namespace,
+					Name:        m.Name,
+					ClusterType: t.clusterType(&cluster),
+				})
+		}
 	}
 	return nil
 }
