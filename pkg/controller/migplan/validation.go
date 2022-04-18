@@ -42,6 +42,7 @@ const (
 	SourceClusterNoRegistryPath                = "SourceClusterNoRegistryPath"
 	DestinationClusterNoRegistryPath           = "DestinationClusterNoRegistryPath"
 	StorageNotReady                            = "StorageNotReady"
+	StorageClassConversionUnavailable          = "StorageClassConversionUnavailable"
 	NsListEmpty                                = "NamespaceListEmpty"
 	InvalidDestinationCluster                  = "InvalidDestinationCluster"
 	NsNotFoundOnSourceCluster                  = "NamespaceNotFoundOnSourceCluster"
@@ -1108,7 +1109,7 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 	for _, storageClass := range plan.Status.DestStorageClasses {
 		storageClasses[storageClass.Name] = storageClass.AccessModes
 	}
-
+	skippedVolumes := 0
 	for _, pv := range plan.Spec.PersistentVolumes.List {
 		actions := map[string]bool{}
 		if len(pv.Supported.Actions) > 0 {
@@ -1123,6 +1124,9 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 		if !found {
 			invalidAction = append(invalidAction, pv.Name)
 			continue
+		}
+		if pv.Selection.Action == migapi.PvSkipAction {
+			skippedVolumes += 1
 		}
 		// Don't report StorageClass, AccessMode, CopyMethod errors if Action != 'copy'
 		if pv.Selection.Action != migapi.PvCopyAction {
@@ -1273,7 +1277,25 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 			Items:    invalidPVCNameMappings,
 		})
 	}
-
+	// storage class conversion specific validations
+	if isStorageConversionPlan(plan) {
+		if skippedVolumes == len(plan.Spec.PersistentVolumes.List) {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     StorageClassConversionUnavailable,
+				Status:   True,
+				Category: Critical,
+				Message:  "At least one PVC must be selected for Storage Class Conversion.",
+			})
+		}
+		if len(plan.Status.DestStorageClasses) < 2 {
+			plan.Status.SetCondition(migapi.Condition{
+				Type:     StorageClassConversionUnavailable,
+				Status:   True,
+				Category: Critical,
+				Message:  "At least two Storage Classes must be available in the cluster for Storage Class Conversion.",
+			})
+		}
+	}
 	return nil
 }
 
