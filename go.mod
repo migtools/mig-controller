@@ -4,27 +4,31 @@ go 1.14
 
 require (
 	cloud.google.com/go/storage v1.10.0
-	github.com/Azure/azure-sdk-for-go v48.1.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.21
-	github.com/Azure/go-autorest/autorest/adal v0.9.14
+	github.com/Azure/azure-sdk-for-go v61.4.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.24
+	github.com/Azure/go-autorest/autorest/adal v0.9.18
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
 	github.com/containerd/containerd v1.5.7 // indirect
-	github.com/containers/image/v5 v5.7.0
+	github.com/containers/image/v5 v5.17.0
 	github.com/containers/storage v1.37.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dnaeon/go-vcr v1.1.0 // indirect
 	github.com/elazarl/goproxy v0.0.0-20201021153353-00ad82a08272 // indirect
+	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/gin-contrib/cors v1.3.1
-	github.com/gin-gonic/gin v1.7.2
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-logr/logr v0.4.0
 	github.com/go-logr/zapr v0.3.0
-	github.com/go-playground/validator/v10 v10.8.0 // indirect
-	github.com/google/uuid v1.2.0
+	github.com/go-playground/validator/v10 v10.10.0 // indirect
+	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/google/uuid v1.3.0
 	github.com/joho/godotenv v1.3.0
+	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/konveyor/controller v0.4.1
 	github.com/konveyor/crane-lib v0.0.6-0.20220110140809-e59142d7deab
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
+	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
@@ -36,9 +40,13 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ugorji/go v1.2.6 // indirect
+	github.com/vbauerster/mpb/v5 v5.3.0 // indirect
+	github.com/vbauerster/mpb/v6 v6.0.3 // indirect
 	github.com/vmware-tanzu/velero v1.7.1
 	go.uber.org/zap v1.17.0
-	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
+	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
 	google.golang.org/api v0.56.0
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
