@@ -2,8 +2,6 @@ package directvolumemigration
 
 import (
 	"context"
-	"path"
-
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -11,6 +9,7 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"path"
 )
 
 func (t *Task) areSourcePVCsUnattached() error {
@@ -116,10 +115,19 @@ func (t *Task) createDestinationPVCs() error {
 			"pvcStorageClassName", destPVC.Spec.StorageClassName,
 			"pvcAccessModes", destPVC.Spec.AccessModes,
 			"pvcRequests", destPVC.Spec.Resources.Requests)
-		err = destClient.Create(context.TODO(), &destPVC)
-		if k8serror.IsAlreadyExists(err) {
-			t.Log.Info("PVC already exists on destination", "name", pvc.Name)
-		} else if err != nil {
+		destPVCCheck := corev1.PersistentVolumeClaim{}
+		err = destClient.Get(context.TODO(), types.NamespacedName{
+			Namespace: destNs,
+			Name:      destName,
+		}, &destPVCCheck)
+		if k8serror.IsNotFound(err) {
+			err = destClient.Create(context.TODO(), &destPVC)
+			if err != nil {
+				return err
+			}
+		} else if err == nil {
+			t.Log.Info("PVC already exists on destination", "namespace", pvc.Namespace, "name", pvc.Name)
+		} else {
 			return err
 		}
 	}

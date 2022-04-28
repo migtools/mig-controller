@@ -55,6 +55,9 @@ require (
 	sigs.k8s.io/controller-runtime v0.10.2
 )
 
+// CVE-2021-41190
+replace github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2-0.20211123152302-43a7dee1ec31
+
 // CVE-2020-28483
 replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.2
 

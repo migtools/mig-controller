@@ -271,10 +271,10 @@ func (t *Task) playbookJobTemplate(hook migapi.MigPlanHook, migHook migapi.MigHo
 	jobTemplate.Spec.Template.Spec.Containers[0].Command = []string{
 		"/bin/entrypoint",
 		"ansible-runner",
-		"-p",
-		"/tmp/playbook/playbook.yml",
 		"run",
 		"/tmp/runner",
+		"-p",
+		"/tmp/playbook/playbook.yml",
 	}
 
 	jobTemplate.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{

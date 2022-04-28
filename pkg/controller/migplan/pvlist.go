@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -199,6 +200,26 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPla
 	if err != nil {
 		return nil, err
 	}
+	allPodList := core.PodList{}
+	err = client.List(context.TODO(), &allPodList, &k8sclient.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	inNamespaces := func(objNamespace string, namespaces []string) bool {
+		for _, ns := range namespaces {
+			if ns == objNamespace {
+				return true
+			}
+		}
+		return false
+	}
+	podList := []core.Pod{}
+	for _, pod := range allPodList.Items {
+		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
+			podList = append(podList, pod)
+		}
+	}
+
 	for _, pv := range list.Items {
 		if pv.Status.Phase != core.VolumeBound {
 			continue
@@ -207,7 +228,7 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPla
 		if migref.RefSet(claim) {
 			key := k8sclient.ObjectKey{
 				Namespace: claim.Namespace,
-				Name:      getMappedNameForPVC(claim, plan),
+				Name:      getMappedNameForPVC(claim, podList, plan),
 			}
 			pvMap[key] = pv
 		}
@@ -216,7 +237,7 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPla
 	return pvMap, nil
 }
 
-func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) string {
+func getMappedNameForPVC(pvcRef *core.ObjectReference, podList []core.Pod, plan *migapi.MigPlan) string {
 	pvcName := pvcRef.Name
 	existingPVC := plan.Spec.FindPVC(pvcRef.Namespace, pvcRef.Name)
 	if existingPVC != nil &&
@@ -233,6 +254,9 @@ func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) str
 			return pvcName
 		} else {
 			destName := fmt.Sprintf("%s:%s-%s", pvcName, pvcName, migapi.StorageConversionPVCNamePrefix)
+			if isStatefulSet, setName := isStatefulSetVolume(pvcRef, podList); isStatefulSet {
+				destName = getStatefulSetVolumeName(pvcName, setName)
+			}
 			if len(destName) > 253 {
 				return destName[:253]
 			} else {
@@ -243,11 +267,46 @@ func getMappedNameForPVC(pvcRef *core.ObjectReference, plan *migapi.MigPlan) str
 	return pvcName
 }
 
+// getStatefulSetVolumeName add the storage conversion prefix between the ordeal and the pvc name string
+func getStatefulSetVolumeName(pvcName string, setName string) string {
+	formattedName := pvcName
+	matcher := regexp.MustCompile(fmt.Sprintf("(.*)?(-%s)(-\\d+)$", setName))
+	if !matcher.MatchString(pvcName) {
+		return pvcName
+	} else {
+		cols := matcher.FindStringSubmatch(pvcName)
+		if len(cols) > 3 {
+			formattedName = fmt.Sprintf("%s:%s-%s%s%s",
+				pvcName, cols[1],
+				migapi.StorageConversionPVCNamePrefix, cols[2], cols[3])
+		}
+	}
+	return formattedName
+}
+
+// isStatefulSetVolume given a volume and a list of discovered pods, returns whether the volume is used by a statefulset
+func isStatefulSetVolume(pvcRef *core.ObjectReference, podList []core.Pod) (bool, string) {
+	for _, pod := range podList {
+		for _, owner := range pod.OwnerReferences {
+			if owner.Kind == "StatefulSet" {
+				for _, vol := range pod.Spec.Volumes {
+					if vol.PersistentVolumeClaim != nil {
+						if vol.PersistentVolumeClaim.ClaimName == pvcRef.Name {
+							return true, owner.Name
+						}
+					}
+				}
+			}
+		}
+	}
+	return false, ""
+}
+
 // isStorageConversionPlan tells whether the migration plan is for storage conversion
 func isStorageConversionPlan(plan *migapi.MigPlan) bool {
-	migrationTypeCond := plan.Status.FindCondition(MigrationTypeIdentified)
+	migrationTypeCond := plan.Status.FindCondition(migapi.MigrationTypeIdentified)
 	if migrationTypeCond != nil {
-		if migrationTypeCond.Reason == StorageConversionPlan {
+		if migrationTypeCond.Reason == string(migapi.StorageConversionPlan) {
 			return true
 		}
 	}
@@ -313,7 +372,7 @@ func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPl
 				Name: getMappedNameForPVC(&core.ObjectReference{
 					Name:      pvc.Name,
 					Namespace: pvc.Namespace,
-				}, plan),
+				}, podList, plan),
 				AccessModes:  pvc.Spec.AccessModes,
 				HasReference: pvcInPodVolumes(pvc, podList),
 			})
@@ -412,6 +471,11 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 	targetStorageClassName := ""
 	warnIfTargetUnavailable := false
 
+	isIntraCluster, err := plan.IsIntraCluster(r)
+	if err != nil {
+		return targetStorageClassName, liberr.Wrap(err)
+	}
+
 	// For gluster src volumes, migrate to cephfs or cephrbd (warn if unavailable)
 	// For nfs src volumes, migrate to cephfs or cephrbd (no warning if unavailable)
 	if srcProvisioner == "kubernetes.io/glusterfs" ||
@@ -426,7 +490,8 @@ func (r *ReconcileMigPlan) getDestStorageClass(pv core.PersistentVolume,
 			targetProvisioner = findProvisionerForSuffix("cephfs.csi.ceph.com", destStorageClasses)
 		}
 		// warn for gluster but not NFS
-		if pv.Spec.NFS == nil {
+		// don't warn for intra-cluster migrations
+		if pv.Spec.NFS == nil && !isIntraCluster {
 			warnIfTargetUnavailable = true
 		}
 		// For all other pvs, migrate to storage class with the same provisioner, if available
