@@ -9,13 +9,10 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.18
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
-	github.com/containerd/containerd v1.5.7 // indirect
 	github.com/containers/image/v5 v5.17.0
-	github.com/containers/storage v1.37.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dnaeon/go-vcr v1.1.0 // indirect
 	github.com/elazarl/goproxy v0.0.0-20201021153353-00ad82a08272 // indirect
-	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-logr/logr v0.4.0
@@ -24,11 +21,9 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/google/uuid v1.3.0
 	github.com/joho/godotenv v1.3.0
-	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/konveyor/controller v0.4.1
 	github.com/konveyor/crane-lib v0.0.6-0.20220110140809-e59142d7deab
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
-	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.16.0
@@ -40,8 +35,6 @@ require (
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ugorji/go v1.2.6 // indirect
-	github.com/vbauerster/mpb/v5 v5.3.0 // indirect
-	github.com/vbauerster/mpb/v6 v6.0.3 // indirect
 	github.com/vmware-tanzu/velero v1.7.1
 	go.uber.org/zap v1.17.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
@@ -54,6 +47,18 @@ require (
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
 	sigs.k8s.io/controller-runtime v0.10.2
 )
+
+// CVE-2015-3627
+replace github.com/docker/docker => github.com/docker/docker v20.10.14+incompatible
+
+// CVE-2022-23648, CVE-2021-43816, and Ambiguous OCI manifest parsing (no CVE)
+replace github.com/containerd/containerd => github.com/containerd/containerd v1.5.10
+
+// CVE-2021-43784
+replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.1
+
+// OCI Manifest Type Confusion Issue (No CVE)
+replace github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
 
 // CVE-2021-41190
 replace github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2-0.20211123152302-43a7dee1ec31
