@@ -305,13 +305,13 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 	if plan.Spec.IndirectImageMigration || plan.Spec.IndirectVolumeMigration {
 		msg := "Indirect migration modes can only be used for full namespace migrations."
 		setMigrationType(plan, migapi.NamespaceMigrationPlan, msg, false)
-		if isIntraCluster {
+		if isIntraCluster && plan.Spec.IndirectVolumeMigration {
 			plan.Status.SetCondition(migapi.Condition{
 				Type:     IntraClusterMigration,
 				Status:   True,
 				Reason:   string(migapi.NamespaceMigrationPlan),
 				Category: Critical,
-				Message:  "Indirect migration modes cannot be used in intra-cluster migrations.",
+				Message:  "Indirect volume migration mode cannot be used in intra-cluster migrations.",
 			})
 		}
 		return nil
