@@ -31,7 +31,7 @@ require (
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/uber/jaeger-client-go v2.25.0+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ugorji/go v1.2.6 // indirect
@@ -48,6 +48,9 @@ require (
 	sigs.k8s.io/controller-runtime v0.10.2
 )
 
+// CVE-2020-28483
+replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.7
+
 // CVE-2015-3627
 replace github.com/docker/docker => github.com/docker/docker v20.10.14+incompatible
 
@@ -62,9 +65,6 @@ replace github.com/docker/distribution => github.com/docker/distribution v2.8.1+
 
 // CVE-2021-41190
 replace github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2-0.20211123152302-43a7dee1ec31
-
-// CVE-2020-28483
-replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.2
 
 // CVE-2021-3121
 replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
