@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7 AS builder
+FROM quay.io/konveyor/builder:latest AS builder
 
 # Copy in the go src
 WORKDIR $APP_ROOT/src/github.com/konveyor/mig-controller
