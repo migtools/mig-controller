@@ -506,7 +506,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 						LivenessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/v2/_catalog?n=5",
+									Path: RegistryDefaultHealthcheckSubpath,
 									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
@@ -517,7 +517,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 						ReadinessProbe: &kapi.Probe{
 							Handler: kapi.Handler{
 								HTTPGet: &kapi.HTTPGetAction{
-									Path: "/v2/_catalog?n=5",
+									Path: RegistryDefaultHealthcheckSubpath,
 									Port: intstr.IntOrString{IntVal: 5000},
 								},
 							},
