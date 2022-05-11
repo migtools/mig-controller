@@ -64,11 +64,13 @@ const (
 	OperatorVersionKey            = "OPERATOR_VERSION"
 	RegistryReadinessProbeTimeout = "REGISTRY_READINESS_TIMEOUT"
 	RegistryLivenessProbeTimeout  = "REGISTRY_LIVENESS_TIMEOUT"
+	RegistryValidationSubpath     = "REGISTRY_VALIDATION_SUBPATH"
 )
 
 // constants
 const (
-	RegistryDefaultProbeTimeout = 300
+	RegistryDefaultProbeTimeout       = 300
+	RegistryDefaultHealthcheckSubpath = "/v2/_catalog?n=5"
 )
 
 // MigClusterSpec defines the desired state of MigCluster

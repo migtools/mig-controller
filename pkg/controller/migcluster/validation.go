@@ -3,6 +3,7 @@ package migcluster
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -306,8 +307,29 @@ func (r ReconcileMigCluster) validateRegistryRoute(ctx context.Context, cluster 
 func checkRegistryConnection(cluster *migapi.MigCluster, kclient k8sclient.Client) (int, error, error) {
 	var statusCode int
 
-	url := "https://" + cluster.Spec.ExposedRegistryPath + "/v2/"
+	validationSubPath := migapi.RegistryDefaultHealthcheckSubpath
+	clusterClient, err := cluster.GetClient(kclient)
+	if err != nil {
+		return statusCode, nil, err
+	}
+	clusterConfig, err := cluster.GetClusterConfigMap(clusterClient)
+	if err != nil {
+		return statusCode, nil, err
+	}
+	if val, exists := clusterConfig.Data[migapi.RegistryValidationSubpath]; exists {
+		log.V(4).Info("using configured validation subpath", "path", val)
+		validationSubPath = val
+	}
+
+	registryURI := "https://" + cluster.Spec.ExposedRegistryPath + validationSubPath
+	if _, err := url.ParseRequestURI(registryURI); err != nil {
+		log.Error(err, "failed to parse exposed registry validation url", "url", registryURI)
+		return statusCode, fmt.Errorf("invalid healthcheck url %s", registryURI), nil
+	}
 	restConfig, err := cluster.BuildRestConfig(kclient)
+	if err != nil {
+		return statusCode, nil, err
+	}
 	token := restConfig.BearerToken
 	// Construct transport using default values from http lib
 	defaultTransport := http.DefaultTransport.(*http.Transport)
@@ -324,7 +346,7 @@ func checkRegistryConnection(cluster *migapi.MigCluster, kclient k8sclient.Clien
 	}
 
 	client := &http.Client{Transport: transport}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", registryURI, nil)
 	if err != nil {
 		return statusCode, nil, err
 	}
@@ -333,7 +355,17 @@ func checkRegistryConnection(cluster *migapi.MigCluster, kclient k8sclient.Clien
 	res, regErr := client.Do(req)
 	if regErr == nil && res != nil {
 		statusCode = res.StatusCode
+		if validationSubPath == migapi.RegistryDefaultHealthcheckSubpath {
+			type catalog struct {
+				Repositories []string `json:"repositories"`
+			}
+			if err := json.NewDecoder(res.Body).Decode(&catalog{}); err != nil {
+				return statusCode,
+					fmt.Errorf("invalid reply from registry url %s", registryURI), nil
+			}
+		}
 	}
+
 	return statusCode, regErr, nil
 }
 
