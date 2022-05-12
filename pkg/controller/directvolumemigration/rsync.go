@@ -117,8 +117,8 @@ func (t *Task) ensureRsyncEndpoint() error {
 }
 
 // getRsyncTransferContainerMutation returns container mutation to be applied on Rsync tranfer pods
-func (t *Task) getRsyncTransferContainerMutation(srcClient compat.Client) (*corev1.Container, error) {
-	isPrivileged, err := isRsyncPrivileged(srcClient)
+func (t *Task) getRsyncTransferContainerMutation(client compat.Client) (*corev1.Container, error) {
+	isPrivileged, err := isRsyncPrivileged(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -187,7 +187,7 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 }
 
 // getRsyncContainerMutations get Rsync container mutations
-func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsynctransfer.TransferOption, error) {
+func (t *Task) getRsyncContainerMutations(client compat.Client) ([]rsynctransfer.TransferOption, error) {
 	transferOptions := []rsynctransfer.TransferOption{}
 	// info, exists := pvcSecInfo.Get(
 	// 	pvc.Source().Claim().Name, pvc.Source().Claim().Namespace)
@@ -211,7 +211,7 @@ func (t *Task) getRsyncContainerMutations(srcClient compat.Client) ([]rsynctrans
 	// 	}
 
 	// }
-	containerMutation, err := t.getRsyncTransferContainerMutation(srcClient)
+	containerMutation, err := t.getRsyncTransferContainerMutation(client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -287,7 +287,7 @@ func (t *Task) ensureRsyncTransferServer() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		mutations, err := t.getRsyncContainerMutations(srcClient)
+		mutations, err := t.getRsyncContainerMutations(destClient)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
