@@ -1574,7 +1574,16 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod
 		for _, model := range podModels {
 			pod := PlanPod{}
 			pod.With(model, &cluster)
-			pods = append(pods, pod)
+			present := false
+			for _, p := range pods {
+				if p.Name == pod.Name {
+					present = true
+					break
+				}
+			}
+			if !present {
+				pods = append(pods, pod)
+			}
 		}
 	}
 
