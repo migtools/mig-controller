@@ -17,7 +17,7 @@ func FindVeleroPods(client k8sclient.Client) ([]corev1.Pod, error) {
 	list := &corev1.PodList{}
 	labelSelector := labels.SelectorFromSet(
 		map[string]string{
-			"component": "velero",
+			"app.kubernetes.io/instance": "velero",
 		})
 	fieldSelector := fields.SelectorFromSet(
 		map[string]string{
