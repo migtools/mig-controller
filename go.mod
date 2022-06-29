@@ -39,7 +39,6 @@ require (
 	go.uber.org/zap v1.17.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
-	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
 	google.golang.org/api v0.56.0
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
@@ -54,11 +53,11 @@ replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.7
 // CVE-2015-3627
 replace github.com/docker/docker => github.com/docker/docker v20.10.14+incompatible
 
-// CVE-2022-23648, CVE-2021-43816, and Ambiguous OCI manifest parsing (no CVE)
-replace github.com/containerd/containerd => github.com/containerd/containerd v1.5.10
+// CVE-2022-23648, CVE-2021-43816, CVE-2022-31030, and Ambiguous OCI manifest parsing (no CVE)
+replace github.com/containerd/containerd => github.com/containerd/containerd v1.5.13
 
-// CVE-2021-43784
-replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.1
+// CVE-2021-43784, CVE-2022-29162
+replace github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.2
 
 // OCI Manifest Type Confusion Issue (No CVE)
 replace github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
