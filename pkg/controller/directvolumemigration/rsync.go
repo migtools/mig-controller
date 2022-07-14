@@ -152,25 +152,20 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 }
 
 // getRsyncClientMutations get Rsync container mutations for source Rsync Pod
-func (t *Task) getRsyncClientMutations(client compat.Client, namespace string) ([]rsynctransfer.TransferOption, error) {
+func (t *Task) getRsyncClientMutations(srcClient compat.Client, destClient compat.Client, namespace string) ([]rsynctransfer.TransferOption, error) {
 	transferOptions := []rsynctransfer.TransferOption{}
 	containerMutation := &corev1.Container{}
-	isPrivileged, err := isRsyncPrivileged(client)
+
+	migration, err := t.Owner.GetMigrationForDVM(destClient)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
-	runAsUser := int64(0)
-	trueBool := bool(true)
-	customSecurityContext := &corev1.SecurityContext{
-		Privileged:             &isPrivileged,
-		RunAsUser:              &runAsUser,
-		ReadOnlyRootFilesystem: &trueBool,
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-		},
+
+	containerMutation.SecurityContext, err = t.getSecurityContext(srcClient, namespace, migration)
+	if err != nil {
+		return nil, liberr.Wrap(err)
 	}
-	containerMutation.SecurityContext = customSecurityContext
-	resourceRequirements, err := t.getRsyncClientResourceRequirements(namespace, client)
+	resourceRequirements, err := t.getRsyncClientResourceRequirements(namespace, srcClient)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -186,26 +181,21 @@ func (t *Task) getRsyncClientMutations(client compat.Client, namespace string) (
 func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace string) ([]rsynctransfer.TransferOption, error) {
 	transferOptions := []rsynctransfer.TransferOption{}
 	containerMutation := &corev1.Container{}
-	isPrivileged, err := isRsyncPrivileged(client)
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
+
 	resourceRequirements, err := t.getRsyncServerResourceRequirements(namespace, client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
 	containerMutation.Resources = resourceRequirements
-	trueBool := bool(true)
-	runAsUser := int64(0)
-	securityContext := &corev1.SecurityContext{
-		Privileged:             &isPrivileged,
-		ReadOnlyRootFilesystem: &trueBool,
-		RunAsUser:              &runAsUser,
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-		},
+	migration, err := t.Owner.GetMigrationForDVM(client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
 	}
-	containerMutation.SecurityContext = securityContext
+
+	containerMutation.SecurityContext, err = t.getSecurityContext(client, namespace, migration)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
 	transferOptions = append(transferOptions,
 		rsynctransfer.DestinationContainerMutation{
 			C: containerMutation,
@@ -221,6 +211,73 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 	}
 	transferOptions = append(transferOptions, podSecurityContext)
 	return transferOptions, nil
+}
+
+// getSecurityContext returns the appropriate pod security context based on user input on migmigration
+func (t *Task) getSecurityContext(client compat.Client, namespace string, migration *migapi.MigMigration) (*corev1.SecurityContext, error) {
+	securityContext := &corev1.SecurityContext{}
+	isPrivileged, err := isRsyncPrivileged(client)
+	if err != nil {
+		return securityContext, liberr.Wrap(err)
+	}
+	trueBool := true
+	falseBool := false
+	if migration.Spec.RunAsRoot != nil && *migration.Spec.RunAsRoot {
+		// if rsync needs to run as root then check if the cluster if 4.11+ to see if namespace needs needed label or not to run pod as root.
+		checkLabels := checkUserNamespaceLabel(client)
+		// assume that namespace has the label, this will be useful in the case where cluster version is < 4.11
+		privilegedLabelPresent := true
+		// if the cluster version is 4.11+ then check for the labels on namespace to run rsync as root
+		if checkLabels {
+			privilegedLabelPresent, err = isPrivilegedLabelPresent(client, namespace)
+			if err != nil {
+				return securityContext, liberr.Wrap(err)
+			}
+		}
+		// configure appropriate securityContext for root or non root based on the labels present on namespace
+		if privilegedLabelPresent {
+			runAsUser := int64(0)
+			securityContext = &corev1.SecurityContext{
+				Privileged:             &isPrivileged,
+				ReadOnlyRootFilesystem: &trueBool,
+				RunAsUser:              &runAsUser,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+				},
+			}
+		} else {
+			securityContext.RunAsNonRoot = &trueBool
+			securityContext.Capabilities = &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			}
+			securityContext.AllowPrivilegeEscalation = &falseBool
+			securityContext.SeccompProfile = &corev1.SeccompProfile{
+				Type: "RuntimeDefault",
+			}
+			// warning in DVM since user wants to run rsync as root but the namespace is missing needed labels, so we are running rsync as non root
+			rsyncMessage := "missing required labels on namespace, running rsync as non root even though it needs to run as root"
+			t.Log.Info(rsyncMessage)
+			t.Owner.Status.SetCondition(migapi.Condition{
+				Type:     RsyncServerPodsRunningAsNonRoot,
+				Status:   migapi.True,
+				Reason:   "RsyncOperationsAreRunningAsNonRoot",
+				Category: Warn,
+				Message:  rsyncMessage,
+			})
+		}
+	} else {
+		securityContext.RunAsUser = migration.Spec.RunAsUser
+		securityContext.RunAsGroup = migration.Spec.RunAsGroup
+		securityContext.RunAsNonRoot = &trueBool
+		securityContext.Capabilities = &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		}
+		securityContext.AllowPrivilegeEscalation = &falseBool
+		securityContext.SeccompProfile = &corev1.SeccompProfile{
+			Type: "RuntimeDefault",
+		}
+	}
+	return securityContext, nil
 }
 
 // ensureRsyncTransferServer ensures that server component of the Transfer is created
@@ -325,10 +382,15 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
+	migration, err := t.Owner.GetMigrationForDVM(destClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
-		mutations, err := t.getRsyncClientMutations(srcClient, srcNs)
+		mutations, err := t.getRsyncClientMutations(srcClient, destClient, srcNs)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
@@ -351,6 +413,15 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		}
 
 		labels := t.buildDVMLabels()
+
+		checkLabels := checkUserNamespaceLabel(destClient)
+		privilegedLabelPresent := true
+		if checkLabels {
+			privilegedLabelPresent, err = isPrivilegedLabelPresent(destClient, destNs)
+			if err != nil {
+				return nil, liberr.Wrap(err)
+			}
+		}
 
 		for _, pvc := range pvcPairs {
 			optionsForPvc := []rsynctransfer.TransferOption{}
@@ -418,6 +489,14 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					"--no-inplace",
 				}
 				optionsForPvc = append(optionsForPvc, sparseFileOption)
+			}
+
+			if migration.Spec.RunAsRoot != nil {
+				if !*migration.Spec.RunAsRoot || !privilegedLabelPresent {
+					optionsForPvc = append(optionsForPvc, ExtraOpts{"--omit-dir-times"})
+				}
+			} else {
+				optionsForPvc = append(optionsForPvc, ExtraOpts{"--omit-dir-times"})
 			}
 
 			// Add identification label for Rsync Pod that keep them associated with a pvc
@@ -1488,6 +1567,23 @@ func (t *Task) deleteProgressReportingCRs(client k8sclient.Client) error {
 	return nil
 }
 
+// checking privileged labels in destination namespace
+func isPrivilegedLabelPresent(client compat.Client, namespace string) (bool, error) {
+	ns := &corev1.Namespace{}
+	err := client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns)
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+
+	if ns.Labels != nil {
+		if ns.Labels["pod-security.kubernetes.io/enforce"] == "privileged" {
+			return true, nil
+		}
+		return false, nil
+	}
+	return false, nil
+}
+
 func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
 	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
 	// when both the spec and the overridden backoff limits are not set, use default
@@ -1909,4 +2005,13 @@ func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	}
 	opts.Extras = append(opts.Extras, validatedOptions...)
 	return nil
+}
+
+func checkUserNamespaceLabel(client compat.Client) bool {
+	minor := client.MinorVersion()
+
+	if minor >= 24 {
+		return true
+	}
+	return false
 }

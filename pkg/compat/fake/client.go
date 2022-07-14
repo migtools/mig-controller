@@ -19,6 +19,9 @@ import (
 type fakeCompatClient struct {
 	k8sclient.Client
 	dapi.DiscoveryInterface
+
+	Major int
+	Minor int
 }
 
 func (fake fakeCompatClient) RestConfig() *rest.Config {
@@ -26,11 +29,11 @@ func (fake fakeCompatClient) RestConfig() *rest.Config {
 }
 
 func (fake fakeCompatClient) MajorVersion() int {
-	return 0
+	return fake.Major
 }
 
 func (fake fakeCompatClient) MinorVersion() int {
-	return 0
+	return fake.Minor
 }
 
 func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object) error {
@@ -68,6 +71,18 @@ func NewFakeClient(obj ...k8sclient.Object) (compat.Client, error) {
 	}
 	return fakeCompatClient{
 		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj...).Build(),
+	}, nil
+}
+
+func NewFakeClientWithVersion(Major int, Minor int, obj ...k8sclient.Object) (compat.Client, error) {
+	scheme, err := getSchemeForFakeClient()
+	if err != nil {
+		return nil, err
+	}
+	return fakeCompatClient{
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj...).Build(),
+		Major:  Major,
+		Minor:  Minor,
 	}, nil
 }
 

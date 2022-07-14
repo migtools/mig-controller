@@ -32,6 +32,7 @@ const (
 	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
 	FailedCreatingRsyncPods         = "FailedCreatingRsyncPods"
 	FailedDeletingRsyncPods         = "FailedDeletingRsyncPods"
+	RsyncServerPodsRunningAsNonRoot = "RsyncServerPodsRunningAsNonRoot"
 )
 
 // Reasons
