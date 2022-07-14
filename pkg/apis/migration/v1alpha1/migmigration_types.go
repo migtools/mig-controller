@@ -51,6 +51,15 @@ type MigMigrationSpec struct {
 
 	// Invokes the rollback migration operation, when set to true the migration controller switches to rollback itinerary. This field needs to be set prior to creation of a MigMigration.
 	Rollback bool `json:"rollback,omitempty"`
+
+	// If set True, run rsync operations with escalated privileged, takes precedence over setting RunAsUser and RunAsGroup
+	RunAsRoot *bool `json:"runAsRoot,omitempty"`
+
+	// If set, runs rsync operations with provided user id. This provided user id should be a valid one that falls within the range of allowed UID of user namespace
+	RunAsUser *int64 `json:"runAsUser,omitempty"`
+
+	// If set, runs rsync operations with provided group id. This provided user id should be a valid one that falls within the range of allowed GID of user namespace
+	RunAsGroup *int64 `json:"runAsGroup,omitempty"`
 }
 
 // MigMigrationStatus defines the observed state of MigMigration
