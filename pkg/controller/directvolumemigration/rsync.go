@@ -222,7 +222,12 @@ func (t *Task) getSecurityContext(client compat.Client, namespace string, migrat
 	}
 	trueBool := true
 	falseBool := false
-	if migration.Spec.RunAsRoot != nil && *migration.Spec.RunAsRoot {
+
+	if migration.Spec.RunAsRoot == nil {
+		migration.Spec.RunAsRoot = &isPrivileged
+	}
+
+	if *migration.Spec.RunAsRoot {
 		// if rsync needs to run as root then check if the cluster if 4.11+ to see if namespace needs needed label or not to run pod as root.
 		checkLabels := checkUserNamespaceLabel(client)
 		// assume that namespace has the label, this will be useful in the case where cluster version is < 4.11
@@ -387,6 +392,8 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return nil, liberr.Wrap(err)
 	}
 
+	checkLabels := checkUserNamespaceLabel(destClient)
+
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -414,13 +421,20 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 
 		labels := t.buildDVMLabels()
 
-		checkLabels := checkUserNamespaceLabel(destClient)
 		privilegedLabelPresent := true
 		if checkLabels {
 			privilegedLabelPresent, err = isPrivilegedLabelPresent(destClient, destNs)
 			if err != nil {
 				return nil, liberr.Wrap(err)
 			}
+		}
+
+		isPrivileged, err := isRsyncPrivileged(destClient)
+		if migration.Spec.RunAsRoot == nil {
+			migration.Spec.RunAsRoot = &isPrivileged
+		}
+		if err != nil {
+			return nil, liberr.Wrap(err)
 		}
 
 		for _, pvc := range pvcPairs {
@@ -491,11 +505,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				optionsForPvc = append(optionsForPvc, sparseFileOption)
 			}
 
-			if migration.Spec.RunAsRoot != nil {
-				if !*migration.Spec.RunAsRoot || !privilegedLabelPresent {
-					optionsForPvc = append(optionsForPvc, ExtraOpts{"--omit-dir-times"})
-				}
-			} else {
+			if !*migration.Spec.RunAsRoot || !privilegedLabelPresent {
 				optionsForPvc = append(optionsForPvc, ExtraOpts{"--omit-dir-times"})
 			}
 
