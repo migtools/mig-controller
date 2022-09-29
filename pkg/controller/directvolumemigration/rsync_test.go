@@ -985,7 +985,6 @@ func Test_getSecurityContext(t *testing.T) {
 	}
 	trueBool := bool(true)
 	falseBool := bool(false)
-	runAsRoot := int64(0)
 	runAsUser := int64(100000)
 	runAsGroup := int64(2)
 	tests := []struct {
@@ -994,34 +993,6 @@ func Test_getSecurityContext(t *testing.T) {
 		wantErr    bool
 		wantReturn *corev1.SecurityContext
 	}{
-		{
-			name: "run rsync as root",
-			fields: fields{
-				client: getFakeCompatClient(),
-				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
-					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
-				},
-				Migration: &migapi.MigMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "migmigration",
-						Namespace: migapi.OpenshiftMigrationNamespace,
-					},
-					Spec: migapi.MigMigrationSpec{
-						RunAsRoot: &trueBool,
-					},
-				},
-			},
-			wantErr: false,
-			wantReturn: &corev1.SecurityContext{
-				Privileged:             &falseBool,
-				ReadOnlyRootFilesystem: &trueBool,
-				RunAsUser:              &runAsRoot,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
-				},
-			},
-		},
 		{
 			name: "run rsync as user and group",
 			fields: fields{
@@ -1141,68 +1112,6 @@ func Test_getSecurityContext(t *testing.T) {
 				AllowPrivilegeEscalation: &falseBool,
 				SeccompProfile: &corev1.SeccompProfile{
 					Type: "RuntimeDefault",
-				},
-			},
-		},
-		{
-			name: "run rsync as root in environment with kubernetes 1.24 and missing labels on user namespace",
-			fields: fields{
-				client: getFakeCompatClientFor124(&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
-				}),
-				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
-					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
-				},
-				Migration: &migapi.MigMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "migmigration",
-						Namespace: migapi.OpenshiftMigrationNamespace,
-					},
-					Spec: migapi.MigMigrationSpec{
-						RunAsRoot: &trueBool,
-					},
-				},
-			},
-			wantErr: false,
-			wantReturn: &corev1.SecurityContext{
-				RunAsNonRoot: &trueBool,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
-				},
-				AllowPrivilegeEscalation: &falseBool,
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: "RuntimeDefault",
-				},
-			},
-		},
-		{
-			name: "run rsync as root in environment with kubernetes 1.24 and enforce label is present on user namespace",
-			fields: fields{
-				client: getFakeCompatClientFor124(&corev1.Namespace{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-ns", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "privileged"}},
-				}),
-				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
-					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
-				},
-				Migration: &migapi.MigMigration{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "migmigration",
-						Namespace: migapi.OpenshiftMigrationNamespace,
-					},
-					Spec: migapi.MigMigrationSpec{
-						RunAsRoot: &trueBool,
-					},
-				},
-			},
-			wantErr: false,
-			wantReturn: &corev1.SecurityContext{
-				Privileged:             &falseBool,
-				ReadOnlyRootFilesystem: &trueBool,
-				RunAsUser:              &runAsRoot,
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
 				},
 			},
 		},
