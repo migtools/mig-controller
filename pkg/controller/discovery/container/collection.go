@@ -6,7 +6,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
-//
 // Disposition.
 // Used for collection reconcile and describes whether a resource
 // has been `discovered` (exists on the cluster); Is `stored` in the
@@ -19,7 +18,6 @@ type Disposition struct {
 	stored model.Model
 }
 
-//
 // Collection of resources.
 // Each collection loosely corresponds to a k8s resource and
 // to a resource in the REST API. It is responsible for setting up
@@ -55,7 +53,6 @@ type Collection interface {
 	GetStored() ([]model.Model, error)
 }
 
-//
 // Base collection.
 // Provides base fields and methods for collections.
 type BaseCollection struct {
@@ -65,31 +62,26 @@ type BaseCollection struct {
 	ds *DataSource
 }
 
-//
 // Get whether the collection has reconciled.
 func (r *BaseCollection) IsReady() bool {
 	return r.hasReconciled
 }
 
-//
 // Reset `hasReconciled` and association with a DataSource.
 func (r *BaseCollection) Reset() {
 	r.hasReconciled = false
 }
 
-//
 // Bind to a DataSource.
 func (r *BaseCollection) Bind(ds *DataSource) {
 	r.ds = ds
 }
 
-//
 // Get the associated DataSource.
 func (r *BaseCollection) GetDs() *DataSource {
 	return r.ds
 }
 
-//
 // A basic Reconciler.
 // The term is borrowed from k8s and is similar but different.
 // Using the `GetDiscovered()` and `GetStored()` methods, a disposition
@@ -99,7 +91,6 @@ type SimpleReconciler struct {
 	Db *sql.DB
 }
 
-//
 // Reconcile the resources on the cluster and the collection in the DB.
 // Using the `GetDiscovered()` and `GetStored()` methods, a disposition
 // is constructed and used to update the DB.

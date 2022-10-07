@@ -1635,19 +1635,18 @@ func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode k
 	return false
 }
 
-//
 // NFS validation
-//
 const (
 	NfsPort = "2049"
 )
 
 // NFS validation.
-//   Plan - A migration plan.
-//   cluster - The destination cluster.
-//   client - A client for the destination.
-//   restCfg - A rest configuration for the destination.
-//   pod - The pod to be used to execute commands.
+//
+//	Plan - A migration plan.
+//	cluster - The destination cluster.
+//	client - A client for the destination.
+//	restCfg - A rest configuration for the destination.
+//	pod - The pod to be used to execute commands.
 type NfsValidation struct {
 	Plan    *migapi.MigPlan
 	cluster *migapi.MigCluster

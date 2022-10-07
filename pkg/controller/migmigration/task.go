@@ -343,10 +343,10 @@ type Task struct {
 
 // Run the task.
 // Each call will:
-//   1. Run the current phase.
-//   2. Update the phase to the next phase.
-//   3. Set the Requeue (as appropriate).
-//   4. Return.
+//  1. Run the current phase.
+//  2. Update the phase to the next phase.
+//  3. Set the Requeue (as appropriate).
+//  4. Return.
 func (t *Task) Run(ctx context.Context) error {
 	// Set stage, phase, phase description, migplan name
 	t.Log = t.Log.WithValues("phase", t.Phase)

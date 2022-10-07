@@ -15,11 +15,9 @@ import (
 // Shared logger.
 var Log *logging.Logger
 
-//
 // DataSource Key
 type DsKey types.NamespacedName
 
-//
 // Container of DataSources.
 // Each DataSource corresponds to a MigCluster.
 // The container is responsible for the lifecycle of DataSources based
@@ -38,7 +36,6 @@ type Container struct {
 	mutex sync.RWMutex
 }
 
-//
 // Construct a new container.
 func NewContainer(cnt client.Client, db *sql.DB) *Container {
 	return &Container{
@@ -48,7 +45,6 @@ func NewContainer(cnt client.Client, db *sql.DB) *Container {
 	}
 }
 
-//
 // Get the DataSource for a cluster.
 func (r *Container) GetDs(cluster *model.Cluster) (*DataSource, bool) {
 	r.mutex.RLock()
@@ -61,7 +57,6 @@ func (r *Container) GetDs(cluster *model.Cluster) (*DataSource, bool) {
 	return ds, found
 }
 
-//
 // Add a cluster to the container.
 // Build/update a DataSource for the cluster as needed.
 func (r *Container) Add(cluster *migapi.MigCluster, collections ...Collection) error {
@@ -92,7 +87,6 @@ func (r *Container) Add(cluster *migapi.MigCluster, collections ...Collection) e
 	return nil
 }
 
-//
 // Delete the DataSource for a deleted MigCluster.
 func (r *Container) Delete(cluster types.NamespacedName) {
 	r.mutex.Lock()
@@ -108,7 +102,6 @@ func (r *Container) Delete(cluster types.NamespacedName) {
 	}
 }
 
-//
 // Prune (delete) clusters in the DB that no longer exist.
 // Intended to call called once on container initialization.
 func (r *Container) Prune() error {
@@ -141,7 +134,6 @@ func (r *Container) Prune() error {
 	return nil
 }
 
-//
 // Determine of a MigCluster actually exists.
 func (r *Container) HasCluster(cluster *model.Cluster) (bool, error) {
 	found := migapi.MigCluster{}

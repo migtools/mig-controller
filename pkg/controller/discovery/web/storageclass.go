@@ -15,14 +15,12 @@ const (
 	StorageClassRoot  = StorageClasssRoot + "/:" + StorageClassParam
 )
 
-//
 // StorageClass (route) handler.
 type StorageClassHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h StorageClassHandler) AddRoutes(r *gin.Engine) {
 	r.GET(StorageClasssRoot, h.List)
@@ -30,7 +28,6 @@ func (h StorageClassHandler) AddRoutes(r *gin.Engine) {
 	r.GET(StorageClassRoot, h.Get)
 }
 
-//
 // List all of the StorageClasss on a cluster.
 func (h StorageClassHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -72,7 +69,6 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific StorageClass on a cluster.
 func (h StorageClassHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -105,7 +101,6 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h StorageClassHandler) Link(c *model.Cluster, m *model.StorageClass) string {
 	return h.BaseHandler.Link(
@@ -130,7 +125,6 @@ type StorageClass struct {
 	Object *v1.StorageClass `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *StorageClass) With(m *model.StorageClass) {
 	r.Namespace = m.Namespace
@@ -138,7 +132,6 @@ func (r *StorageClass) With(m *model.StorageClass) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // StorageClass collection REST resource.
 type StorageClassList struct {
 	// Total number in the collection.

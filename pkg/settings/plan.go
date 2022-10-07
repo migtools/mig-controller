@@ -45,12 +45,13 @@ var ExcludedStageResources = mapset.NewSetFromSlice([]interface{}{})
 var MoveStorageClasses = mapset.NewSetFromSlice([]interface{}{})
 
 // Plan settings.
-//   NsLimit: Maximum number of namespaces on a Plan.
-//   PodLimit: Maximum number of Pods across namespaces.
-//   PvLimit: Maximum number PVs on a Plan.
-//   ExcludedResources: Resources excluded from a Plan.
-//   EnableIntelligentPVResize: Enable/Disable PV resizing at plan level
-//   PVResizingVolumeUsageThreshold: Usage percentage threshold for pv resizing
+//
+//	NsLimit: Maximum number of namespaces on a Plan.
+//	PodLimit: Maximum number of Pods across namespaces.
+//	PvLimit: Maximum number PVs on a Plan.
+//	ExcludedResources: Resources excluded from a Plan.
+//	EnableIntelligentPVResize: Enable/Disable PV resizing at plan level
+//	PVResizingVolumeUsageThreshold: Usage percentage threshold for pv resizing
 type Plan struct {
 	NsLimit                        int
 	PodLimit                       int

@@ -6,13 +6,11 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
-//
 // DirectVolumeMigrationProgress model.
 type DirectVolumeMigrationProgress struct {
 	CR
 }
 
-//
 // Update the model `with` a DirectImageMigration.
 func (m *DirectVolumeMigrationProgress) With(object *migapi.DirectVolumeMigrationProgress) {
 	m.UID = string(object.UID)
@@ -23,14 +21,12 @@ func (m *DirectVolumeMigrationProgress) With(object *migapi.DirectVolumeMigratio
 	m.EncodeObject(object)
 }
 
-//
 // Encode the object.
 func (m *DirectVolumeMigrationProgress) EncodeObject(dvmp *migapi.DirectVolumeMigrationProgress) {
 	object, _ := json.Marshal(dvmp)
 	m.Object = string(object)
 }
 
-//
 // Decode the object.
 func (m *DirectVolumeMigrationProgress) DecodeObject() *migapi.DirectVolumeMigrationProgress {
 	dvmp := &migapi.DirectVolumeMigrationProgress{}
@@ -38,13 +34,11 @@ func (m *DirectVolumeMigrationProgress) DecodeObject() *migapi.DirectVolumeMigra
 	return dvmp
 }
 
-//
 // Count in the DB.
 func (m DirectVolumeMigrationProgress) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
-//
 // Fetch the model from the DB.
 func (m DirectVolumeMigrationProgress) List(db DB, options ListOptions) ([]*DirectVolumeMigrationProgress, error) {
 	list := []*DirectVolumeMigrationProgress{}
@@ -60,27 +54,23 @@ func (m DirectVolumeMigrationProgress) List(db DB, options ListOptions) ([]*Dire
 	return list, err
 }
 
-//
 // Fetch the model from the DB.
 func (m *DirectVolumeMigrationProgress) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
-//
 // Insert the model into the DB.
 func (m *DirectVolumeMigrationProgress) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
-//
 // Update the model in the DB.
 func (m *DirectVolumeMigrationProgress) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
-//
 // Delete the model in the DB.
 func (m *DirectVolumeMigrationProgress) Delete(db DB) error {
 	m.SetPk()

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-//
 // A collection of k8s DirectVolumeMigrationProgress resources.
 type DirectVolumeMigrationProgress struct {
 	// Base

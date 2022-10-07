@@ -14,21 +14,18 @@ const (
 	EventRoot             = EventsRoot + "/:" + EventInvolvedUIDParam
 )
 
-//
 // Event (route) handler.
 type EventHandler struct {
 	// Base
 	BaseHandler
 }
 
-//
 // Add routes.
 func (h EventHandler) AddRoutes(r *gin.Engine) {
 	r.GET(EventsRoot, h.List)
 	r.GET(EventRoot, h.Get)
 }
 
-//
 // List all of the Events on a cluster.
 func (h EventHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -67,7 +64,6 @@ func (h EventHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get Events for a particular involvedObject UID on a cluster.
 func (h EventHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -110,7 +106,6 @@ func (h EventHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h EventHandler) Link(m *model.Event) string {
 	return h.BaseHandler.Link(
@@ -133,7 +128,6 @@ type Event struct {
 	Object *v1.Event `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Event) With(m *model.Event) {
 	r.Namespace = m.Namespace
@@ -141,7 +135,6 @@ func (r *Event) With(m *model.Event) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Event collection REST resource.
 type EventList struct {
 	// Total number in the collection.

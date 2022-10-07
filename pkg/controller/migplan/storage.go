@@ -122,13 +122,11 @@ func (r ReconcileMigPlan) planClusters(plan *migapi.MigPlan) ([]migapi.MigCluste
 	return list, nil
 }
 
-//
 // PlanStorage
 // Client: The controller client.
 // targetClient: A client for a cluster.
 // plan: A plan resource.
 // storage: A storage resource.
-//
 type PlanStorage struct {
 	k8sclient.Client
 	targetCluster *migapi.MigCluster

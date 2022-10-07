@@ -87,7 +87,7 @@ func (r *MigStorage) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-//Analytic
+// Analytic
 func (r *MigAnalytic) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
@@ -116,7 +116,7 @@ func (r *MigAnalytic) HasReconciled() bool {
 	return r.Status.ObservedGeneration == r.Generation
 }
 
-//Hook
+// Hook
 func (r *MigHook) GetCorrelationLabels() map[string]string {
 	key, value := r.GetCorrelationLabel()
 	return map[string]string{
@@ -309,7 +309,6 @@ func (r *DirectImageStreamMigration) HasReconciled() bool {
 	return r.Status.ObservedDigest == digest(r.Spec)
 }
 
-//
 // Generate a sha256 hex-digest for an object.
 func digest(object interface{}) string {
 	j, _ := json.Marshal(object)

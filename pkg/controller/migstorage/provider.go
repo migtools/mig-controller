@@ -13,9 +13,10 @@ import (
 )
 
 // A cloud provider `watch` source used to routinely run provider tests.
-//   Client - A controller-runtime client.
-//   Interval - The connection test interval.
-//   Namespace - Only objects in this namespace are queued
+//
+//	Client - A controller-runtime client.
+//	Interval - The connection test interval.
+//	Namespace - Only objects in this namespace are queued
 type ProviderSource struct {
 	Client     client.Client
 	Interval   time.Duration

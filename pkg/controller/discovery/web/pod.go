@@ -22,14 +22,12 @@ const (
 	LogRoot  = PodRoot + "/log"
 )
 
-//
 // Pod (route) handler.
 type PodHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h PodHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PodsRoot, h.List)
@@ -37,7 +35,6 @@ func (h PodHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PodRoot, h.Get)
 }
 
-//
 // Get a specific pod.
 func (h PodHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -73,7 +70,6 @@ func (h PodHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // List pods on a cluster in a namespace.
 func (h PodHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -117,7 +113,6 @@ func (h PodHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PodHandler) Link(c *model.Cluster, m *model.Pod) string {
 	return h.BaseHandler.Link(
@@ -130,7 +125,6 @@ func (h PodHandler) Link(c *model.Cluster, m *model.Pod) string {
 		})
 }
 
-//
 // Pod-log (route) handler.
 type LogHandler struct {
 	// Base
@@ -142,13 +136,11 @@ func (h LogHandler) AddRoutes(r *gin.Engine) {
 	r.GET(LogRoot, h.List)
 }
 
-//
 // Not supported.
 func (h LogHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)
 }
 
-//
 // List all logs (entries) for a pod (and optional container).
 func (h LogHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -180,7 +172,6 @@ func (h LogHandler) List(ctx *gin.Context) {
 	h.getLog(ctx, &pod)
 }
 
-//
 // Get the k8s logs.
 func (h *LogHandler) getLog(ctx *gin.Context, pod *model.Pod) {
 	options, status := h.buildOptions(ctx)
@@ -210,7 +201,6 @@ func (h *LogHandler) getLog(ctx *gin.Context, pod *model.Pod) {
 	ctx.Status(http.StatusOK)
 }
 
-//
 // Write the json-encoded logs in the response.
 func (h *LogHandler) writeBody(ctx *gin.Context, stream io.ReadCloser) {
 	ctx.Header("Content-Type", "application/json; charset=utf-8")
@@ -249,7 +239,6 @@ func (h *LogHandler) writeBody(ctx *gin.Context, stream io.ReadCloser) {
 	}
 }
 
-//
 // Build the k8s log API options based on parameters.
 // The `tail` parameter indicates that pagination is relative
 // to the last log entry.
@@ -271,7 +260,6 @@ func (h *LogHandler) buildOptions(ctx *gin.Context) (*v1.PodLogOptions, int) {
 	return &options, http.StatusOK
 }
 
-//
 // Build the REST client.
 func (h *LogHandler) buildClient(pod *model.Pod) (capi.PodInterface, int) {
 	ds, found := h.container.GetDs(&h.cluster)
@@ -287,7 +275,6 @@ func (h *LogHandler) buildClient(pod *model.Pod) (capi.PodInterface, int) {
 	return podInt, http.StatusOK
 }
 
-//
 // Get the `tail` parameter.
 func (h *LogHandler) getTail(ctx *gin.Context) (bool, int) {
 	q := ctx.Request.URL.Query()
@@ -303,7 +290,6 @@ func (h *LogHandler) getTail(ctx *gin.Context) (bool, int) {
 	return tail, http.StatusOK
 }
 
-//
 // Get the `container` parameter.
 func (h *LogHandler) getContainer(ctx *gin.Context) string {
 	q := ctx.Request.URL.Query()
@@ -322,7 +308,6 @@ type Pod struct {
 	Object *v1.Pod `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Pod) With(m *model.Pod) {
 	r.Namespace = m.Namespace
@@ -330,7 +315,6 @@ func (r *Pod) With(m *model.Pod) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Pod collection REST resource.
 type PodList struct {
 	// Total number in the collection.

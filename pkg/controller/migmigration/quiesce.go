@@ -9,6 +9,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -84,7 +85,7 @@ func (t *Task) unQuiesceDestApplications() error {
 }
 
 // Unquiesce applications using client and namespace list given
-func (t *Task) unQuiesceApplications(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceApplications(client compat.Client, namespaces []string) error {
 	err := t.unQuiesceCronJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -578,32 +579,63 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 }
 
 // Suspends all CronJobs
-func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
+func (t *Task) quiesceCronJobs(client compat.Client) error {
 	for _, ns := range t.sourceNamespaces() {
-		list := batchv1beta.CronJobList{}
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), &list, options)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		for _, r := range list.Items {
-			if r.Annotations == nil {
-				r.Annotations = make(map[string]string)
-			}
-			if r.Spec.Suspend == pointer.BoolPtr(true) {
-				continue
-			}
-			r.Annotations[migapi.SuspendAnnotation] = "true"
-			r.Spec.Suspend = pointer.BoolPtr(true)
-			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
-				"Setting [Spec.Suspend=true]. "+
-				"Setting Annotation [%v]: true",
-				migapi.SuspendAnnotation),
-				"job", path.Join(r.Namespace, r.Name))
-			err = client.Update(context.TODO(), &r)
+
+		if client.MinorVersion() < 21 {
+			list := batchv1beta.CronJobList{}
+			options := k8sclient.InNamespace(ns)
+			err := client.List(context.TODO(), &list, options)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
+			for _, r := range list.Items {
+				if r.Annotations == nil {
+					r.Annotations = make(map[string]string)
+				}
+				if r.Spec.Suspend == pointer.BoolPtr(true) {
+					continue
+				}
+				r.Annotations[migapi.SuspendAnnotation] = "true"
+				r.Spec.Suspend = pointer.BoolPtr(true)
+				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
+					"Setting [Spec.Suspend=true]. "+
+					"Setting Annotation [%v]: true",
+					migapi.SuspendAnnotation),
+					"job", path.Join(r.Namespace, r.Name))
+				err = client.Update(context.TODO(), &r)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+
+		} else {
+			list := batchv1.CronJobList{}
+			options := k8sclient.InNamespace(ns)
+			err := client.List(context.TODO(), &list, options)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			for _, r := range list.Items {
+				if r.Annotations == nil {
+					r.Annotations = make(map[string]string)
+				}
+				if r.Spec.Suspend == pointer.BoolPtr(true) {
+					continue
+				}
+				r.Annotations[migapi.SuspendAnnotation] = "true"
+				r.Spec.Suspend = pointer.BoolPtr(true)
+				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
+					"Setting [Spec.Suspend=true]. "+
+					"Setting Annotation [%v]: true",
+					migapi.SuspendAnnotation),
+					"job", path.Join(r.Namespace, r.Name))
+				err = client.Update(context.TODO(), &r)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+
 		}
 	}
 
@@ -611,30 +643,58 @@ func (t *Task) quiesceCronJobs(client k8sclient.Client) error {
 }
 
 // Undo quiescence on all CronJobs
-func (t *Task) unQuiesceCronJobs(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) error {
 	for _, ns := range namespaces {
-		list := batchv1beta.CronJobList{}
-		options := k8sclient.InNamespace(ns)
-		err := client.List(context.TODO(), &list, options)
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		for _, r := range list.Items {
-			if r.Annotations == nil {
-				continue
-			}
-			// Only unsuspend if our suspend annotation is present
-			if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
-				continue
-			}
-			delete(r.Annotations, migapi.SuspendAnnotation)
-			r.Spec.Suspend = pointer.BoolPtr(false)
-			t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
-				"cronJob", path.Join(r.Namespace, r.Name))
-			err = client.Update(context.TODO(), &r)
+		if client.MinorVersion() < 21 {
+			list := batchv1beta.CronJobList{}
+			options := k8sclient.InNamespace(ns)
+			err := client.List(context.TODO(), &list, options)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
+			for _, r := range list.Items {
+				if r.Annotations == nil {
+					continue
+				}
+				// Only unsuspend if our suspend annotation is present
+				if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
+					continue
+				}
+				delete(r.Annotations, migapi.SuspendAnnotation)
+				r.Spec.Suspend = pointer.BoolPtr(false)
+				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
+					"cronJob", path.Join(r.Namespace, r.Name))
+				err = client.Update(context.TODO(), &r)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+
+		} else {
+			list := batchv1.CronJobList{}
+			options := k8sclient.InNamespace(ns)
+			err := client.List(context.TODO(), &list, options)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			for _, r := range list.Items {
+				if r.Annotations == nil {
+					continue
+				}
+				// Only unsuspend if our suspend annotation is present
+				if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
+					continue
+				}
+				delete(r.Annotations, migapi.SuspendAnnotation)
+				r.Spec.Suspend = pointer.BoolPtr(false)
+				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
+					"cronJob", path.Join(r.Namespace, r.Name))
+				err = client.Update(context.TODO(), &r)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+			}
+
 		}
 	}
 

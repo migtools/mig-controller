@@ -32,12 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-//
 // Function provided by controller packages to add
 // them self to the manager.
 type AddFunction func(manager.Manager) error
 
-//
 // List of controller add functions for the CAM role.
 var CamControllers = []AddFunction{
 	migcluster.Add,
@@ -52,13 +50,11 @@ var CamControllers = []AddFunction{
 	directvolumemigrationprogress.Add,
 }
 
-//
 // List of controller add functions for the Discovery role.
 var DiscoveryControllers = []AddFunction{
 	discovery.Add,
 }
 
-//
 // Add controllers to the manager based on role.
 func AddToManager(m manager.Manager) error {
 	err := settings.Settings.Load()
