@@ -216,70 +216,78 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 // getSecurityContext returns the appropriate pod security context based on user input on migmigration
 func (t *Task) getSecurityContext(client compat.Client, namespace string, migration *migapi.MigMigration) (*corev1.SecurityContext, error) {
 	securityContext := &corev1.SecurityContext{}
+	// check if user explicitely asked to run Rsync Pods as root
 	isPrivileged, err := isRsyncPrivileged(client)
 	if err != nil {
 		return securityContext, liberr.Wrap(err)
 	}
 	trueBool := true
 	falseBool := false
+	rootUser := int64(0)
 
 	if migration.Spec.RunAsRoot == nil {
 		migration.Spec.RunAsRoot = &isPrivileged
 	}
 
-	if *migration.Spec.RunAsRoot {
-		// if rsync needs to run as root then check if the cluster if 4.11+ to see if namespace needs needed label or not to run pod as root.
-		checkLabels := checkUserNamespaceLabel(client)
-		// assume that namespace has the label, this will be useful in the case where cluster version is < 4.11
-		privilegedLabelPresent := true
-		// if the cluster version is 4.11+ then check for the labels on namespace to run rsync as root
-		if checkLabels {
+	// check if the cluster has restricted PSA enforced
+	// OpenShift 4.12+ versions have it enforced by default
+	psaEnforced := isPSAEnforced(client)
+
+	// if PSA is not enforced, we can safely run Rsync Pod using the rsync-anyuid SCC
+	// if PSA is enforced, we run Rsync Pod with least privileges by default
+	if !psaEnforced {
+		securityContext = &corev1.SecurityContext{
+			Privileged:             &isPrivileged,
+			ReadOnlyRootFilesystem: &trueBool,
+			RunAsUser:              &rootUser,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
+			},
+		}
+	} else {
+		privilegedLabelPresent := false
+		if *migration.Spec.RunAsRoot {
+			// if PSA is enforced, and if the user asked to run Rsync Pod as root explicitely
+			// we check if the namespace has required exception labels set
 			privilegedLabelPresent, err = isPrivilegedLabelPresent(client, namespace)
 			if err != nil {
 				return securityContext, liberr.Wrap(err)
 			}
+			if !privilegedLabelPresent {
+				// warning in DVM since user wants to run rsync as root but the namespace is missing needed labels, so we are running rsync as non root
+				rsyncMessage := "missing required labels on namespace to run rsync as root, running as non root"
+				t.Log.Info(rsyncMessage)
+				t.Owner.Status.SetCondition(migapi.Condition{
+					Type:     RsyncServerPodsRunningAsNonRoot,
+					Status:   migapi.True,
+					Reason:   "RsyncOperationsAreRunningAsNonRoot",
+					Category: Warn,
+					Message:  rsyncMessage,
+				})
+			}
 		}
-		// configure appropriate securityContext for root or non root based on the labels present on namespace
 		if privilegedLabelPresent {
-			runAsUser := int64(0)
 			securityContext = &corev1.SecurityContext{
 				Privileged:             &isPrivileged,
 				ReadOnlyRootFilesystem: &trueBool,
-				RunAsUser:              &runAsUser,
+				RunAsUser:              &rootUser,
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
 				},
 			}
 		} else {
-			securityContext.RunAsNonRoot = &trueBool
-			securityContext.Capabilities = &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
+			securityContext = &corev1.SecurityContext{
+				RunAsUser:    migration.Spec.RunAsUser,
+				RunAsGroup:   migration.Spec.RunAsGroup,
+				RunAsNonRoot: &trueBool,
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				AllowPrivilegeEscalation: &falseBool,
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: "RuntimeDefault",
+				},
 			}
-			securityContext.AllowPrivilegeEscalation = &falseBool
-			securityContext.SeccompProfile = &corev1.SeccompProfile{
-				Type: "RuntimeDefault",
-			}
-			// warning in DVM since user wants to run rsync as root but the namespace is missing needed labels, so we are running rsync as non root
-			rsyncMessage := "missing required labels on namespace, running rsync as non root even though it needs to run as root"
-			t.Log.Info(rsyncMessage)
-			t.Owner.Status.SetCondition(migapi.Condition{
-				Type:     RsyncServerPodsRunningAsNonRoot,
-				Status:   migapi.True,
-				Reason:   "RsyncOperationsAreRunningAsNonRoot",
-				Category: Warn,
-				Message:  rsyncMessage,
-			})
-		}
-	} else {
-		securityContext.RunAsUser = migration.Spec.RunAsUser
-		securityContext.RunAsGroup = migration.Spec.RunAsGroup
-		securityContext.RunAsNonRoot = &trueBool
-		securityContext.Capabilities = &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
-		}
-		securityContext.AllowPrivilegeEscalation = &falseBool
-		securityContext.SeccompProfile = &corev1.SeccompProfile{
-			Type: "RuntimeDefault",
 		}
 	}
 	return securityContext, nil
@@ -392,7 +400,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return nil, liberr.Wrap(err)
 	}
 
-	checkLabels := checkUserNamespaceLabel(destClient)
+	checkLabels := isPSAEnforced(destClient)
 
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
@@ -2017,7 +2025,7 @@ func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 	return nil
 }
 
-func checkUserNamespaceLabel(client compat.Client) bool {
+func isPSAEnforced(client compat.Client) bool {
 	minor := client.MinorVersion()
 
 	if minor >= 24 {

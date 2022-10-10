@@ -84,7 +84,7 @@ func getFakeCompatClient(obj ...k8sclient.Object) compat.Client {
 	return client
 }
 
-func getFakeCompatClientFor124(obj ...k8sclient.Object) compat.Client {
+func getFakeCompatClientWithVersion(major int, minor int, obj ...k8sclient.Object) compat.Client {
 	clusterConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "migration-cluster-config", Namespace: migapi.OpenshiftMigrationNamespace},
 		Data:       map[string]string{"RSYNC_PRIVILEGED": "false"},
@@ -94,7 +94,7 @@ func getFakeCompatClientFor124(obj ...k8sclient.Object) compat.Client {
 	}
 	obj = append(obj, clusterConfig)
 	obj = append(obj, controllerConfig)
-	client, _ := fakecompat.NewFakeClientWithVersion(1, 24, obj...)
+	client, _ := fakecompat.NewFakeClientWithVersion(major, minor, obj...)
 	return client
 }
 
@@ -996,7 +996,7 @@ func Test_getSecurityContext(t *testing.T) {
 		{
 			name: "run rsync as user and group",
 			fields: fields{
-				client: getFakeCompatClient(),
+				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -1029,7 +1029,7 @@ func Test_getSecurityContext(t *testing.T) {
 		{
 			name: "run rsync with user",
 			fields: fields{
-				client: getFakeCompatClient(),
+				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -1060,7 +1060,7 @@ func Test_getSecurityContext(t *testing.T) {
 		{
 			name: "run rsync with group",
 			fields: fields{
-				client: getFakeCompatClient(),
+				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
@@ -1091,7 +1091,7 @@ func Test_getSecurityContext(t *testing.T) {
 		{
 			name: "run rsync with default",
 			fields: fields{
-				client: getFakeCompatClient(),
+				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
