@@ -23,7 +23,7 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/joho/godotenv v1.3.0
 	github.com/konveyor/controller v0.4.1
-	github.com/konveyor/crane-lib v0.0.8
+	github.com/konveyor/crane-lib v0.0.9-0.20221017172508-a93959a896f9
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
 	github.com/mattn/go-sqlite3 v1.14.4
 	github.com/onsi/ginkgo v1.16.4
