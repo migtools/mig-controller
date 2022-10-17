@@ -119,6 +119,9 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 		ExtraOpts(o.Extras),
 		rsynctransfer.Username("root"),
 		rsynctransfer.Password(rsyncPassword),
+		rsynctransfer.ExcludeFiles{
+			"lost+found",
+		},
 	}
 	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
 	if err != nil {
