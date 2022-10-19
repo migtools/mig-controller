@@ -63,6 +63,7 @@ func (t *Task) ensureDestinationNamespaces() error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        destNsName,
 				Annotations: srcNS.Annotations,
+				Labels:      srcNS.Labels,
 			},
 		}
 		existingNamespace := &corev1.Namespace{}
