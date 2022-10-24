@@ -159,7 +159,7 @@ func (t *Task) getRsyncClientMutations(srcClient compat.Client, destClient compa
 	transferOptions := []rsynctransfer.TransferOption{}
 	containerMutation := &corev1.Container{}
 
-	migration, err := t.Owner.GetMigrationForDVM(destClient)
+	migration, err := t.Owner.GetMigrationForDVM(t.Client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -190,7 +190,7 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 		return nil, liberr.Wrap(err)
 	}
 	containerMutation.Resources = resourceRequirements
-	migration, err := t.Owner.GetMigrationForDVM(client)
+	migration, err := t.Owner.GetMigrationForDVM(t.Client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
@@ -398,7 +398,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
-	migration, err := t.Owner.GetMigrationForDVM(destClient)
+	migration, err := t.Owner.GetMigrationForDVM(t.Client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
