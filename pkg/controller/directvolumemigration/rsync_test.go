@@ -922,7 +922,7 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &Task{
 				Log:    log.WithName("test-logger"),
-				Client: tt.fields.SrcClient,
+				Client: tt.fields.DestClient,
 				Owner:  tt.fields.Owner,
 			}
 			got, err := tr.createRsyncTransferClients(tt.fields.SrcClient, tt.fields.DestClient, tt.fields.PVCPairMap)
