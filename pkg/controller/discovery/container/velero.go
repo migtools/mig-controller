@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-//
 // A collection of k8s Backup resources.
 type Backup struct {
 	// Base
@@ -157,7 +156,6 @@ func (r *Backup) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // A collection of k8s Restore resources.
 type Restore struct {
 	// Base
@@ -302,7 +300,6 @@ func (r *Restore) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // A collection of k8s PodVolumeBackup resources.
 type PodVolumeBackup struct {
 	// Base
@@ -447,7 +444,6 @@ func (r *PodVolumeBackup) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // A collection of k8s PodVolumeRestore resources.
 type PodVolumeRestore struct {
 	// Base

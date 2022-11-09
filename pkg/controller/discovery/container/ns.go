@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-//
 // A collection of k8s Namespace resources.
 type Namespace struct {
 	// Base

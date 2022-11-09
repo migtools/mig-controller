@@ -17,7 +17,6 @@ const (
 	MigrationRoot  = MigrationsRoot + "/:" + MigrationParam
 )
 
-//
 // Migration (route) handler.
 type MigrationHandler struct {
 	// Base
@@ -26,7 +25,6 @@ type MigrationHandler struct {
 	migration model.Migration
 }
 
-//
 // Add routes.
 func (h MigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(MigrationsRoot, h.List)
@@ -34,7 +32,6 @@ func (h MigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(MigrationRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced migration.
 // Perform SAR authorization.
@@ -85,7 +82,6 @@ func (h *MigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // List all of the migrations in the namespace.
 func (h MigrationHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -120,7 +116,6 @@ func (h MigrationHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific migration.
 func (h MigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -147,7 +142,6 @@ func (h MigrationHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h MigrationHandler) Link(m *model.Migration) string {
 	return h.BaseHandler.Link(
@@ -158,7 +152,6 @@ func (h MigrationHandler) Link(m *model.Migration) string {
 		})
 }
 
-//
 // Migration REST resource.
 type Migration struct {
 	// The k8s namespace.
@@ -171,7 +164,6 @@ type Migration struct {
 	Object *migapi.MigMigration `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Migration) With(m *model.Migration) {
 	r.Namespace = m.Namespace
@@ -179,7 +171,6 @@ func (r *Migration) With(m *model.Migration) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Migration collection REST resource.
 type MigrationList struct {
 	// Total number in the collection.

@@ -6,6 +6,7 @@ const (
 )
 
 // Jaeger Options
+//
 //	Enabled: whether to emit jaeger spans from controller
 type JaegerOpts struct {
 	Enabled bool

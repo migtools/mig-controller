@@ -14,14 +14,12 @@ const (
 	PvcRoot  = PvcsRoot + "/:" + PvcParam
 )
 
-//
 // PVC (route) handler.
 type PvcHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h PvcHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvcsRoot, h.List)
@@ -29,7 +27,6 @@ func (h PvcHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvcRoot, h.Get)
 }
 
-//
 // List all of the PVCs on a cluster.
 func (h PvcHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -71,7 +68,6 @@ func (h PvcHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific PVC on a cluster.
 func (h PvcHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -105,7 +101,6 @@ func (h PvcHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PvcHandler) Link(c *model.Cluster, m *model.PVC) string {
 	return h.BaseHandler.Link(
@@ -130,7 +125,6 @@ type PVC struct {
 	Object *v1.PersistentVolumeClaim `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *PVC) With(m *model.PVC) {
 	r.Namespace = m.Namespace
@@ -138,7 +132,6 @@ func (r *PVC) With(m *model.PVC) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // PVC collection REST resource.
 type PvcList struct {
 	// Total number in the collection.

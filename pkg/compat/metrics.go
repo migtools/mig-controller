@@ -10,7 +10,6 @@ import (
 	api "k8s.io/apimachinery/pkg/runtime"
 )
 
-//
 // Labels.
 const (
 	Get       = "Get"
@@ -25,14 +24,12 @@ const (
 	Method    = "method"
 )
 
-//
 // Numeric metrics consts
 const (
 	one         = 1
 	nanoToMilli = 1e6
 )
 
-//
 // Global reporter.
 var Metrics *Reporter
 
@@ -65,44 +62,37 @@ func init() {
 	}
 }
 
-//
 // Metric reporter.
 type Reporter struct {
 	callCounter    *prometheus.CounterVec
 	elapsedCounter *prometheus.CounterVec
 }
 
-//
 // Report `get` API call.
 func (m *Reporter) Get(client Client, object api.Object, elapsed float64) {
 	m.report(client, Get, object, elapsed)
 }
 
-//
 // Report `list` API call.
 func (m *Reporter) List(client Client, object api.Object, elapsed float64) {
 	m.report(client, List, object, elapsed)
 }
 
-//
 // Report `create` API call.
 func (m *Reporter) Create(client Client, object api.Object, elapsed float64) {
 	m.report(client, Create, object, elapsed)
 }
 
-//
 // Report `update` API call.
 func (m *Reporter) Update(client Client, object api.Object, elapsed float64) {
 	m.report(client, Update, object, elapsed)
 }
 
-//
 // Report `delete` API call.
 func (m *Reporter) Delete(client Client, object api.Object, elapsed float64) {
 	m.report(client, Delete, object, elapsed)
 }
 
-//
 // Determine the call context.
 func (m *Reporter) context() (component, function string) {
 	bfr := make([]uintptr, 50)
@@ -132,7 +122,6 @@ func (m *Reporter) context() (component, function string) {
 	return
 }
 
-//
 // Report the API call.
 func (m *Reporter) report(client Client, method string, object api.Object, elapsed float64) {
 	component, function := m.context()

@@ -15,7 +15,6 @@ const (
 	BackupRoot  = BackupsRoot + "/:" + BackupParam
 )
 
-//
 // Backup (route) handler.
 type BackupHandler struct {
 	// Base
@@ -24,7 +23,6 @@ type BackupHandler struct {
 	backup model.Backup
 }
 
-//
 // Add routes.
 func (h BackupHandler) AddRoutes(r *gin.Engine) {
 	r.GET(BackupsRoot, h.List)
@@ -32,7 +30,6 @@ func (h BackupHandler) AddRoutes(r *gin.Engine) {
 	r.GET(BackupRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced backup.
 func (h *BackupHandler) Prepare(ctx *gin.Context) int {
@@ -63,7 +60,6 @@ func (h *BackupHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // List all of the backups in the namespace.
 func (h BackupHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -98,7 +94,6 @@ func (h BackupHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific backup.
 func (h BackupHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -125,7 +120,6 @@ func (h BackupHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h BackupHandler) Link(c *model.Cluster, m *model.Backup) string {
 	return h.BaseHandler.Link(
@@ -138,7 +132,6 @@ func (h BackupHandler) Link(c *model.Cluster, m *model.Backup) string {
 		})
 }
 
-//
 // Backup REST resource.
 type Backup struct {
 	// The k8s namespace.
@@ -151,7 +144,6 @@ type Backup struct {
 	Object *velero.Backup `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Backup) With(m *model.Backup) {
 	r.Namespace = m.Namespace
@@ -159,7 +151,6 @@ func (r *Backup) With(m *model.Backup) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Backup collection REST resource.
 type BackupList struct {
 	// Total number in the collection.

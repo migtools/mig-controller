@@ -14,15 +14,17 @@ const (
 )
 
 // CORS
-//   AllowedOrigins: Allowed origins.
+//
+//	AllowedOrigins: Allowed origins.
 type CORS struct {
 	AllowedOrigins []string
 }
 
 // Discovery settings.
-//   Origins: Permitted CORS allowed origins.
-//   AuthOptional: Authorization header is optional.
-//   CollectEvents: Discovery Service event collection switch. May want to turn off in large clusters.
+//
+//	Origins: Permitted CORS allowed origins.
+//	AuthOptional: Authorization header is optional.
+//	CollectEvents: Discovery Service event collection switch. May want to turn off in large clusters.
 type Discovery struct {
 	CORS          CORS
 	WorkingDir    string

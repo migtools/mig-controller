@@ -6,13 +6,11 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
-//
 // Cluster model.
 type Cluster struct {
 	CR
 }
 
-//
 // Update the model `with` a MigCluster.
 func (m *Cluster) With(object *migapi.MigCluster) {
 	m.UID = string(object.UID)
@@ -23,14 +21,12 @@ func (m *Cluster) With(object *migapi.MigCluster) {
 	m.EncodeObject(object)
 }
 
-//
 // Encode the object.
 func (m *Cluster) EncodeObject(cluster *migapi.MigCluster) {
 	object, _ := json.Marshal(cluster)
 	m.Object = string(object)
 }
 
-//
 // Decode the object.
 func (m *Cluster) DecodeObject() *migapi.MigCluster {
 	cluster := &migapi.MigCluster{}
@@ -38,13 +34,11 @@ func (m *Cluster) DecodeObject() *migapi.MigCluster {
 	return cluster
 }
 
-//
 // Count in the DB.
 func (m Cluster) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
-//
 // Fetch the model from the DB.
 func (m Cluster) List(db DB, options ListOptions) ([]*Cluster, error) {
 	list := []*Cluster{}
@@ -60,27 +54,23 @@ func (m Cluster) List(db DB, options ListOptions) ([]*Cluster, error) {
 	return list, err
 }
 
-//
 // Fetch the model from the DB.
 func (m *Cluster) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
-//
 // Insert the model into the DB.
 func (m *Cluster) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
-//
 // Update the model in the DB.
 func (m *Cluster) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
-//
 // Delete the model in the DB.
 func (m *Cluster) Delete(db DB) error {
 	m.SetPk()

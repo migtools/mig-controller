@@ -16,7 +16,7 @@ require (
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-logr/logr v0.4.0
-	github.com/go-logr/zapr v0.3.0
+	github.com/go-logr/zapr v0.4.0
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/google/uuid v1.3.0
@@ -36,14 +36,14 @@ require (
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/vmware-tanzu/velero v1.7.1
-	go.uber.org/zap v1.17.0
+	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	google.golang.org/api v0.56.0
-	k8s.io/api v0.22.2
-	k8s.io/apimachinery v0.22.2
-	k8s.io/client-go v0.22.2
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/api v0.22.14
+	k8s.io/apimachinery v0.22.14
+	k8s.io/client-go v0.22.14
+	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/controller-runtime v0.10.2
 )
 
@@ -68,15 +68,15 @@ replace github.com/opencontainers/image-spec => github.com/opencontainers/image-
 // CVE-2021-3121
 replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 
-replace k8s.io/client-go => k8s.io/client-go v0.20.7
+replace k8s.io/client-go => k8s.io/client-go v0.22.14
 
-replace k8s.io/apimachinery => k8s.io/apimachinery v0.20.7
+replace k8s.io/apimachinery => k8s.io/apimachinery v0.22.14
 
-replace k8s.io/api => k8s.io/api v0.20.7
+replace k8s.io/api => k8s.io/api v0.22.14
 
-replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.20.7
+replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.22.14
 
-replace k8s.io/apiserver => k8s.io/apiserver v0.20.7
+replace k8s.io/apiserver => k8s.io/apiserver v0.22.14
 
 // Use fork
 replace bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c => github.com/markusthoemmes/goautoneg v0.0.0-20190713162725-c6008fefa5b1
@@ -94,4 +94,4 @@ replace github.com/vmware-tanzu/velero => github.com/konveyor/velero v0.10.2-0.2
 //openshift deps pinning
 replace github.com/openshift/api => github.com/openshift/api v0.0.0-20190716152234-9ea19f9dd578
 
-replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
+//replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091

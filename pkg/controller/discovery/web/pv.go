@@ -14,14 +14,12 @@ const (
 	PvRoot  = PvsRoot + "/:" + PvParam
 )
 
-//
 // PV (route) handler.
 type PvHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h PvHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvsRoot, h.List)
@@ -29,7 +27,6 @@ func (h PvHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvRoot, h.Get)
 }
 
-//
 // List all of the PVs on a cluster.
 func (h PvHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -71,7 +68,6 @@ func (h PvHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific PV on a cluster.
 func (h PvHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -104,7 +100,6 @@ func (h PvHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PvHandler) Link(c *model.Cluster, m *model.PV) string {
 	return h.BaseHandler.Link(
@@ -129,7 +124,6 @@ type PV struct {
 	Object *v1.PersistentVolume `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *PV) With(m *model.PV) {
 	r.Namespace = m.Namespace
@@ -137,7 +131,6 @@ func (r *PV) With(m *model.PV) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // PV collection REST resource.
 type PvList struct {
 	// Total number in the collection.

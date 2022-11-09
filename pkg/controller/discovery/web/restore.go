@@ -15,7 +15,6 @@ const (
 	RestoreRoot  = RestoresRoot + "/:" + RestoreParam
 )
 
-//
 // Restore (route) handler.
 type RestoreHandler struct {
 	// Base
@@ -24,7 +23,6 @@ type RestoreHandler struct {
 	restore model.Restore
 }
 
-//
 // Add routes.
 func (h RestoreHandler) AddRoutes(r *gin.Engine) {
 	r.GET(RestoresRoot, h.List)
@@ -32,7 +30,6 @@ func (h RestoreHandler) AddRoutes(r *gin.Engine) {
 	r.GET(RestoreRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced restore.
 func (h *RestoreHandler) Prepare(ctx *gin.Context) int {
@@ -63,7 +60,6 @@ func (h *RestoreHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // List all of the restores in the namespace.
 func (h RestoreHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -98,7 +94,6 @@ func (h RestoreHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific restore.
 func (h RestoreHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -125,7 +120,6 @@ func (h RestoreHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h RestoreHandler) Link(c *model.Cluster, m *model.Restore) string {
 	return h.BaseHandler.Link(
@@ -138,7 +132,6 @@ func (h RestoreHandler) Link(c *model.Cluster, m *model.Restore) string {
 		})
 }
 
-//
 // Restore REST resource.
 type Restore struct {
 	// The k8s namespace.
@@ -151,7 +144,6 @@ type Restore struct {
 	SelfLink string `json:"selfLink"`
 }
 
-//
 // Build the resource.
 func (r *Restore) With(m *model.Restore) {
 	r.Namespace = m.Namespace
@@ -159,7 +151,6 @@ func (r *Restore) With(m *model.Restore) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Restore collection REST resource.
 type RestoreList struct {
 	// Total number in the collection.

@@ -214,7 +214,6 @@ func (r *ReconcileDiscovery) IsValid(cluster *migapi.MigCluster) bool {
 	return true
 }
 
-//
 // Cluster predicate
 type ClusterPredicate struct {
 }

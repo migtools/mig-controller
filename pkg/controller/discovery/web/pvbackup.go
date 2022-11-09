@@ -15,7 +15,6 @@ const (
 	PvBackupRoot  = PvBackupsRoot + "/:" + PvBackupParam
 )
 
-//
 // PodVolumeBackup (route) handler.
 type PvBackupHandler struct {
 	// Base
@@ -24,7 +23,6 @@ type PvBackupHandler struct {
 	backup model.PodVolumeBackup
 }
 
-//
 // Add routes.
 func (h PvBackupHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvBackupsRoot, h.List)
@@ -32,7 +30,6 @@ func (h PvBackupHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvBackupRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced backup.
 func (h *PvBackupHandler) Prepare(ctx *gin.Context) int {
@@ -63,7 +60,6 @@ func (h *PvBackupHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // List all of the backups in the namespace.
 func (h PvBackupHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -98,7 +94,6 @@ func (h PvBackupHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific backup.
 func (h PvBackupHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -125,7 +120,6 @@ func (h PvBackupHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PvBackupHandler) Link(c *model.Cluster, m *model.PodVolumeBackup) string {
 	return h.BaseHandler.Link(
@@ -138,7 +132,6 @@ func (h PvBackupHandler) Link(c *model.Cluster, m *model.PodVolumeBackup) string
 		})
 }
 
-//
 // PodVolumeBackup REST resource.
 type PvBackup struct {
 	// The k8s namespace.
@@ -151,7 +144,6 @@ type PvBackup struct {
 	Object *velero.PodVolumeBackup `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *PvBackup) With(m *model.PodVolumeBackup) {
 	r.Namespace = m.Namespace
@@ -159,7 +151,6 @@ func (r *PvBackup) With(m *model.PodVolumeBackup) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // PodVolumeBackup collection REST resource.
 type PvBackupList struct {
 	// Total number in the collection.

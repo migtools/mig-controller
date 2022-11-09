@@ -26,7 +26,6 @@ const (
 	PlanTreeMigrationRoot = PlanTreeRoot + "/:" + TreeMigrationParam
 )
 
-//
 // Plan (route) handler.
 type PlanHandler struct {
 	// Base
@@ -37,7 +36,6 @@ type PlanHandler struct {
 	migration model.Migration
 }
 
-//
 // Add routes.
 func (h PlanHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PlansRoot, h.List)
@@ -48,7 +46,6 @@ func (h PlanHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PlanTreeMigrationRoot, h.Tree)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced plan.
 // Perform SAR authorization.
@@ -120,7 +117,6 @@ func (h *PlanHandler) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // List all of the plans in the namespace.
 func (h PlanHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -155,7 +151,6 @@ func (h PlanHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific plan.
 func (h PlanHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -182,7 +177,6 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific migration tree.
 func (h PlanHandler) Tree(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -212,7 +206,6 @@ func (h PlanHandler) Tree(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get the `PlanPods` for the plan.
 func (h PlanHandler) Pods(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -226,7 +219,6 @@ func (h PlanHandler) Pods(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PlanHandler) Link(m *model.Plan) string {
 	return h.BaseHandler.Link(
@@ -244,7 +236,6 @@ const (
 	clusterTypeTarget = "target"
 )
 
-//
 // Tree node.
 type TreeNode struct {
 	Kind        string     `json:"kind"`
@@ -255,7 +246,6 @@ type TreeNode struct {
 	ObjectLink  string     `json:"objectLink"`
 }
 
-//
 // Plan Tree.
 type PlanTree struct {
 	// Subject.
@@ -273,7 +263,6 @@ type PlanTree struct {
 	}
 }
 
-//
 // Build the tree.
 func (t *PlanTree) Build() (*TreeNode, error) {
 	err := t.setCluster()
@@ -291,7 +280,6 @@ func (t *PlanTree) Build() (*TreeNode, error) {
 	return root, nil
 }
 
-//
 // Get the relevant correlation labels.
 func (t *PlanTree) cLabel(r MigResource) model.Label {
 	k, v := r.GetCorrelationLabel()
@@ -301,7 +289,6 @@ func (t *PlanTree) cLabel(r MigResource) model.Label {
 	}
 }
 
-//
 // Set the cluster field based on
 // the referenced plan.
 func (t *PlanTree) setCluster() error {
@@ -336,7 +323,6 @@ func (t *PlanTree) setCluster() error {
 	return nil
 }
 
-//
 // Build root node.
 func (t *PlanTree) getRoot() *TreeNode {
 	root := &TreeNode{
@@ -362,7 +348,6 @@ func (t *PlanTree) clusterType(cluster *model.Cluster) string {
 	}
 }
 
-//
 // Add related migrations.
 func (t *PlanTree) addMigrations(parent *TreeNode) error {
 	planObject := t.plan.DecodeObject()
@@ -436,7 +421,6 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 	return nil
 }
 
-//
 // Add related velero Backups.
 func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) error {
 	cluster := t.cluster.source
@@ -544,7 +528,6 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, paren
 	return nil
 }
 
-//
 // Add related velero Restores.
 func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) error {
 	cluster := t.cluster.destination
@@ -655,7 +638,6 @@ func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *
 	return nil
 }
 
-//
 // Add direct volumes
 func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode) error {
 	collection := model.DirectVolumeMigration{}
@@ -698,7 +680,6 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 	return nil
 }
 
-//
 // Add mighooks
 func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error {
 	migrationObject := migration.DecodeObject()
@@ -743,7 +724,6 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 	return nil
 }
 
-//
 // Add jobs associated with hooks
 func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migration, parent *TreeNode) error {
 	hookObject := hook.DecodeObject()
@@ -791,7 +771,6 @@ func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migr
 	return nil
 }
 
-//
 // Add pods associated with job
 func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, parent *TreeNode) error {
 	jobObject := job.DecodeObject()
@@ -822,7 +801,6 @@ func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, p
 	return nil
 }
 
-//
 // Add direct images
 func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode) error {
 	collection := model.DirectImageMigration{}
@@ -855,7 +833,6 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 	return nil
 }
 
-//
 // Add direct volumes progress
 func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMigration, parent *TreeNode) error {
 	collection := model.DirectVolumeMigrationProgress{}
@@ -1130,7 +1107,6 @@ func (t *PlanTree) addDirectVolumeRoutesForCluster(cluster model.Cluster, direct
 	return nil
 }
 
-//
 // Add direct images
 func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration, parent *TreeNode) error {
 	cLabel := t.cLabel(directImage.DecodeObject())
@@ -1171,7 +1147,6 @@ func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration
 	return nil
 }
 
-//
 // Add related velero PodVolumeBackups.
 func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 	cluster := t.cluster.source
@@ -1222,7 +1197,6 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 	return nil
 }
 
-//
 // Add related velero PodVolumeRestores.
 func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error {
 	cluster := t.cluster.destination
@@ -1273,7 +1247,6 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 	return nil
 }
 
-//
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVR(pvr *model.PodVolumeRestore, restore *model.Restore, parent *TreeNode) error {
 	cluster := t.cluster.destination
@@ -1313,7 +1286,6 @@ func (t *PlanTree) addPVCsForPVR(pvr *model.PodVolumeRestore, restore *model.Res
 	return nil
 }
 
-//
 // Add PVCs moved by a velero backup.
 func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) error {
 	cluster := t.cluster.source
@@ -1350,7 +1322,6 @@ func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) erro
 	return nil
 }
 
-//
 // Add PVCs moved by a velero restore.
 func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) error {
 	cluster := t.cluster.destination
@@ -1387,7 +1358,6 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 	return nil
 }
 
-//
 // Add PVCs related to velero restore.
 func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) error {
 	cluster := t.cluster.source
@@ -1459,7 +1429,6 @@ func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *Tr
 	return nil
 }
 
-//
 // Update the model `with` a PlanHandler
 // Fetch and build the pod lists.
 func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
@@ -1489,7 +1458,6 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 	return nil
 }
 
-//
 // Build the controller pods list.
 // Finds pods by label.
 func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod, error) {
@@ -1532,7 +1500,6 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod,
 	return pods, nil
 }
 
-//
 // Build list of relevant pods on a cluster.
 // Finds pods by label. Currently includes velero and restic pods.
 func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod, error) {
@@ -1590,7 +1557,6 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod
 	return pods, nil
 }
 
-//
 // Plan REST resource.
 type Plan struct {
 	// The k8s namespace.
@@ -1603,7 +1569,6 @@ type Plan struct {
 	Object *migapi.MigPlan `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Plan) With(m *model.Plan) {
 	r.Namespace = m.Namespace
@@ -1611,7 +1576,6 @@ func (r *Plan) With(m *model.Plan) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Plan collection REST resource.
 type PlanList struct {
 	// Total number in the collection.
@@ -1620,7 +1584,6 @@ type PlanList struct {
 	Items []Plan `json:"resources"`
 }
 
-//
 // PlanPods REST resource.
 type PlanPods struct {
 	// The k8s namespace.
@@ -1635,7 +1598,6 @@ type PlanPods struct {
 	Destination []PlanPod `json:"destination"`
 }
 
-//
 // Container REST resource.
 type Container struct {
 	// Pod k8s name.
@@ -1644,7 +1606,6 @@ type Container struct {
 	Log string `json:"log"`
 }
 
-//
 // PlanPod REST resource.
 type PlanPod struct {
 	// Pod k8s namespace.
@@ -1655,11 +1616,9 @@ type PlanPod struct {
 	Containers []Container `json:"containers"`
 }
 
-//
 // Container filter.
 type ContainerFilter func(*v1.Container) bool
 
-//
 // Update fields using the specified models.
 func (p *PlanPod) With(pod *model.Pod, cluster *model.Cluster, filters ...ContainerFilter) {
 	p.Containers = []Container{}
@@ -1680,7 +1639,6 @@ func (p *PlanPod) With(pod *model.Pod, cluster *model.Cluster, filters ...Contai
 	}
 }
 
-//
 // Get a filtered list of containers.
 func (p *PlanPod) filterContainers(pod *model.Pod, filters []ContainerFilter) []v1.Container {
 	list := []v1.Container{}

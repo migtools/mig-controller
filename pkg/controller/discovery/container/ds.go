@@ -19,12 +19,12 @@ import (
 
 type Collections []Collection
 
-//
 // A DataSource corresponds to a MigCluster and is
 // responsible for maintaining a k8s:
 //   - Manager/controller
 //   - REST configuration
 //   - Client
+//
 // Each contains a set of `Collection`.
 type DataSource struct {
 	// The associated (owner) container.
@@ -50,7 +50,6 @@ type DataSource struct {
 	versionThreshold uint64
 }
 
-//
 // Determine if the DataSource is `ready`.
 // The DataSource is `ready` when all of the collections are `ready`.
 func (r *DataSource) IsReady() bool {
@@ -63,7 +62,6 @@ func (r *DataSource) IsReady() bool {
 	return true
 }
 
-//
 // The k8s reconcile loop.
 // Implements the k8s Reconciler interface. The DataSource is the reconciler
 // for the container k8s manager/controller but is should never be called. The design
@@ -73,7 +71,6 @@ func (r *DataSource) Reconcile(ctx context.Context, request reconcile.Request) (
 	return reconcile.Result{Requeue: false}, nil
 }
 
-//
 // Start the DataSource.
 //   - Create the cluster in the DB.
 //   - Create a k8s client.
@@ -133,7 +130,6 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	return nil
 }
 
-//
 // Stop the DataSource.
 // Stop the associated k8s manager/controller and delete all
 // of the associated data in the DB. The data should be deleted
@@ -165,7 +161,6 @@ func (r *DataSource) HasDiscovered(m model.Model) {
 	}
 }
 
-//
 // Enqueue create model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -178,7 +173,6 @@ func (r *DataSource) Create(m model.Model) {
 	r.eventChannel <- ModelEvent{}.Create(m)
 }
 
-//
 // Enqueue update model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -191,7 +185,6 @@ func (r *DataSource) Update(m model.Model) {
 	r.eventChannel <- ModelEvent{}.Update(m)
 }
 
-//
 // Enqueue delete model event.
 // Used by watch predicates.
 // Swallow panic: send on closed channel.
@@ -204,7 +197,6 @@ func (r *DataSource) Delete(m model.Model) {
 	r.eventChannel <- ModelEvent{}.Delete(m)
 }
 
-//
 // Build k8s client.
 func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 	var err error
@@ -226,7 +218,6 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 	return nil
 }
 
-//
 // Build the k8s manager.
 func (r *DataSource) buildManager(name string) error {
 	var err error
@@ -259,7 +250,6 @@ func (r *DataSource) buildManager(name string) error {
 	return nil
 }
 
-//
 // Apply model events.
 func (r *DataSource) applyEvents() {
 	for event := range r.eventChannel {
@@ -270,7 +260,6 @@ func (r *DataSource) applyEvents() {
 	}
 }
 
-//
 // Model event.
 // Used with `eventChannel`.
 type ModelEvent struct {
@@ -283,7 +272,6 @@ type ModelEvent struct {
 	action byte
 }
 
-//
 // Apply the change to the DB.
 func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 	tx, err := db.Begin()
@@ -332,7 +320,6 @@ func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 	return
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Create(m model.Model) ModelEvent {
 	r.model = m
@@ -340,7 +327,6 @@ func (r ModelEvent) Create(m model.Model) ModelEvent {
 	return r
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Update(m model.Model) ModelEvent {
 	r.model = m
@@ -348,7 +334,6 @@ func (r ModelEvent) Update(m model.Model) ModelEvent {
 	return r
 }
 
-//
 // Set the event model and action.
 func (r ModelEvent) Delete(m model.Model) ModelEvent {
 	r.model = m

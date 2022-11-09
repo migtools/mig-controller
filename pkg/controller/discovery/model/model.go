@@ -23,12 +23,12 @@ var Settings = &settings.Settings
 // Not found error.
 var NotFound = sql.ErrNoRows
 
-//
 // DB driver cannot be used for concurrent writes.
 // Model methods must use:
 //   - Insert()
 //   - Update()
 //   - Delete()
+//
 // And, all transactions.
 var Mutex sync.RWMutex
 
@@ -36,7 +36,6 @@ const (
 	Pragma = "PRAGMA foreign_keys = ON"
 )
 
-//
 // Create the schema in the DB.
 func Create() (*sql.DB, error) {
 	path := pathlib.Join(Settings.WorkingDir, "discovery.db")
@@ -92,7 +91,6 @@ func Create() (*sql.DB, error) {
 	return db, nil
 }
 
-//
 // Database interface.
 // Support model methods taking either sql.DB or sql.Tx.
 type DB interface {
@@ -101,14 +99,12 @@ type DB interface {
 	QueryRow(string, ...interface{}) *sql.Row
 }
 
-//
 // Database interface.
 // Support model `Scan` taking either sql.Row or sql.Rows.
 type Row interface {
 	Scan(...interface{}) error
 }
 
-//
 // Page.
 // Support pagination.
 type Page struct {
@@ -118,7 +114,6 @@ type Page struct {
 	Limit int
 }
 
-//
 // Slice the collection according to the page definition.
 // The `collection` must be a pointer to a `Slice` which is
 // modified as needed.
@@ -146,7 +141,6 @@ func (p *Page) Slice(collection interface{}) {
 	}
 }
 
-//
 // Model
 // Each model represents a table in the DB.
 type Model interface {
@@ -169,7 +163,6 @@ type Model interface {
 	Labels() Labels
 }
 
-//
 // Model meta-data.
 type Meta struct {
 	// Primary key.
@@ -184,7 +177,6 @@ type Meta struct {
 	Name string
 }
 
-//
 // Base Model
 type Base struct {
 	// Primary key (digest).
@@ -210,7 +202,6 @@ func (m *Base) Pk() string {
 	return m.PK
 }
 
-//
 // Set the primary key.
 // The PK is calculated as the SHA1 of the:
 //   - cluster FK
@@ -222,7 +213,6 @@ func (m *Base) SetPk() {
 	m.PK = fmt.Sprintf("%x", h.Sum(nil))
 }
 
-//
 // Get the meta-data.
 func (m *Base) Meta() *Meta {
 	n, _ := strconv.ParseUint(m.Version, 10, 64)
@@ -235,13 +225,11 @@ func (m *Base) Meta() *Meta {
 	}
 }
 
-//
 // Get labels.
 func (m *Base) Labels() Labels {
 	return m.labels
 }
 
-//
 // Fetch referenced cluster.
 func (m *Base) GetCluster(db DB) (*Cluster, error) {
 	cluster := &Cluster{
@@ -253,7 +241,6 @@ func (m *Base) GetCluster(db DB) (*Cluster, error) {
 	return cluster, err
 }
 
-//
 // Custom Resource.
 type CR struct {
 	// Primary key (digest).
@@ -272,13 +259,11 @@ type CR struct {
 	labels Labels
 }
 
-//
 // Get the primary key.
 func (m *CR) Pk() string {
 	return m.PK
 }
 
-//
 // Set the primary key.
 func (m *CR) SetPk() {
 	h := sha1.New()
@@ -286,7 +271,6 @@ func (m *CR) SetPk() {
 	m.PK = fmt.Sprintf("%x", h.Sum(nil))
 }
 
-//
 // Get the model meta-data.
 func (m *CR) Meta() *Meta {
 	n, _ := strconv.ParseUint(m.Version, 10, 64)
@@ -299,7 +283,6 @@ func (m *CR) Meta() *Meta {
 	}
 }
 
-//
 // Get associated labels.
 func (m *CR) Labels() Labels {
 	return m.labels

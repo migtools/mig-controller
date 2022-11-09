@@ -548,7 +548,7 @@ func (r *MigPlan) UpdateRegistryDeployment(storage *MigStorage, deployment *apps
 }
 
 // Get an existing registry Deployment on the specified cluster.
-//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
+// TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
 func (r *MigPlan) GetRegistryDeployment(client k8sclient.Client) (*appsv1.Deployment, error) {
 	list := appsv1.DeploymentList{}
 	labels := r.GetCorrelationLabels()
@@ -627,7 +627,7 @@ func (r *MigPlan) UpdateRegistryService(service *kapi.Service, name string) {
 }
 
 // Get an existing registry Service on the specifiedcluster.
-//TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
+// TODO: We need to convert this from a list call to a get call. The name of the deployment is equal to the name of the secret
 func (r *MigPlan) GetRegistryService(client k8sclient.Client) (*kapi.Service, error) {
 	list := kapi.ServiceList{}
 	labels := r.GetCorrelationLabels()
@@ -928,7 +928,6 @@ func (r *PV) Update(pv PV) {
 // plan.Spec.AddPv(pvB)
 // plan.Spec.AddPv(pvC)
 // plan.Spec.EndPvStaging()
-//
 type PersistentVolumes struct {
 	List    []PV           `json:"persistentVolumes,omitempty"`
 	index   map[string]int `json:"-"`
@@ -1039,9 +1038,10 @@ func (r *PersistentVolumes) ResetPvs() {
 
 // Convert name to a DNS_LABEL-compliant string
 // DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
-//     to the definition of a "label" in RFCs 1035 and 1123. This is captured
-//     by the following regex:
-//         [a-z0-9]([-a-z0-9]*[a-z0-9])?
+//
+//	to the definition of a "label" in RFCs 1035 and 1123. This is captured
+//	by the following regex:
+//	    [a-z0-9]([-a-z0-9]*[a-z0-9])?
 func toDnsLabel(name string) (string, error) {
 	// keep lowercase alphanumeric and hyphen
 	reg, err := regexp.Compile("[^-a-z0-9]+")
