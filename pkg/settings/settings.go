@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-//
 // Manager roles.
 const (
 	// Role environment variable.
@@ -33,7 +32,8 @@ const (
 var Settings = _Settings{}
 
 // Settings
-//   Plan: Plan settings.
+//
+//	Plan: Plan settings.
 type _Settings struct {
 	Discovery
 	Plan
@@ -78,7 +78,6 @@ func (r *_Settings) Load() error {
 	return nil
 }
 
-//
 // Load the manager role.
 // The default is ALL roles.
 func (r *_Settings) loadProxyVars() error {
@@ -120,7 +119,6 @@ func (r *_Settings) loadRoles() error {
 	return nil
 }
 
-//
 // Test manager role.
 func (r *_Settings) HasRole(name string) bool {
 	_, found := r.Roles[name]

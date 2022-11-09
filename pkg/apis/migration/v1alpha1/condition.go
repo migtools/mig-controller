@@ -123,7 +123,9 @@ func (r *Condition) BuildItems() {
 // Intended to be included in resource Status.
 // List - The list of conditions.
 // staging - In `staging` mode, the search methods like
-//          HasCondition() filter out un-staging conditions.
+//
+//	HasCondition() filter out un-staging conditions.
+//
 // -------------------
 // Example:
 //
@@ -133,9 +135,9 @@ func (r *Condition) BuildItems() {
 // thing.Status.SetCondition(c)
 // thing.Status.EndStagingConditions()
 // thing.Status.SetReady(
-//     !thing.Status.HasBlockerCondition(),
-//     "Resource Ready.")
 //
+//	!thing.Status.HasBlockerCondition(),
+//	"Resource Ready.")
 type Conditions struct {
 	List    []Condition `json:"conditions,omitempty"`
 	staging bool        `json:"-"`

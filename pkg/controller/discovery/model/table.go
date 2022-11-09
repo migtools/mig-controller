@@ -16,7 +16,6 @@ const (
 	Tag = "sql"
 )
 
-//
 // DDL templates.
 var TableDDL = `
 CREATE TABLE IF NOT EXISTS {{.Table}} (
@@ -41,7 +40,6 @@ ON {{.Table}}
 );
 `
 
-//
 // SQL templates.
 var InsertSQL = `
 INSERT INTO {{.Table}} (
@@ -158,23 +156,22 @@ LIMIT {{.Options.Page.Limit}} OFFSET {{.Options.Page.Offset}}
 ;
 `
 
-//
 // Represents a table in the DB.
 // Using reflect, the model is inspected to determine the
 // table name and columns. The column definition is specified
 // using field tags:
-//   pk - Primary key.
-//   key - Natural key.
-//   fk:<table>(field) - Foreign key.
-//   unique(<group>) - Unique constraint collated by <group>.
-//   index(<group>) - Non-unique indexed fields collated by <group>.
-//   const - Not updated.
+//
+//	pk - Primary key.
+//	key - Natural key.
+//	fk:<table>(field) - Foreign key.
+//	unique(<group>) - Unique constraint collated by <group>.
+//	index(<group>) - Non-unique indexed fields collated by <group>.
+//	const - Not updated.
 type Table struct {
 	// Database connection.
 	Db DB
 }
 
-//
 // Get the table name for the model.
 func (t Table) Name(model interface{}) string {
 	mt := reflect.TypeOf(model)
@@ -185,7 +182,6 @@ func (t Table) Name(model interface{}) string {
 	return mt.Name()
 }
 
-//
 // Get table and index create DDL.
 func (t Table) DDL(model interface{}) ([]string, error) {
 	list := []string{}
@@ -280,7 +276,6 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 	return list, nil
 }
 
-//
 // Insert the model in the DB.
 // Expects the primary key (PK) to be set.
 func (t Table) Insert(model interface{}) error {
@@ -327,7 +322,6 @@ func (t Table) Insert(model interface{}) error {
 	return nil
 }
 
-//
 // Update the model in the DB.
 // Expects the primary key (PK) or natural keys to be set.
 func (t Table) Update(model interface{}) error {
@@ -369,7 +363,6 @@ func (t Table) Update(model interface{}) error {
 	return nil
 }
 
-//
 // Delete the model in the DB.
 // Expects the primary key (PK) or natural keys to be set.
 func (t Table) Delete(model interface{}) error {
@@ -411,7 +404,6 @@ func (t Table) Delete(model interface{}) error {
 	return nil
 }
 
-//
 // Get the model in the DB.
 // Expects the primary key (PK) or natural keys to be set.
 // Fetch the row and populate the fields in the model.
@@ -436,7 +428,6 @@ func (t Table) Get(model interface{}) error {
 	return err
 }
 
-//
 // List the model in the DB.
 // Qualified by the model field values and list options.
 // Expects natural keys to be set.
@@ -476,7 +467,6 @@ func (t Table) List(model interface{}, options ListOptions) ([]interface{}, erro
 	return list, nil
 }
 
-//
 // Count the models in the DB.
 // Qualified by the model field values and list options.
 // Expects natural keys to be set.
@@ -509,7 +499,6 @@ func (t Table) Count(model interface{}, options ListOptions) (int64, error) {
 	return count, nil
 }
 
-//
 // Insert labels for the model into the DB.
 func (t Table) InsertLabels(model Model) error {
 	for l, v := range model.Labels() {
@@ -529,7 +518,6 @@ func (t Table) InsertLabels(model Model) error {
 	return nil
 }
 
-//
 // Delete labels for a model in the DB.
 func (t Table) DeleteLabels(model Model) error {
 	return t.Delete(
@@ -539,7 +527,6 @@ func (t Table) DeleteLabels(model Model) error {
 		})
 }
 
-//
 // Replace labels.
 func (t Table) ReplaceLabels(model Model) error {
 	err := t.DeleteLabels(model)
@@ -551,7 +538,6 @@ func (t Table) ReplaceLabels(model Model) error {
 	return t.InsertLabels(model)
 }
 
-//
 // Get the `Fields` for the model.
 func (t Table) Fields(model interface{}) ([]*Field, error) {
 	fields := []*Field{}
@@ -598,7 +584,6 @@ func (t Table) Fields(model interface{}) ([]*Field, error) {
 	return fields, nil
 }
 
-//
 // Get the populated `Fields` for the model.
 func (t Table) NotEmptyFields(fields []*Field) []*Field {
 	list := []*Field{}
@@ -611,7 +596,6 @@ func (t Table) NotEmptyFields(fields []*Field) []*Field {
 	return list
 }
 
-//
 // Get the `Fields` referenced as param in SQL.
 func (t Table) Params(fields []*Field) []interface{} {
 	list := []interface{}{}
@@ -625,7 +609,6 @@ func (t Table) Params(fields []*Field) []interface{} {
 	return list
 }
 
-//
 // Get the mutable `Fields` for the model.
 func (t Table) MutableFields(fields []*Field) []*Field {
 	list := []*Field{}
@@ -638,7 +621,6 @@ func (t Table) MutableFields(fields []*Field) []*Field {
 	return list
 }
 
-//
 // Get the natural key `Fields` for the model.
 func (t Table) KeyFields(fields []*Field) []*Field {
 	list := []*Field{}
@@ -651,7 +633,6 @@ func (t Table) KeyFields(fields []*Field) []*Field {
 	return list
 }
 
-//
 // Get the PK field.
 func (t Table) PkField(fields []*Field) *Field {
 	for _, f := range fields {
@@ -663,7 +644,6 @@ func (t Table) PkField(fields []*Field) *Field {
 	return nil
 }
 
-//
 // Get constraint DDL.
 func (t Table) Constraints(fields []*Field) []string {
 	constraints := []string{}
@@ -696,7 +676,6 @@ func (t Table) Constraints(fields []*Field) []string {
 	return constraints
 }
 
-//
 // Build model insert SQL.
 func (t Table) insertSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
@@ -720,7 +699,6 @@ func (t Table) insertSQL(table string, fields []*Field) (string, error) {
 	return bfr.String(), nil
 }
 
-//
 // Build model update SQL.
 func (t Table) updateSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
@@ -746,7 +724,6 @@ func (t Table) updateSQL(table string, fields []*Field) (string, error) {
 	return bfr.String(), nil
 }
 
-//
 // Build model delete SQL.
 func (t Table) deleteSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
@@ -771,7 +748,6 @@ func (t Table) deleteSQL(table string, fields []*Field) (string, error) {
 	return bfr.String(), nil
 }
 
-//
 // Build model get SQL.
 func (t Table) getSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
@@ -797,7 +773,6 @@ func (t Table) getSQL(table string, fields []*Field) (string, error) {
 	return bfr.String(), nil
 }
 
-//
 // Build model list SQL.
 func (t Table) listSQL(table string, fields []*Field, options ListOptions) (string, error) {
 	tpl := template.New("")
@@ -825,7 +800,6 @@ func (t Table) listSQL(table string, fields []*Field, options ListOptions) (stri
 	return bfr.String(), nil
 }
 
-//
 // Scan the fetch row into the model.
 // The model fields are updated.
 func (t Table) scan(row Row, fields []*Field) error {
@@ -844,19 +818,15 @@ func (t Table) scan(row Row, fields []*Field) error {
 	return err
 }
 
-//
 // Regex used for `unique(group)` tags.
 var UniqueRegex = regexp.MustCompile(`(unique)(\()(.+)(\))`)
 
-//
 // Regex used for `index(group)` tags.
 var IndexRegex = regexp.MustCompile(`(index)(\()(.+)(\))`)
 
-//
 // Regex used for `fk:<table>(field)` tags.
 var FkRegex = regexp.MustCompile(`(fk):(.+)(\()(.+)(\))`)
 
-//
 // Model (struct) Field
 type Field struct {
 	// reflect.Value of the field.
@@ -873,7 +843,6 @@ type Field struct {
 	isParam bool
 }
 
-//
 // Validate.
 func (f *Field) Validate() error {
 	switch f.Value.Kind() {
@@ -886,7 +855,6 @@ func (f *Field) Validate() error {
 	return nil
 }
 
-//
 // Pull from model.
 // Populate the appropriate `staging` field using the
 // model field value.
@@ -903,7 +871,6 @@ func (f *Field) Pull() interface{} {
 	return nil
 }
 
-//
 // Pointer used for Scan().
 func (f *Field) Ptr() interface{} {
 	switch f.Value.Kind() {
@@ -916,7 +883,6 @@ func (f *Field) Ptr() interface{} {
 	return nil
 }
 
-//
 // Push to the model.
 // Set the model field value using the `staging` field.
 func (f *Field) Push() {
@@ -928,7 +894,6 @@ func (f *Field) Push() {
 	}
 }
 
-//
 // Column DDL.
 func (f *Field) DDL() string {
 	part := []string{
@@ -951,14 +916,12 @@ func (f *Field) DDL() string {
 	return strings.Join(part, " ")
 }
 
-//
 // Get as SQL param.
 func (f *Field) Param() string {
 	f.isParam = true
 	return ":" + f.Name
 }
 
-//
 // Get whether field is empty.
 func (f *Field) Empty() bool {
 	f.Pull()
@@ -972,13 +935,11 @@ func (f *Field) Empty() bool {
 	return false
 }
 
-//
 // Get whether field is the primary key.
 func (f *Field) Pk() bool {
 	return f.hasOpt("pk")
 }
 
-//
 // Get whether field is mutable.
 // Only mutable fields will be updated.
 func (f *Field) Mutable() bool {
@@ -989,13 +950,11 @@ func (f *Field) Mutable() bool {
 	return !f.hasOpt("const")
 }
 
-//
 // Get whether field is a natural key.
 func (f *Field) Key() bool {
 	return f.hasOpt("key")
 }
 
-//
 // Get whether the field is unique.
 func (f *Field) Unique() []string {
 	list := []string{}
@@ -1010,7 +969,6 @@ func (f *Field) Unique() []string {
 	return list
 }
 
-//
 // Get whether the field is part of a non-unique index.
 func (f *Field) Index() []string {
 	list := []string{}
@@ -1025,7 +983,6 @@ func (f *Field) Index() []string {
 	return list
 }
 
-//
 // Get whether the field is a foreign key.
 func (f *Field) Fk() *FK {
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -1042,7 +999,6 @@ func (f *Field) Fk() *FK {
 	return nil
 }
 
-//
 // Get whether field has an option.
 func (f *Field) hasOpt(name string) bool {
 	for _, opt := range strings.Split(f.Tag, ",") {
@@ -1055,7 +1011,6 @@ func (f *Field) hasOpt(name string) bool {
 	return false
 }
 
-//
 // FK constraint.
 type FK struct {
 	// Table name.
@@ -1064,7 +1019,6 @@ type FK struct {
 	Field string
 }
 
-//
 // Get DDL.
 func (f *FK) DDL(field *Field) string {
 	return fmt.Sprintf(
@@ -1074,7 +1028,6 @@ func (f *FK) DDL(field *Field) string {
 		f.Field)
 }
 
-//
 // Template data.
 type TmplData struct {
 	// Table name.
@@ -1097,7 +1050,6 @@ type TmplData struct {
 	Count bool
 }
 
-//
 // Labels list.
 func (t TmplData) Labels() []Label {
 	list := []Label{}
@@ -1111,7 +1063,6 @@ func (t TmplData) Labels() []Label {
 	return list
 }
 
-//
 // List options.
 type ListOptions struct {
 	// Row count.

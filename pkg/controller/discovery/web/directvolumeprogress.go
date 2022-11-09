@@ -16,7 +16,6 @@ const (
 	DirectVolumeProgressRoot   = DirectVolumeProgressesRoot + "/:" + DirectVolumeProgressParam
 )
 
-//
 // DirectVolumeMigrationProgress (route) handler.
 type DirectVolumeMigrationProgressHandler struct {
 	// Base
@@ -25,7 +24,6 @@ type DirectVolumeMigrationProgressHandler struct {
 	directVolumeProgress model.DirectVolumeMigrationProgress
 }
 
-//
 // Add DVMP routes.
 func (h DirectVolumeMigrationProgressHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumeProgressesRoot, h.List)
@@ -33,7 +31,6 @@ func (h DirectVolumeMigrationProgressHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumeProgressRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced dvmp.
 // Perform SAR authorization.
@@ -84,7 +81,6 @@ func (h *DirectVolumeMigrationProgressHandler) getSAR() auth.SelfSubjectAccessRe
 	}
 }
 
-//
 // List all of the dvmps in the namespace.
 func (h DirectVolumeMigrationProgressHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -119,7 +115,6 @@ func (h DirectVolumeMigrationProgressHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific dvmp.
 func (h DirectVolumeMigrationProgressHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -146,7 +141,6 @@ func (h DirectVolumeMigrationProgressHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h DirectVolumeMigrationProgressHandler) Link(m *model.DirectVolumeMigrationProgress) string {
 	return h.BaseHandler.Link(
@@ -157,7 +151,6 @@ func (h DirectVolumeMigrationProgressHandler) Link(m *model.DirectVolumeMigratio
 		})
 }
 
-//
 // DirectVolumeMigrationProgress REST resource.
 type DirectVolumeProgress struct {
 	// The k8s namespace.
@@ -170,7 +163,6 @@ type DirectVolumeProgress struct {
 	Object *migapi.DirectVolumeMigrationProgress `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *DirectVolumeProgress) With(m *model.DirectVolumeMigrationProgress) {
 	r.Namespace = m.Namespace
@@ -178,7 +170,6 @@ func (r *DirectVolumeProgress) With(m *model.DirectVolumeMigrationProgress) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // DirectVolumeProgress collection REST resource.
 type DirectVolumeProgressList struct {
 	// Total number in the collection.

@@ -15,7 +15,6 @@ const (
 	PvRestoreRoot  = PvRestoresRoot + "/:" + PvRestoreParam
 )
 
-//
 // PodVolumeRestore (route) handler.
 type PvRestoreHandler struct {
 	// Base
@@ -24,7 +23,6 @@ type PvRestoreHandler struct {
 	restore model.PodVolumeRestore
 }
 
-//
 // Add routes.
 func (h PvRestoreHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvRestoresRoot, h.List)
@@ -32,7 +30,6 @@ func (h PvRestoreHandler) AddRoutes(r *gin.Engine) {
 	r.GET(PvRestoreRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced restore.
 func (h *PvRestoreHandler) Prepare(ctx *gin.Context) int {
@@ -63,7 +60,6 @@ func (h *PvRestoreHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // List all of the restores in the namespace.
 func (h PvRestoreHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -98,7 +94,6 @@ func (h PvRestoreHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific restore.
 func (h PvRestoreHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -125,7 +120,6 @@ func (h PvRestoreHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h PvRestoreHandler) Link(c *model.Cluster, m *model.PodVolumeRestore) string {
 	return h.BaseHandler.Link(
@@ -138,7 +132,6 @@ func (h PvRestoreHandler) Link(c *model.Cluster, m *model.PodVolumeRestore) stri
 		})
 }
 
-//
 // PodVolumeRestore REST resource.
 type PvRestore struct {
 	// The k8s namespace.
@@ -151,7 +144,6 @@ type PvRestore struct {
 	Object *velero.PodVolumeRestore `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *PvRestore) With(m *model.PodVolumeRestore) {
 	r.Namespace = m.Namespace
@@ -159,7 +151,6 @@ func (r *PvRestore) With(m *model.PodVolumeRestore) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // PodVolumeRestore collection REST resource.
 type PvRestoreList struct {
 	// Total number in the collection.

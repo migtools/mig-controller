@@ -24,7 +24,6 @@ type HookHandler struct {
 	hook model.Hook
 }
 
-//
 // Add DIM routes.
 func (h HookHandler) AddRoutes(r *gin.Engine) {
 	r.GET(HooksRoot, h.List)
@@ -32,7 +31,6 @@ func (h HookHandler) AddRoutes(r *gin.Engine) {
 	r.GET(HookRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced hook.
 // Perform SAR authorization.
@@ -83,7 +81,6 @@ func (h *HookHandler) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // List all of the dims in the namespace.
 func (h HookHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -118,7 +115,6 @@ func (h HookHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific dim.
 func (h HookHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -145,7 +141,6 @@ func (h HookHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h HookHandler) Link(m *model.Hook) string {
 	return h.BaseHandler.Link(
@@ -156,7 +151,6 @@ func (h HookHandler) Link(m *model.Hook) string {
 		})
 }
 
-//
 // Hook REST resource.
 type Hook struct {
 	// The k8s namespace.
@@ -169,7 +163,6 @@ type Hook struct {
 	Object *migapi.MigHook `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Hook) With(m *model.Hook) {
 	r.Namespace = m.Namespace
@@ -177,7 +170,6 @@ func (r *Hook) With(m *model.Hook) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Hook collection REST resource.
 type HookList struct {
 	// Total number in the collection.

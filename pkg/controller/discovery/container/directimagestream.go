@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-//
 // A collection of k8s DirectImageStreamMigration resources.
 type DirectImageStreamMigration struct {
 	// Base

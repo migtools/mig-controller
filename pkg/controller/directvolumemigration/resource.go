@@ -310,9 +310,10 @@ func getHalvedResourceList(resourceList corev1.ResourceList) corev1.ResourceList
 
 // applyLimitRangeOnRequirements given a ResourceRequirements & a LimitRange, applies Container & Pod limitranges on original Requirements
 // LimitRange can contain a LimitRangeItem of ContainerType or a PodType or both. when there's only one LimitRangeItem, there are two cases:
-// 1. LimitRangeItem is ContainerType: in this case, the limits are applied as-is on the ResourceRequirements for each container in DVM Pod
-// 2. LimitRangeItem is PodType: in this case, the Limits are further scaled down to half of their original values, because DVM Pods contain
-//    two containers each. Therefore, Limits are spread across two containers so that total ResourceRequirements of the Pod remains in limit
+//  1. LimitRangeItem is ContainerType: in this case, the limits are applied as-is on the ResourceRequirements for each container in DVM Pod
+//  2. LimitRangeItem is PodType: in this case, the Limits are further scaled down to half of their original values, because DVM Pods contain
+//     two containers each. Therefore, Limits are spread across two containers so that total ResourceRequirements of the Pod remains in limit
+//
 // When there are two LimitRangeItems of type Container & Pod both, it is hard to calculate resulting values for ResourceRequirements such
 // that they do not violate the combined Pod Limits and the individual Contaainer limits at the same time. in that case, we aggregate over
 // both values and try to find the most restrictive of all and hope that we never hit the following corner case -"Container.Min.Cpu = 500m"

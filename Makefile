@@ -102,7 +102,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
@@ -119,7 +119,7 @@ ifeq (, $(shell which conversion-gen))
 	CONVERSION_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONVERSION_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get k8s.io/code-generator/cmd/conversion-gen@v0.18.12 ;\
+	go install k8s.io/code-generator/cmd/conversion-gen@v0.19.16 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONVERSION_GEN=$(GOBIN)/conversion-gen

@@ -24,7 +24,6 @@ type DirectImageMigrationHandler struct {
 	directImage model.DirectImageMigration
 }
 
-//
 // Add DIM routes.
 func (h DirectImageMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectImagesRoot, h.List)
@@ -32,7 +31,6 @@ func (h DirectImageMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectImageRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced dim.
 // Perform SAR authorization.
@@ -83,7 +81,6 @@ func (h *DirectImageMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // List all of the dims in the namespace.
 func (h DirectImageMigrationHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -118,7 +115,6 @@ func (h DirectImageMigrationHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific dim.
 func (h DirectImageMigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -145,7 +141,6 @@ func (h DirectImageMigrationHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h DirectImageMigrationHandler) Link(m *model.DirectImageMigration) string {
 	return h.BaseHandler.Link(
@@ -156,7 +151,6 @@ func (h DirectImageMigrationHandler) Link(m *model.DirectImageMigration) string 
 		})
 }
 
-//
 // DirectImage REST resource.
 type DirectImage struct {
 	// The k8s namespace.
@@ -169,7 +163,6 @@ type DirectImage struct {
 	Object *migapi.DirectImageMigration `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *DirectImage) With(m *model.DirectImageMigration) {
 	r.Namespace = m.Namespace
@@ -177,7 +170,6 @@ func (r *DirectImage) With(m *model.DirectImageMigration) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // DirectImage collection REST resource.
 type DirectImageList struct {
 	// Total number in the collection.

@@ -14,14 +14,12 @@ const (
 	ServiceRoot  = ServicesRoot + "/:" + ServiceParam
 )
 
-//
 // Service (route) handler.
 type ServiceHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h ServiceHandler) AddRoutes(r *gin.Engine) {
 	r.GET(ServicesRoot, h.List)
@@ -29,7 +27,6 @@ func (h ServiceHandler) AddRoutes(r *gin.Engine) {
 	r.GET(ServiceRoot, h.Get)
 }
 
-//
 // List all of the Services on a cluster.
 func (h ServiceHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -71,7 +68,6 @@ func (h ServiceHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific Service on a cluster.
 func (h ServiceHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -105,7 +101,6 @@ func (h ServiceHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h ServiceHandler) Link(c *model.Cluster, m *model.Service) string {
 	return h.BaseHandler.Link(
@@ -130,7 +125,6 @@ type Service struct {
 	Object *v1.Service `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Service) With(m *model.Service) {
 	r.Namespace = m.Namespace
@@ -138,7 +132,6 @@ func (r *Service) With(m *model.Service) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Service collection REST resource.
 type ServiceList struct {
 	// Total number in the collection.

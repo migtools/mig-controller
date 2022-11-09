@@ -6,7 +6,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-//
 func GetRequests(a client.Object, migrationNamespace string, source interface{}) []reconcile.Request {
 	requests := []reconcile.Request{}
 	refMap := GetMap()

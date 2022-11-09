@@ -14,8 +14,6 @@ import (
 	"github.com/konveyor/mig-controller/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	batchv1beta "k8s.io/api/batch/v1beta1"
-	batchv2alpha "k8s.io/api/batch/v2alpha1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,7 +27,6 @@ import (
 
 var Settings = &settings.Settings
 
-//
 // A smart client.
 // Provides seamless API version compatibility.
 type Client interface {
@@ -50,7 +47,6 @@ type client struct {
 	Minor int
 }
 
-//
 // Create a new client.
 func NewClient(restCfg *rest.Config, rClient *k8sclient.Client) (Client, error) {
 	dClient, err := dapi.NewDiscoveryClientForConfig(restCfg)
@@ -108,7 +104,6 @@ func (c client) MinorVersion() int {
 	return c.Minor
 }
 
-//
 // supportedVersion will determine correct version of the object provided, based on cluster version
 func (c client) supportedVersion(obj k8sclient.Object) k8sclient.Object {
 	if c.Minor < 16 {
@@ -132,19 +127,9 @@ func (c client) supportedVersion(obj k8sclient.Object) k8sclient.Object {
 		}
 	}
 
-	if c.Minor < 8 {
-		switch obj.(type) {
-
-		// CronJob
-		case *batchv1beta.CronJob:
-			return &batchv2alpha.CronJob{}
-		}
-	}
-
 	return obj
 }
 
-//
 // supportedVersion will determine correct version of the object provided, based on cluster version
 func (c client) supportedVersionList(obj k8sclient.ObjectList) k8sclient.ObjectList {
 	if c.Minor < 16 {
@@ -168,19 +153,9 @@ func (c client) supportedVersionList(obj k8sclient.ObjectList) k8sclient.ObjectL
 		}
 	}
 
-	if c.Minor < 8 {
-		switch obj.(type) {
-
-		// CronJob
-		case *batchv1beta.CronJobList:
-			return &batchv2alpha.CronJobList{}
-		}
-	}
-
 	return obj
 }
 
-//
 // Down convert a resource as needed based on cluster version.
 func (c client) downConvert(ctx context.Context, obj k8sclient.Object) (k8sclient.Object, error) {
 	new := c.supportedVersion(obj)
@@ -196,7 +171,6 @@ func (c client) downConvert(ctx context.Context, obj k8sclient.Object) (k8sclien
 	return new, nil
 }
 
-//
 // upConvert will convert src resource to dst as needed based on cluster version
 func (c client) upConvert(ctx context.Context, src k8sclient.Object, dst k8sclient.Object) error {
 	if c.supportedVersion(dst) == dst {
@@ -207,7 +181,6 @@ func (c client) upConvert(ctx context.Context, src k8sclient.Object, dst k8sclie
 	return scheme.Scheme.Convert(src, dst, ctx)
 }
 
-//
 // Down convert a resource as needed based on cluster version.
 func (c client) downConvertList(ctx context.Context, obj k8sclient.ObjectList) (k8sclient.ObjectList, error) {
 	new := c.supportedVersionList(obj)
@@ -223,7 +196,6 @@ func (c client) downConvertList(ctx context.Context, obj k8sclient.ObjectList) (
 	return new, nil
 }
 
-//
 // upConvert will convert src resource to dst as needed based on cluster version
 func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst k8sclient.ObjectList) error {
 	if c.supportedVersionList(dst) == dst {
@@ -234,7 +206,6 @@ func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst
 	return scheme.Scheme.Convert(src, dst, ctx)
 }
 
-//
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object) error {
@@ -251,7 +222,6 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.O
 	return c.upConvert(ctx, obj, in)
 }
 
-//
 // List the specified resource.
 // The resource will be converted to a compatible version as needed.
 func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8sclient.ListOption) error {
