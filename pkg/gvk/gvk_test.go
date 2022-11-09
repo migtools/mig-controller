@@ -33,22 +33,23 @@ import (
 //  }
 //}
 
-//dst 4.4
-//{
-//  "kind": "APIGroup",
-//  "apiVersion": "v1",
-//  "name": "apps",
-//  "versions": [
-//    {
-//      "groupVersion": "apps/v1",
-//      "version": "v1"
-//    }
-//  ],
-//  "preferredVersion": {
-//    "groupVersion": "apps/v1",
-//    "version": "v1"
-//  }
-//}
+// dst 4.4
+//
+//	{
+//	 "kind": "APIGroup",
+//	 "apiVersion": "v1",
+//	 "name": "apps",
+//	 "versions": [
+//	   {
+//	     "groupVersion": "apps/v1",
+//	     "version": "v1"
+//	   }
+//	 ],
+//	 "preferredVersion": {
+//	   "groupVersion": "apps/v1",
+//	   "version": "v1"
+//	 }
+//	}
 func Test_compareResources(t *testing.T) {
 	type args struct {
 		src []*metav1.APIResourceList

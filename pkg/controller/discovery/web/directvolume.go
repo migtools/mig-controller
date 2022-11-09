@@ -16,7 +16,6 @@ const (
 	DirectVolumeRoot  = DirectVolumesRoot + "/:" + DirectVolumeParam
 )
 
-//
 // DirectVolume (route) handler.
 type DirectVolumeMigrationHandler struct {
 	// Base
@@ -25,7 +24,6 @@ type DirectVolumeMigrationHandler struct {
 	directVolume model.DirectVolumeMigration
 }
 
-//
 // Add DVM routes.
 func (h DirectVolumeMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumesRoot, h.List)
@@ -33,7 +31,6 @@ func (h DirectVolumeMigrationHandler) AddRoutes(r *gin.Engine) {
 	r.GET(DirectVolumeRoot, h.Get)
 }
 
-//
 // Prepare to fulfil the request.
 // Fetch the referenced dvm.
 // Perform SAR authorization.
@@ -84,7 +81,6 @@ func (h *DirectVolumeMigrationHandler) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // List all of the dvms in the namespace.
 func (h DirectVolumeMigrationHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -119,7 +115,6 @@ func (h DirectVolumeMigrationHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific dvm.
 func (h DirectVolumeMigrationHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -146,7 +141,6 @@ func (h DirectVolumeMigrationHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h DirectVolumeMigrationHandler) Link(m *model.DirectVolumeMigration) string {
 	return h.BaseHandler.Link(
@@ -157,7 +151,6 @@ func (h DirectVolumeMigrationHandler) Link(m *model.DirectVolumeMigration) strin
 		})
 }
 
-//
 // DirectVolume REST resource.
 type DirectVolume struct {
 	// The k8s namespace.
@@ -170,7 +163,6 @@ type DirectVolume struct {
 	Object *migapi.DirectVolumeMigration `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *DirectVolume) With(m *model.DirectVolumeMigration) {
 	r.Namespace = m.Namespace
@@ -178,7 +170,6 @@ func (r *DirectVolume) With(m *model.DirectVolumeMigration) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // DirectVolume collection REST resource.
 type DirectVolumeList struct {
 	// Total number in the collection.

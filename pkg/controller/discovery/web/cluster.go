@@ -16,7 +16,6 @@ const (
 	ClusterRoot  = ClustersRoot + "/:" + ClusterParam
 )
 
-//
 // Base handler for cluster scoped routes.
 type ClusterScoped struct {
 	// Base
@@ -25,7 +24,6 @@ type ClusterScoped struct {
 	cluster model.Cluster
 }
 
-//
 // Prepare to fulfil the request.
 // Set the `cluster` field and ensure the related DataSource is `ready`.
 // Perform SAR authorization.
@@ -52,7 +50,6 @@ func (h *ClusterScoped) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Build the appropriate SAR object.
 // For clusters without a secret, the cluster itself is the subject.
 // For clusters with a secret, the secret is the subject.
@@ -86,7 +83,6 @@ func (h *ClusterScoped) getSAR() auth.SelfSubjectAccessReview {
 	}
 }
 
-//
 // Ensure the DataSource associated with the cluster is `ready`.
 func (h *ClusterScoped) dsReady() int {
 	wait := time.Second * 30
@@ -117,14 +113,12 @@ func (h *ClusterScoped) dsReady() int {
 	return http.StatusPartialContent
 }
 
-//
 // Cluster (route) handler.
 type ClusterHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h ClusterHandler) AddRoutes(r *gin.Engine) {
 	r.GET(ClustersRoot, h.List)
@@ -132,7 +126,6 @@ func (h ClusterHandler) AddRoutes(r *gin.Engine) {
 	r.GET(ClusterRoot, h.Get)
 }
 
-//
 // List clusters in the namespace.
 func (h ClusterHandler) List(ctx *gin.Context) {
 	status := h.BaseHandler.Prepare(ctx)
@@ -169,7 +162,6 @@ func (h ClusterHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific cluster.
 func (h ClusterHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -185,7 +177,6 @@ func (h ClusterHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h ClusterHandler) Link(m *model.Cluster) string {
 	return h.BaseHandler.Link(
@@ -196,7 +187,6 @@ func (h ClusterHandler) Link(m *model.Cluster) string {
 		})
 }
 
-//
 // Cluster REST resource.
 type Cluster struct {
 	// Cluster k8s namespace.
@@ -209,7 +199,6 @@ type Cluster struct {
 	Object *migapi.MigCluster `json:"object,omitempty"`
 }
 
-//
 // Get self URI.
 func (r *Cluster) With(m *model.Cluster) {
 	r.Namespace = m.Namespace
@@ -217,7 +206,6 @@ func (r *Cluster) With(m *model.Cluster) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Cluster collection REST resource.
 type ClusterList struct {
 	// Total number in the collection.

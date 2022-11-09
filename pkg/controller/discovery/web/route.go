@@ -15,14 +15,12 @@ const (
 	RouteRoot  = RoutesRoot + "/:" + RouteParam
 )
 
-//
 // Route (route) handler.
 type RouteHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h RouteHandler) AddRoutes(r *gin.Engine) {
 	r.GET(RoutesRoot, h.List)
@@ -30,7 +28,6 @@ func (h RouteHandler) AddRoutes(r *gin.Engine) {
 	r.GET(RouteRoot, h.Get)
 }
 
-//
 // Get a specific route.
 func (h RouteHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -66,7 +63,6 @@ func (h RouteHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // List routes on a cluster in a namespace.
 func (h RouteHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -110,7 +106,6 @@ func (h RouteHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h RouteHandler) Link(c *model.Cluster, m *model.Route) string {
 	return h.BaseHandler.Link(
@@ -135,7 +130,6 @@ type Route struct {
 	Object *v1.Route `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Route) With(m *model.Route) {
 	r.Namespace = m.Namespace
@@ -143,7 +137,6 @@ func (r *Route) With(m *model.Route) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Route collection REST resource.
 type RouteList struct {
 	// Total number in the collection.

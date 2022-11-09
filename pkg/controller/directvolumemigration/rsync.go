@@ -53,7 +53,7 @@ const (
 	RsyncAttemptLabel = "migration.openshift.io/rsync-attempt"
 )
 
-//.ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
+// .ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
 func (t *Task) ensureRsyncEndpoint() error {
 	destClient, err := t.getDestinationClient()
 	if err != nil {
@@ -977,7 +977,7 @@ func (t *Task) deleteRsyncPassword() error {
 	return nil
 }
 
-//Returns a map of PVCNamespacedName to the pod.NodeName
+// Returns a map of PVCNamespacedName to the pod.NodeName
 func (t *Task) getPVCNodeNameMap(srcClient compat.Client) (map[string]string, error) {
 	nodeNameMap := map[string]string{}
 	pvcMap := t.getPVCNamespaceMap()

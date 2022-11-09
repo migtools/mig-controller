@@ -380,7 +380,7 @@ func TestReconcileMigPlan_ensureMigAnalytics(t *testing.T) {
 					if got.GenerateName == "test-plan-" {
 						got.Name = ""
 					}
-					if !reflect.DeepEqual(got, tt.want) {
+					if !reflect.DeepEqual(got.Spec, tt.want.Spec) {
 						t.Errorf("waitForMigAnalyticsReady() got = %v, want %v", got, tt.want)
 					}
 				}

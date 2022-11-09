@@ -6,13 +6,11 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 )
 
-//
 // DirectImageMigration model.
 type DirectImageMigration struct {
 	CR
 }
 
-//
 // Update the model `with` a DirectImageMigration.
 func (m *DirectImageMigration) With(object *migapi.DirectImageMigration) {
 	m.UID = string(object.UID)
@@ -23,14 +21,12 @@ func (m *DirectImageMigration) With(object *migapi.DirectImageMigration) {
 	m.EncodeObject(object)
 }
 
-//
 // Encode the object.
 func (m *DirectImageMigration) EncodeObject(dim *migapi.DirectImageMigration) {
 	object, _ := json.Marshal(dim)
 	m.Object = string(object)
 }
 
-//
 // Decode the object.
 func (m *DirectImageMigration) DecodeObject() *migapi.DirectImageMigration {
 	dim := &migapi.DirectImageMigration{}
@@ -38,13 +34,11 @@ func (m *DirectImageMigration) DecodeObject() *migapi.DirectImageMigration {
 	return dim
 }
 
-//
 // Count in the DB.
 func (m DirectImageMigration) Count(db DB, options ListOptions) (int64, error) {
 	return Table{db}.Count(&m, options)
 }
 
-//
 // Fetch the model from the DB.
 func (m DirectImageMigration) List(db DB, options ListOptions) ([]*DirectImageMigration, error) {
 	list := []*DirectImageMigration{}
@@ -60,27 +54,23 @@ func (m DirectImageMigration) List(db DB, options ListOptions) ([]*DirectImageMi
 	return list, err
 }
 
-//
 // Fetch the model from the DB.
 func (m *DirectImageMigration) Get(db DB) error {
 	return Table{db}.Get(m)
 }
 
-//
 // Insert the model into the DB.
 func (m *DirectImageMigration) Insert(db DB) error {
 	m.SetPk()
 	return Table{db}.Insert(m)
 }
 
-//
 // Update the model in the DB.
 func (m *DirectImageMigration) Update(db DB) error {
 	m.SetPk()
 	return Table{db}.Update(m)
 }
 
-//
 // Delete the model in the DB.
 func (m *DirectImageMigration) Delete(db DB) error {
 	m.SetPk()

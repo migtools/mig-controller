@@ -26,6 +26,7 @@ const (
 )
 
 // RsyncOpts Rsync Options
+//
 //	BwLimit: equivalent to --bwlimit=<integer>
 //	Archive: whether to set --archive option or not
 //	Partial: whether to set --partial option or not

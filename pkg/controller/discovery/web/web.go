@@ -35,11 +35,9 @@ const (
 	Root         = "/" + NsCollection + "/" + ":" + NsParam
 )
 
-//
 // Params
 type Params = map[string]string
 
-//
 // Web server
 type WebServer struct {
 	// Allowed CORS origins.
@@ -48,7 +46,6 @@ type WebServer struct {
 	Container *container.Container
 }
 
-//
 // Start the web-server.
 // Initializes `gin` with routes and CORS origins.
 func (w *WebServer) Start() {
@@ -65,7 +62,6 @@ func (w *WebServer) Start() {
 	go r.Run()
 }
 
-//
 // Build a REGEX for each CORS origin.
 func (w *WebServer) buildOrigins() {
 	w.allowedOrigins = []*regexp.Regexp{}
@@ -87,7 +83,6 @@ func (w *WebServer) buildOrigins() {
 	}
 }
 
-//
 // Add the routes.
 func (w *WebServer) addRoutes(r *gin.Engine) {
 	handlers := []RequestHandler{
@@ -243,7 +238,6 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 	}
 }
 
-//
 // Called by `gin` to perform CORS authorization.
 func (w *WebServer) allow(origin string) bool {
 	for _, expr := range w.allowedOrigins {
@@ -257,7 +251,6 @@ func (w *WebServer) allow(origin string) bool {
 	return false
 }
 
-//
 // Web request handler.
 type RequestHandler interface {
 	// Add routes to the `gin` router.
@@ -268,7 +261,6 @@ type RequestHandler interface {
 	Get(*gin.Context)
 }
 
-//
 // Base web request handler.
 type BaseHandler struct {
 	// Reference to the container used to fulfil requests.
@@ -279,7 +271,6 @@ type BaseHandler struct {
 	page model.Page
 }
 
-//
 // Prepare the handler to fulfil the request.
 // Set the `token` and `page` fields using passed parameters.
 func (h *BaseHandler) Prepare(ctx *gin.Context) int {
@@ -295,7 +286,6 @@ func (h *BaseHandler) Prepare(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Set the `token` field.
 func (h *BaseHandler) setToken(ctx *gin.Context) int {
 	header := ctx.GetHeader("Authorization")
@@ -315,7 +305,6 @@ func (h *BaseHandler) setToken(ctx *gin.Context) int {
 	return http.StatusBadRequest
 }
 
-//
 // Set the `token` field.
 func (h *BaseHandler) setPage(ctx *gin.Context) int {
 	q := ctx.Request.URL.Query()
@@ -344,7 +333,6 @@ func (h *BaseHandler) setPage(ctx *gin.Context) int {
 	return http.StatusOK
 }
 
-//
 // Perform SAR.
 func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 	restCfg, _ := config.GetConfig()
@@ -381,7 +369,6 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 	return http.StatusForbidden
 }
 
-//
 // Build link.
 func (h *BaseHandler) Link(path string, params Params) string {
 	for k, v := range params {
@@ -391,7 +378,6 @@ func (h *BaseHandler) Link(path string, params Params) string {
 	return path
 }
 
-//
 // Schema (route) handler.
 type SchemaHandler struct {
 	// The `gin` router.
@@ -402,7 +388,6 @@ func (h SchemaHandler) AddRoutes(r *gin.Engine) {
 	r.GET("/schema", h.List)
 }
 
-//
 // List schema.
 func (h SchemaHandler) List(ctx *gin.Context) {
 	type Schema struct {
@@ -422,13 +407,11 @@ func (h SchemaHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, schema)
 }
 
-//
 // Not supported.
 func (h SchemaHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)
 }
 
-//
 // Root namespace (route) handler.
 type RootNsHandler struct {
 	// Base
@@ -440,7 +423,6 @@ func (h RootNsHandler) AddRoutes(r *gin.Engine) {
 	r.GET(strings.Split(Root, "/")[1]+"/", h.List)
 }
 
-//
 // List all root level namespaces.
 func (h RootNsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -489,7 +471,6 @@ func (h RootNsHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, list)
 }
 
-//
 // Not supported.
 func (h RootNsHandler) Get(ctx *gin.Context) {
 	ctx.Status(http.StatusMethodNotAllowed)

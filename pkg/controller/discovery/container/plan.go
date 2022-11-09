@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-//
 // A collection of k8s Plan resources.
 type Plan struct {
 	// Base
@@ -137,7 +136,6 @@ func (r *Plan) Generic(e event.GenericEvent) bool {
 	return false
 }
 
-//
 // A collection of k8s Migration resources.
 type Migration struct {
 	// Base

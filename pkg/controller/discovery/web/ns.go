@@ -13,14 +13,12 @@ const (
 	NamespaceRoot  = NamespacesRoot + "/:" + Ns2Param
 )
 
-//
 // Namespaces (route) handler.
 type NsHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h NsHandler) AddRoutes(r *gin.Engine) {
 	r.GET(NamespacesRoot, h.List)
@@ -28,7 +26,6 @@ func (h NsHandler) AddRoutes(r *gin.Engine) {
 	r.GET(NamespaceRoot, h.Get)
 }
 
-//
 // List namespaces on a cluster.
 func (h NsHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -111,7 +108,6 @@ func (h NsHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific namespace on a cluster.
 func (h NsHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -123,7 +119,6 @@ func (h NsHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, h.cluster.Namespace)
 }
 
-//
 // Build self link.
 func (h NsHandler) Link(m *model.Namespace) string {
 	return h.BaseHandler.Link(
@@ -151,7 +146,6 @@ type Namespace struct {
 	Object *v1.Namespace `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Namespace) With(m *model.Namespace, serviceCount, podCount, pvcCount int64) {
 	r.Namespace = m.Namespace
@@ -161,7 +155,6 @@ func (r *Namespace) With(m *model.Namespace, serviceCount, podCount, pvcCount in
 	r.PvcCount = pvcCount
 }
 
-//
 // NS collection REST resource.
 type NamespaceList struct {
 	// Total number in the collection.

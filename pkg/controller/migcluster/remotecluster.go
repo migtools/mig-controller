@@ -14,8 +14,9 @@ import (
 
 // RemoteClusterSource is a `watch` source used to
 // checkup on the connectivity of remote clusters.
-//	  Client - A controller-runtime client.
-//	  Interval - The connection test interval
+//
+//	Client - A controller-runtime client.
+//	Interval - The connection test interval
 type RemoteClusterSource struct {
 	Client     client.Client
 	Interval   time.Duration

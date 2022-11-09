@@ -15,14 +15,12 @@ const (
 	JobRoot  = JobsRoot + "/:" + JobParam
 )
 
-//
 // Job (route) handler.
 type JobHandler struct {
 	// Base
 	ClusterScoped
 }
 
-//
 // Add routes.
 func (h JobHandler) AddRoutes(r *gin.Engine) {
 	r.GET(JobsRoot, h.List)
@@ -30,7 +28,6 @@ func (h JobHandler) AddRoutes(r *gin.Engine) {
 	r.GET(JobRoot, h.Get)
 }
 
-//
 // List all of the Jobs on a cluster.
 func (h JobHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -72,7 +69,6 @@ func (h JobHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Get a specific Job on a cluster.
 func (h JobHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
@@ -106,7 +102,6 @@ func (h JobHandler) Get(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-//
 // Build self link.
 func (h JobHandler) Link(c *model.Cluster, m *model.Job) string {
 	return h.BaseHandler.Link(
@@ -131,7 +126,6 @@ type Job struct {
 	Object *batchv1.Job `json:"object,omitempty"`
 }
 
-//
 // Build the resource.
 func (r *Job) With(m *model.Job) {
 	r.Namespace = m.Namespace
@@ -139,7 +133,6 @@ func (r *Job) With(m *model.Job) {
 	r.Object = m.DecodeObject()
 }
 
-//
 // Job collection REST resource.
 type JobList struct {
 	// Total number in the collection.
