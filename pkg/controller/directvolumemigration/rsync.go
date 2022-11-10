@@ -5,17 +5,19 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	random "math/rand"
 	"path"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	liberr "github.com/konveyor/controller/pkg/error"
+	"github.com/konveyor/crane-lib/state_transfer/endpoint"
 	routeendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
+	svcendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/service"
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	transfer "github.com/konveyor/crane-lib/state_transfer/transfer"
 	rsynctransfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
@@ -31,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,46 +56,71 @@ const (
 	RsyncAttemptLabel = "migration.openshift.io/rsync-attempt"
 )
 
-// .ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
+// ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
 func (t *Task) ensureRsyncEndpoint() error {
 	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
+
+	hostnames := []string{}
+	if t.EndpointType == migapi.NodePort {
+		hostnames, err = getWorkerNodeHostnames(destClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+	}
+
 	for bothNs := range t.getPVCNamespaceMap() {
 		ns := getDestNs(bothNs)
 
-		// Get cluster subdomain if it exists
-		cluster, err := t.Owner.GetDestinationCluster(t.Client)
-		if err != nil {
-			return err
-		}
+		var endpoint endpoint.Endpoint
 
-		// Get the user provided subdomain, if empty we'll attempt to
-		// get the cluster's subdomain from destination client directly
-		subdomain, err := cluster.GetClusterSubdomain(t.Client)
-		if err != nil {
-			t.Log.Info("failed to get cluster_subdomain" + err.Error() + "attempting to get cluster's ingress domain")
-			ingressConfig := &configv1.Ingress{}
-			err = destClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
+		switch t.EndpointType {
+		case migapi.ClusterIP, migapi.NodePort:
+			endpoint = svcendpoint.NewEndpoint(
+				types.NamespacedName{
+					Namespace: ns,
+					Name:      DirectVolumeMigrationRsyncTransferSvc,
+				},
+				dvmLabels,
+				getNodeHostnameAtRandom(hostnames),
+				t.getServiceType(),
+			)
+		default:
+			// Get cluster subdomain if it exists
+			cluster, err := t.Owner.GetDestinationCluster(t.Client)
 			if err != nil {
-				t.Log.Error(err, "failed to retrieve cluster's ingress domain, extremely long namespace names will cause route creation failure")
-			} else {
-				subdomain = ingressConfig.Spec.Domain
+				return err
 			}
-		}
 
-		endpoint := routeendpoint.NewEndpoint(
-			types.NamespacedName{
-				Namespace: ns,
-				Name:      DirectVolumeMigrationRsyncTransferRoute,
-			},
-			routeendpoint.EndpointTypePassthrough,
-			dvmLabels,
-			subdomain,
-		)
+			// Get the user provided subdomain, if empty we'll attempt to
+			// get the cluster's subdomain from destination client directly
+			subdomain, err := cluster.GetClusterSubdomain(t.Client)
+			if err != nil {
+				t.Log.Info("failed to get cluster_subdomain" + err.Error() + "attempting to get cluster's ingress domain")
+				ingressConfig := &configv1.Ingress{}
+				err = destClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
+				if err != nil {
+					t.Log.Error(err, "failed to retrieve cluster's ingress domain, extremely long namespace names will cause route creation failure")
+				} else {
+					subdomain = ingressConfig.Spec.Domain
+				}
+			}
+
+			endpoint = routeendpoint.NewEndpoint(
+				types.NamespacedName{
+					Namespace: ns,
+					Name:      DirectVolumeMigrationRsyncTransferRoute,
+				},
+				routeendpoint.EndpointTypePassthrough,
+				dvmLabels,
+				subdomain,
+			)
+		}
 
 		err = endpoint.Create(destClient)
 		if err != nil {
@@ -330,10 +358,7 @@ func (t *Task) ensureRsyncTransferServer() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
 		)
-		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
-			Name:      DirectVolumeMigrationRsyncTransferRoute,
-			Namespace: destNs,
-		})
+		endpoint, err := t.getEndpoint(destClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -417,10 +442,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
-		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(destClient, types.NamespacedName{
-			Name:      DirectVolumeMigrationRsyncTransferRoute,
-			Namespace: destNs,
-		})
+		endpoint, err := t.getEndpoint(destClient, destNs)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
@@ -852,42 +874,53 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 	nsMap := t.getPVCNamespaceMap()
 	for bothNs, _ := range nsMap {
 		namespace := getDestNs(bothNs)
-		route := routev1.Route{}
 
-		key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
-		err = destClient.Get(context.TODO(), key, &route)
-		if err != nil {
-			return false, messages, err
-		}
-		// Logs abnormal events related to route if any are found
-		migevent.LogAbnormalEventsForResource(
-			destClient, t.Log,
-			"Found abnormal event for Rsync Route on destination cluster",
-			types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
-			route.UID, "Route")
+		switch t.EndpointType {
+		case migapi.Route:
+			route := routev1.Route{}
 
-		admitted := false
-		message := "no status condition available for the route"
-		// Check if we can find the admitted condition for the route
-		for _, ingress := range route.Status.Ingress {
-			for _, condition := range ingress.Conditions {
-				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
-					t.Log.Info("Rsync Transfer Route has not been admitted.",
-						"route", path.Join(route.Namespace, route.Name))
-					admitted = false
-					message = condition.Message
-					break
-				}
-				if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
-					t.Log.Info("Rsync Transfer Route has been admitted successfully.",
-						"route", path.Join(route.Namespace, route.Name))
-					admitted = true
-					break
+			key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
+			err = destClient.Get(context.TODO(), key, &route)
+			if err != nil {
+				return false, messages, err
+			}
+			// Logs abnormal events related to route if any are found
+			migevent.LogAbnormalEventsForResource(
+				destClient, t.Log,
+				"Found abnormal event for Rsync Route on destination cluster",
+				types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
+				route.UID, "Route")
+
+			admitted := false
+			message := "no status condition available for the route"
+			// Check if we can find the admitted condition for the route
+			for _, ingress := range route.Status.Ingress {
+				for _, condition := range ingress.Conditions {
+					if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionFalse {
+						t.Log.Info("Rsync Transfer Route has not been admitted.",
+							"route", path.Join(route.Namespace, route.Name))
+						admitted = false
+						message = condition.Message
+						break
+					}
+					if condition.Type == routev1.RouteAdmitted && condition.Status == corev1.ConditionTrue {
+						t.Log.Info("Rsync Transfer Route has been admitted successfully.",
+							"route", path.Join(route.Namespace, route.Name))
+						admitted = true
+						break
+					}
 				}
 			}
-		}
-		if !admitted {
-			messages = append(messages, message)
+			if !admitted {
+				messages = append(messages, message)
+			}
+		default:
+			_, err = t.getEndpoint(destClient, namespace)
+			if err != nil {
+				t.Log.Info("rsync transfer service is not healthy", "namespace", namespace)
+				messages = append(messages, fmt.Sprintf("rsync transfer service is not healthy in namespace %s", namespace))
+			}
+
 		}
 	}
 	if len(messages) > 0 {
@@ -1863,51 +1896,6 @@ func (r *rsyncClientOperationStatusList) Running() int {
 	return i
 }
 
-// garbageCollectRsyncPods garbage collection routine
-// will run in background, sends list of errors on a channel, logs deletion
-func (t *Task) garbageCollectPodsForRequirements(client compat.Client, op migapi.RsyncOperation, rateLimiter chan bool, outputChan chan<- []error, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rateLimiter <- true
-		errors := []error{}
-		podList, err := t.getAllPodsForOperation(client, op)
-		if err != nil {
-			errors = append(errors, liberr.Wrap(err))
-			outputChan <- errors
-			<-rateLimiter
-			return
-		}
-		for i := range podList.Items {
-			pod := podList.Items[i]
-			shouldDelete := false
-			if label, exists := pod.Labels[RsyncAttemptLabel]; exists {
-				if podAttempt, err := strconv.Atoi(label); err == nil {
-					// Delete the pod when it was created for a past attempt and DVMP is done gathering info from this pod
-					// keep a safety window of 1 attempt to avoid race conditions
-					if _, present := pod.Labels[migapi.DVMPDoneLabelKey]; present && podAttempt < op.CurrentAttempt {
-						shouldDelete = true
-					}
-				} else {
-					// Delete the pod when the attempt label cannot be parsed as int, we never consider this pod anyway
-					shouldDelete = true
-				}
-			}
-			if shouldDelete {
-				// Delete the pod when the pod attempt label is missing, we never consider this pod anyway
-				err := client.Delete(context.TODO(), &pod)
-				if err != nil {
-					t.Log.Error(err, "failed deleting garbage Rsync pods for operation", "pvc", op)
-					errors = append(errors, liberr.Wrap(err))
-				}
-				t.Log.Info("garbage cleaned pod", "pod", path.Join(pod.Namespace, pod.Name))
-			}
-		}
-		outputChan <- errors
-		<-rateLimiter
-	}()
-}
-
 // getAllPodsForOperation returns all pods matching given Rsync operation
 func (t *Task) getAllPodsForOperation(client compat.Client, operation migapi.RsyncOperation) (*corev1.PodList, error) {
 	podList := corev1.PodList{}
@@ -2035,4 +2023,74 @@ func isPSAEnforced(client compat.Client) bool {
 		return true
 	}
 	return false
+}
+
+// getEndpoint returns correct endpoint object as per app settings
+func (t *Task) getEndpoint(client client.Client, namespace string) (endpoint.Endpoint, error) {
+	switch t.EndpointType {
+	case migapi.ClusterIP, migapi.NodePort:
+		endpoint, err := svcendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferSvc,
+			Namespace: namespace,
+		})
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		return endpoint, nil
+	default:
+		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferRoute,
+			Namespace: namespace,
+		})
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		return endpoint, nil
+	}
+}
+
+// getServiceType returns endpoint service type based on settings
+func (t *Task) getServiceType() corev1.ServiceType {
+	switch t.EndpointType {
+	case migapi.NodePort:
+		return corev1.ServiceTypeNodePort
+	case migapi.ClusterIP:
+		return corev1.ServiceTypeClusterIP
+	}
+	return corev1.ServiceTypeNodePort
+}
+
+// getWorkerNodeHostnames returns hostnames of worker nodes
+func getWorkerNodeHostnames(client client.Client) ([]string, error) {
+	nodeList := corev1.NodeList{}
+	hostnames := []string{}
+	err := client.List(context.TODO(), &nodeList, k8sclient.MatchingLabels{
+		"node-role.kubernetes.io/worker": "",
+	})
+	if err != nil {
+		return hostnames, liberr.Wrap(err)
+	}
+	for _, node := range nodeList.Items {
+		hostname := ""
+		for _, address := range node.Status.Addresses {
+			switch address.Type {
+			case corev1.NodeInternalIP, corev1.NodeInternalDNS, corev1.NodeHostName:
+				hostname = address.Address
+			}
+			if hostname != "" {
+				hostnames = append(hostnames, hostname)
+				break
+			}
+		}
+	}
+	return hostnames, nil
+}
+
+// getNodeHostnameAtRandom returns a random hostname from a list of hostnames
+func getNodeHostnameAtRandom(hostnames []string) string {
+	if len(hostnames) == 0 {
+		return ""
+	}
+	rand.Seed(time.Now().Unix())
+	return hostnames[rand.Int()%len(hostnames)]
 }

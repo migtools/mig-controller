@@ -148,6 +148,7 @@ type Task struct {
 	Client                       k8sclient.Client
 	Owner                        *migapi.DirectVolumeMigration
 	SSHKeys                      *sshKeys
+	EndpointType                 migapi.EndpointType
 	RsyncRoutes                  map[string]string
 	Phase                        string
 	PhaseDescription             string

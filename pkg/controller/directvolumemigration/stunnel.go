@@ -10,7 +10,7 @@ import (
 	//"encoding/asn1"
 
 	//"k8s.io/apimachinery/pkg/types"
-	routeendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
+
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	cranetransport "github.com/konveyor/crane-lib/state_transfer/transport"
 	stunneltransport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
@@ -60,13 +60,7 @@ func (t *Task) ensureStunnelTransport() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
 
-		endpoint, _ := routeendpoint.GetEndpointFromKubeObjects(
-			destClient,
-			types.NamespacedName{
-				Namespace: destNs,
-				Name:      DirectVolumeMigrationRsyncTransferRoute,
-			},
-		)
+		endpoint, _ := t.getEndpoint(destClient, destNs)
 		if endpoint == nil {
 			continue
 		}
