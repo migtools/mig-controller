@@ -24,6 +24,16 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type EndpointType string
+
+const (
+	Route     EndpointType = "Route"
+	ClusterIP EndpointType = "ClusterIP"
+	NodePort  EndpointType = "NodePort"
+)
+
+const RSYNC_ENDPOINT_TYPE = "RSYNC_ENDPOINT_TYPE"
+
 type PVCToMigrate struct {
 	*kapi.ObjectReference `json:",inline"`
 	// TargetStorageClass storage class of the migrated PVC in the target cluster
