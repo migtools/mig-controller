@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7 AS builder
+FROM quay.io/konveyor/builder:latest AS builder
 
 # Copy in the go src
 WORKDIR $APP_ROOT/src/github.com/konveyor/mig-controller
@@ -13,4 +13,5 @@ RUN CGO_ENABLED=1 GOOS=linux go build -tags "$BUILDTAGS" -a -o $APP_ROOT/src/man
 FROM registry.access.redhat.com/ubi8-minimal
 WORKDIR /
 COPY --from=builder /opt/app-root/src/manager .
+USER 65534:65534
 ENTRYPOINT ["/manager"]
