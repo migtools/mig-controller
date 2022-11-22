@@ -83,4 +83,4 @@ replace github.com/vmware-tanzu/velero => github.com/konveyor/velero v0.10.2-0.2
 //openshift deps pinning
 replace github.com/openshift/api => github.com/openshift/api v0.0.0-20190716152234-9ea19f9dd578
 
-//replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.7.1-0.20201215171748-096b2e07c091
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.9.7
