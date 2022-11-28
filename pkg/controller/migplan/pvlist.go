@@ -9,6 +9,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
@@ -314,7 +315,7 @@ func isStorageConversionPlan(plan *migapi.MigPlan) bool {
 }
 
 // Get a list of PVCs found within the specified namespaces.
-func (r *ReconcileMigPlan) getClaims(client k8sclient.Client, plan *migapi.MigPlan) (Claims, error) {
+func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan) (Claims, error) {
 	claims := Claims{}
 	list := &core.PersistentVolumeClaimList{}
 	err := client.List(context.TODO(), list, &k8sclient.ListOptions{})

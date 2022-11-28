@@ -3,6 +3,7 @@ package pods
 import (
 	"context"
 
+	"github.com/konveyor/mig-controller/pkg/compat"
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -13,7 +14,7 @@ import (
 )
 
 // ListTemplatePods - get list of pod templates, associated with a plan resource
-func ListTemplatePods(client k8sclient.Client, namespaces []string) ([]corev1.Pod, error) {
+func ListTemplatePods(client compat.Client, namespaces []string) ([]corev1.Pod, error) {
 	pods := []corev1.Pod{}
 
 	for _, ns := range namespaces {
