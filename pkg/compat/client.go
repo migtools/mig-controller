@@ -14,6 +14,8 @@ import (
 	"github.com/konveyor/mig-controller/pkg/settings"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -127,6 +129,13 @@ func (c client) supportedVersion(obj k8sclient.Object) k8sclient.Object {
 		}
 	}
 
+	if c.Minor > 24 {
+		switch obj.(type) {
+		case *batchv1beta1.CronJob:
+			return &batchv1.CronJob{}
+		}
+	}
+
 	return obj
 }
 
@@ -150,6 +159,13 @@ func (c client) supportedVersionList(obj k8sclient.ObjectList) k8sclient.ObjectL
 		// StatefulSet
 		case *appsv1.StatefulSetList:
 			return &appsv1beta1.StatefulSetList{}
+		}
+	}
+
+	if c.Minor > 24 {
+		switch obj.(type) {
+		case *batchv1beta1.CronJobList:
+			return &batchv1.CronJobList{}
 		}
 	}
 
