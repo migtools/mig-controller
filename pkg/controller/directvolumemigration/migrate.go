@@ -26,6 +26,11 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 		return 0, liberr.Wrap(err)
 	}
 
+	endpointType, err := r.getEndpointType(direct)
+	if err != nil {
+		return 0, liberr.Wrap(err)
+	}
+
 	// Started
 	if direct.Status.StartTimestamp == nil {
 		log.Info("Marking DirectVolumeMigration as started.")
@@ -42,6 +47,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 		PlanResources:    planResources,
 		SparseFileMap:    sparseFilePVCMap,
 		Tracer:           r.tracer,
+		EndpointType:     endpointType,
 	}
 	err = task.Run(ctx)
 	if err != nil {
@@ -160,4 +166,31 @@ func (r *ReconcileDirectVolumeMigration) getSparseFilePVCMap(plan *migapi.MigPla
 		}
 	}
 	return sparseFilesMap, nil
+}
+
+// getEndpointType returns user configured endpoint type to be used for rsync transfer
+func (r *ReconcileDirectVolumeMigration) getEndpointType(direct *migapi.DirectVolumeMigration) (migapi.EndpointType, error) {
+	destCluster, err := direct.GetDestinationCluster(r)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	destClient, err := destCluster.GetClient(r)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	clusterConfig, err := destCluster.GetClusterConfigMap(destClient)
+	if err != nil {
+		return "", liberr.Wrap(err)
+	}
+	endpointType, exists := clusterConfig.Data[migapi.RSYNC_ENDPOINT_TYPE]
+	if !exists {
+		return migapi.Route, nil
+	}
+	switch migapi.EndpointType(endpointType) {
+	case migapi.Route, migapi.ClusterIP, migapi.NodePort:
+		return migapi.EndpointType(endpointType), nil
+	default:
+		log.Info("invalid endpoint type specified, using default", "specified", endpointType, "default", migapi.Route)
+		return migapi.Route, nil
+	}
 }
