@@ -73,7 +73,7 @@ func arePodsEqual(p1 *corev1.Pod, p2 *corev1.Pod) bool {
 func getFakeCompatClient(obj ...k8sclient.Object) compat.Client {
 	clusterConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "migration-cluster-config", Namespace: migapi.OpenshiftMigrationNamespace},
-		Data:       map[string]string{"RSYNC_PRIVILEGED": "false"},
+		Data:       map[string]string{"RSYNC_PRIVILEGED": "false", "RSYNC_SUPER_PRIVILEGED": "false"},
 	}
 	controllerConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace},
@@ -87,7 +87,7 @@ func getFakeCompatClient(obj ...k8sclient.Object) compat.Client {
 func getFakeCompatClientWithVersion(major int, minor int, obj ...k8sclient.Object) compat.Client {
 	clusterConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "migration-cluster-config", Namespace: migapi.OpenshiftMigrationNamespace},
-		Data:       map[string]string{"RSYNC_PRIVILEGED": "false"},
+		Data:       map[string]string{"RSYNC_PRIVILEGED": "false", "RSYNC_SUPER_PRIVILEGED": "false"},
 	}
 	controllerConfig := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "migration-controller", Namespace: migapi.OpenshiftMigrationNamespace},

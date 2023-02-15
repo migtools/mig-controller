@@ -48,6 +48,8 @@ const (
 	DefaultRsyncOperationConcurrency = 5
 	// PendingPodWarningTimeLimit time threshold for Rsync Pods in Pending state to show warning
 	PendingPodWarningTimeLimit = 10 * time.Minute
+	// SuperPrivilegedContainerType is the selinux SPC type string
+	SuperPrivilegedContainerType = "spc_t"
 )
 
 // labels
@@ -247,14 +249,27 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 // getSecurityContext returns the appropriate pod security context based on user input on migmigration
 func (t *Task) getSecurityContext(client compat.Client, namespace string, migration *migapi.MigMigration) (*corev1.SecurityContext, error) {
 	securityContext := &corev1.SecurityContext{}
+	selinuxOptions := &corev1.SELinuxOptions{}
+
 	// check if user explicitely asked to run Rsync Pods as root
 	isPrivileged, err := isRsyncPrivileged(client)
 	if err != nil {
 		return securityContext, liberr.Wrap(err)
 	}
+
+	isSuperPrivileged, err := isRsyncSuperPrivileged(client)
+	if err != nil {
+		return securityContext, liberr.Wrap(err)
+	}
+
 	trueBool := true
 	falseBool := false
 	rootUser := int64(0)
+
+	if isSuperPrivileged {
+		isPrivileged = trueBool
+		selinuxOptions.Type = SuperPrivilegedContainerType
+	}
 
 	if migration.Spec.RunAsRoot == nil {
 		migration.Spec.RunAsRoot = &isPrivileged
@@ -271,6 +286,7 @@ func (t *Task) getSecurityContext(client compat.Client, namespace string, migrat
 			Privileged:             &isPrivileged,
 			ReadOnlyRootFilesystem: &trueBool,
 			RunAsUser:              &rootUser,
+			SELinuxOptions:         selinuxOptions,
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
 			},
@@ -302,6 +318,7 @@ func (t *Task) getSecurityContext(client compat.Client, namespace string, migrat
 				Privileged:             &isPrivileged,
 				ReadOnlyRootFilesystem: &trueBool,
 				RunAsUser:              &rootUser,
+				SELinuxOptions:         selinuxOptions,
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"MKNOD", "SETPCAP"},
 				},
@@ -1051,6 +1068,26 @@ func isRsyncPrivileged(client compat.Client) (bool, error) {
 			return false, fmt.Errorf("RSYNC_PRIVILEGED boolean does not exist. Verify source and destination clusters operators are up to date")
 		}
 		parsed, err := strconv.ParseBool(isRsyncPrivileged)
+		if err != nil {
+			return false, err
+		}
+		return parsed, nil
+	}
+	return false, fmt.Errorf("configmap %s of source cluster has empty data", k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}.String())
+}
+
+func isRsyncSuperPrivileged(client compat.Client) (bool, error) {
+	cm := &corev1.ConfigMap{}
+	err := client.Get(context.TODO(), k8sclient.ObjectKey{Name: migapi.ClusterConfigMapName, Namespace: migapi.OpenshiftMigrationNamespace}, cm)
+	if err != nil {
+		return false, err
+	}
+	if cm.Data != nil {
+		isRsyncSuperPrivileged, exists := cm.Data["RSYNC_SUPER_PRIVILEGED"]
+		if !exists {
+			return false, fmt.Errorf("RSYNC_SUPER_PRIVILEGED boolean does not exist. Verify source and destination clusters operators are up to date")
+		}
+		parsed, err := strconv.ParseBool(isRsyncSuperPrivileged)
 		if err != nil {
 			return false, err
 		}
