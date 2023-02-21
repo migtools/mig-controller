@@ -249,7 +249,7 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 // getSecurityContext returns the appropriate pod security context based on user input on migmigration
 func (t *Task) getSecurityContext(client compat.Client, namespace string, migration *migapi.MigMigration) (*corev1.SecurityContext, error) {
 	securityContext := &corev1.SecurityContext{}
-	selinuxOptions := &corev1.SELinuxOptions{}
+	var selinuxOptions *corev1.SELinuxOptions
 
 	// check if user explicitely asked to run Rsync Pods as root
 	isPrivileged, err := isRsyncPrivileged(client)
@@ -268,7 +268,9 @@ func (t *Task) getSecurityContext(client compat.Client, namespace string, migrat
 
 	if isSuperPrivileged {
 		isPrivileged = trueBool
-		selinuxOptions.Type = SuperPrivilegedContainerType
+		selinuxOptions = &corev1.SELinuxOptions{
+			Type: SuperPrivilegedContainerType,
+		}
 	}
 
 	if migration.Spec.RunAsRoot == nil {
