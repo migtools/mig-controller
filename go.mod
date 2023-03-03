@@ -38,7 +38,7 @@ require (
 	github.com/vmware-tanzu/velero v1.7.1
 	go.uber.org/zap v1.19.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/net v0.7.0
 	google.golang.org/api v0.56.0
 	k8s.io/api v0.22.14
 	k8s.io/apimachinery v0.22.14
