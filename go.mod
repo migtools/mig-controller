@@ -9,7 +9,7 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/HdrHistogram/hdrhistogram-go v1.1.0 // indirect
 	github.com/aws/aws-sdk-go v1.35.23
-	github.com/containerd/containerd v1.5.7 // indirect
+	github.com/containerd/containerd v1.5.18 // indirect
 	github.com/containers/image/v5 v5.7.0
 	github.com/containers/storage v1.37.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
