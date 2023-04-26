@@ -20,18 +20,18 @@ func Test_getStatefulSetVolumeName(t *testing.T) {
 			name:    "given a statefulset volume with single ordinal value, must return correctly formatted name",
 			pvcName: "example-set-0",
 			setName: "set",
-			want:    fmt.Sprintf("example-set-0:example-%s-set-0", migapi.StorageConversionPVCNamePrefix),
+			want:    fmt.Sprintf("example-%s-set-0", migapi.StorageConversionPVCNamePrefix),
 		},
 		{
 			name:    "given a statefulset volume with double ordinal value, must return correctly formatted name",
 			pvcName: "example-set-10",
 			setName: "set",
-			want:    fmt.Sprintf("example-set-10:example-%s-set-10", migapi.StorageConversionPVCNamePrefix),
+			want:    fmt.Sprintf("example-%s-set-10", migapi.StorageConversionPVCNamePrefix),
 		},
 		{
 			name:    "given a volume with no ordinal, must return original name",
 			pvcName: "example-set",
-			want:    "example-set",
+			want:    "example-set-new",
 		},
 	}
 	for _, tt := range tests {

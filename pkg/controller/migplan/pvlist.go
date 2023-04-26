@@ -254,15 +254,14 @@ func getMappedNameForPVC(pvcRef *core.ObjectReference, podList []core.Pod, plan 
 		if len(pvcName) > 251 {
 			return pvcName
 		} else {
-			destName := fmt.Sprintf("%s:%s-%s", pvcName, pvcName, migapi.StorageConversionPVCNamePrefix)
+			destName := fmt.Sprintf("%s-%s", pvcName, migapi.StorageConversionPVCNamePrefix)
 			if isStatefulSet, setName := isStatefulSetVolume(pvcRef, podList); isStatefulSet {
 				destName = getStatefulSetVolumeName(pvcName, setName)
 			}
 			if len(destName) > 253 {
-				return destName[:253]
-			} else {
-				return destName
+				destName = destName[:253]
 			}
+			return fmt.Sprintf("%s:%s", pvcName, destName)
 		}
 	}
 	return pvcName
@@ -271,14 +270,17 @@ func getMappedNameForPVC(pvcRef *core.ObjectReference, podList []core.Pod, plan 
 // getStatefulSetVolumeName add the storage conversion prefix between the ordeal and the pvc name string
 func getStatefulSetVolumeName(pvcName string, setName string) string {
 	formattedName := pvcName
+	// templated volumes follow a pattern
 	matcher := regexp.MustCompile(fmt.Sprintf("(.*)?(-%s)(-\\d+)$", setName))
 	if !matcher.MatchString(pvcName) {
-		return pvcName
+		// this is not a templated volume
+		// must be treated as any other volume
+		return fmt.Sprintf("%s-%s", pvcName, migapi.StorageConversionPVCNamePrefix)
 	} else {
 		cols := matcher.FindStringSubmatch(pvcName)
 		if len(cols) > 3 {
-			formattedName = fmt.Sprintf("%s:%s-%s%s%s",
-				pvcName, cols[1],
+			formattedName = fmt.Sprintf("%s-%s%s%s",
+				cols[1],
 				migapi.StorageConversionPVCNamePrefix, cols[2], cols[3])
 		}
 	}
