@@ -110,7 +110,7 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 			fmt.Sprintf("Failed updating PVC references on CronJobs [%s]", strings.Join(failedCronJobNames, ",")))
 	}
 	// update pvc refs on statefulsets
-	failedStatefulSetNames := t.swapStatefulSetPVCRefs(client)
+	failedStatefulSetNames := t.swapStatefulSetPVCRefs(client, mapping)
 	if len(failedStatefulSetNames) > 0 {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on StatefulSets [%s]", strings.Join(failedStatefulSetNames, ",")))
@@ -134,7 +134,7 @@ func (t *Task) getPVCNameMapping() pvcNameMapping {
 	return mapping
 }
 
-func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client) (failedStatefulSets []string) {
+func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMapping) (failedStatefulSets []string) {
 	for _, ns := range t.destinationNamespaces() {
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
@@ -212,16 +212,23 @@ func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client) (failedStatefulSe
 					set.Annotations[statefulSetUpdateAnnotation] = migapi.True
 					formattedName = fmt.Sprintf("%s-%s", volumeTemplate.Name, migapi.StorageConversionPVCNamePrefix)
 				}
-				for i := range set.Spec.Template.Spec.Containers {
-					container := &set.Spec.Template.Spec.Containers[i]
-					for i := range container.VolumeMounts {
-						volumeMount := &container.VolumeMounts[i]
-						if volumeMount.Name == volumeTemplate.Name {
-							volumeMount.Name = formattedName
+				updateContainerVolumeMounts := func(containers []v1.Container) {
+					for i := range containers {
+						container := &containers[i]
+						for i := range container.VolumeMounts {
+							volumeMount := &container.VolumeMounts[i]
+							if volumeMount.Name == volumeTemplate.Name {
+								volumeMount.Name = formattedName
+							}
 						}
 					}
 				}
+				updateContainerVolumeMounts(set.Spec.Template.Spec.Containers)
+				updateContainerVolumeMounts(set.Spec.Template.Spec.InitContainers)
 				volumeTemplate.Name = formattedName
+			}
+			for _, volume := range set.Spec.Template.Spec.Volumes {
+				updatePVCRef(volume.PersistentVolumeClaim, set.Namespace, mapping)
 			}
 			err = client.Create(context.TODO(), newSet)
 			if err != nil {
