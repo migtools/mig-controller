@@ -626,6 +626,8 @@ github.com/konveyor/controller v0.4.1 h1:0LiBaAIrXScOqb6OoIGOIqpK9dxBAQotPWEhP4J
 github.com/konveyor/controller v0.4.1/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
 github.com/konveyor/crane-lib v0.0.10 h1:INF/XTo7M5Z3vguB7quSS2AoLvcdeXjr8dm6l3lNFX8=
 github.com/konveyor/crane-lib v0.0.10/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
+github.com/konveyor/crane-lib v0.0.11-0.20230522181322-b34f7a23f234 h1:SW6O/H5MzFeBUaaa7REQQR0l1SaxXPp6gwVsD3k1z/k=
+github.com/konveyor/crane-lib v0.0.11-0.20230522181322-b34f7a23f234/go.mod h1:C0H3dr85YlsaAt1Av7zFu4IPdwG4+SW7wEBFE+1udTw=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d h1:tETgPq+JxXhVhnrcLc7rcW9BURax36VUsix8DAU0wuY=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d/go.mod h1:Yk0xQ4N5rwE1+NWLSFQUQLgNT1/8p4Uor60LlgQfymg=
 github.com/konveyor/velero v0.10.2-0.20220124204642-f91d69bb9a5e h1:cjeGzY/zgPJCSLpC6Yurpn1li9ERrMtrF0nixFz2fmc=
