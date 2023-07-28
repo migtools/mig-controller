@@ -32,7 +32,7 @@ const (
 	// ResticPodLabelKey is the key of the label used to discover Restic pod
 	ResticPodLabelKey = "name"
 	// ResticPodLabelValue is the value of the label used to discover Restic pod
-	ResticPodLabelValue = "restic"
+	ResticPodLabelValue = "node-agent"
 )
 
 // ResticDFCommandExecutor uses Restic pods to run DF command
