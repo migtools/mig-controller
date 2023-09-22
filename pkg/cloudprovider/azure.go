@@ -65,8 +65,10 @@ func (p *AzureProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 	}
 
 	bsl.Spec.Config = map[string]string{
-		"resourceGroup":  p.ResourceGroup,
-		"storageAccount": p.StorageAccount,
+		"resourceGroup":           p.ResourceGroup,
+		"storageAccount":          p.StorageAccount,
+		"subscriptionId":          "", // Setting an empty value unblocks velero, we document to use this as an env var
+		"storageAccountKeyEnvVar": "AZURE_STORAGE_ACCOUNT_ACCESS_KEY",
 	}
 }
 
