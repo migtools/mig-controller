@@ -85,6 +85,9 @@ func (p *AWSProvider) UpdateBSL(bsl *velero.BackupStorageLocation) {
 			Prefix: "velero",
 		},
 	}
+	if len(p.CustomCABundle) > 0 {
+		bsl.Spec.StorageType.ObjectStorage.CACert = p.CustomCABundle
+	}
 	bsl.Spec.Config = map[string]string{
 		"s3ForcePathStyle":      strconv.FormatBool(p.GetForcePathStyle()),
 		"region":                p.GetRegion(),
