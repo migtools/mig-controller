@@ -33,4 +33,4 @@ fi
 
 # Login to migration controller SA without making changes to original KUBECONFIG
 KUBECONFIG=$MIG_KUBECONFIG \
-oc login --token $(oc sa get-token migration-controller -n openshift-migration) > /dev/null
+oc login --token $(oc create token migration-controller --duration=24h -n openshift-migration) > /dev/null
