@@ -6,37 +6,37 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/storage/v1"
+	virtv1 "kubevirt.io/api/core/v1"
 )
 
 const (
-	StorageClassParam = "storageclass"
-	StorageClasssRoot = ClusterRoot + "/storageclasses"
-	StorageClassRoot  = StorageClasssRoot + "/:" + StorageClassParam
+	VirtualMachineParam = "virtualmachine"
+	VirtualMachinesRoot = NamespaceRoot + "/virtualmachines"
+	VirtualMachineRoot  = VirtualMachinesRoot + "/:" + VirtualMachineParam
 )
 
-// StorageClass (route) handler.
-type StorageClassHandler struct {
+// Virtual Machine (route) handler.
+type VirtualMachineHandler struct {
 	// Base
 	ClusterScoped
 }
 
 // Add routes.
-func (h StorageClassHandler) AddRoutes(r *gin.Engine) {
-	r.GET(StorageClasssRoot, h.List)
-	r.GET(StorageClasssRoot+"/", h.List)
-	r.GET(StorageClassRoot, h.Get)
+func (h VirtualMachineHandler) AddRoutes(r *gin.Engine) {
+	r.GET(VirtualMachinesRoot, h.List)
+	r.GET(VirtualMachinesRoot+"/", h.List)
+	r.GET(VirtualMachineRoot, h.Get)
 }
 
-// List all of the StorageClasss on a cluster.
-func (h StorageClassHandler) List(ctx *gin.Context) {
+// List all of the VirtualMachines on a cluster.
+func (h VirtualMachineHandler) List(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
 	db := h.container.Db
-	collection := model.StorageClass{
+	collection := model.VirtualMachine{
 		Base: model.Base{
 			Cluster: h.cluster.PK,
 		},
@@ -56,11 +56,11 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	content := StorageClassList{
+	content := VirtualMachineList{
 		Count: count,
 	}
 	for _, m := range list {
-		r := StorageClass{}
+		r := VirtualMachine{}
 		r.With(m)
 		r.SelfLink = h.Link(&h.cluster, m)
 		content.Items = append(content.Items, r)
@@ -69,17 +69,18 @@ func (h StorageClassHandler) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, content)
 }
 
-// Get a specific StorageClass on a cluster.
-func (h StorageClassHandler) Get(ctx *gin.Context) {
+// Get a specific Virtual Machine on a cluster.
+func (h VirtualMachineHandler) Get(ctx *gin.Context) {
 	status := h.Prepare(ctx)
 	if status != http.StatusOK {
 		ctx.Status(status)
 		return
 	}
-	m := model.StorageClass{
+	m := model.VirtualMachine{
 		Base: model.Base{
-			Cluster: h.cluster.PK,
-			Name:    ctx.Param(StorageClassParam),
+			Cluster:   h.cluster.PK,
+			Namespace: ctx.Param(Ns2Param),
+			Name:      ctx.Param(VirtualMachineParam),
 		},
 	}
 	err := m.Get(h.container.Db)
@@ -93,7 +94,7 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 			return
 		}
 	}
-	r := StorageClass{}
+	r := VirtualMachine{}
 	r.With(&m)
 	r.SelfLink = h.Link(&h.cluster, &m)
 	content := r
@@ -102,19 +103,19 @@ func (h StorageClassHandler) Get(ctx *gin.Context) {
 }
 
 // Build self link.
-func (h StorageClassHandler) Link(c *model.Cluster, m *model.StorageClass) string {
+func (h VirtualMachineHandler) Link(c *model.Cluster, m *model.VirtualMachine) string {
 	return h.BaseHandler.Link(
-		StorageClassRoot,
+		VirtualMachineRoot,
 		Params{
-			NsParam:           c.Namespace,
-			ClusterParam:      c.Name,
-			Ns2Param:          m.Namespace,
-			StorageClassParam: m.Name,
+			NsParam:             c.Namespace,
+			ClusterParam:        c.Name,
+			Ns2Param:            m.Namespace,
+			VirtualMachineParam: m.Name,
 		})
 }
 
-// StorageClass REST resource
-type StorageClass struct {
+// VirtualMachine REST resource
+type VirtualMachine struct {
 	// The k8s namespace.
 	Namespace string `json:"namespace,omitempty"`
 	// The k8s name.
@@ -122,20 +123,20 @@ type StorageClass struct {
 	// Self URI.
 	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
-	Object *v1.StorageClass `json:"object,omitempty"`
+	Object *virtv1.VirtualMachine `json:"object,omitempty"`
 }
 
 // Build the resource.
-func (r *StorageClass) With(m *model.StorageClass) {
+func (r *VirtualMachine) With(m *model.VirtualMachine) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.Object = m.DecodeObject()
 }
 
-// StorageClass collection REST resource.
-type StorageClassList struct {
+// Virtual Machine collection REST resource.
+type VirtualMachineList struct {
 	// Total number in the collection.
 	Count int64 `json:"count"`
 	// List of resources.
-	Items []StorageClass `json:"resources"`
+	Items []VirtualMachine `json:"resources"`
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -13,6 +14,8 @@ import (
 	dapi "k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	virtv1 "kubevirt.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -37,7 +40,7 @@ func (fake fakeCompatClient) MinorVersion() int {
 	return fake.Minor
 }
 
-func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object) error {
+func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object, options ...client.GetOption) error {
 	return fake.Client.Get(ctx, key, obj)
 }
 
@@ -66,13 +69,7 @@ func (fake fakeCompatClient) Update(ctx context.Context, obj k8sclient.Object, o
 }
 
 func NewFakeClient(obj ...k8sclient.Object) (compat.Client, error) {
-	scheme, err := getSchemeForFakeClient()
-	if err != nil {
-		return nil, err
-	}
-	return fakeCompatClient{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj...).Build(),
-	}, nil
+	return NewFakeClientWithVersion(0, 0, obj...)
 }
 
 func NewFakeClientWithVersion(Major int, Minor int, obj ...k8sclient.Object) (compat.Client, error) {
@@ -81,9 +78,21 @@ func NewFakeClientWithVersion(Major int, Minor int, obj ...k8sclient.Object) (co
 		return nil, err
 	}
 	return fakeCompatClient{
-		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj...).Build(),
-		Major:  Major,
-		Minor:  Minor,
+		Client: fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj...).WithIndex(&migapi.MigMigration{},
+			migapi.PlanIndexField,
+			func(rawObj k8sclient.Object) []string {
+				p, cast := rawObj.(*migapi.MigMigration)
+				if !cast {
+					return nil
+				}
+				res := []string{}
+				if p.Spec.MigPlanRef != nil {
+					res = append(res, fmt.Sprintf("%s/%s", p.Spec.MigPlanRef.Namespace, p.Spec.MigPlanRef.Name))
+				}
+				return res
+			}).Build(),
+		Major: Major,
+		Minor: Minor,
 	}, nil
 }
 
@@ -92,6 +101,9 @@ func getSchemeForFakeClient() (*runtime.Scheme, error) {
 		return nil, err
 	}
 	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, err
+	}
+	if err := virtv1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, err
 	}
 	return scheme.Scheme, nil

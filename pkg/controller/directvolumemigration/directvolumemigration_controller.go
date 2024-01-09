@@ -34,7 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("directvolume")
+var (
+	sink = logging.WithName("directvolume")
+	log  = sink.Real
+)
 
 // Add creates a new DirectVolumeMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -56,18 +59,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectVolumeMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &migapi.DirectVolumeMigration{},
-		},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigrationProgress{}),
+		handler.EnqueueRequestForOwner(
+			mgr.GetScheme(),
+			mgr.GetClient().RESTMapper(),
+			&migapi.DirectVolumeMigration{},
+			handler.OnlyControllerOwner()),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
@@ -98,7 +102,8 @@ type ReconcileDirectVolumeMigration struct {
 func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 
 	// Set values
-	log = logging.WithName("directvolume", "dvm", request.Name)
+	tracer := logging.WithName("directvolume", "dvm", request.Name)
+	log := tracer.Real
 
 	// Fetch the DirectVolumeMigration instance
 	direct := &migapi.DirectVolumeMigration{}
@@ -116,7 +121,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	// Set MigMigration name key on logger
 	migration, err := direct.GetMigrationForDVM(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx
@@ -137,7 +142,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	// Validation
 	err = r.validate(ctx, direct)
 	if err != nil {
-		log.Trace(err)
+		tracer.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -147,7 +152,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	if !direct.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(ctx, direct)
 		if err != nil {
-			log.Trace(err)
+			tracer.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -165,7 +170,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	direct.MarkReconciled()
 	err = r.Update(context.TODO(), direct)
 	if err != nil {
-		log.Trace(err)
+		tracer.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

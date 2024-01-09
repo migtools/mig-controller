@@ -15,7 +15,10 @@ import (
 )
 
 // Shared logger.
-var Log *logging.Logger
+var (
+	sink = logging.WithName("model")
+	log  = sink.Real
+)
 
 // Application settings.
 var Settings = &settings.Settings
@@ -67,6 +70,7 @@ func Create() (*sql.DB, error) {
 		&Job{},
 		&Event{},
 		&StorageClass{},
+		&VirtualMachine{},
 	}
 	for _, m := range models {
 		ddl, err := Table{}.DDL(m)
@@ -80,13 +84,13 @@ func Create() (*sql.DB, error) {
 	for _, ddl := range statements {
 		_, err = db.Exec(ddl)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			db.Close()
 			return nil, err
 		}
 	}
 
-	Log.Info("Database opened.", "path", path)
+	log.Info("Database opened.", "path", path)
 
 	return db, nil
 }

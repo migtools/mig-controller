@@ -1,7 +1,7 @@
 package model
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Namespace model.
@@ -27,7 +27,7 @@ func (m Namespace) List(db DB, options ListOptions) ([]*Namespace, error) {
 	list := []*Namespace{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

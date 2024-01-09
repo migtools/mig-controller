@@ -47,7 +47,7 @@ func (h RouteHandler) Get(ctx *gin.Context) {
 	err := m.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
@@ -79,7 +79,7 @@ func (h RouteHandler) List(ctx *gin.Context) {
 	}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -89,7 +89,7 @@ func (h RouteHandler) List(ctx *gin.Context) {
 			Page: &h.page,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}

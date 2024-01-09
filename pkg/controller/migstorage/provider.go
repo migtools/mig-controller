@@ -47,7 +47,7 @@ func (p *ProviderSource) run() {
 		time.Sleep(p.Interval)
 		list, err := v1alpha1.ListStorage(p.Client)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 		for _, storage := range list {
@@ -66,7 +66,7 @@ func (p *ProviderSource) run() {
 			// Storage Provider
 			secret, err := storage.GetBackupStorageCredSecret(p.Client)
 			if err != nil {
-				log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 			provider := storage.GetBackupStorageProvider()
@@ -79,7 +79,7 @@ func (p *ProviderSource) run() {
 			// Snapshot Provider
 			secret, err = storage.GetVolumeSnapshotCredSecret(p.Client)
 			if err != nil {
-				log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 			provider = storage.GetVolumeSnapshotProvider()
@@ -104,5 +104,5 @@ func (p *ProviderSource) enqueue(storage v1alpha1.MigStorage) {
 		}
 	}
 
-	p.handler.Generic(event, p.queue)
+	p.handler.Generic(context.Background(), event, p.queue)
 }

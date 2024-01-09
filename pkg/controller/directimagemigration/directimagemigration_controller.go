@@ -35,7 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("directimage")
+var (
+	sink = logging.WithName("directimage")
+	log  = sink.Real
+)
 
 // Add creates a new DirectImageMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -61,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageMigration{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectImageMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
 	)
@@ -71,8 +74,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageMigration{})
 		}),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
@@ -82,11 +85,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageStreamMigrations
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &migapi.DirectImageMigration{},
-		}, &migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectImageStreamMigration{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetClient().RESTMapper(), &migapi.DirectImageMigration{}, handler.OnlyControllerOwner()),
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
@@ -113,7 +114,7 @@ type ReconcileDirectImageMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagemigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// Fetch the DirectImageMigration instance
-	log = logging.WithName("directimage", "dim", request.Name)
+	log = logging.WithName("directimage", "dim", request.Name).Real
 	imageMigration := &migapi.DirectImageMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageMigration)
 	if err != nil {
@@ -129,7 +130,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 	// Set MigMigration name key on logger
 	migration, err := imageMigration.GetMigrationForDIM(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx
@@ -150,7 +151,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 	// Validation
 	err = r.validate(ctx, imageMigration)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -160,7 +161,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 	if !imageMigration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(ctx, imageMigration)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -178,7 +179,7 @@ func (r *ReconcileDirectImageMigration) Reconcile(ctx context.Context, request r
 	imageMigration.MarkReconciled()
 	err = r.Update(context.TODO(), imageMigration)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

@@ -92,7 +92,13 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test", Namespace: migapi.OpenshiftMigrationNamespace,
 					},
-					Spec: migapi.MigMigrationSpec{MigrateState: true},
+					Spec: migapi.MigMigrationSpec{
+						MigrateState: true,
+						MigPlanRef: &v1.ObjectReference{
+							Name:      "migplan",
+							Namespace: migapi.OpenshiftMigrationNamespace,
+						},
+					},
 				},
 			),
 			plan:    getTestMigPlan("test-cluster", "test-cluster-2", []string{}, []migapi.Condition{}),
@@ -121,7 +127,13 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 						CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Second * 3)},
 						Name:              "rollback-01", Namespace: migapi.OpenshiftMigrationNamespace,
 					},
-					Spec: migapi.MigMigrationSpec{Rollback: true},
+					Spec: migapi.MigMigrationSpec{
+						Rollback: true,
+						MigPlanRef: &v1.ObjectReference{
+							Name:      "migplan",
+							Namespace: migapi.OpenshiftMigrationNamespace,
+						},
+					},
 					Status: migapi.MigMigrationStatus{
 						Conditions: migapi.Conditions{
 							List: []migapi.Condition{
@@ -163,7 +175,14 @@ func TestReconcileMigPlan_validatePossibleMigrationTypes(t *testing.T) {
 						CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Second * 3)},
 						Name:              "rollback-01", Namespace: migapi.OpenshiftMigrationNamespace,
 					},
-					Spec: migapi.MigMigrationSpec{Rollback: true},
+					Spec: migapi.MigMigrationSpec{
+						Rollback:     true,
+						MigrateState: true,
+						MigPlanRef: &v1.ObjectReference{
+							Name:      "migplan",
+							Namespace: migapi.OpenshiftMigrationNamespace,
+						},
+					},
 				},
 			),
 			plan:    getTestMigPlan("test-cluster", "test-cluster-2", []string{}, []migapi.Condition{}),

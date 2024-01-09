@@ -294,6 +294,7 @@ func (r ReconcileMigPlan) validatePossibleMigrationTypes(ctx context.Context, pl
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+
 	// find out whether any of the source namespaces are mapped to destination namespaces
 	mappedNamespaces := 0
 	for srcNs, destNs := range plan.GetNamespaceMapping() {
@@ -683,19 +684,18 @@ func (r ReconcileMigPlan) validatePodProperties(ctx context.Context, plan *migap
 // Returns true if custom nodeselectors found on any Pod.
 func (r ReconcileMigPlan) hasCustomNodeSelectors(podList []kapi.Pod) bool {
 	// Known default node selector values. Ignore these if we spot them on Pods
-	defaultNodeSelectors := []string{
-		"node-role.kubernetes.io/compute",
+	defaultNodeSelectors := map[string]interface{}{
+		"node-role.kubernetes.io/compute": nil,
+		"kubernetes.io/arch":              nil,
+		"kubevirt.io/schedulable":         nil,
 	}
 	for _, pod := range podList {
 		if pod.Spec.NodeSelector == nil {
 			continue
 		}
 		for nodeSelector := range pod.Spec.NodeSelector {
-			for _, defaultSelector := range defaultNodeSelectors {
-				// Return true if node selector on Pod is not one of the defaults
-				if nodeSelector != defaultSelector {
-					return true
-				}
+			if _, ok := defaultNodeSelectors[nodeSelector]; !ok {
+				return true
 			}
 		}
 	}

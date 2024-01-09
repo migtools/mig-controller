@@ -40,17 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log *logging.Logger
+var log = logging.WithName("discovery")
 
 // Application settings.
 var Settings = &settings.Settings
-
-func init() {
-	log = logging.WithName("discovery")
-	model.Log = logging.WithName("discovery")
-	container.Log = logging.WithName("discovery")
-	web.Log = logging.WithName("discovery")
-}
 
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
@@ -61,7 +54,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	if err != nil {
 		panic(err)
 	}
-	restCfg, _ := config.GetConfig()
+	restCfg, err := config.GetConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -111,9 +104,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 	err = c.Watch(
-		&source.Kind{
-			Type: &migapi.MigCluster{},
-		},
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {
@@ -166,6 +157,7 @@ func (r *ReconcileDiscovery) Reconcile(ctx context.Context, request reconcile.Re
 		&container.Job{},
 		&container.PV{},
 		&container.StorageClass{},
+		&container.VirtualMachine{},
 	}
 	if cluster.Spec.IsHostCluster {
 		collections = append(

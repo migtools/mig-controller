@@ -50,7 +50,7 @@ func (h *HookHandler) Prepare(ctx *gin.Context) int {
 		err := h.hook.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				Log.Trace(err)
+				sink.Trace(err)
 				return http.StatusInternalServerError
 			} else {
 				return http.StatusNotFound
@@ -92,13 +92,13 @@ func (h HookHandler) List(ctx *gin.Context) {
 	collection := model.Hook{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	list, err := collection.List(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -125,7 +125,7 @@ func (h HookHandler) Get(ctx *gin.Context) {
 	err := h.hook.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {

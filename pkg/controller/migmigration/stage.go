@@ -299,7 +299,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 	t.Log.Info("Getting list of existing Stage Pods")
 	existingStagePods, err := t.listStagePods(client)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return nil
 	}
 
@@ -336,7 +336,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 		list := &corev1.PersistentVolumeClaimList{}
 		err = client.List(context.TODO(), list, k8sclient.InNamespace(ns))
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return nil
 		}
 		for _, pvc := range list.Items {

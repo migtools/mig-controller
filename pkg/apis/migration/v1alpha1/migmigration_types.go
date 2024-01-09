@@ -24,7 +24,7 @@ import (
 
 // Cache Indexes.
 const (
-	PlanIndexField = "planRef"
+	PlanIndexField = "MigPlanRef"
 )
 
 // MigMigrationSpec defines the desired state of MigMigration
