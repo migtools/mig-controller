@@ -20,7 +20,9 @@ import (
 	svcendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/service"
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	transfer "github.com/konveyor/crane-lib/state_transfer/transfer"
+	blockrsynctransfer "github.com/konveyor/crane-lib/state_transfer/transfer/blockrsync"
 	rsynctransfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
+	"github.com/konveyor/crane-lib/state_transfer/transport"
 	stunneltransport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
@@ -32,6 +34,7 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,8 +61,8 @@ const (
 	RsyncAttemptLabel = "migration.openshift.io/rsync-attempt"
 )
 
-// ensureRsyncEndpoint ensures that a new Endpoint is created for Rsync Transfer
-func (t *Task) ensureRsyncEndpoint() error {
+// ensureRsyncEndpoints ensures that new Endpoints are created for Rsync and Blockrsync Transfers
+func (t *Task) ensureRsyncEndpoints() error {
 	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -67,6 +70,9 @@ func (t *Task) ensureRsyncEndpoint() error {
 
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
+	blockdvmLabels := t.buildDVMLabels()
+	blockdvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	blockdvmLabels["purpose"] = DirectVolumeMigrationRsync
 
 	hostnames := []string{}
 	if t.EndpointType == migapi.NodePort {
@@ -79,7 +85,7 @@ func (t *Task) ensureRsyncEndpoint() error {
 	for bothNs := range t.getPVCNamespaceMap() {
 		ns := getDestNs(bothNs)
 
-		var endpoint endpoint.Endpoint
+		var endpoint, blockEndpoint endpoint.Endpoint
 
 		switch t.EndpointType {
 		case migapi.ClusterIP, migapi.NodePort:
@@ -89,6 +95,15 @@ func (t *Task) ensureRsyncEndpoint() error {
 					Name:      DirectVolumeMigrationRsyncTransferSvc,
 				},
 				dvmLabels,
+				getNodeHostnameAtRandom(hostnames),
+				t.getServiceType(),
+			)
+			blockEndpoint = svcendpoint.NewEndpoint(
+				types.NamespacedName{
+					Namespace: ns,
+					Name:      DirectVolumeMigrationRsyncTransferSvcBlock,
+				},
+				blockdvmLabels,
 				getNodeHostnameAtRandom(hostnames),
 				t.getServiceType(),
 			)
@@ -103,7 +118,7 @@ func (t *Task) ensureRsyncEndpoint() error {
 			// get the cluster's subdomain from destination client directly
 			subdomain, err := cluster.GetClusterSubdomain(t.Client)
 			if err != nil {
-				t.Log.Info("failed to get cluster_subdomain" + err.Error() + "attempting to get cluster's ingress domain")
+				t.Log.Info("failed to get cluster_subdomain, attempting to get cluster's ingress domain", "error", err)
 				ingressConfig := &configv1.Ingress{}
 				err = destClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
 				if err != nil {
@@ -122,9 +137,22 @@ func (t *Task) ensureRsyncEndpoint() error {
 				dvmLabels,
 				subdomain,
 			)
+			blockEndpoint = routeendpoint.NewEndpoint(
+				types.NamespacedName{
+					Namespace: ns,
+					Name:      DirectVolumeMigrationRsyncTransferRouteBlock,
+				},
+				routeendpoint.EndpointTypePassthrough,
+				blockdvmLabels,
+				subdomain,
+			)
 		}
 
 		err = endpoint.Create(destClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = blockEndpoint.Create(destClient)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -132,8 +160,8 @@ func (t *Task) ensureRsyncEndpoint() error {
 	return nil
 }
 
-// getRsyncTransferOptions returns Rsync transfer options
-func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error) {
+// getFSRsyncTransferOptions returns Rsync transfer options
+func (t *Task) getFSRsyncTransferOptions() ([]rsynctransfer.TransferOption, error) {
 	// prepare rsync command options
 	o := settings.Settings.DvmOpts.RsyncOpts
 	rsyncPassword, err := t.getRsyncPassword()
@@ -180,6 +208,35 @@ func (t *Task) getRsyncTransferOptions() ([]rsynctransfer.TransferOption, error)
 	if o.BwLimit > 0 {
 		transferOptions = append(transferOptions,
 			RsyncBwLimit(o.BwLimit))
+	}
+	return transferOptions, nil
+}
+
+// getBlockRsyncTransferOptions returns Rsync transfer options
+func (t *Task) getBlockRsyncTransferOptions() (*blockrsynctransfer.TransferOptions, error) {
+	// prepare rsync command options
+	transferOptions := &blockrsynctransfer.TransferOptions{}
+	srcCluster, err := t.Owner.GetSourceCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if srcCluster != nil {
+		srcTransferImage, err := srcCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		blockrsynctransfer.RsyncClientImage(srcTransferImage).ApplyTo(transferOptions)
+	}
+	destCluster, err := t.Owner.GetDestinationCluster(t.Client)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	if destCluster != nil {
+		destTransferImage, err := destCluster.GetRsyncTransferImage(t.Client)
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		blockrsynctransfer.RsyncServerImage(destTransferImage).ApplyTo(transferOptions)
 	}
 	return transferOptions, nil
 }
@@ -370,6 +427,16 @@ func (t *Task) ensureRsyncTransferServer() error {
 		return liberr.Wrap(err)
 	}
 
+	if err := t.ensureFilesystemRsyncTransferServer(srcClient, destClient, nsMap, transportOptions); err != nil {
+		return err
+	}
+	if err := t.ensureBlockRsyncTransferServer(srcClient, destClient, nsMap, transportOptions); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Task) ensureFilesystemRsyncTransferServer(srcClient, destClient compat.Client, nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -377,42 +444,94 @@ func (t *Task) ensureRsyncTransferServer() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
 		)
-		endpoint, err := t.getEndpoint(destClient, destNs)
+		endpoints, err := t.getEndpoints(destClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint, transportOptions)
+			srcClient, destClient, "fs", nnPair, endpoints[0], transportOptions)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		pvcList, err := transfer.NewPVCPairList(pvcPairs...)
+		filesystemPvcList, err := transfer.NewFilesystemPVCPairList(pvcPairs...)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		labels := t.buildDVMLabels()
-		labels["purpose"] = DirectVolumeMigrationRsync
-		rsyncOptions, err := t.getRsyncTransferOptions()
+		if len(filesystemPvcList) > 0 {
+			labels := t.buildDVMLabels()
+			labels["purpose"] = DirectVolumeMigrationRsync
+			rsyncOptions, err := t.getFSRsyncTransferOptions()
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			mutations, err := t.getRsyncTransferServerMutations(destClient, destNs)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			rsyncOptions = append(rsyncOptions, mutations...)
+			rsyncOptions = append(rsyncOptions, rsynctransfer.WithDestinationPodLabels(labels))
+			transfer, err := rsynctransfer.NewTransfer(
+				stunnelTransport, endpoints[0], srcClient, destClient, filesystemPvcList, t.Log, rsyncOptions...)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if transfer == nil {
+				return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
+			}
+			err = transfer.CreateServer(destClient)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) ensureBlockRsyncTransferServer(srcClient, destClient compat.Client, nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
+	for bothNs, pvcPairs := range nsMap {
+		srcNs := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		nnPair := cranemeta.NewNamespacedPair(
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
+			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
+		)
+		endpoints, err := t.getEndpoints(destClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		mutations, err := t.getRsyncTransferServerMutations(destClient, destNs)
+		stunnelTransports, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, "block", nnPair, endpoints[1], transportOptions)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		rsyncOptions = append(rsyncOptions, mutations...)
-		rsyncOptions = append(rsyncOptions, rsynctransfer.WithDestinationPodLabels(labels))
-		transfer, err := rsynctransfer.NewTransfer(
-			stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, rsyncOptions...)
+		blockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvcPairs...)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		if transfer == nil {
-			return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
-		}
-		err = transfer.CreateServer(destClient)
-		if err != nil {
-			return liberr.Wrap(err)
+		if len(blockOrVMPvcList) > 0 {
+			labels := t.buildDVMLabels()
+			labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+			labels["purpose"] = DirectVolumeMigrationRsync
+			transferOptions, err := t.getBlockRsyncTransferOptions()
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			transferOptions.SourcePodMeta = transfer.ResourceMetadata{
+				Labels: labels,
+			}
+
+			transfer, err := blockrsynctransfer.NewTransfer(
+				stunnelTransports, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, transferOptions)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			if transfer == nil {
+				return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
+			}
+			err = transfer.CreateServer(destClient)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 	}
 	return nil
@@ -432,7 +551,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		return statusList, liberr.Wrap(err)
 	}
 
-	rsyncOptions, err := t.getRsyncTransferOptions()
+	rsyncOptions, err := t.getFSRsyncTransferOptions()
 	if err != nil {
 		return statusList, liberr.Wrap(err)
 	}
@@ -461,12 +580,17 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
-		endpoint, err := t.getEndpoint(destClient, destNs)
+		endpoints, err := t.getEndpoints(destClient, destNs)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
-		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint, transportOptions)
+		fsStunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, "fs", nnPair, endpoints[0], transportOptions)
+		if err != nil {
+			return statusList, liberr.Wrap(err)
+		}
+		blockStunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, "block", nnPair, endpoints[1], transportOptions)
 		if err != nil {
 			return statusList, liberr.Wrap(err)
 		}
@@ -521,13 +645,21 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				continue
 			}
 
-			pvcList, err := transfer.NewPVCPairList(pvc)
+			filesystemPVCList, err := transfer.NewFilesystemPVCPairList(pvc)
 			if err != nil {
 				t.Log.Error(err, "failed creating PVC pair", "pvc", newOperation)
 				currentStatus.AddError(err)
 				statusList.Add(currentStatus)
 				continue
 			}
+			blockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvc)
+			if err != nil {
+				t.Log.Error(err, "failed creating PVC pair", "pvc", newOperation)
+				currentStatus.AddError(err)
+				statusList.Add(currentStatus)
+				continue
+			}
+
 			// Force schedule Rsync Pod on the application node
 			nodeName := pvcNodeMap[fmt.Sprintf("%s/%s", srcNs, pvc.Source().Claim().Name)]
 			clientPodMutation := rsynctransfer.SourcePodSpecMutation{
@@ -574,27 +706,42 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					currentStatus.pending = true
 					labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
 					optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
-					transfer, err := rsynctransfer.NewTransfer(
-						stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, append(rsyncOptions, optionsForPvc...)...)
-					if err != nil {
-						t.Log.Error(err, "failed creating new rsync transfer", "pvc", newOperation)
-						currentStatus.AddError(err)
-						statusList.Add(currentStatus)
-						continue
+					if len(filesystemPVCList) > 0 {
+						optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
+						transfer, err := rsynctransfer.NewTransfer(
+							fsStunnelTransport, endpoints[0], srcClient, destClient, filesystemPVCList, t.Log, append(rsyncOptions, optionsForPvc...)...)
+						if err != nil {
+							t.Log.Error(err, "failed creating filesystem transfer", "pvc", currentStatus.operation)
+							currentStatus.AddError(err)
+							continue
+						}
+						if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
+							nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
+							statusList.Add(*currentStatus)
+							continue
+						}
 					}
-					if transfer == nil {
-						currentStatus.AddError(
-							fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
-						statusList.Add(currentStatus)
-						continue
+					if len(blockOrVMPvcList) > 0 {
+						transferOptions := blockrsynctransfer.TransferOptions{
+							SourcePodMeta: transfer.ResourceMetadata{
+								Labels: labels,
+							},
+						}
+						transfer, err := blockrsynctransfer.NewTransfer(
+							blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, &transferOptions)
+						if err != nil {
+							t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
+							currentStatus.AddError(err)
+							continue
+						}
+
+						if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
+							nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
+							statusList.Add(*currentStatus)
+							continue
+						}
 					}
-					err = transfer.CreateClient(srcClient)
-					if err != nil {
-						t.Log.Error(err, "failed creating rsync pod for pvc", "pvc", newOperation)
-						currentStatus.AddError(err)
-						statusList.Add(currentStatus)
-						continue
-					}
+
 					t.Log.Info("previous attempt of Rsync failed for pvc, created a new pod", "pvc", newOperation)
 					err = srcClient.Delete(context.TODO(), pod)
 					if err != nil {
@@ -621,27 +768,44 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			} else {
 				newOperation.CurrentAttempt = 0
 				labels[RsyncAttemptLabel] = fmt.Sprintf("%d", currentStatus.operation.CurrentAttempt+1)
-				optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
-				transfer, err := rsynctransfer.NewTransfer(
-					stunnelTransport, endpoint, srcClient.RestConfig(), destClient.RestConfig(), pvcList, append(rsyncOptions, optionsForPvc...)...)
-				if err != nil {
-					t.Log.Error(err, "failed creating rsync transfer", "pvc", newOperation)
-					currentStatus.AddError(err)
-					statusList.Add(currentStatus)
-					continue
+				if len(filesystemPVCList) > 0 {
+					optionsForPvc = append(optionsForPvc, rsynctransfer.WithSourcePodLabels(labels))
+					transfer, err := rsynctransfer.NewTransfer(
+						fsStunnelTransport, endpoints[0], srcClient, destClient, filesystemPVCList, t.Log, append(rsyncOptions, optionsForPvc...)...)
+					if err != nil {
+						t.Log.Error(err, "failed creating filesystem transfer", "pvc", currentStatus.operation)
+						currentStatus.AddError(err)
+						continue
+					}
+					if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
+						nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
+						statusList.Add(*currentStatus)
+						continue
+					}
 				}
-				if transfer == nil {
-					currentStatus.AddError(
-						fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name))
-					statusList.Add(currentStatus)
-					continue
-				}
-				err = transfer.CreateClient(srcClient)
-				if err != nil {
-					t.Log.Error(err, "failed creating rsync client", "pvc", newOperation)
-					currentStatus.AddError(err)
-					statusList.Add(currentStatus)
-					continue
+				if len(blockOrVMPvcList) > 0 {
+					transferOptions, err := t.getBlockRsyncTransferOptions()
+					if err != nil {
+						t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
+						currentStatus.AddError(err)
+						continue
+					}
+					transferOptions.SourcePodMeta = transfer.ResourceMetadata{
+						Labels: labels,
+					}
+					transfer, err := blockrsynctransfer.NewTransfer(
+						blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, transferOptions)
+					if err != nil {
+						t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
+						currentStatus.AddError(err)
+						continue
+					}
+
+					if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
+						nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
+						statusList.Add(*currentStatus)
+						continue
+					}
 				}
 			}
 			statusList.Add(currentStatus)
@@ -649,6 +813,23 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		}
 	}
 	return statusList, nil
+}
+
+func (t *Task) createClientPodForTransfer(
+	name, namespace string,
+	tr transfer.Transfer,
+	currentStatus *rsyncClientOperationStatus) *rsyncClientOperationStatus {
+	if tr == nil {
+		currentStatus.AddError(
+			fmt.Errorf("transfer %s/%s not found", namespace, name))
+		return currentStatus
+	}
+	if err := transfer.CreateClient(tr); err != nil {
+		t.Log.Error(err, "failed creating client", "pvc", currentStatus.operation)
+		currentStatus.AddError(err)
+		return currentStatus
+	}
+	return nil
 }
 
 func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
@@ -675,11 +856,6 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 			})
 		if err != nil {
 			return false, nil, err
-		}
-		if len(pods.Items) != 1 {
-			t.Log.Info("Unexpected number of DVM Rsync Pods found.",
-				"podExpected", 1, "podsFound", len(pods.Items))
-			return false, nil, nil
 		}
 		for _, pod := range pods.Items {
 			if pod.Status.Phase != corev1.PodRunning {
@@ -891,7 +1067,7 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 		return false, messages, err
 	}
 	nsMap := t.getPVCNamespaceMap()
-	for bothNs, _ := range nsMap {
+	for bothNs := range nsMap {
 		namespace := getDestNs(bothNs)
 
 		switch t.EndpointType {
@@ -934,7 +1110,7 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 				messages = append(messages, message)
 			}
 		default:
-			_, err = t.getEndpoint(destClient, namespace)
+			_, err = t.getEndpoints(destClient, namespace)
 			if err != nil {
 				t.Log.Info("rsync transfer service is not healthy", "namespace", namespace)
 				messages = append(messages, fmt.Sprintf("rsync transfer service is not healthy in namespace %s", namespace))
@@ -1501,10 +1677,12 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMap map[string][]pvcMapElement) error {
 	// Find all resources with the app label
 	// TODO: This label set should include a DVM run-specific UID.
-	selector := labels.SelectorFromSet(map[string]string{
-		"app": DirectVolumeMigrationRsyncTransfer,
-	})
-	for bothNs, _ := range pvcMap {
+	req, err := labels.NewRequirement("app", selection.In, []string{DirectVolumeMigrationRsyncTransfer, DirectVolumeMigrationRsyncTransferBlock})
+	if err != nil {
+		return err
+	}
+	selector := labels.NewSelector().Add(*req)
+	for bothNs := range pvcMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
 		err := t.findAndDeleteNsResources(srcClient, srcNs, selector)
@@ -1928,7 +2106,7 @@ func (r *rsyncClientOperationStatusList) Pending() int {
 func (r *rsyncClientOperationStatusList) Running() int {
 	i := 0
 	for _, attempt := range r.ops {
-		if attempt.pending {
+		if attempt.running {
 			i += 1
 		}
 	}
@@ -2056,16 +2234,12 @@ func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 }
 
 func isPSAEnforced(client compat.Client) bool {
-	minor := client.MinorVersion()
-
-	if minor >= 24 {
-		return true
-	}
-	return false
+	return client.MinorVersion() >= 24
 }
 
-// getEndpoint returns correct endpoint object as per app settings
-func (t *Task) getEndpoint(client client.Client, namespace string) (endpoint.Endpoint, error) {
+// getEndpoints returns correct endpoint objects as per app settings
+func (t *Task) getEndpoints(client client.Client, namespace string) ([]endpoint.Endpoint, error) {
+	res := []endpoint.Endpoint{}
 	switch t.EndpointType {
 	case migapi.ClusterIP, migapi.NodePort:
 		endpoint, err := svcendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
@@ -2075,7 +2249,16 @@ func (t *Task) getEndpoint(client client.Client, namespace string) (endpoint.End
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		return endpoint, nil
+		res = append(res, endpoint)
+		endpoint, err = svcendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferSvcBlock,
+			Namespace: namespace,
+		})
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		res = append(res, endpoint)
+		return res, nil
 	default:
 		endpoint, err := routeendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
 			Name:      DirectVolumeMigrationRsyncTransferRoute,
@@ -2084,7 +2267,16 @@ func (t *Task) getEndpoint(client client.Client, namespace string) (endpoint.End
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		return endpoint, nil
+		res = append(res, endpoint)
+		endpoint, err = routeendpoint.GetEndpointFromKubeObjects(client, types.NamespacedName{
+			Name:      DirectVolumeMigrationRsyncTransferRouteBlock,
+			Namespace: namespace,
+		})
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		res = append(res, endpoint)
+		return res, nil
 	}
 }
 
@@ -2130,6 +2322,5 @@ func getNodeHostnameAtRandom(hostnames []string) string {
 	if len(hostnames) == 0 {
 		return ""
 	}
-	rand.Seed(time.Now().Unix())
 	return hostnames[rand.Int()%len(hostnames)]
 }

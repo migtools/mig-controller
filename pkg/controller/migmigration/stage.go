@@ -70,7 +70,7 @@ func BuildStagePods(labels map[string]string,
 			pv, found := pvcMapping[claimKey]
 			if !found ||
 				pv.Selection.Action != migapi.PvCopyAction ||
-				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				(pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod && pv.Selection.CopyMethod != migapi.PvBlockCopyMethod) {
 				continue
 			}
 			volumes = append(volumes, volume)
@@ -116,7 +116,7 @@ func GetApplicationPodsWithStageLabels(labels map[string]string, pvcMapping map[
 				continue
 			}
 			if pv.Selection.Action != migapi.PvCopyAction ||
-				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				(pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod && pv.Selection.CopyMethod != migapi.PvBlockCopyMethod) {
 				excludePVC = append(excludePVC, volume.Name)
 				continue
 			}
@@ -351,7 +351,7 @@ func (t *Task) ensureStagePodsFromOrphanedPVCs() error {
 			pv, found := pvcMapping[claimKey]
 			if !found ||
 				pv.Selection.Action != migapi.PvCopyAction ||
-				pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+				(pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod && pv.Selection.CopyMethod != migapi.PvBlockCopyMethod) {
 				continue
 			}
 			if pvcMounted(existingStagePods, claimKey) {
@@ -486,7 +486,7 @@ func parseResourceLimitMapping(ns string, mapping map[string]map[string]resource
 	return memVal, cpuVal
 }
 
-// Ensure all stage pods from running pods withing the application were created
+// Ensure all stage pods from running pods within the application were created
 func (t *Task) ensureStagePodsFromRunning() error {
 	client, err := t.getSourceClient()
 	if err != nil {
@@ -1017,20 +1017,36 @@ func buildStagePodFromPod(ref k8sclient.ObjectKey,
 		return false
 	}
 
+	inDevices := func(device corev1.VolumeDevice) bool {
+		for _, volume := range pvcVolumes {
+			if volume.Name == device.Name {
+				return true
+			}
+		}
+		return false
+	}
+
 	// Add containers.
 	for i, container := range pod.Spec.Containers {
 		volumeMounts := []corev1.VolumeMount{}
+		volumeDevices := []corev1.VolumeDevice{}
 		for _, mount := range container.VolumeMounts {
 			if inVolumes(mount) {
 				volumeMounts = append(volumeMounts, mount)
 			}
 		}
+		for _, device := range container.VolumeDevices {
+			if inDevices(device) {
+				volumeDevices = append(volumeDevices, device)
+			}
+		}
 		stageContainer := corev1.Container{
-			Name:         "sleep-" + strconv.Itoa(i),
-			Image:        stagePodImage,
-			Command:      []string{"sleep"},
-			Args:         []string{"infinity"},
-			VolumeMounts: volumeMounts,
+			Name:          "sleep-" + strconv.Itoa(i),
+			Image:         stagePodImage,
+			Command:       []string{"sleep"},
+			Args:          []string{"infinity"},
+			VolumeMounts:  volumeMounts,
+			VolumeDevices: volumeDevices,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					memory: podMemory,

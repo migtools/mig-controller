@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/konveyor/mig-controller/pkg/compat"
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,8 +88,10 @@ func NewFakeClientWithVersion(Major int, Minor int, obj ...k8sclient.Object) (co
 }
 
 func getSchemeForFakeClient() (*runtime.Scheme, error) {
-	err := routev1.AddToScheme(scheme.Scheme)
-	if err != nil {
+	if err := routev1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, err
+	}
+	if err := configv1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, err
 	}
 	return scheme.Scheme, nil

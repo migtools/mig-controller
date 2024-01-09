@@ -39,7 +39,6 @@ import (
 	"github.com/openshift/library-go/pkg/image/reference"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	kapi "k8s.io/api/core/v1"
 	storageapi "k8s.io/api/storage/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
@@ -142,10 +141,24 @@ type MigClusterList struct {
 // Default - whether or not this storage class is the default
 // AccessModes - access modes supported by the dynamic provisioner
 type StorageClass struct {
-	Name        string                            `json:"name,omitempty"`
-	Provisioner string                            `json:"provisioner,omitempty"`
-	Default     bool                              `json:"default,omitempty"`
+	Name              string                 `json:"name,omitempty"`
+	Provisioner       string                 `json:"provisioner,omitempty"`
+	Default           bool                   `json:"default,omitempty"`
+	VolumeAccessModes []VolumeModeAccessMode `json:"volumeAccessModes,omitempty"`
+}
+
+type VolumeModeAccessMode struct {
+	VolumeMode  kapi.PersistentVolumeMode         `json:"volumeMode,omitempty"`
 	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+}
+
+func GetAccessModesForVolumeMode(volumeMode kapi.PersistentVolumeMode, volumeAccessModes []VolumeModeAccessMode) []kapi.PersistentVolumeAccessMode {
+	for _, volumeModeAccessMode := range volumeAccessModes {
+		if volumeModeAccessMode.VolumeMode == volumeMode {
+			return volumeModeAccessMode.AccessModes
+		}
+	}
+	return nil
 }
 
 func init() {
@@ -280,8 +293,8 @@ func (m *MigCluster) GetClient(c k8sclient.Client) (compat.Client, error) {
 	return compatClient, nil
 }
 
-func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*corev1.ConfigMap, error) {
-	clusterConfig := &corev1.ConfigMap{}
+func (m *MigCluster) GetClusterConfigMap(c k8sclient.Client) (*kapi.ConfigMap, error) {
+	clusterConfig := &kapi.ConfigMap{}
 	clusterConfigRef := types.NamespacedName{Name: ClusterConfigMapName, Namespace: VeleroNamespace}
 	err := c.Get(context.TODO(), clusterConfigRef, clusterConfig)
 	if err != nil {
@@ -371,10 +384,8 @@ func (m *MigCluster) GetRsyncTransferImage(c k8sclient.Client) (string, error) {
 
 // GetClusterSubdomain gets a MigCluster specific subdomain value to be used for DVM routes
 func (m *MigCluster) GetClusterSubdomain(c k8sclient.Client) (string, error) {
-	client, err := m.GetClient(c)
-	if err != nil {
-		return "", err
-	}
+	// Only called for DVM, no need to get a compat client.
+	client := c
 	clusterConfig, err := m.GetClusterConfigMap(client)
 	if err != nil {
 		return "", liberr.Wrap(err)
@@ -616,10 +627,22 @@ func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]StorageClass,
 	// Transform kube storage classes into format used in PV discovery
 	var storageClasses []StorageClass
 	for _, clusterStorageClass := range kubeStorageClasses {
+		blockAccessModes := r.accessModesForProvisioner(clusterStorageClass.Provisioner, kapi.PersistentVolumeBlock)
 		storageClass := StorageClass{
 			Name:        clusterStorageClass.Name,
 			Provisioner: clusterStorageClass.Provisioner,
-			AccessModes: r.accessModesForProvisioner(clusterStorageClass.Provisioner),
+			VolumeAccessModes: []VolumeModeAccessMode{
+				{
+					VolumeMode:  kapi.PersistentVolumeFilesystem,
+					AccessModes: r.accessModesForProvisioner(clusterStorageClass.Provisioner, kapi.PersistentVolumeFilesystem),
+				},
+			},
+		}
+		if len(blockAccessModes) > 0 {
+			storageClass.VolumeAccessModes = append(storageClass.VolumeAccessModes, VolumeModeAccessMode{
+				VolumeMode:  kapi.PersistentVolumeBlock,
+				AccessModes: blockAccessModes,
+			})
 		}
 		if clusterStorageClass.Annotations != nil {
 			isDefault, _ := strconv.ParseBool(clusterStorageClass.Annotations["storageclass.kubernetes.io/is-default-class"])
@@ -636,23 +659,26 @@ func (r *MigCluster) GetStorageClasses(client k8sclient.Client) ([]StorageClass,
 
 // Gets the list of supported access modes for a provisioner
 // TODO: allow the in-file mapping to be overridden by a configmap
-func (r *MigCluster) accessModesForProvisioner(provisioner string) []kapi.PersistentVolumeAccessMode {
+func (r *MigCluster) accessModesForProvisioner(provisioner string, volumeMode kapi.PersistentVolumeMode) []kapi.PersistentVolumeAccessMode {
 	for _, pModes := range accessModeList {
 		if pModes.MatchBySuffix {
 			if strings.HasSuffix(provisioner, pModes.Provisioner) {
-				return pModes.AccessModes
+				return pModes.AccessModes[volumeMode]
 			}
 		} else if pModes.MatchByPrefix {
 			if strings.HasPrefix(provisioner, pModes.Provisioner) {
-				return pModes.AccessModes
+				return pModes.AccessModes[volumeMode]
 			}
 		} else {
 			if pModes.Provisioner == provisioner {
-				return pModes.AccessModes
+				return pModes.AccessModes[volumeMode]
 			}
 		}
 	}
 
+	if volumeMode == kapi.PersistentVolumeBlock {
+		return nil
+	}
 	// default value
 	return []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce}
 }
@@ -661,7 +687,7 @@ type provisionerAccessModes struct {
 	Provisioner   string
 	MatchBySuffix bool
 	MatchByPrefix bool
-	AccessModes   []kapi.PersistentVolumeAccessMode
+	AccessModes   map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode
 }
 
 // Since the StorageClass API doesn't provide this information, the support list has been
@@ -671,78 +697,112 @@ type provisionerAccessModes struct {
 var accessModeList = []provisionerAccessModes{
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/aws-ebs",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/azure-file",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/azure-disk",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/cinder",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+		},
 	},
 	// FC : {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
 	// Flexvolume : {kapi.ReadWriteOnce, kapi.ReadOnlyMany}, RWX?
 	// Flocker . : {kapi.ReadWriteOnce},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/gce-pd",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/glusterfs",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner:   "gluster.org/glusterblock",
 		MatchByPrefix: true,
-		AccessModes:   []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
 	}, // verify glusterblock ROX
 	// ISCSI : {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/quobyte",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 	// NFS : {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/rbd",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/vsphere-volume",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/portworx-volume",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadWriteMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/scaleio",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "kubernetes.io/storageos",
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+		},
 	},
 	// other CSI?
 	// other OCP4?
 	provisionerAccessModes{
 		Provisioner:   "rbd.csi.ceph.com",
 		MatchBySuffix: true,
-		AccessModes:   []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+			kapi.PersistentVolumeBlock:      {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner:   "cephfs.csi.ceph.com",
 		MatchBySuffix: true,
-		AccessModes:   []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 	provisionerAccessModes{
 		Provisioner: "netapp.io/trident",
 		// Note: some backends won't support RWX
-		AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+			kapi.PersistentVolumeBlock:      {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
 	},
 }
 

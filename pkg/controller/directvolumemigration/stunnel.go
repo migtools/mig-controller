@@ -6,11 +6,9 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/mig-controller/pkg/settings"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	//"encoding/asn1"
-
-	//"k8s.io/apimachinery/pkg/types"
-
+	"github.com/konveyor/crane-lib/state_transfer/endpoint"
 	cranemeta "github.com/konveyor/crane-lib/state_transfer/meta"
 	cranetransport "github.com/konveyor/crane-lib/state_transfer/transport"
 	stunneltransport "github.com/konveyor/crane-lib/state_transfer/transport/stunnel"
@@ -60,36 +58,59 @@ func (t *Task) ensureStunnelTransport() error {
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncClient, Namespace: destNs},
 		)
 
-		endpoint, _ := t.getEndpoint(destClient, destNs)
-		if endpoint == nil {
+		endpoints, err := t.getEndpoints(destClient, destNs)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		if len(endpoints) == 0 {
 			continue
 		}
 
-		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, nnPair, endpoint, transportOptions)
+		fsStunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, "fs", nnPair, endpoints[0], transportOptions)
 		if err != nil && !k8serror.IsNotFound(err) {
 			return liberr.Wrap(err)
 		}
-
-		if stunnelTransport == nil {
-			nsPair := cranemeta.NewNamespacedPair(
-				types.NamespacedName{Namespace: sourceNs},
-				types.NamespacedName{Namespace: destNs},
-			)
-			stunnelTransport = stunneltransport.NewTransport(nsPair, transportOptions)
-
-			err = stunnelTransport.CreateServer(destClient, endpoint)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-
-			err = stunnelTransport.CreateClient(srcClient, endpoint)
+		if fsStunnelTransport == nil {
+			err = createStunnelForPrefix(sourceNs, destNs, "fs", transportOptions, endpoints[0], srcClient, destClient)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 		}
+
+		blockStunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
+			srcClient, destClient, "block", nnPair, endpoints[1], transportOptions)
+		if err != nil && !k8serror.IsNotFound(err) {
+			return liberr.Wrap(err)
+		}
+		if blockStunnelTransport == nil {
+			err = createStunnelForPrefix(sourceNs, destNs, "block", transportOptions, endpoints[1], srcClient, destClient)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+
 	}
 
+	return nil
+}
+
+func createStunnelForPrefix(sourceNs, destNs, prefix string, transportOptions *cranetransport.Options, e endpoint.Endpoint, srcClient, destClient client.Client) error {
+	nsPair := cranemeta.NewNamespacedPair(
+		types.NamespacedName{Namespace: sourceNs},
+		types.NamespacedName{Namespace: destNs},
+	)
+	stunnelTransport := stunneltransport.NewTransport(nsPair, transportOptions)
+
+	err := stunnelTransport.CreateServer(destClient, prefix, e)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+
+	err = stunnelTransport.CreateClient(srcClient, prefix, e)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	return nil
 }
 

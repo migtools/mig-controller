@@ -1618,7 +1618,7 @@ func (t *Task) getStagePVs() migapi.PersistentVolumes {
 		// don't include it in a stage PV
 		if pv.Selection.Action == migapi.PvSkipAction ||
 			(directVolumesEnabled && pv.Selection.Action == migapi.PvCopyAction &&
-				pv.Selection.CopyMethod == migapi.PvFilesystemCopyMethod) {
+				(pv.Selection.CopyMethod == migapi.PvFilesystemCopyMethod || pv.Selection.CopyMethod == migapi.PvBlockCopyMethod)) {
 			continue
 		}
 		volumes = append(volumes, pv)

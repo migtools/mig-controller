@@ -828,6 +828,7 @@ const (
 
 // PV Copy Methods.
 const (
+	PvBlockCopyMethod      = "block"
 	PvFilesystemCopyMethod = "filesystem"
 	PvSnapshotCopyMethod   = "snapshot"
 )
@@ -858,6 +859,7 @@ type PVC struct {
 	Namespace    string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 	Name         string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	VolumeMode   kapi.PersistentVolumeMode         `json:"volumeMode,omitempty"`
 	HasReference bool                              `json:"hasReference,omitempty"`
 }
 

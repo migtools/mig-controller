@@ -35,6 +35,7 @@ import (
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/controller/pkg/logging"
+	diskrsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/blockrsync"
 	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
@@ -60,6 +61,7 @@ const (
 const (
 	DefaultReconcileConcurrency = 5
 	RsyncContainerName          = rsync_transfer.RsyncContainer
+	DiskRsyncContainerName      = diskrsync_transfer.BlockRsyncContainer
 )
 
 type GetPodLogger interface {
@@ -352,7 +354,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p
 	var containerStatus *kapi.ContainerStatus
 	for i := range podRef.Status.ContainerStatuses {
 		c := podRef.Status.ContainerStatuses[i]
-		if c.Name == RsyncContainerName {
+		if c.Name == RsyncContainerName || c.Name == DiskRsyncContainerName {
 			containerStatus = &c
 		}
 	}
@@ -365,7 +367,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p
 	case containerStatus.Ready:
 		rsyncPodStatus.PodPhase = kapi.PodRunning
 		numberOfLogLines := int64(5)
-		logMessage, err := p.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
+		logMessage, err := p.getPodLogs(podRef, containerStatus.Name, &numberOfLogLines, false)
 		if err != nil {
 			log.Info("Failed to get logs from Rsync Pod on source cluster",
 				"pod", path.Join(podRef.Namespace, podRef.Name))

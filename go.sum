@@ -635,8 +635,8 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.2/go.mod h1:T0+1ngSBFLxv
 github.com/konsorten/go-windows-terminal-sequences v1.0.3/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konveyor/controller v0.4.1 h1:0LiBaAIrXScOqb6OoIGOIqpK9dxBAQotPWEhP4JX4qk=
 github.com/konveyor/controller v0.4.1/go.mod h1:j0DSNesS0XHmqOLcJEuwB+qIRkdJ3mSIEJFA2byC12c=
-github.com/konveyor/crane-lib v0.0.11 h1:duL21ayFHw0NsALyPKhBv5AlxXsNOtAfdIG48X7Waw4=
-github.com/konveyor/crane-lib v0.0.11/go.mod h1:GUD89sJcG26d5dAj4hSDuWrIhPyDQxcJvD18jPl/c+U=
+github.com/konveyor/crane-lib v0.1.2 h1:HSQd2u7UJB0vV8c75Gxd5KqDm9gevpT9bsB02P9MoZ4=
+github.com/konveyor/crane-lib v0.1.2/go.mod h1:oSqLMhvUa3kNC/IaKXdGV/Tfs2bdwoZpYrbiV4KpVdY=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d h1:tETgPq+JxXhVhnrcLc7rcW9BURax36VUsix8DAU0wuY=
 github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d/go.mod h1:Yk0xQ4N5rwE1+NWLSFQUQLgNT1/8p4Uor60LlgQfymg=
 github.com/konveyor/velero v0.10.2-0.20220124204642-f91d69bb9a5e h1:cjeGzY/zgPJCSLpC6Yurpn1li9ERrMtrF0nixFz2fmc=
