@@ -53,12 +53,12 @@ deploy: manifests
 	kustomize build config/default | kubectl apply -f -
 
 
-CRD_OPTIONS ?= "crd:crdVersions=v1,trivialVersions=true,preserveUnknownFields=false"
+CRD_OPTIONS ?= crdVersions=v1
 
-# Generate manifests e.g. CRD, Webhooks
+# Generate manifests e.g. CRD, Webhooks, requires kubebuilder 0.13.0 or newer
 manifests:
-	${CONTROLLER_GEN} ${CRD_OPTIONS} crd rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases 
-	mv config/migration.openshift.io*yaml config/crds
+	${CONTROLLER_GEN} "crd:${CRD_OPTIONS}" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crds/bases 
+	mv config/crds/bases/migration.openshift.io*yaml config/crds
 	rm -rf config/crds/bases
 
 # Copy sample CRs to a new 'migsamples' directory that is in .gitignore to avoid committing SA tokens
