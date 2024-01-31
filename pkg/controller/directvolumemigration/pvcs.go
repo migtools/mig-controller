@@ -2,6 +2,8 @@ package directvolumemigration
 
 import (
 	"context"
+	"path"
+
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -9,7 +11,6 @@ import (
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"path"
 )
 
 func (t *Task) areSourcePVCsUnattached() error {
@@ -41,7 +42,6 @@ func (t *Task) createDestinationPVCs() error {
 	}
 	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
 		// Get pvc definition from source cluster
-
 		srcPVC := corev1.PersistentVolumeClaim{}
 		key := types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}
 		err = srcClient.Get(context.TODO(), key, &srcPVC)
@@ -57,6 +57,10 @@ func (t *Task) createDestinationPVCs() error {
 		newSpec.StorageClassName = &pvc.TargetStorageClass
 		newSpec.AccessModes = pvc.TargetAccessModes
 		newSpec.VolumeName = ""
+		// Remove DataSource and DataSourceRef from PVC spec so any populators or sources are not
+		// copied over to the destination PVC
+		newSpec.DataSource = nil
+		newSpec.DataSourceRef = nil
 
 		// Adjusting destination PVC storage size request
 		// max(requested capacity on source, capacity reported in migplan, proposed capacity in migplan)
@@ -114,7 +118,9 @@ func (t *Task) createDestinationPVCs() error {
 			"destPersistentVolumeClaim", path.Join(destNs, pvc.Name),
 			"pvcStorageClassName", destPVC.Spec.StorageClassName,
 			"pvcAccessModes", destPVC.Spec.AccessModes,
-			"pvcRequests", destPVC.Spec.Resources.Requests)
+			"pvcRequests", destPVC.Spec.Resources.Requests,
+			"pvcDataSource", destPVC.Spec.DataSource,
+			"pvcDataSourceRef", destPVC.Spec.DataSourceRef)
 		destPVCCheck := corev1.PersistentVolumeClaim{}
 		err = destClient.Get(context.TODO(), types.NamespacedName{
 			Namespace: destNs,

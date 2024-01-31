@@ -146,6 +146,8 @@ var FailedItinerary = Itinerary{
 type Task struct {
 	Log                          logr.Logger
 	Client                       k8sclient.Client
+	sourceClient                 compat.Client
+	destinationClient            compat.Client
 	Owner                        *migapi.DirectVolumeMigration
 	SSHKeys                      *sshKeys
 	EndpointType                 migapi.EndpointType
@@ -512,6 +514,9 @@ func (t *Task) failed() bool {
 
 // Get client for source cluster
 func (t *Task) getSourceClient() (compat.Client, error) {
+	if t.sourceClient != nil {
+		return t.sourceClient, nil
+	}
 	cluster, err := t.Owner.GetSourceCluster(t.Client)
 	if err != nil {
 		return nil, err
@@ -525,6 +530,9 @@ func (t *Task) getSourceClient() (compat.Client, error) {
 
 // Get client for destination cluster
 func (t *Task) getDestinationClient() (compat.Client, error) {
+	if t.destinationClient != nil {
+		return t.destinationClient, nil
+	}
 	cluster, err := t.Owner.GetDestinationCluster(t.Client)
 	if err != nil {
 		return nil, err
