@@ -71,6 +71,7 @@ func (t *Task) buildDirectImageMigration() *migapi.DirectImageMigration {
 			SrcMigClusterRef:  t.PlanResources.MigPlan.Spec.SrcMigClusterRef,
 			DestMigClusterRef: t.PlanResources.MigPlan.Spec.DestMigClusterRef,
 			Namespaces:        t.PlanResources.MigPlan.Spec.Namespaces,
+			LabelSelector:     t.PlanResources.MigPlan.Spec.LabelSelector,
 		},
 	}
 	migapi.SetOwnerReference(t.Owner, t.Owner, dim)
