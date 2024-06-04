@@ -49,11 +49,14 @@ func (t *Task) listImageStreams() error {
 	var isRefList []*migapi.ImageStreamListItem
 	// Get list namespaces to iterate over
 	for srcNsName, destNsName := range t.Owner.GetNamespaceMapping() {
+		labels, _ := metav1.LabelSelectorAsSelector(t.Owner.Spec.LabelSelector)
 		isList := imagev1.ImageStreamList{}
 		err := srcClient.List(
 			context.TODO(),
 			&isList,
-			k8sclient.InNamespace(srcNsName))
+			k8sclient.InNamespace(srcNsName),
+			k8sclient.MatchingLabelsSelector{Selector: labels},
+		)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
