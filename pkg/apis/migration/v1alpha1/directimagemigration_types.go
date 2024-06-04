@@ -37,6 +37,10 @@ type DirectImageMigrationSpec struct {
 
 	// Holds names of all namespaces to run DIM to get all the imagestreams in these namespaces.
 	Namespaces []string `json:"namespaces,omitempty"`
+
+	// LabelSelector optional label selector on the included resources to migrate
+	// +kubebuilder:validation:Optional
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 }
 
 // DirectImageMigrationStatus defines the observed state of DirectImageMigration
