@@ -208,7 +208,7 @@ replace k8s.io/apimachinery => k8s.io/apimachinery v0.29.2
 
 replace k8s.io/component-base => k8s.io/component-base v0.29.2
 
-replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.17.3
+replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.17.4
 
 // OCI Manifest Type Confusion Issue (No CVE)
 replace github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
