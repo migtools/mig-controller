@@ -93,7 +93,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &kapi.Secret{}),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a k8sclient.Object) []reconcile.Request {
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a k8sclient.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigCluster{})
 		}))
 	if err != nil {

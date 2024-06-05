@@ -71,7 +71,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageStreamMigration{})
 		}),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},

@@ -77,7 +77,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to MigPlans referenced by MigMigrations
 	err = c.Watch(
 		source.Kind(mgr.GetCache(), &migapi.MigPlan{}),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigMigration{})
 		}),
 		&PlanPredicate{
