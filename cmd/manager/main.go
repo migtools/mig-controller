@@ -61,7 +61,7 @@ func main() {
 	log.Info("setting up manager")
 	mgr, err := manager.New(cfg, manager.Options{
 		Metrics: server.Options{
-			BindAddress: "0.0.0.0",
+			BindAddress: "0",
 		}})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")

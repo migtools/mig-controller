@@ -49,7 +49,7 @@ func TestReconcile(t *testing.T) {
 		cfg,
 		manager.Options{
 			Metrics: server.Options{
-				BindAddress: "0.0.0.0",
+				BindAddress: "0",
 			},
 		},
 	)

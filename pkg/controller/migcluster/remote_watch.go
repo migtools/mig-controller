@@ -37,7 +37,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 		manager.Options{
 			Scheme: config.Scheme,
 			Metrics: server.Options{
-				BindAddress: "0.0.0.0",
+				BindAddress: "0",
 			},
 		})
 	if err != nil {

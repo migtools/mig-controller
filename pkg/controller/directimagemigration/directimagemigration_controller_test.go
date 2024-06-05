@@ -47,7 +47,7 @@ func TestReconcile(t *testing.T) {
 	// channel when it is finished.
 	mgr, err := manager.New(cfg, manager.Options{
 		Metrics: server.Options{
-			BindAddress: "0.0.0.0",
+			BindAddress: "0",
 		}})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
