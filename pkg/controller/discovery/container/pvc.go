@@ -21,9 +21,7 @@ type PVC struct {
 
 func (r *PVC) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.PersistentVolumeClaim{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.PersistentVolumeClaim{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +44,7 @@ func (r *PVC) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"PVC (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

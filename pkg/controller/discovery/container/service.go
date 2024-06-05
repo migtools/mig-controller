@@ -20,9 +20,10 @@ type Service struct {
 
 func (r *Service) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Service{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&v1.Service{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -45,6 +46,7 @@ func (r *Service) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Service (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

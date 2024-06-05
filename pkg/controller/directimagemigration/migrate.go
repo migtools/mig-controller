@@ -31,13 +31,13 @@ import (
 func (r *ReconcileDirectImageMigration) migrate(ctx context.Context, imageMigration *migapi.DirectImageMigration) (time.Duration, error) {
 	// Started
 	if imageMigration.Status.StartTimestamp == nil {
-		log.Info("Marking DirectImageMigration as started.")
+		log.Info(0, "Marking DirectImageMigration as started.")
 		imageMigration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Run
 	task := Task{
-		Log:    log,
+		Log:    log.Real,
 		Client: r,
 		Owner:  imageMigration,
 		Phase:  imageMigration.Status.Phase,
@@ -50,7 +50,7 @@ func (r *ReconcileDirectImageMigration) migrate(ctx context.Context, imageMigrat
 			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
-		log.Info("Phase execution failed.",
+		log.Info(0, "Phase execution failed.",
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())

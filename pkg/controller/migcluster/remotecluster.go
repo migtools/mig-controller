@@ -107,5 +107,5 @@ func (r *RemoteClusterSource) enqueue(cluster v1alpha1.MigCluster) {
 		}
 	}
 
-	r.handler.Generic(clusterEvent, r.queue)
+	r.handler.Generic(context.Background(), clusterEvent, r.queue)
 }

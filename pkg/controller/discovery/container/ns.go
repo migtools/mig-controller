@@ -20,9 +20,10 @@ type Namespace struct {
 
 func (r *Namespace) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Namespace{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&v1.Namespace{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -45,6 +46,7 @@ func (r *Namespace) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Namespace (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

@@ -21,9 +21,10 @@ type Event struct {
 
 func (r *Event) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Event{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&v1.Event{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *Event) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Event (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

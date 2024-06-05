@@ -22,9 +22,10 @@ type Job struct {
 
 func (r *Job) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &batchv1.Job{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&batchv1.Job{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -47,6 +48,7 @@ func (r *Job) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Job (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

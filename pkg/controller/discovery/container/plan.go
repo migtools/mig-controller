@@ -20,9 +20,10 @@ type Plan struct {
 
 func (r *Plan) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.MigPlan{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&migapi.MigPlan{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -45,6 +46,7 @@ func (r *Plan) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Plan (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -144,9 +146,7 @@ type Migration struct {
 
 func (r *Migration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.MigMigration{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &migapi.MigMigration{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -169,6 +169,7 @@ func (r *Migration) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Migration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

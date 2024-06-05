@@ -21,9 +21,7 @@ type Pod struct {
 
 func (r *Pod) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &corev1.Pod{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &corev1.Pod{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -44,6 +42,7 @@ func (r *Pod) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Pod (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

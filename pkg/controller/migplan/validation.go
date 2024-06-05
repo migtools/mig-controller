@@ -981,7 +981,7 @@ func (r ReconcileMigPlan) validateDestinationNamespaces(plan *migapi.MigPlan) er
 	nonDNSCompliantNames := []string{}
 	for _, ns := range namespaces {
 		if errs := validation.IsDNS1123Label(ns); len(errs) != 0 {
-			log.Info("Namespace validation failed!!", "namespace", ns, "errors", errs)
+			log.Info(0, "Namespace validation failed!!", "namespace", ns, "errors", errs)
 			nonDNSCompliantNames = append(nonDNSCompliantNames, ns)
 		}
 	}

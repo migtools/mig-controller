@@ -70,15 +70,10 @@ func ZapLoggerTo(destWriter io.Writer, development bool) logr.Logger {
 	return zapr.NewLogger(log)
 }
 
-// SetLogger sets a concrete logging implementation for all deferred Loggers.
-func SetLogger(l logr.Logger) {
-	Log.Fulfill(l)
-}
-
 // Log is the base logger used by kubebuilder.  It delegates
 // to another logr.Logger.  You *must* call SetLogger to
 // get any actual logging.
-var Log = logf.NewDelegatingLogger(logf.NullLogger{})
+var Log = logf.Log
 
 // KBLog is a base parent logger.
 var KBLog logr.Logger

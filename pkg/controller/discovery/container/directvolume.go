@@ -21,9 +21,10 @@ type DirectVolumeMigration struct {
 
 func (r *DirectVolumeMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.DirectVolumeMigration{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&migapi.DirectVolumeMigration{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *DirectVolumeMigration) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"DirectVolumeMigration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

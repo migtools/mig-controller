@@ -311,7 +311,7 @@ func (t Table) Insert(model interface{}) error {
 		return nil
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s inserted.", t.Name(m)), "meta", m.Meta())
+		Log.Info(0, fmt.Sprintf("%s inserted.", t.Name(m)), "meta", m.Meta())
 		err := t.InsertLabels(m)
 		if err != nil {
 			Log.Trace(err)
@@ -352,7 +352,7 @@ func (t Table) Update(model interface{}) error {
 		return sql.ErrNoRows
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s updated.", t.Name(m)), "meta", m.Meta())
+		Log.Info(0, fmt.Sprintf("%s updated.", t.Name(m)), "meta", m.Meta())
 		err := t.ReplaceLabels(m)
 		if err != nil {
 			Log.Trace(err)
@@ -393,7 +393,7 @@ func (t Table) Delete(model interface{}) error {
 		return nil
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s deleted.", t.Name(m)), "meta", m.Meta())
+		Log.Info(0, fmt.Sprintf("%s deleted.", t.Name(m)), "meta", m.Meta())
 		err := t.DeleteLabels(m)
 		if err != nil {
 			Log.Trace(err)

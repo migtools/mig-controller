@@ -31,6 +31,10 @@ type PodCommand struct {
 // Run the command.
 func (p *PodCommand) Run() error {
 	codec := serializer.NewCodecFactory(scheme.Scheme)
+	c, err := rest.HTTPClientFor(p.RestCfg)
+	if err != nil {
+		return err
+	}
 	restClient, err := apiutil.RESTClientForGVK(
 		schema.GroupVersionKind{
 			Version: "v1",
@@ -38,7 +42,8 @@ func (p *PodCommand) Run() error {
 		},
 		false,
 		p.RestCfg,
-		codec)
+		codec,
+		c)
 	if err != nil {
 		return err
 	}

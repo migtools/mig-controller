@@ -548,7 +548,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given zero rsync pods in the source namespace, should return nil",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: logging.WithName("rsync-operation-test").Real,
 			},
 			args: args{
 				client:    getFakeCompatClient(),
@@ -570,7 +570,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for given pvc, should return the most recent pod",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: logging.WithName("rsync-operation-test").Real,
 			},
 			args: args{
 				client: getFakeCompatClient(
@@ -586,7 +586,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for given pvc with some of them with non-integer attempt labels, should return the most recent pod with the correct label",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: logging.WithName("rsync-operation-test").Real,
 			},
 			args: args{
 				client: getFakeCompatClient(
@@ -602,7 +602,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for different PVCs, should return pod corresponding to the most recent attempt for the correct PVC",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: logging.WithName("rsync-operation-test").Real,
 			},
 			args: args{
 				client: getFakeCompatClient(
@@ -656,7 +656,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 		{
 			name: "when there are errors within less than 5 minutes of running the phase, warning should not be present",
 			fields: fields{
-				Log:    log.WithName("test-logger"),
+				Log:    log.Real.WithName("test-logger"),
 				Client: getFakeCompatClient(),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{
@@ -686,7 +686,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 		{
 			name: "when there are errors for over 5 minutes of running the phase, warning should be present",
 			fields: fields{
-				Log:    log.WithName("test-logger"),
+				Log:    log.Real.WithName("test-logger"),
 				Client: getFakeCompatClient(),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{
@@ -921,7 +921,7 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &Task{
-				Log:    log.WithName("test-logger"),
+				Log:    log.Real.WithName("test-logger"),
 				Client: tt.fields.DestClient,
 				Owner:  tt.fields.Owner,
 			}
@@ -1119,7 +1119,7 @@ func Test_getSecurityContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &Task{
-				Log:    log.WithName("test-logger"),
+				Log:    log.Real.WithName("test-logger"),
 				Client: tt.fields.client,
 				Owner:  tt.fields.Owner,
 			}

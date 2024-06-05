@@ -36,7 +36,7 @@ func (fake fakeCompatClient) MinorVersion() int {
 	return fake.Minor
 }
 
-func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object) error {
+func (fake fakeCompatClient) Get(ctx context.Context, key k8sclient.ObjectKey, obj k8sclient.Object, opts ...k8sclient.GetOption) error {
 	return fake.Client.Get(ctx, key, obj)
 }
 

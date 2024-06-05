@@ -838,7 +838,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 				if err != nil && !k8serr.IsNotFound(err) {
 					return liberr.Wrap(err)
 				}
-				log.Info("Stage Pod deletion requested on source cluster.",
+				log.Info(0, "Stage Pod deletion requested on source cluster.",
 					"pod", path.Join(pod.Namespace, pod.Name))
 			}
 		}
@@ -864,7 +864,7 @@ func (t *Task) ensureStagePodsDeleted() error {
 			if err != nil && !k8serr.IsNotFound(err) {
 				return liberr.Wrap(err)
 			}
-			log.Info("Stage Pod deletion requested on destination cluster.",
+			log.Info(0, "Stage Pod deletion requested on destination cluster.",
 				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}

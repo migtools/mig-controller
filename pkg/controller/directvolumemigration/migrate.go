@@ -33,13 +33,13 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 
 	// Started
 	if direct.Status.StartTimestamp == nil {
-		log.Info("Marking DirectVolumeMigration as started.")
+		log.Info(0, "Marking DirectVolumeMigration as started.")
 		direct.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Run
 	task := Task{
-		Log:              log,
+		Log:              log.Real,
 		Client:           r,
 		Owner:            direct,
 		Phase:            direct.Status.Phase,
@@ -55,7 +55,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
-		log.Info("Phase execution failed.",
+		log.Info(0, "Phase execution failed.",
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())
@@ -115,7 +115,7 @@ func (r *ReconcileDirectVolumeMigration) getDVMPlanResources(direct *migapi.Dire
 		}
 
 		if migration == nil {
-			log.Info("Migration not found for DVM", "name", direct.Name)
+			log.Info(0, "Migration not found for DVM", "name", direct.Name)
 			return planResources, liberr.Wrap(err)
 		}
 
@@ -124,7 +124,7 @@ func (r *ReconcileDirectVolumeMigration) getDVMPlanResources(direct *migapi.Dire
 			return planResources, liberr.Wrap(err)
 		}
 		if !plan.Status.IsReady() {
-			log.Info("Plan not ready.", "name", migration.Name)
+			log.Info(0, "Plan not ready.", "name", migration.Name)
 			return planResources, liberr.Wrap(err)
 		}
 
@@ -190,7 +190,7 @@ func (r *ReconcileDirectVolumeMigration) getEndpointType(direct *migapi.DirectVo
 	case migapi.Route, migapi.ClusterIP, migapi.NodePort:
 		return migapi.EndpointType(endpointType), nil
 	default:
-		log.Info("invalid endpoint type specified, using default", "specified", endpointType, "default", migapi.Route)
+		log.Info(0, "invalid endpoint type specified, using default", "specified", endpointType, "default", migapi.Route)
 		return migapi.Route, nil
 	}
 }

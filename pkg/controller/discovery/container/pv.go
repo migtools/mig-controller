@@ -20,9 +20,7 @@ type PV struct {
 
 func (r *PV) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.PersistentVolume{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.PersistentVolume{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -45,6 +43,7 @@ func (r *PV) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"PV (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

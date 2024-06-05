@@ -86,7 +86,7 @@ func Create() (*sql.DB, error) {
 		}
 	}
 
-	Log.Info("Database opened.", "path", path)
+	Log.Info(0, "Database opened.", "path", path)
 
 	return db, nil
 }

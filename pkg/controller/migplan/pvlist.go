@@ -47,7 +47,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 		return nil
 	}
 
-	log.Info("PV Discovery: Starting for Migration Plan",
+	log.Info(0, "PV Discovery: Starting for Migration Plan",
 		"migPlan", path.Join(plan.Namespace, plan.Name),
 		"migPlanNamespaces", plan.Spec.Namespaces)
 
@@ -94,7 +94,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 
 	plan.Spec.BeginPvStaging()
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
-		log.Info("PV Discovery: 'persistentvolumeclaims' found in MigPlan "+
+		log.Info(0, "PV Discovery: 'persistentvolumeclaims' found in MigPlan "+
 			"Status.ExcludedResources, ending PV discovery",
 			"migPlan", path.Join(plan.Namespace, plan.Name))
 		plan.Spec.ResetPvs()
@@ -187,7 +187,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 		})
 	}
 
-	log.Info("PV Discovery: Finished for Migration Plan",
+	log.Info(0, "PV Discovery: Finished for Migration Plan",
 		"migPlan", path.Join(plan.Namespace, plan.Name),
 		"migPlanNamespaces", plan.Spec.Namespaces)
 	return nil
@@ -449,7 +449,7 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 			}
 		}
 	}
-	log.Info("PV Discovery: Setting default selections for discovered PV.",
+	log.Info(0, "PV Discovery: Setting default selections for discovered PV.",
 		"persistentVolume", pv.Name,
 		"pvSelectedAction", selectedAction,
 		"pvSelectedStorageClass", selectedStorageClass,

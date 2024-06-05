@@ -20,9 +20,9 @@ type Backup struct {
 
 func (r *Backup) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &velero.Backup{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(), &velero.Backup{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -45,6 +45,7 @@ func (r *Backup) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Backup (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -164,9 +165,9 @@ type Restore struct {
 
 func (r *Restore) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &velero.Restore{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(), &velero.Restore{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -189,6 +190,7 @@ func (r *Restore) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Restore (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -308,9 +310,9 @@ type PodVolumeBackup struct {
 
 func (r *PodVolumeBackup) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &velero.PodVolumeBackup{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(), &velero.PodVolumeBackup{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -333,6 +335,7 @@ func (r *PodVolumeBackup) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"PodVolumeBackup (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -452,9 +455,9 @@ type PodVolumeRestore struct {
 
 func (r *PodVolumeRestore) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &velero.PodVolumeRestore{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(), &velero.PodVolumeRestore{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -477,6 +480,7 @@ func (r *PodVolumeRestore) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"PodVolumeRestore (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

@@ -21,9 +21,10 @@ type DirectVolumeMigrationProgress struct {
 
 func (r *DirectVolumeMigrationProgress) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.DirectVolumeMigrationProgress{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&migapi.DirectVolumeMigrationProgress{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *DirectVolumeMigrationProgress) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"DirectVolumeMigrationProgress (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

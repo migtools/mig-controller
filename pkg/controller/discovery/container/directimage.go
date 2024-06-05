@@ -21,9 +21,10 @@ type DirectImageMigration struct {
 
 func (r *DirectImageMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.DirectImageMigration{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&migapi.DirectImageMigration{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,7 +47,7 @@ func (r *DirectImageMigration) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
-		"DirectImageMigration (collection) reconciled.",
+		0, "DirectImageMigration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",

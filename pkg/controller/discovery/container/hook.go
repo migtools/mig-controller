@@ -21,9 +21,10 @@ type Hook struct {
 
 func (r *Hook) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.MigHook{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&migapi.MigHook{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *Hook) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Hook (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

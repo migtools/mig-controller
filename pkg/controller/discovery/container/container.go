@@ -96,7 +96,7 @@ func (r *Container) Delete(cluster types.NamespacedName) {
 		Name:      cluster.Name,
 	}
 	if ds, found := r.sources[key]; found {
-		Log.Info("Deleted.", "cluster", key)
+		Log.Info(0, "Deleted.", "cluster", key)
 		delete(r.sources, key)
 		ds.Stop(true)
 	}

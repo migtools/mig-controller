@@ -21,9 +21,10 @@ type StorageClass struct {
 
 func (r *StorageClass) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.StorageClass{},
-		},
+		source.Kind(
+			r.ds.manager.GetCache(),
+			&v1.StorageClass{},
+		),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -46,6 +47,7 @@ func (r *StorageClass) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"StorageClass (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
