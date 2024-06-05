@@ -61,7 +61,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigStorage
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigStorage{}},
+		source.Kind(mgr.GetCache(), &migapi.MigStorage{}),
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -84,8 +84,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to Secrets referenced by MigStorage.
 	err = c.Watch(
-		&source.Kind{Type: &kapi.Secret{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &kapi.Secret{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigStorage{})
 		}),
 	)
@@ -131,7 +131,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", storage.Status.Conditions)
+		log.Info(0, "CR", "conditions", storage.Status.Conditions)
 		storage.Status.Conditions.RecordEvents(storage, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return

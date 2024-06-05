@@ -21,9 +21,7 @@ type Route struct {
 
 func (r *Route) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Route{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.Route{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -44,6 +42,7 @@ func (r *Route) Reconcile() error {
 	}
 	r.hasReconciled = true
 	Log.Info(
+		0,
 		"Route (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,

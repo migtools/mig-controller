@@ -90,7 +90,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigAnalytic
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigAnalytic{}},
+		source.Kind(mgr.GetCache(), &migapi.MigAnalytic{}),
 		&handler.EnqueueRequestForObject{},
 		&AnalyticPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -156,7 +156,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", analytic.Status.Conditions)
+		log.Info(0, "CR", "conditions", analytic.Status.Conditions)
 		analytic.Status.Conditions.RecordEvents(analytic, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
@@ -198,7 +198,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 	// Analyze
 	err = r.analyze(analytic)
 	if err != nil {
-		log.Info("Error calculating migration analytics", "error", err.Error())
+		log.Info(0, "Error calculating migration analytics", "error", err.Error())
 		return reconcile.Result{RequeueAfter: time.Second * RequeueInterval}, nil
 	}
 
@@ -581,7 +581,7 @@ func pvStorage(self corev1.ResourceList) *resource.Quantity {
 }
 
 func collectResources(client compat.Client) ([]*metav1.APIResourceList, error) {
-	resources, err := client.ServerResources()
+	resources, err := client.ServerPreferredResources()
 	if err != nil {
 		return nil, err
 	}

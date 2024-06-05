@@ -174,7 +174,7 @@ func (t *Task) deleteMigratedNamespaceScopedResources() error {
 					log.Error(err, fmt.Sprintf("Failed to request delete on: %s", gvr.String()))
 					return err
 				}
-				log.Info("DELETION REQUESTED for resource on destination cluster with matching migrated-by label",
+				log.Info(0, "DELETION REQUESTED for resource on destination cluster with matching migrated-by label",
 					"gvk", gvkCombined,
 					"resource", path.Join(ns, r.GetName()))
 			}
@@ -221,7 +221,7 @@ func (t *Task) deleteMovedNfsPVs() error {
 				"persistentVolume", pv.Name)
 			return err
 		}
-		log.Info("Deleted moved NFS PV from destination cluster", "persistentVolume", pv.Name)
+		log.Info(0, "Deleted moved NFS PV from destination cluster", "persistentVolume", pv.Name)
 	}
 
 	return nil
@@ -244,7 +244,7 @@ func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {
 	for _, gvr := range GVRs {
 		for _, ns := range t.destinationNamespaces() {
 			gvkCombinedName := gvr.Group + "/" + gvr.Version + "/" + gvr.Resource
-			log.Info("Rollback: Checking for leftover resources in destination cluster",
+			log.Info(0, "Rollback: Checking for leftover resources in destination cluster",
 				"gvk", gvkCombinedName, "namespace", ns)
 			list, err := client.Resource(gvr).Namespace(ns).List(context.Background(), *listOptions)
 			if err != nil {

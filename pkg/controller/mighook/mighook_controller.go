@@ -58,7 +58,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigHook
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigHook{}},
+		source.Kind(mgr.GetCache(), &migapi.MigHook{}),
 		&handler.EnqueueRequestForObject{},
 		&HookPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -105,7 +105,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", hook.Status.Conditions)
+		log.Info(0, "CR", "conditions", hook.Status.Conditions)
 		hook.Status.Conditions.RecordEvents(hook, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return

@@ -40,7 +40,7 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 		return 0, liberr.Wrap(err)
 	}
 	if !plan.Status.IsReady() {
-		log.Info("Plan not ready. Migration can't run unless Plan is ready.")
+		log.Info(0, "Plan not ready. Migration can't run unless Plan is ready.")
 		return 0, liberr.Wrap(err)
 	}
 
@@ -52,13 +52,13 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 
 	// Started
 	if migration.Status.StartTimestamp == nil {
-		log.Info("Marking MigMigration as started.")
+		log.Info(0, "Marking MigMigration as started.")
 		migration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Run
 	task := Task{
-		Log:             log,
+		Log:             log.Real,
 		Client:          r,
 		Owner:           migration,
 		PlanResources:   planResources,
@@ -73,7 +73,7 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
-		log.Info("Phase execution failed.",
+		log.Info(0, "Phase execution failed.",
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())

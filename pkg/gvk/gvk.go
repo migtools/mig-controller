@@ -192,7 +192,7 @@ func toSet(strSlice []string) mapset.Set {
 
 // collectNamespacedResources collects all namespace-scoped apiResources from the cluster
 func collectNamespacedResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	resources, err := discovery.ServerResources()
+	resources, err := discovery.ServerPreferredResources()
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +252,7 @@ func collectPreferredCRDResource(discovery discovery.DiscoveryInterface) ([]*met
 
 // collectNamespacedResources collects all namespace-scoped apiResources from the cluster
 func collectCRDResources(discovery discovery.DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	resources, err := discovery.ServerResources()
+	resources, err := discovery.ServerPreferredResources()
 	crdResources := []*metav1.APIResourceList{}
 	if err != nil {
 		return nil, err

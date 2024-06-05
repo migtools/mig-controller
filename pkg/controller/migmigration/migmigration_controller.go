@@ -65,7 +65,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigMigration
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigMigration{}},
+		source.Kind(mgr.GetCache(), &migapi.MigMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&MigrationPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -76,8 +76,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigPlans referenced by MigMigrations
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigPlan{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigPlan{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigMigration{})
 		}),
 		&PlanPredicate{
@@ -88,20 +88,28 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageMigrations
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageMigration{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &migapi.MigMigration{},
-	},
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &migapi.DirectImageMigration{}),
+		handler.EnqueueRequestForOwner(
+			mgr.GetScheme(),
+			mgr.GetRESTMapper(),
+			&migapi.MigMigration{},
+			handler.OnlyControllerOwner(),
+		),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to DirectImageMigrations
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &migapi.MigMigration{},
-	},
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigration{}),
+		handler.EnqueueRequestForOwner(
+			mgr.GetScheme(),
+			mgr.GetRESTMapper(),
+			&migapi.MigMigration{},
+			handler.OnlyControllerOwner(),
+		),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
@@ -181,7 +189,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 			err = r.deleted()
 			return reconcile.Result{Requeue: false}, nil
 		}
-		log.Info("Error getting migmigration for reconcile, requeueing.")
+		log.Info(0, "Error getting migmigration for reconcile, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -195,7 +203,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 	// Ensure required labels are present on migmigration
 	err = r.ensureLabels(migration)
 	if err != nil {
-		log.Info("Error setting debug labels, requeueing.")
+		log.Info(0, "Error setting debug labels, requeueing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
@@ -205,7 +213,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 		// Only log critical conditions.
 		critConditions := migration.Status.Conditions.FindConditionByCategory(Critical)
 		if len(critConditions) > 0 {
-			log.Info("CR", "critical_conditions", critConditions)
+			log.Info(0, "CR", "critical_conditions", critConditions)
 		}
 		migration.Status.Conditions.RecordEvents(migration, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
@@ -228,7 +236,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 	// Owner Reference
 	err = r.setOwnerReference(migration)
 	if err != nil {
-		log.Info("Failed to set owner references, requeuing.")
+		log.Info(0, "Failed to set owner references, requeuing.")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
@@ -239,7 +247,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 	// Validate
 	err = r.validate(ctx, migration)
 	if err != nil {
-		log.Info("Validation failed, requeueing")
+		log.Info(0, "Validation failed, requeueing")
 		log.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
@@ -253,7 +261,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 	if !migration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.postpone(migration)
 		if err != nil {
-			log.Info("Failed to check if postpone required, requeueing")
+			log.Info(0, "Failed to check if postpone required, requeueing")
 			log.Trace(err)
 			return reconcile.Result{Requeue: true}, err
 		}

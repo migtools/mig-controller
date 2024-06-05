@@ -69,7 +69,7 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 
 	// Watch for changes to MigCluster
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -92,8 +92,8 @@ func add(mgr manager.Manager, r *ReconcileMigCluster) error {
 
 	// Watch for changes to Secrets referenced by MigClusters
 	err = c.Watch(
-		&source.Kind{Type: &kapi.Secret{}},
-		handler.EnqueueRequestsFromMapFunc(func(a k8sclient.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &kapi.Secret{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a k8sclient.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigCluster{})
 		}))
 	if err != nil {
@@ -139,7 +139,7 @@ func (r *ReconcileMigCluster) Reconcile(ctx context.Context, request reconcile.R
 
 	// Report reconcile error.
 	defer func() {
-		log.Info("CR", "conditions", cluster.Status.Conditions)
+		log.Info(0, "CR", "conditions", cluster.Status.Conditions)
 		cluster.Status.Conditions.RecordEvents(cluster, r.EventRecorder)
 		if err == nil || errors.IsConflict(errorutil.Unwrap(err)) {
 			return
@@ -239,7 +239,7 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 
 	r.shutdownRemoteWatch(cluster)
 
-	log.Info("Starting remote manager.", "cluster", cluster.Name)
+	log.Info(0, "Starting remote manager.", "cluster", cluster.Name)
 	StartRemoteWatch(r, remote.ManagerConfig{
 		RemoteRestConfig: restCfg,
 		ParentNsName:     nsName,
@@ -247,18 +247,18 @@ func (r *ReconcileMigCluster) setupRemoteWatch(cluster *migapi.MigCluster) error
 		ParentObject:     cluster,
 		Scheme:           r.scheme,
 	})
-	log.Info("Remote manager started.", "cluster", cluster.Name)
+	log.Info(0, "Remote manager started.", "cluster", cluster.Name)
 
 	return nil
 }
 
 func (r *ReconcileMigCluster) shutdownRemoteWatch(cluster *migapi.MigCluster) {
-	log.Info("Stopping remote manager.", "cluster", cluster.Name)
+	log.Info(0, "Stopping remote manager.", "cluster", cluster.Name)
 	nsName := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      cluster.Name,
 	}
 
 	StopRemoteWatch(nsName)
-	log.Info("Stopped remote manager.", "cluster", cluster.Name)
+	log.Info(0, "Stopped remote manager.", "cluster", cluster.Name)
 }

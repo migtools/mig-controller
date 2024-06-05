@@ -31,13 +31,13 @@ import (
 func (r *ReconcileDirectImageStreamMigration) migrate(ctx context.Context, imageStreamMigration *migapi.DirectImageStreamMigration) (time.Duration, error) {
 	// Started
 	if imageStreamMigration.Status.StartTimestamp == nil {
-		log.Info("Marking DirectImageStreamMigration as started.")
+		log.Info(0, "Marking DirectImageStreamMigration as started.")
 		imageStreamMigration.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Run
 	task := Task{
-		Log:    log,
+		Log:    log.Real,
 		Client: r,
 		Owner:  imageStreamMigration,
 		Phase:  imageStreamMigration.Status.Phase,
@@ -49,7 +49,7 @@ func (r *ReconcileDirectImageStreamMigration) migrate(ctx context.Context, image
 		if errors.IsConflict(errorutil.Unwrap(err)) {
 			return FastReQ, nil
 		}
-		log.Info("Phase execution failed.",
+		log.Info(0, "Phase execution failed.",
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())

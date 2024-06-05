@@ -56,19 +56,23 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectVolumeMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigration{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}},
-		&handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &migapi.DirectVolumeMigration{},
-		},
-		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigrationProgress{}),
+		handler.EnqueueRequestForOwner(
+			mgr.GetScheme(),
+			mgr.GetRESTMapper(),
+			&migapi.DirectVolumeMigration{},
+			handler.OnlyControllerOwner(),
+		),
+		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
+	)
 	if err != nil {
 		return err
 	}
@@ -116,7 +120,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	// Set MigMigration name key on logger
 	migration, err := direct.GetMigrationForDVM(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log.Real = log.Real.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx

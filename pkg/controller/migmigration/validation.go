@@ -372,7 +372,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(ctx context.Context, mi
 			return liberr.Wrap(err)
 		}
 		if nEnsured != 2 {
-			log.Info(fmt.Sprintf("Found %v/2 registries in healthy condition. Registries are unhealthy.", nEnsured), "message", message)
+			log.Info(0, fmt.Sprintf("Found %v/2 registries in healthy condition. Registries are unhealthy.", nEnsured), "message", message)
 			migration.Status.DeleteCondition(RegistriesHealthy)
 			migration.Status.SetCondition(migapi.Condition{
 				Type:     RegistriesUnhealthy,
@@ -382,7 +382,7 @@ func (r ReconcileMigMigration) validateRegistriesRunning(ctx context.Context, mi
 				Durable:  true,
 			})
 		} else if nEnsured == 2 {
-			log.Info("Found 2/2 registries in healthy condition.", "message", message)
+			log.Info(0, "Found 2/2 registries in healthy condition.", "message", message)
 			migration.Status.DeleteCondition(RegistriesUnhealthy)
 			setMigRegistryHealthyCondition(migration)
 		}
@@ -402,7 +402,7 @@ func setMigRegistryHealthyCondition(migration *migapi.MigMigration) {
 
 // Validate that migration registries on both source and dest clusters are healthy
 func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (int, string, error) {
-	log.Info("Checking registry health")
+	log.Info(0, "Checking registry health")
 
 	nEnsured := 0
 	unHealthyPod := corev1.Pod{}
@@ -443,7 +443,7 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 		for _, pod := range registryPods.Items {
 			// Logs abnormal events for Registry Pods if any are found
 			migevent.LogAbnormalEventsForResource(
-				client, log,
+				client, log.Real,
 				"Found abnormal event for Registry Pod",
 				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
 				pod.UID, "Pod")

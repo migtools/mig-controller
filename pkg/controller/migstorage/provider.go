@@ -104,5 +104,5 @@ func (p *ProviderSource) enqueue(storage v1alpha1.MigStorage) {
 		}
 	}
 
-	p.handler.Generic(event, p.queue)
+	p.handler.Generic(context.Background(), event, p.queue)
 }

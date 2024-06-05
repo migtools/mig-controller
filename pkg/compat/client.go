@@ -224,7 +224,7 @@ func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst
 
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object) error {
+func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object, opts ...k8sclient.GetOption) error {
 	start := time.Now()
 	defer Metrics.Get(c, in, float64(time.Since(start)/nanoToMilli))
 

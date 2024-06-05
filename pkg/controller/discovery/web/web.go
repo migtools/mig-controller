@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"k8s.io/client-go/rest"
 	"net/http"
 	"regexp"
 	"sort"
@@ -77,6 +78,7 @@ func (w *WebServer) buildOrigins() {
 		}
 		w.allowedOrigins = append(w.allowedOrigins, expr)
 		Log.Info(
+			0,
 			"Added allowed origin.",
 			"expr",
 			r)
@@ -246,7 +248,7 @@ func (w *WebServer) allow(origin string) bool {
 		}
 	}
 
-	Log.Info("Denied.", "origin", origin)
+	Log.Info(0, "Denied.", "origin", origin)
 
 	return false
 }
@@ -300,7 +302,7 @@ func (h *BaseHandler) setToken(ctx *gin.Context) int {
 		return http.StatusOK
 	}
 
-	Log.Info("`Authorization: Bearer <token>` header required but not found.")
+	Log.Info(0, "`Authorization: Bearer <token>` header required but not found.")
 
 	return http.StatusBadRequest
 }
@@ -343,7 +345,12 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 		Log.Trace(err)
 		return http.StatusInternalServerError
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, restCfg, codec)
+	c, err := rest.HTTPClientFor(restCfg)
+	if err != nil {
+		Log.Trace(err)
+		return http.StatusInternalServerError
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, restCfg, codec, c)
 	if err != nil {
 		Log.Trace(err)
 		return http.StatusInternalServerError
@@ -363,7 +370,7 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 			return http.StatusOK
 		}
 	default:
-		Log.Info("Unexpected SAR reply", "status", status)
+		Log.Info(0, "Unexpected SAR reply", "status", status)
 	}
 
 	return http.StatusForbidden

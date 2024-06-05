@@ -111,9 +111,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 	err = c.Watch(
-		&source.Kind{
-			Type: &migapi.MigCluster{},
-		},
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
 		&handler.EnqueueRequestForObject{},
 		&ClusterPredicate{})
 	if err != nil {

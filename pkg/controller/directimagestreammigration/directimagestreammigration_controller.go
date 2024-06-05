@@ -61,7 +61,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageStreamMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectImageStreamMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
@@ -70,8 +70,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageStreamMigration{})
 		}),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
@@ -118,7 +118,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	// Set MigMigration name key on logger
 	migration, err := imageStreamMigration.GetMigrationForDISM(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log.Real = log.Real.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx

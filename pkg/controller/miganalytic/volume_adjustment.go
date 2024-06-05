@@ -261,7 +261,7 @@ func (p *PersistentVolumeAdjuster) generateWarningForErroredPVs(erroredPVs []*DF
 	}
 	if len(pvNames) > 0 {
 		msg := fmt.Sprintf(warningString, strings.Join(pvNames, " "))
-		log.Info(msg)
+		log.Info(0, msg)
 		p.Owner.Status.Conditions.SetCondition(migapi.Condition{
 			Category: migapi.Warn,
 			Status:   True,
@@ -276,7 +276,7 @@ func (p *PersistentVolumeAdjuster) generateWarningForSparseFileFailure(erroredPV
 	warningString := "Failed identifying whether sparse files exist on PVs [%s]"
 	if len(erroredPVs) > 0 {
 		msg := fmt.Sprintf(warningString, strings.Join(erroredPVs, " "))
-		log.Info(msg)
+		log.Info(0, msg)
 		p.Owner.Status.Conditions.SetCondition(migapi.Condition{
 			Category: migapi.Warn,
 			Status:   True,
@@ -346,7 +346,7 @@ func (p *PersistentVolumeAdjuster) Run(pvNodeMap map[string][]MigAnalyticPersist
 				// the volume making apparent size bigger than actual usage
 				if duData.Usage > pvDfOutput.Usage {
 					statusFieldUpdate.SparseFilesFound = true
-					log.Info("Sparse files found in volume",
+					log.Info(0, "Sparse files found in volume",
 						"persistentVolume", fmt.Sprintf("%s/%s", pvDfOutput.Namespace, statusFieldUpdate.Name))
 				}
 			} else {

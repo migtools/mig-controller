@@ -79,8 +79,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to MigPlan
-	err = c.Watch(&source.Kind{
-		Type: &migapi.MigPlan{}},
+	err = c.Watch(
+		source.Kind(
+			mgr.GetCache(),
+			&migapi.MigPlan{},
+		),
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -92,8 +95,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigClusters referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(
+			mgr.GetCache(),
+			&migapi.MigCluster{},
+		),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&ClusterPredicate{
@@ -105,8 +111,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigStorage referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigStorage{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigStorage{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&StoragePredicate{
@@ -118,8 +124,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to Mighooks referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigHook{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigHook{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&HookPredicate{
@@ -131,8 +137,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigMigrations.
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigMigration{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigMigration{}),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return MigrationRequests(a, migapi.OpenshiftMigrationNamespace)
 		}),
 		&MigrationPredicate{

@@ -2048,7 +2048,7 @@ func (e ExtraOpts) ApplyTo(opts *rsynctransfer.TransferOptions) error {
 		if r.MatchString(opt) {
 			validatedOptions = append(validatedOptions, opt)
 		} else {
-			log.Info("Invalid Rsync extra option passed", "option", opt)
+			log.Info(0, "Invalid Rsync extra option passed", "option", opt)
 		}
 	}
 	opts.Extras = append(opts.Extras, validatedOptions...)

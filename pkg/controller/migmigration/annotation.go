@@ -143,7 +143,7 @@ func (t *Task) labelNamespaces(client k8sclient.Client, itemsUpdated int) (int, 
 			continue
 		}
 		namespace.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
-		log.Info("Adding migration annotations/labels to source cluster namespace.",
+		log.Info(0, "Adding migration annotations/labels to source cluster namespace.",
 			"namespace", namespace.Name)
 		err = client.Update(context.TODO(), &namespace)
 		if err != nil {
@@ -196,7 +196,7 @@ func (t *Task) annotatePods(client k8sclient.Client, itemsUpdated int) (int, Ser
 		pod.Annotations[migapi.ResticPvVerifyAnnotation] = strings.Join(verifyVolumes, ",")
 
 		// Update
-		log.Info("Adding annotations/labels to source cluster Pod.",
+		log.Info(0, "Adding annotations/labels to source cluster Pod.",
 			"pod", path.Join(pod.Namespace, pod.Name))
 		err = client.Update(context.TODO(), &pod)
 		if err != nil {
@@ -261,7 +261,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 		pvResource.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 
 		// Update
-		log.Info("Adding annotations/labels to source cluster PersistentVolume.",
+		log.Info(0, "Adding annotations/labels to source cluster PersistentVolume.",
 			"persistentVolume", pv.Name)
 		err = client.Update(context.TODO(), &pvResource)
 		if err != nil {
@@ -303,7 +303,7 @@ func (t *Task) annotatePVs(client k8sclient.Client, itemsUpdated int) (int, erro
 			}
 		}
 		// Update
-		log.Info("Adding annotations/labels to source cluster PersistentVolumeClaim.",
+		log.Info(0, "Adding annotations/labels to source cluster PersistentVolumeClaim.",
 			"persistentVolumeClaim", path.Join(pv.PVC.Namespace, pv.PVC.GetSourceName()))
 		err = client.Update(context.TODO(), &pvcResource)
 		if err != nil {
@@ -349,7 +349,7 @@ func (t *Task) labelServiceAccounts(client k8sclient.Client, serviceAccounts Ser
 			if err != nil {
 				return itemsUpdated, liberr.Wrap(err)
 			}
-			log.Info("Added annotations/labels to source cluster Service Account.",
+			log.Info(0, "Added annotations/labels to source cluster Service Account.",
 				"serviceAccount", path.Join(sa.Namespace, sa.Name))
 			itemsUpdated++
 			if itemsUpdated > AnnotationsPerReconcile {
@@ -381,7 +381,7 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 			}
 			is.Labels[migapi.IncludedInStageBackupLabel] = t.UID()
 
-			log.Info("Adding labels to source cluster ImageStream.",
+			log.Info(0, "Adding labels to source cluster ImageStream.",
 				"imageStream", path.Join(is.Namespace, is.Name))
 			err = client.Update(context.Background(), &is)
 			if err != nil {
@@ -472,7 +472,7 @@ func (t *Task) deletePodAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info("Velero Annotations/Labels removed on Pod.",
+			log.Info(0, "Velero Annotations/Labels removed on Pod.",
 				"pod", path.Join(pod.Namespace, pod.Name))
 		}
 	}
@@ -548,7 +548,7 @@ func (t *Task) deletePVCAnnotations(client k8sclient.Client, namespaceList []str
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			log.Info("Velero Annotations/Labels removed on PersistentVolumeClaim.",
+			log.Info(0, "Velero Annotations/Labels removed on PersistentVolumeClaim.",
 				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name))
 		}
 	}
@@ -575,7 +575,7 @@ func (t *Task) deletePVAnnotations(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info("Velero Annotations/Labels removed on PersistentVolume.",
+		log.Info(0, "Velero Annotations/Labels removed on PersistentVolume.",
 			"persistentVolume", path.Join(pv.Namespace, pv.Name))
 	}
 
@@ -599,7 +599,7 @@ func (t *Task) deleteServiceAccountLabels(client k8sclient.Client) error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info("Velero Annotations/Labels removed on ServiceAccount.",
+		log.Info(0, "Velero Annotations/Labels removed on ServiceAccount.",
 			"serviceAccount", path.Join(sa.Namespace, sa.Name))
 	}
 	return nil
@@ -622,7 +622,7 @@ func (t *Task) deleteImageStreamLabels(client k8sclient.Client, namespaceList []
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		log.Info("Velero Annotations/Labels removed on ImageStream.",
+		log.Info(0, "Velero Annotations/Labels removed on ImageStream.",
 			"imageStream", path.Join(is.Namespace, is.Name))
 	}
 	return nil

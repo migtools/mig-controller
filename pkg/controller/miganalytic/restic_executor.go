@@ -70,7 +70,7 @@ func (r *ResticDFCommandExecutor) ExecuteStorageCommands(podRef *corev1.Pod, per
 		RestCfg: restCfg,
 		Args:    duCmdString,
 	}
-	log.Info("Executing df command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
+	log.Info(0, "Executing df command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
 		"pod", path.Join(podRef.Namespace, podRef.Name),
 		"command", dfCmdString)
 	err := podDfCommand.Run()
@@ -81,7 +81,7 @@ func (r *ResticDFCommandExecutor) ExecuteStorageCommands(podRef *corev1.Pod, per
 	}
 	dfCmd.StdErr = podDfCommand.Err.String()
 	dfCmd.StdOut = podDfCommand.Out.String()
-	log.Info("Executing du command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
+	log.Info(0, "Executing du command inside source cluster Restic Pod to measure actual usage for extended PV analysis",
 		"pod", path.Join(podRef.Namespace, podRef.Name),
 		"command", duCmdString)
 	err = podDuCommand.Run()
@@ -197,7 +197,7 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 			pvcDUInfo.Namespace = pvc.Namespace
 			gatheredDfData = append(gatheredDfData, pvcDFInfo)
 			gatheredDuData = append(gatheredDuData, pvcDUInfo)
-			log.Info("Got `df` command output from Restic Pod",
+			log.Info(0, "Got `df` command output from Restic Pod",
 				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
 				"resticPodUID", pvc.PodUID,
 				"pvcStorageClass", pvc.StorageClass,
@@ -205,7 +205,7 @@ func (r *ResticDFCommandExecutor) Execute(pvcNodeMap map[string][]MigAnalyticPer
 				"pvcProvisionedCapacity", pvc.ProvisionedCapacity,
 				"usagePercentage", pvcDFInfo.UsagePercentage,
 				"totalSize", pvcDFInfo.TotalSize)
-			log.Info("Got `du` command output from Restic Pod",
+			log.Info(0, "Got `du` command output from Restic Pod",
 				"persistentVolumeClaim", path.Join(pvc.Namespace, pvc.Name),
 				"usage", pvcDUInfo.Usage)
 		}

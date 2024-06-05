@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"time"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -117,6 +118,7 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	startDuration := time.Since(mark)
 
 	Log.Info(
+		0,
 		"DataSource Started.",
 		"ns",
 		r.Cluster.Namespace,
@@ -145,6 +147,7 @@ func (r *DataSource) Stop(purge bool) {
 	}
 
 	Log.Info(
+		0,
 		"DataSource Stopped.",
 		"ns",
 		r.Cluster.Namespace,
@@ -167,7 +170,7 @@ func (r *DataSource) HasDiscovered(m model.Model) {
 func (r *DataSource) Create(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			Log.Info(0, "channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Create(m)
@@ -179,7 +182,7 @@ func (r *DataSource) Create(m model.Model) {
 func (r *DataSource) Update(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			Log.Info(0, "channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Update(m)
@@ -191,7 +194,7 @@ func (r *DataSource) Update(m model.Model) {
 func (r *DataSource) Delete(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			Log.Info(0, "channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Delete(m)
@@ -224,7 +227,11 @@ func (r *DataSource) buildManager(name string) error {
 	if name == "" {
 		name = "local"
 	}
-	r.manager, err = manager.New(r.RestCfg, manager.Options{MetricsBindAddress: "0"})
+	r.manager, err = manager.New(r.RestCfg, manager.Options{
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+	})
 	if err != nil {
 		Log.Trace(err)
 		return err

@@ -15,6 +15,7 @@ package migcluster
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"strconv"
 
 	liberr "github.com/konveyor/controller/pkg/error"
@@ -31,14 +32,21 @@ import (
 func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error {
 	remoteWatchMap := remote.GetWatchMap()
 
-	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{Scheme: config.Scheme, MetricsBindAddress: "0"})
+	mgr, err := manager.New(
+		config.RemoteRestConfig,
+		manager.Options{
+			Scheme: config.Scheme,
+			Metrics: server.Options{
+				BindAddress: "0.0.0.0",
+			},
+		})
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
 	ctx := context.TODO()
 	ctx, stopFunc := context.WithCancel(ctx)
-	log.Info("Remote cache: Starting manager for MigCluster",
+	log.Info(0, "Remote cache: Starting manager for MigCluster",
 		"migCluster", config.ParentNsName)
 	go mgr.Start(ctx)
 
@@ -100,7 +108,7 @@ func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error
 		return err
 	}
 
-	log.Info("Remote cache: Manager started for MigCluster",
+	log.Info(0, "Remote cache: Manager started for MigCluster",
 		"migCluster", config.ParentNsName)
 
 	// Create remoteWatchCluster tracking obj and attach reference to parent object so we don't create extra

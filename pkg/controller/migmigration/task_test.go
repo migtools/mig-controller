@@ -22,7 +22,7 @@ func TestTask_getStagePVs(t1 *testing.T) {
 		{
 			name: "one move action pvc",
 			fields: fields{
-				Log: log.WithName("test_getStagePVs"),
+				Log: log.Real.WithName("test_getStagePVs"),
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
@@ -54,7 +54,7 @@ func TestTask_getStagePVs(t1 *testing.T) {
 		{
 			name: "one move action pvc, one skip action pvc with restic copy",
 			fields: fields{
-				Log: log.WithName("test_getStagePVs"),
+				Log: log.Real.WithName("test_getStagePVs"),
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
@@ -100,7 +100,7 @@ func TestTask_getStagePVs(t1 *testing.T) {
 		{
 			name: "one move action pvc, one copy action pvc with DVM",
 			fields: fields{
-				Log: log.WithName("test_getStagePVs"),
+				Log: log.Real.WithName("test_getStagePVs"),
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
@@ -139,7 +139,7 @@ func TestTask_getStagePVs(t1 *testing.T) {
 		{
 			name: "one move action pvc, one skip action",
 			fields: fields{
-				Log: log.WithName("test_getStagePVs"),
+				Log: log.Real.WithName("test_getStagePVs"),
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{

@@ -86,7 +86,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectVolumeMigrationProgress
-	err = c.Watch(&source.Kind{Type: &migapi.DirectVolumeMigrationProgress{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectVolumeMigrationProgress{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
@@ -127,7 +127,7 @@ func (r *ReconcileDirectVolumeMigrationProgress) Reconcile(ctx context.Context, 
 	// Set MigMigration name key on logger
 	migration, err := pvProgress.GetMigrationforDVMP(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log.Real = log.Real.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing
@@ -264,7 +264,7 @@ func (r *RsyncPodProgressTask) addDVMPDoneLabel(pod *kapi.Pod) error {
 	err := r.SrcClient.Get(context.TODO(),
 		types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, podRef)
 	if err != nil {
-		log.Info("Failed to find Pod before adding DVMP label",
+		log.Info(0, "Failed to find Pod before adding DVMP label",
 			"pod", path.Join(pod.Namespace, pod.Name))
 		return err
 	}
@@ -272,7 +272,7 @@ func (r *RsyncPodProgressTask) addDVMPDoneLabel(pod *kapi.Pod) error {
 	podRef.Labels[migapi.DVMPDoneLabelKey] = migapi.True
 	err = r.SrcClient.Update(context.TODO(), podRef)
 	if err != nil {
-		log.Info("Failed to add DVMP label on the Pod",
+		log.Info(0, "Failed to add DVMP label on the Pod",
 			"pod", path.Join(pod.Namespace, pod.Name))
 		return err
 	}
@@ -357,7 +357,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p
 		}
 	}
 	if containerStatus == nil {
-		log.Info("Failed to find container in Rsync Pod on source cluster",
+		log.Info(0, "Failed to find container in Rsync Pod on source cluster",
 			"container", RsyncContainerName, "pod", path.Join(podRef.Namespace, podRef.Name))
 		return &rsyncPodStatus
 	}
@@ -367,7 +367,7 @@ func (r *RsyncPodProgressTask) getRsyncClientContainerStatus(podRef *kapi.Pod, p
 		numberOfLogLines := int64(5)
 		logMessage, err := p.getPodLogs(podRef, RsyncContainerName, &numberOfLogLines, false)
 		if err != nil {
-			log.Info("Failed to get logs from Rsync Pod on source cluster",
+			log.Info(0, "Failed to get logs from Rsync Pod on source cluster",
 				"pod", path.Join(podRef.Namespace, podRef.Name))
 			return &rsyncPodStatus
 		}

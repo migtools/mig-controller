@@ -20,6 +20,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/konveyor/mig-controller/pkg/apis"
 	"github.com/konveyor/mig-controller/pkg/compat/conversion"
@@ -58,7 +59,10 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	mgr, err := manager.New(cfg, manager.Options{
+		Metrics: server.Options{
+			BindAddress: "0.0.0.0",
+		}})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
 		os.Exit(1)

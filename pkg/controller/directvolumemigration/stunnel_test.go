@@ -50,7 +50,7 @@ func TestTask_generateStunnelProxyConfig(t *testing.T) {
 				ProxyHost: "just-host",
 			},
 			fields: fields{
-				Log: log,
+				Log: log.Real,
 			},
 			wantErr: false,
 		},
@@ -61,7 +61,7 @@ func TestTask_generateStunnelProxyConfig(t *testing.T) {
 				ProxyHost: "valid",
 			},
 			fields: fields{
-				Log: log,
+				Log: log.Real,
 			},
 			wantErr: false,
 		},
@@ -73,7 +73,7 @@ func TestTask_generateStunnelProxyConfig(t *testing.T) {
 				ProxyPassword: "pass",
 			},
 			fields: fields{
-				Log: log,
+				Log: log.Real,
 			},
 			proxyString: validProxySecret,
 			wantErr:     false,
@@ -86,7 +86,7 @@ func TestTask_generateStunnelProxyConfig(t *testing.T) {
 				ProxyPassword: "!:pass",
 			},
 			fields: fields{
-				Log: log,
+				Log: log.Real,
 			},
 			proxyString: basicAuthWithSpecialChars,
 			wantErr:     false,
@@ -95,7 +95,7 @@ func TestTask_generateStunnelProxyConfig(t *testing.T) {
 			name: "when given a proxy with invalid host/port, should return err",
 			want: stunnelProxyConfig{},
 			fields: fields{
-				Log: log,
+				Log: log.Real,
 			},
 			proxyString: invalidProxy,
 			wantErr:     true,
