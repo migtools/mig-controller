@@ -202,7 +202,7 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 	nsMapping := t.PlanResources.MigPlan.GetNamespaceMapping()
 	pvcList := []migapi.PVCToMigrate{}
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
-		if pv.Selection.Action != migapi.PvCopyAction || pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod {
+		if pv.Selection.Action != migapi.PvCopyAction || (pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod && pv.Selection.CopyMethod != migapi.PvBlockCopyMethod) {
 			continue
 		}
 		accessModes := pv.PVC.AccessModes

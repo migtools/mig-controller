@@ -369,6 +369,10 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 			continue
 		}
 
+		volumeMode := core.PersistentVolumeFilesystem
+		if pvc.Spec.VolumeMode != nil {
+			volumeMode = *pvc.Spec.VolumeMode
+		}
 		claims = append(
 			claims, migapi.PVC{
 				Namespace: pvc.Namespace,
@@ -377,6 +381,7 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 					Namespace: pvc.Namespace,
 				}, podList, plan),
 				AccessModes:  pvc.Spec.AccessModes,
+				VolumeMode:   volumeMode,
 				HasReference: pvcInPodVolumes(pvc, podList),
 			})
 	}
@@ -413,6 +418,7 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim m
 func (r *ReconcileMigPlan) getSupportedCopyMethods(pv core.PersistentVolume) []string {
 	return []string{
 		migapi.PvFilesystemCopyMethod,
+		migapi.PvBlockCopyMethod,
 		migapi.PvSnapshotCopyMethod,
 	}
 }
@@ -449,15 +455,19 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 			}
 		}
 	}
+	copyMethod := migapi.PvFilesystemCopyMethod
+	if pv.Spec.VolumeMode != nil && *pv.Spec.VolumeMode == core.PersistentVolumeBlock {
+		copyMethod = migapi.PvBlockCopyMethod
+	}
 	log.Info("PV Discovery: Setting default selections for discovered PV.",
 		"persistentVolume", pv.Name,
 		"pvSelectedAction", selectedAction,
 		"pvSelectedStorageClass", selectedStorageClass,
-		"pvCopyMethod", migapi.PvFilesystemCopyMethod)
+		"pvCopyMethod", copyMethod)
 	return migapi.Selection{
 		Action:       selectedAction,
 		StorageClass: selectedStorageClass,
-		CopyMethod:   migapi.PvFilesystemCopyMethod,
+		CopyMethod:   copyMethod,
 	}, nil
 }
 

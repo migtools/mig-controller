@@ -375,6 +375,10 @@ spec:
                           type: string
                         namespace:
                           type: string
+                        volumeMode:
+                          description: PersistentVolumeMode describes how a volume
+                            is intended to be consumed, either Block or Filesystem.
+                          type: string
                       type: object
                     selection:
                       description: Selection Action - The PV migration action (move|copy|skip)
@@ -525,16 +529,25 @@ spec:
                     is the default AccessModes - access modes supported by the dynamic
                     provisioner
                   properties:
-                    accessModes:
-                      items:
-                        type: string
-                      type: array
                     default:
                       type: boolean
                     name:
                       type: string
                     provisioner:
                       type: string
+                    volumeAccessModes:
+                      items:
+                        properties:
+                          accessModes:
+                            items:
+                              type: string
+                            type: array
+                          volumeMode:
+                            description: PersistentVolumeMode describes how a volume
+                              is intended to be consumed, either Block or Filesystem.
+                            type: string
+                        type: object
+                      type: array
                   type: object
                 type: array
               excludedResources:
@@ -607,16 +620,25 @@ spec:
                     is the default AccessModes - access modes supported by the dynamic
                     provisioner
                   properties:
-                    accessModes:
-                      items:
-                        type: string
-                      type: array
                     default:
                       type: boolean
                     name:
                       type: string
                     provisioner:
                       type: string
+                    volumeAccessModes:
+                      items:
+                        properties:
+                          accessModes:
+                            items:
+                              type: string
+                            type: array
+                          volumeMode:
+                            description: PersistentVolumeMode describes how a volume
+                              is intended to be consumed, either Block or Filesystem.
+                            type: string
+                        type: object
+                      type: array
                   type: object
                 type: array
             type: object

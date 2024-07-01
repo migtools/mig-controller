@@ -1093,7 +1093,7 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 	invalidAction := make([]string, 0)
 	unsupported := make([]string, 0)
 
-	storageClasses := map[string][]kapi.PersistentVolumeAccessMode{}
+	storageClasses := map[string][]migapi.VolumeModeAccessMode{}
 	missingStorageClass := make([]string, 0)
 	invalidStorageClass := make([]string, 0)
 	invalidAccessMode := make([]string, 0)
@@ -1107,7 +1107,7 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 		return nil
 	}
 	for _, storageClass := range plan.Status.DestStorageClasses {
-		storageClasses[storageClass.Name] = storageClass.AccessModes
+		storageClasses[storageClass.Name] = storageClass.VolumeAccessModes
 	}
 	skippedVolumes := 0
 	for _, pv := range plan.Spec.PersistentVolumes.List {
@@ -1140,13 +1140,13 @@ func (r ReconcileMigPlan) validatePvSelections(ctx context.Context, plan *migapi
 				if pv.Selection.AccessMode != "" {
 					if !containsAccessMode(validAccessModes, pv.Selection.AccessMode) {
 						invalidAccessMode = append(invalidAccessMode, pv.Name)
-					} else if !containsAccessMode(storageClassAccessModes, pv.Selection.AccessMode) {
+					} else if !containsAccessMode(migapi.GetAccessModesForVolumeMode(pv.PVC.VolumeMode, storageClassAccessModes), pv.Selection.AccessMode) {
 						unavailableAccessMode = append(unavailableAccessMode, pv.Name)
 					}
 				} else {
 					foundMode := false
 					for _, accessMode := range pv.PVC.AccessModes {
-						if containsAccessMode(storageClassAccessModes, accessMode) {
+						if containsAccessMode(migapi.GetAccessModesForVolumeMode(pv.PVC.VolumeMode, storageClassAccessModes), accessMode) {
 							foundMode = true
 						}
 					}

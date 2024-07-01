@@ -48,20 +48,23 @@ const (
 
 // labels
 const (
-	DirectVolumeMigration                   = "directvolumemigration"
-	DirectVolumeMigrationRsyncTransfer      = "directvolumemigration-rsync-transfer"
-	DirectVolumeMigrationRsyncConfig        = "directvolumemigration-rsync-config"
-	DirectVolumeMigrationRsyncCreds         = "directvolumemigration-rsync-creds"
-	DirectVolumeMigrationRsyncTransferSvc   = "directvolumemigration-rsync-transfer-svc"
-	DirectVolumeMigrationRsyncTransferRoute = "dvm"
-	DirectVolumeMigrationStunnelConfig      = "crane2-stunnel-config"
-	DirectVolumeMigrationStunnelCerts       = "crane2-stunnel-secret"
-	DirectVolumeMigrationRsyncPass          = "directvolumemigration-rsync-pass"
-	DirectVolumeMigrationStunnelTransfer    = "directvolumemigration-stunnel-transfer"
-	DirectVolumeMigrationRsync              = "rsync"
-	DirectVolumeMigrationRsyncClient        = "rsync-client"
-	DirectVolumeMigrationStunnel            = "stunnel"
-	MigratedByDirectVolumeMigration         = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
+	DirectVolumeMigration                        = "directvolumemigration"
+	DirectVolumeMigrationRsyncTransfer           = "directvolumemigration-rsync-transfer"
+	DirectVolumeMigrationRsyncTransferBlock      = "directvolumemigration-rsync-transfer-block"
+	DirectVolumeMigrationRsyncConfig             = "directvolumemigration-rsync-config"
+	DirectVolumeMigrationRsyncCreds              = "directvolumemigration-rsync-creds"
+	DirectVolumeMigrationRsyncTransferSvc        = "directvolumemigration-rsync-transfer-svc"
+	DirectVolumeMigrationRsyncTransferSvcBlock   = "directvolumemigration-rsync-transfer-svc-block"
+	DirectVolumeMigrationRsyncTransferRoute      = "dvm"
+	DirectVolumeMigrationRsyncTransferRouteBlock = "dvm-block"
+	DirectVolumeMigrationStunnelConfig           = "crane2-stunnel-config"
+	DirectVolumeMigrationStunnelCerts            = "crane2-stunnel-secret"
+	DirectVolumeMigrationRsyncPass               = "directvolumemigration-rsync-pass"
+	DirectVolumeMigrationStunnelTransfer         = "directvolumemigration-stunnel-transfer"
+	DirectVolumeMigrationRsync                   = "rsync"
+	DirectVolumeMigrationRsyncClient             = "rsync-client"
+	DirectVolumeMigrationStunnel                 = "stunnel"
+	MigratedByDirectVolumeMigration              = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
 )
 
 // Flags
@@ -269,7 +272,7 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case CreateRsyncRoute:
-		err := t.ensureRsyncEndpoint()
+		err := t.ensureRsyncEndpoints()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -532,6 +535,9 @@ func (t *Task) getSourceClient() (compat.Client, error) {
 func (t *Task) getDestinationClient() (compat.Client, error) {
 	if t.destinationClient != nil {
 		return t.destinationClient, nil
+	}
+	if t.Owner == nil {
+		return nil, fmt.Errorf("owner is nil")
 	}
 	cluster, err := t.Owner.GetDestinationCluster(t.Client)
 	if err != nil {
