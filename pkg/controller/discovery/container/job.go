@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -22,13 +21,11 @@ type Job struct {
 
 func (r *Job) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &batchv1.Job{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &batchv1.Job{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -42,11 +39,11 @@ func (r *Job) Reconcile() error {
 	}
 	err := sr.Reconcile(r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.hasReconciled = true
-	Log.Info(
+	log.Info(
 		"Job (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -63,7 +60,7 @@ func (r *Job) GetDiscovered() ([]model.Model, error) {
 	onCluster := batchv1.JobList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
@@ -89,7 +86,7 @@ func (r *Job) GetStored() ([]model.Model, error) {
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, pvc := range list {
@@ -104,7 +101,6 @@ func (r *Job) GetStored() ([]model.Model, error) {
 //
 
 func (r *Job) Create(e event.CreateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false
@@ -121,7 +117,6 @@ func (r *Job) Create(e event.CreateEvent) bool {
 }
 
 func (r *Job) Update(e event.UpdateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*batchv1.Job)
 	if !cast {
 		return false
@@ -138,7 +133,6 @@ func (r *Job) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Job) Delete(e event.DeleteEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*batchv1.Job)
 	if !cast {
 		return false

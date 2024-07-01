@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/konveyor/controller/pkg/logging"
+	testlog "github.com/go-logr/logr/testr"
 	transferservice "github.com/konveyor/crane-lib/state_transfer/endpoint/service"
 	transfer "github.com/konveyor/crane-lib/state_transfer/transfer"
 	"github.com/konveyor/crane-lib/state_transfer/transport"
@@ -576,7 +576,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given zero rsync pods in the source namespace, should return nil",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: testlog.New(t).WithName("rsync-operation-test"),
 			},
 			args: args{
 				client:    getFakeCompatClient(),
@@ -598,7 +598,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for given pvc, should return the most recent pod",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: testlog.New(t).WithName("rsync-operation-test"),
 			},
 			args: args{
 				client: getFakeCompatClient(
@@ -614,7 +614,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for given pvc with some of them with non-integer attempt labels, should return the most recent pod with the correct label",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: testlog.New(t).WithName("rsync-operation-test"),
 			},
 			args: args{
 				client: getFakeCompatClient(
@@ -630,7 +630,7 @@ func TestTask_getLatestPodForOperation(t *testing.T) {
 		{
 			name: "given more than one pods present for different PVCs, should return pod corresponding to the most recent attempt for the correct PVC",
 			fields: fields{
-				Log: logging.WithName("rsync-operation-test"),
+				Log: testlog.New(t).WithName("rsync-operation-test"),
 			},
 			args: args{
 				client: getFakeCompatClient(

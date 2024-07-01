@@ -15,14 +15,26 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
+	virtv1 "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+)
+
+const (
+	vmSubresourceURLFmt = "/apis/subresources.kubevirt.io/%s/namespaces/%s/virtualmachines/%s/%s"
 )
 
 // Quiesce applications on source cluster
 func (t *Task) quiesceApplications() error {
 	client, err := t.getSourceClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	restConfig, err := t.getSourceRestConfig()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -54,6 +66,14 @@ func (t *Task) quiesceApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	restClient, err := t.createRestClient(restConfig)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = t.quiesceVirtualMachines(client, restClient)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 
 	return nil
 }
@@ -63,8 +83,12 @@ func (t *Task) unQuiesceSrcApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	restConfig, err := t.getSourceRestConfig()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	t.Log.Info("Unquiescing applications on source cluster.")
-	err = t.unQuiesceApplications(srcClient, t.sourceNamespaces())
+	err = t.unQuiesceApplications(srcClient, restConfig, t.sourceNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -76,8 +100,12 @@ func (t *Task) unQuiesceDestApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
+	restConfig, err := t.getDestinationRestConfig()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	t.Log.Info("Unquiescing applications on destination cluster.")
-	err = t.unQuiesceApplications(destClient, t.destinationNamespaces())
+	err = t.unQuiesceApplications(destClient, restConfig, t.destinationNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -85,7 +113,7 @@ func (t *Task) unQuiesceDestApplications() error {
 }
 
 // Unquiesce applications using client and namespace list given
-func (t *Task) unQuiesceApplications(client compat.Client, namespaces []string) error {
+func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
 	err := t.unQuiesceCronJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
@@ -111,6 +139,14 @@ func (t *Task) unQuiesceApplications(client compat.Client, namespaces []string) 
 		return liberr.Wrap(err)
 	}
 	err = t.unQuiesceJobs(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	restClient, err := t.createRestClient(restConfig)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	err = t.unQuiesceVirtualMachines(client, restClient, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -593,11 +629,11 @@ func (t *Task) quiesceCronJobs(client compat.Client) error {
 				if r.Annotations == nil {
 					r.Annotations = make(map[string]string)
 				}
-				if r.Spec.Suspend == pointer.BoolPtr(true) {
+				if r.Spec.Suspend == ptr.To[bool](true) {
 					continue
 				}
 				r.Annotations[migapi.SuspendAnnotation] = "true"
-				r.Spec.Suspend = pointer.BoolPtr(true)
+				r.Spec.Suspend = ptr.To[bool](true)
 				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 					"Setting [Spec.Suspend=true]. "+
 					"Setting Annotation [%v]: true",
@@ -620,11 +656,11 @@ func (t *Task) quiesceCronJobs(client compat.Client) error {
 				if r.Annotations == nil {
 					r.Annotations = make(map[string]string)
 				}
-				if r.Spec.Suspend == pointer.BoolPtr(true) {
+				if r.Spec.Suspend == ptr.To[bool](true) {
 					continue
 				}
 				r.Annotations[migapi.SuspendAnnotation] = "true"
-				r.Spec.Suspend = pointer.BoolPtr(true)
+				r.Spec.Suspend = ptr.To[bool](true)
 				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 					"Setting [Spec.Suspend=true]. "+
 					"Setting Annotation [%v]: true",
@@ -661,7 +697,7 @@ func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) erro
 					continue
 				}
 				delete(r.Annotations, migapi.SuspendAnnotation)
-				r.Spec.Suspend = pointer.BoolPtr(false)
+				r.Spec.Suspend = ptr.To[bool](false)
 				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
 					"cronJob", path.Join(r.Namespace, r.Name))
 				err = client.Update(context.TODO(), &r)
@@ -686,7 +722,7 @@ func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) erro
 					continue
 				}
 				delete(r.Annotations, migapi.SuspendAnnotation)
-				r.Spec.Suspend = pointer.BoolPtr(false)
+				r.Spec.Suspend = ptr.To[bool](false)
 				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
 					"cronJob", path.Join(r.Namespace, r.Name))
 				err = client.Update(context.TODO(), &r)
@@ -703,7 +739,6 @@ func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) erro
 
 // Scales down all Jobs
 func (t *Task) quiesceJobs(client k8sclient.Client) error {
-	zero := int32(0)
 	for _, ns := range t.sourceNamespaces() {
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
@@ -718,11 +753,11 @@ func (t *Task) quiesceJobs(client k8sclient.Client) error {
 			if job.Annotations == nil {
 				job.Annotations = make(map[string]string)
 			}
-			if job.Spec.Parallelism == &zero {
+			if job.Spec.Parallelism == ptr.To[int32](0) {
 				continue
 			}
 			job.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
-			job.Spec.Parallelism = &zero
+			job.Spec.Parallelism = ptr.To[int32](0)
 			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
 				"Setting [Spec.Parallelism=0]. "+
 				"Annotating with [%v: %v]",
@@ -783,6 +818,152 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 	return nil
 }
 
+func (t *Task) createRestClient(restConfig *rest.Config) (rest.Interface, error) {
+	httpClient, err := rest.HTTPClientFor(restConfig)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	restClient, err := apiutil.RESTClientForGVK(
+		virtv1.VirtualMachineGroupVersionKind,
+		false,
+		restConfig,
+		serializer.NewCodecFactory(t.Scheme),
+		httpClient)
+	if err != nil {
+		return nil, liberr.Wrap(err)
+	}
+	return restClient, nil
+}
+
+// Scales down all Virtual Machines
+func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface) error {
+	for _, ns := range t.sourceNamespaces() {
+		list := virtv1.VirtualMachineList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			&list,
+			options)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		for _, vm := range list.Items {
+			if !isVMActive(&vm, client) {
+				continue
+			}
+			if vm.Annotations == nil {
+				vm.Annotations = make(map[string]string)
+			}
+			if vm.Spec.RunStrategy != nil {
+				vm.Annotations[migapi.RunStrategyAnnotation] = string(*vm.Spec.RunStrategy)
+			}
+			vm.Annotations[migapi.StartVMAnnotation] = "true"
+			err = client.Update(context.TODO(), &vm)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			t.Log.Info("Stopping Virtual Machine",
+				"vm", path.Join(vm.Namespace, vm.Name))
+
+			stopOptions := &virtv1.StopOptions{
+				// 10 minutes grace period
+				GracePeriod: ptr.To[int64](600),
+			}
+			optsJson, err := json.Marshal(stopOptions)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+			uri := fmt.Sprintf(vmSubresourceURLFmt, virtv1.ApiStorageVersion, vm.Namespace, vm.Name, "stop")
+			err = restClient.Put().AbsPath(uri).Body(optsJson).Do(context.Background()).Error()
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Start all Virtual Machines back up
+func (t *Task) unQuiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string) error {
+	for _, ns := range namespaces {
+		list := virtv1.VirtualMachineList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			&list,
+			options)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		for _, vm := range list.Items {
+			if isVMActive(&vm, client) || !shouldStartVM(&vm) {
+				continue
+			}
+			if err := t.startVM(&vm, client, restClient); err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+	return nil
+}
+
+func isVMActive(vm *virtv1.VirtualMachine, client k8sclient.Client) bool {
+	// A VM is defined active if there is a pod associated with the VM.
+	podList := v1.PodList{}
+	client.List(context.TODO(), &podList, k8sclient.InNamespace(vm.Namespace))
+	for _, pod := range podList.Items {
+		for _, owner := range pod.OwnerReferences {
+			if owner.Kind == "VirtualMachineInstance" && owner.Name == vm.Name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func shouldStartVM(vm *virtv1.VirtualMachine) bool {
+	if vm.Annotations == nil {
+		return false
+	}
+	value, exist := vm.Annotations[migapi.StartVMAnnotation]
+	return exist && value == "true"
+}
+
+func (t *Task) startVM(vm *virtv1.VirtualMachine, client k8sclient.Client, restClient rest.Interface) error {
+	restoreRunStrategy := false
+	strategy := ""
+	if vm.Annotations != nil {
+		runStrategy, exist := vm.Annotations[migapi.RunStrategyAnnotation]
+		if exist {
+			restoreRunStrategy = true
+			strategy = runStrategy
+		}
+	}
+	delete(vm.Annotations, migapi.RunStrategyAnnotation)
+	delete(vm.Annotations, migapi.StartVMAnnotation)
+	t.Log.Info("Starting Virtual Machine", "vm", path.Join(vm.Namespace, vm.Name))
+
+	if restoreRunStrategy {
+		vm.Spec.RunStrategy = (*virtv1.VirtualMachineRunStrategy)(&strategy)
+	}
+
+	if err := client.Update(context.Background(), vm); err != nil {
+		return liberr.Wrap(err)
+	}
+	startOptions := &virtv1.StartOptions{}
+	optsJson, err := json.Marshal(startOptions)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	uri := fmt.Sprintf(vmSubresourceURLFmt, virtv1.ApiStorageVersion, vm.Namespace, vm.Name, "start")
+	err = restClient.Put().AbsPath(uri).Body(optsJson).Do(context.Background()).Error()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return nil
+}
+
 // Ensure scaled down pods have terminated.
 // Returns: `true` when all pods terminated.
 func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
@@ -792,6 +973,7 @@ func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
 		"ReplicaSet":            true,
 		"DaemonSet":             true,
 		"Job":                   true,
+		"VirtualMachine":        true,
 	}
 	skippedPhases := map[v1.PodPhase]bool{
 		v1.PodSucceeded: true,

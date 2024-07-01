@@ -15,6 +15,8 @@ import (
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -325,6 +327,7 @@ func (r Itinerary) progressReport(phaseName string) (string, int, int) {
 // Errors - Migration errors.
 // Failed - Task phase has failed.
 type Task struct {
+	Scheme          *runtime.Scheme
 	Log             logr.Logger
 	Client          k8sclient.Client
 	Owner           *migapi.MigMigration
@@ -1299,6 +1302,7 @@ func (t *Task) next() error {
 			return liberr.Wrap(err)
 		}
 		if !flag {
+			log.V(3).Info("Skipped phase due to any flag evaluation.")
 			continue
 		}
 		t.Phase = next.Name
@@ -1601,9 +1605,19 @@ func (t *Task) getSourceClient() (compat.Client, error) {
 	return t.PlanResources.SrcMigCluster.GetClient(t.Client)
 }
 
+// Get a client for the source cluster.
+func (t *Task) getSourceRestConfig() (*rest.Config, error) {
+	return t.PlanResources.SrcMigCluster.BuildRestConfig(t.Client)
+}
+
 // Get a client for the destination cluster.
 func (t *Task) getDestinationClient() (compat.Client, error) {
 	return t.PlanResources.DestMigCluster.GetClient(t.Client)
+}
+
+// Get a client for the source cluster.
+func (t *Task) getDestinationRestConfig() (*rest.Config, error) {
+	return t.PlanResources.DestMigCluster.BuildRestConfig(t.Client)
 }
 
 // Get the persistent volumes included in the plan which are included in the
@@ -1674,14 +1688,14 @@ func (t *Task) hasDirectVolumes() bool {
 func (t *Task) hasImageStreams() (bool, error) {
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return false, err
 	}
 	for _, ns := range t.sourceNamespaces() {
 		imageStreamList := imagev1.ImageStreamList{}
 		err := client.List(context.Background(), &imageStreamList, k8sclient.InNamespace(ns))
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return false, err
 		}
 		if len(imageStreamList.Items) > 0 {

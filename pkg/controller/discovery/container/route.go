@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/controller/pkg/logging"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "github.com/openshift/api/route/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -21,13 +20,11 @@ type Route struct {
 
 func (r *Route) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Route{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.Route{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -39,11 +36,11 @@ func (r *Route) Reconcile() error {
 	sr := SimpleReconciler{Db: r.ds.Container.Db}
 	err := sr.Reconcile(r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.hasReconciled = true
-	Log.Info(
+	log.Info(
 		"Route (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -60,7 +57,7 @@ func (r *Route) GetDiscovered() ([]model.Model, error) {
 	onCluster := v1.RouteList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
@@ -86,7 +83,7 @@ func (r *Route) GetStored() ([]model.Model, error) {
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, route := range list {
@@ -101,7 +98,6 @@ func (r *Route) GetStored() ([]model.Model, error) {
 //
 
 func (r *Route) Create(e event.CreateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false
@@ -118,7 +114,6 @@ func (r *Route) Create(e event.CreateEvent) bool {
 }
 
 func (r *Route) Update(e event.UpdateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*v1.Route)
 	if !cast {
 		return false
@@ -135,7 +130,6 @@ func (r *Route) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Route) Delete(e event.DeleteEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Route)
 	if !cast {
 		return false

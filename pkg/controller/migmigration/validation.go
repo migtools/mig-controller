@@ -436,7 +436,7 @@ func ensureRegistryHealth(c k8sclient.Client, migration *migapi.MigMigration) (i
 
 		registryPods, err := getRegistryPods(plan, client)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return nEnsured, "", liberr.Wrap(err)
 		}
 
@@ -510,7 +510,7 @@ func getRegistryPods(plan *migapi.MigPlan, registryClient compat.Client) (corev1
 	)
 
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return corev1.PodList{}, err
 	}
 	return registryPodList, nil

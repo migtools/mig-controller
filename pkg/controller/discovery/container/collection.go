@@ -2,6 +2,7 @@ package container
 
 import (
 	"database/sql"
+
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
@@ -98,7 +99,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 	dispositions := map[string]*Disposition{}
 	stored, err := collection.GetStored()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 	for _, m := range stored {
@@ -108,7 +109,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 	}
 	discovered, err := collection.GetDiscovered()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 	for _, m := range discovered {
@@ -126,7 +127,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 	defer model.Mutex.RUnlock()
 	tx, err := r.Db.Begin()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 	defer func() {
@@ -139,7 +140,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 		if dpn.stored != nil && dpn.discovered == nil {
 			err = dpn.stored.Delete(tx)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 		}
@@ -149,7 +150,7 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 		if dpn.discovered != nil && dpn.stored == nil {
 			err = dpn.discovered.Insert(tx)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 		}
@@ -164,13 +165,13 @@ func (r *SimpleReconciler) Reconcile(collection Collection) (err error) {
 		}
 		err = dpn.discovered.Update(tx)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	}
 	err = tx.Commit()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 

@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/mattn/go-sqlite3"
 	"reflect"
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -188,20 +189,20 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 	tpl := template.New("")
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, f := range fields {
 		err := f.Validate()
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 	}
 	// Table
 	tpl, err = tpl.Parse(TableDDL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	constraints := t.Constraints(fields)
@@ -214,7 +215,7 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 			Fields:      fields,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	list = append(list, bfr.String())
@@ -223,7 +224,7 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 	if len(keyFields) > 0 {
 		tpl, err = tpl.Parse(IndexDDL)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		bfr = &bytes.Buffer{}
@@ -235,7 +236,7 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 				Fields: keyFields,
 			})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		list = append(list, bfr.String())
@@ -255,7 +256,7 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 	for group, idxFields := range indexes {
 		tpl, err = tpl.Parse(IndexDDL)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		bfr = &bytes.Buffer{}
@@ -267,7 +268,7 @@ func (t Table) DDL(model interface{}) ([]string, error) {
 				Fields: idxFields,
 			})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		list = append(list, bfr.String())
@@ -283,12 +284,12 @@ func (t Table) Insert(model interface{}) error {
 	defer Mutex.RUnlock()
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	stmt, err := t.insertSQL(t.Name(model), fields)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	params := t.Params(fields)
@@ -299,22 +300,22 @@ func (t Table) Insert(model interface{}) error {
 				return t.Update(model)
 			}
 		}
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	nRows, err := r.RowsAffected()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	if nRows == 0 {
 		return nil
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s inserted.", t.Name(m)), "meta", m.Meta())
+		log.Info(fmt.Sprintf("%s inserted.", t.Name(m)), "meta", m.Meta())
 		err := t.InsertLabels(m)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -329,33 +330,33 @@ func (t Table) Update(model interface{}) error {
 	defer Mutex.RUnlock()
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	stmt, err := t.updateSQL(t.Name(model), fields)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	params := t.Params(fields)
 	r, err := t.Db.Exec(stmt, params...)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	nRows, err := r.RowsAffected()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	if nRows == 0 {
 		return sql.ErrNoRows
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s updated.", t.Name(m)), "meta", m.Meta())
+		log.Info(fmt.Sprintf("%s updated.", t.Name(m)), "meta", m.Meta())
 		err := t.ReplaceLabels(m)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -370,33 +371,33 @@ func (t Table) Delete(model interface{}) error {
 	defer Mutex.RUnlock()
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	stmt, err := t.deleteSQL(t.Name(model), fields)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	params := t.Params(fields)
 	r, err := t.Db.Exec(stmt, params...)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	nRows, err := r.RowsAffected()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	if nRows == 0 {
 		return nil
 	}
 	if m, cast := model.(Model); cast {
-		Log.Info(fmt.Sprintf("%s deleted.", t.Name(m)), "meta", m.Meta())
+		log.Info(fmt.Sprintf("%s deleted.", t.Name(m)), "meta", m.Meta())
 		err := t.DeleteLabels(m)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -410,19 +411,19 @@ func (t Table) Delete(model interface{}) error {
 func (t Table) Get(model interface{}) error {
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	stmt, err := t.getSQL(t.Name(model), fields)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	params := t.Params(fields)
 	row := t.Db.QueryRow(stmt, params...)
 	err = t.scan(row, fields)
 	if err != nil && err != sql.ErrNoRows {
-		Log.Trace(err)
+		sink.Trace(err)
 	}
 
 	return err
@@ -435,18 +436,18 @@ func (t Table) Get(model interface{}) error {
 func (t Table) List(model interface{}, options ListOptions) ([]interface{}, error) {
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	stmt, err := t.listSQL(t.Name(model), fields, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	params := t.Params(fields)
 	cursor, err := t.Db.Query(stmt, params...)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	defer cursor.Close()
@@ -458,7 +459,7 @@ func (t Table) List(model interface{}, options ListOptions) ([]interface{}, erro
 		newFields, _ := t.Fields(mInt)
 		err = t.scan(cursor, newFields)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		list = append(list, mInt)
@@ -474,25 +475,25 @@ func (t Table) List(model interface{}, options ListOptions) ([]interface{}, erro
 func (t Table) Count(model interface{}, options ListOptions) (int64, error) {
 	fields, err := t.Fields(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return 0, err
 	}
 	options.Count = true
 	stmt, err := t.listSQL(t.Name(model), fields, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return 0, err
 	}
 	count := int64(0)
 	params := t.Params(fields)
 	row := t.Db.QueryRow(stmt, params...)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return 0, err
 	}
 	err = row.Scan(&count)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return 0, err
 	}
 
@@ -510,7 +511,7 @@ func (t Table) InsertLabels(model Model) error {
 		}
 		err := t.Insert(label)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -531,7 +532,7 @@ func (t Table) DeleteLabels(model Model) error {
 func (t Table) ReplaceLabels(model Model) error {
 	err := t.DeleteLabels(model)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -681,7 +682,7 @@ func (t Table) insertSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
 	tpl, err := tpl.Parse(InsertSQL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 	bfr := &bytes.Buffer{}
@@ -692,7 +693,7 @@ func (t Table) insertSQL(table string, fields []*Field) (string, error) {
 			Fields: fields,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 
@@ -704,7 +705,7 @@ func (t Table) updateSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
 	tpl, err := tpl.Parse(UpdateSQL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 	bfr := &bytes.Buffer{}
@@ -717,7 +718,7 @@ func (t Table) updateSQL(table string, fields []*Field) (string, error) {
 			Pk:     t.PkField(fields),
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 
@@ -729,7 +730,7 @@ func (t Table) deleteSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
 	tpl, err := tpl.Parse(DeleteSQL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 	bfr := &bytes.Buffer{}
@@ -741,7 +742,7 @@ func (t Table) deleteSQL(table string, fields []*Field) (string, error) {
 			Pk:    t.PkField(fields),
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 
@@ -753,7 +754,7 @@ func (t Table) getSQL(table string, fields []*Field) (string, error) {
 	tpl := template.New("")
 	tpl, err := tpl.Parse(GetSQL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 	bfr := &bytes.Buffer{}
@@ -766,7 +767,7 @@ func (t Table) getSQL(table string, fields []*Field) (string, error) {
 			Fields: fields,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 
@@ -778,7 +779,7 @@ func (t Table) listSQL(table string, fields []*Field, options ListOptions) (stri
 	tpl := template.New("")
 	tpl, err := tpl.Parse(ListSQL)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 	bfr := &bytes.Buffer{}
@@ -793,7 +794,7 @@ func (t Table) listSQL(table string, fields []*Field, options ListOptions) (stri
 			Count:    options.Count,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return "", err
 	}
 

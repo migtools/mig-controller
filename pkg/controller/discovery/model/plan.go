@@ -43,7 +43,7 @@ func (m Plan) List(db DB, options ListOptions) ([]*Plan, error) {
 	list := []*Plan{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
@@ -114,7 +114,7 @@ func (m Migration) List(db DB, options ListOptions) ([]*Migration, error) {
 	list := []*Migration{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

@@ -28,6 +28,7 @@ import (
 	"github.com/konveyor/mig-controller/pkg/compat"
 	kapi "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	rsync_transfer "github.com/konveyor/crane-lib/state_transfer/transfer/rsync"
 	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -55,7 +56,11 @@ func TestReconcile(t *testing.T) {
 
 	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	mgr, err := manager.New(cfg, manager.Options{
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+	})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 

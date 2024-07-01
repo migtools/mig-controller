@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -88,27 +89,27 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 	r.Cluster.With(cluster)
 	err = r.Cluster.Insert(r.Container.Db)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	mark := time.Now()
 	err = r.buildClient(cluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	connectDuration := time.Since(mark)
 	mark = time.Now()
 	err = r.buildManager(cluster.Name)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	go r.manager.Start(ctx)
 	for _, collection := range r.Collections {
 		err = collection.Reconcile()
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -116,7 +117,7 @@ func (r *DataSource) Start(cluster *migapi.MigCluster) error {
 
 	startDuration := time.Since(mark)
 
-	Log.Info(
+	log.Info(
 		"DataSource Started.",
 		"ns",
 		r.Cluster.Namespace,
@@ -144,7 +145,7 @@ func (r *DataSource) Stop(purge bool) {
 		r.Cluster.Delete(r.Container.Db)
 	}
 
-	Log.Info(
+	log.Info(
 		"DataSource Stopped.",
 		"ns",
 		r.Cluster.Namespace,
@@ -167,7 +168,7 @@ func (r *DataSource) HasDiscovered(m model.Model) {
 func (r *DataSource) Create(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			log.Info("channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Create(m)
@@ -179,7 +180,7 @@ func (r *DataSource) Create(m model.Model) {
 func (r *DataSource) Update(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			log.Info("channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Update(m)
@@ -191,7 +192,7 @@ func (r *DataSource) Update(m model.Model) {
 func (r *DataSource) Delete(m model.Model) {
 	defer func() {
 		if p := recover(); p != nil {
-			Log.Info("channel send failed")
+			log.Info("channel send failed")
 		}
 	}()
 	r.eventChannel <- ModelEvent{}.Delete(m)
@@ -202,7 +203,7 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 	var err error
 	r.RestCfg, err = cluster.BuildRestConfig(r.Container.Client)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.Client, err = client.New(
@@ -211,7 +212,7 @@ func (r *DataSource) buildClient(cluster *migapi.MigCluster) error {
 			Scheme: scheme.Scheme,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -224,9 +225,13 @@ func (r *DataSource) buildManager(name string) error {
 	if name == "" {
 		name = "local"
 	}
-	r.manager, err = manager.New(r.RestCfg, manager.Options{MetricsBindAddress: "0"})
+	r.manager, err = manager.New(r.RestCfg, manager.Options{
+		Metrics: server.Options{
+			BindAddress: "0",
+		}})
+
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	dsController, err := controller.New(
@@ -236,13 +241,13 @@ func (r *DataSource) buildManager(name string) error {
 			Reconciler: r,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, collection := range r.Collections {
 		err := collection.AddWatch(dsController)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 	}
@@ -255,7 +260,7 @@ func (r *DataSource) applyEvents() {
 	for event := range r.eventChannel {
 		err := event.Apply(r.Container.Db, r.versionThreshold)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 		}
 	}
 }
@@ -276,7 +281,7 @@ type ModelEvent struct {
 func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 	tx, err := db.Begin()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 	defer func() {
@@ -290,7 +295,7 @@ func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 		if version > versionThreshold {
 			err = r.model.Insert(tx)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 		}
@@ -298,14 +303,14 @@ func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 		if version > versionThreshold {
 			err = r.model.Update(tx)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return
 			}
 		}
 	case 0x04: // Delete
 		err = r.model.Delete(tx)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	default:
@@ -313,7 +318,7 @@ func (r *ModelEvent) Apply(db *sql.DB, versionThreshold uint64) (err error) {
 	}
 	err = tx.Commit()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return
 	}
 

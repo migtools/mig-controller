@@ -2,14 +2,14 @@ package container
 
 import (
 	"context"
-	"github.com/konveyor/controller/pkg/logging"
+	"time"
+
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
 )
 
 // A collection of k8s Service resources.
@@ -20,13 +20,11 @@ type Service struct {
 
 func (r *Service) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.Service{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.Service{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -40,11 +38,11 @@ func (r *Service) Reconcile() error {
 	}
 	err := sr.Reconcile(r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.hasReconciled = true
-	Log.Info(
+	log.Info(
 		"Service (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -61,7 +59,7 @@ func (r *Service) GetDiscovered() ([]model.Model, error) {
 	onCluster := v1.ServiceList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
@@ -87,7 +85,7 @@ func (r *Service) GetStored() ([]model.Model, error) {
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, service := range list {
@@ -102,7 +100,6 @@ func (r *Service) GetStored() ([]model.Model, error) {
 //
 
 func (r *Service) Create(e event.CreateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Service)
 	if !cast {
 		return false
@@ -119,7 +116,6 @@ func (r *Service) Create(e event.CreateEvent) bool {
 }
 
 func (r *Service) Update(e event.UpdateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*v1.Service)
 	if !cast {
 		return false
@@ -136,7 +132,6 @@ func (r *Service) Update(e event.UpdateEvent) bool {
 }
 
 func (r *Service) Delete(e event.DeleteEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.Service)
 	if !cast {
 		return false

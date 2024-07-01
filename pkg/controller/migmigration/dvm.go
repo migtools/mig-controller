@@ -100,7 +100,11 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 		runningPods = len(dvm.Status.RunningPods)
 	}
 
-	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed", totalVolumes, successfulPods, runningPods, failedPods)
+	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed",
+		totalVolumes,
+		successfulPods,
+		runningPods,
+		failedPods)
 	switch {
 	//case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 	//	// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
@@ -158,13 +162,13 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 
 func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 	progress := []string{}
-	progressIterator := map[string][]*migapi.PodProgress{
+	podProgressIterator := map[string][]*migapi.PodProgress{
 		"Pending":   dvm.Status.PendingPods,
 		"Running":   dvm.Status.RunningPods,
 		"Completed": dvm.Status.SuccessfulPods,
 		"Failed":    dvm.Status.FailedPods,
 	}
-	for state, pods := range progressIterator {
+	for state, pods := range podProgressIterator {
 		for _, pod := range pods {
 			p := ""
 			if pod.PVCReference != nil {
@@ -200,7 +204,7 @@ func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 
 func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 	nsMapping := t.PlanResources.MigPlan.GetNamespaceMapping()
-	pvcList := []migapi.PVCToMigrate{}
+	var pvcList []migapi.PVCToMigrate
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
 		if pv.Selection.Action != migapi.PvCopyAction || (pv.Selection.CopyMethod != migapi.PvFilesystemCopyMethod && pv.Selection.CopyMethod != migapi.PvBlockCopyMethod) {
 			continue
@@ -223,10 +227,7 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 			Verify:             pv.Selection.Verify,
 		})
 	}
-	if len(pvcList) > 0 {
-		return &pvcList
-	}
-	return nil
+	return &pvcList
 }
 
 func (t *Task) deleteDirectVolumeMigrationResources() error {

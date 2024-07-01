@@ -164,7 +164,7 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 	}
 	client, err := t.getSourceClient()
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return &list
 	}
 	err = client.List(
@@ -172,7 +172,7 @@ func (t *Task) getPodVolumeBackupsForBackup(backup *velero.Backup) *velero.PodVo
 		&list,
 		k8sclient.MatchingLabels(backupAssociationLabel))
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 	}
 	return &list
 }

@@ -62,8 +62,11 @@ const (
 	maxConcurrentReconciles = 2
 )
 
-var log = logging.WithName("analytics")
-var Settings = &settings.Settings
+var (
+	sink     = logging.WithName("analytics")
+	log      = sink.Real
+	Settings = &settings.Settings
+)
 
 // Add creates a new MigAnalytic Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -84,19 +87,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		MaxConcurrentReconciles: maxConcurrentReconciles,
 	})
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
 	// Watch for changes to MigAnalytic
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigAnalytic{}},
+		source.Kind(mgr.GetCache(), &migapi.MigAnalytic{}),
 		&handler.EnqueueRequestForObject{},
 		&AnalyticPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
 		})
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -127,7 +130,7 @@ type MigAnalyticPersistentVolumeDetails struct {
 
 func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log = logging.WithName("analytics", "migAnalytic", request.Name)
+	log = logging.WithName("analytics", "migAnalytic", request.Name).Real
 
 	// Fetch the MigAnalytic instance
 	analytic := &migapi.MigAnalytic{}
@@ -137,7 +140,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
 		}
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -164,7 +167,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 		analytic.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), analytic)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	}()
@@ -179,14 +182,14 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 	// Validations.
 	err = r.validate(analytic)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Update Validation Status
 	err = r.Update(context.TODO(), analytic)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -216,7 +219,7 @@ func (r *ReconcileMigAnalytic) Reconcile(ctx context.Context, request reconcile.
 	analytic.MarkReconciled()
 	err = r.Update(context.TODO(), analytic)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -581,7 +584,7 @@ func pvStorage(self corev1.ResourceList) *resource.Quantity {
 }
 
 func collectResources(client compat.Client) ([]*metav1.APIResourceList, error) {
-	resources, err := client.ServerResources()
+	_, resources, err := client.ServerGroupsAndResources()
 	if err != nil {
 		return nil, err
 	}

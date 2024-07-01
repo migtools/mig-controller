@@ -44,7 +44,7 @@ func (m DirectImageMigration) List(db DB, options ListOptions) ([]*DirectImageMi
 	list := []*DirectImageMigration{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

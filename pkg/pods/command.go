@@ -3,7 +3,8 @@ package pods
 import (
 	"bytes"
 	"io"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,6 +32,10 @@ type PodCommand struct {
 // Run the command.
 func (p *PodCommand) Run() error {
 	codec := serializer.NewCodecFactory(scheme.Scheme)
+	httpClient, err := rest.HTTPClientFor(p.RestCfg)
+	if err != nil {
+		return err
+	}
 	restClient, err := apiutil.RESTClientForGVK(
 		schema.GroupVersionKind{
 			Version: "v1",
@@ -38,7 +43,8 @@ func (p *PodCommand) Run() error {
 		},
 		false,
 		p.RestCfg,
-		codec)
+		codec,
+		httpClient)
 	if err != nil {
 		return err
 	}

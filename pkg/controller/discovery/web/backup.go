@@ -2,10 +2,11 @@ package web
 
 import (
 	"database/sql"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	velero "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"net/http"
 )
 
 // Backup route root.
@@ -49,7 +50,7 @@ func (h *BackupHandler) Prepare(ctx *gin.Context) int {
 		err := h.backup.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				Log.Trace(err)
+				sink.Trace(err)
 				return http.StatusInternalServerError
 			} else {
 				return http.StatusNotFound
@@ -71,13 +72,13 @@ func (h BackupHandler) List(ctx *gin.Context) {
 	collection := model.Backup{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	list, err := collection.List(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -104,7 +105,7 @@ func (h BackupHandler) Get(ctx *gin.Context) {
 	err := h.backup.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {

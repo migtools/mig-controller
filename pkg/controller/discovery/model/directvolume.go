@@ -44,7 +44,7 @@ func (m DirectVolumeMigration) List(db DB, options ListOptions) ([]*DirectVolume
 	list := []*DirectVolumeMigration{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

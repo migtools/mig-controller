@@ -25,13 +25,18 @@ import (
 	"k8s.io/client-go/rest"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // StartRemoteWatch will configure a new RemoteWatcher manager that provides a cached client
 func StartRemoteWatch(r *ReconcileMigCluster, config remote.ManagerConfig) error {
 	remoteWatchMap := remote.GetWatchMap()
 
-	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{Scheme: config.Scheme, MetricsBindAddress: "0"})
+	mgr, err := manager.New(config.RemoteRestConfig, manager.Options{
+		Scheme: config.Scheme,
+		Metrics: server.Options{
+			BindAddress: "0",
+		}})
 	if err != nil {
 		return liberr.Wrap(err)
 	}

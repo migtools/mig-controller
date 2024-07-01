@@ -3,17 +3,21 @@ package container
 import (
 	"context"
 	"database/sql"
+	"sync"
+
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
 )
 
 // Shared logger.
-var Log *logging.Logger
+var (
+	sink = logging.WithName("discovery")
+	log  = sink.Real
+)
 
 // DataSource Key
 type DsKey types.NamespacedName
@@ -80,7 +84,7 @@ func (r *Container) Add(cluster *migapi.MigCluster, collections ...Collection) e
 	ds := build()
 	err := ds.Start(cluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -96,7 +100,7 @@ func (r *Container) Delete(cluster types.NamespacedName) {
 		Name:      cluster.Name,
 	}
 	if ds, found := r.sources[key]; found {
-		Log.Info("Deleted.", "cluster", key)
+		log.Info("Deleted.", "cluster", key)
 		delete(r.sources, key)
 		ds.Stop(true)
 	}
@@ -110,13 +114,13 @@ func (r *Container) Prune() error {
 	}
 	stored, err := model.Cluster{}.List(r.Db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	list := migapi.MigClusterList{}
 	err = r.Client.List(context.TODO(), &list)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	wanted := map[string]bool{}
@@ -148,7 +152,7 @@ func (r *Container) HasCluster(cluster *model.Cluster) (bool, error) {
 		if errors.IsNotFound(err) {
 			return false, nil
 		} else {
-			Log.Trace(err)
+			sink.Trace(err)
 			return false, err
 		}
 	}

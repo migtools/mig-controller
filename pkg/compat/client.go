@@ -224,9 +224,9 @@ func (c client) upConvertList(ctx context.Context, src k8sclient.ObjectList, dst
 
 // Get the specified resource.
 // The resource will be converted to a compatible version as needed.
-func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object) error {
+func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.Object, options ...k8sclient.GetOption) error {
 	start := time.Now()
-	defer Metrics.Get(c, in, float64(time.Since(start)/nanoToMilli))
+	defer func() { Metrics.Get(c, in, float64(time.Since(start)/nanoToMilli)) }()
 
 	obj := c.supportedVersion(in)
 
@@ -243,7 +243,7 @@ func (c client) Get(ctx context.Context, key k8sclient.ObjectKey, in k8sclient.O
 func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8sclient.ListOption) error {
 	obj, err := c.downConvertList(ctx, in)
 	start := time.Now()
-	defer Metrics.List(c, in, float64(time.Since(start)/nanoToMilli))
+	defer func() { Metrics.List(c, in, float64(time.Since(start)/nanoToMilli)) }()
 
 	if err != nil {
 		return err
@@ -261,7 +261,7 @@ func (c client) List(ctx context.Context, in k8sclient.ObjectList, opt ...k8scli
 // The resource will be converted to a compatible version as needed.
 func (c client) Create(ctx context.Context, in k8sclient.Object, opt ...k8sclient.CreateOption) error {
 	start := time.Now()
-	defer Metrics.Create(c, in, float64(time.Since(start)/nanoToMilli))
+	defer func() { Metrics.Create(c, in, float64(time.Since(start)/nanoToMilli)) }()
 
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
@@ -283,7 +283,7 @@ func (c client) Create(ctx context.Context, in k8sclient.Object, opt ...k8sclien
 // The resource will be converted to a compatible version as needed.
 func (c client) Delete(ctx context.Context, in k8sclient.Object, opt ...k8sclient.DeleteOption) error {
 	start := time.Now()
-	defer Metrics.Delete(c, in, float64(time.Since(start)/nanoToMilli))
+	defer func() { Metrics.Delete(c, in, float64(time.Since(start)/nanoToMilli)) }()
 
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {
@@ -302,7 +302,7 @@ func (c client) Delete(ctx context.Context, in k8sclient.Object, opt ...k8sclien
 // The resource will be converted to a compatible version as needed.
 func (c client) Update(ctx context.Context, in k8sclient.Object, opt ...k8sclient.UpdateOption) error {
 	start := time.Now()
-	defer Metrics.Update(c, in, float64(time.Since(start)/nanoToMilli))
+	defer func() { Metrics.Update(c, in, float64(time.Since(start)/nanoToMilli)) }()
 
 	obj, err := c.downConvert(ctx, in)
 	if err != nil {

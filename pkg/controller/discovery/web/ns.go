@@ -1,10 +1,11 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	"k8s.io/api/core/v1"
-	"net/http"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -41,7 +42,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 	}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -52,7 +53,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 			Sort: []int{5},
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -69,7 +70,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -82,7 +83,7 @@ func (h NsHandler) List(ctx *gin.Context) {
 			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
@@ -95,12 +96,26 @@ func (h NsHandler) List(ctx *gin.Context) {
 			h.container.Db,
 			model.ListOptions{})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		}
+		vmCount, err := model.VirtualMachine{
+			Base: model.Base{
+				Cluster:   h.cluster.PK,
+				Namespace: m.Name,
+			},
+		}.Count(
+			h.container.Db,
+			model.ListOptions{})
+		if err != nil {
+			sink.Trace(err)
+			ctx.Status(http.StatusInternalServerError)
+			return
+		}
+
 		r := Namespace{}
-		r.With(m, srvCount, podCount, pvcCount)
+		r.With(m, srvCount, podCount, pvcCount, vmCount)
 		r.SelfLink = h.Link(m)
 		content.Items = append(content.Items, r)
 	}
@@ -140,6 +155,8 @@ type Namespace struct {
 	PodCount int64 `json:"podCount"`
 	// Number of PVCs.
 	PvcCount int64 `json:"pvcCount"`
+	// Number of Virtual Machines.
+	VmCount int64 `json:"vmCount"`
 	// Self URI.
 	SelfLink string `json:"selfLink"`
 	// Raw k8s object.
@@ -147,12 +164,13 @@ type Namespace struct {
 }
 
 // Build the resource.
-func (r *Namespace) With(m *model.Namespace, serviceCount, podCount, pvcCount int64) {
+func (r *Namespace) With(m *model.Namespace, serviceCount, podCount, pvcCount, vmCount int64) {
 	r.Namespace = m.Namespace
 	r.Name = m.Name
 	r.ServiceCount = serviceCount
 	r.PodCount = podCount
 	r.PvcCount = pvcCount
+	r.VmCount = vmCount
 }
 
 // NS collection REST resource.

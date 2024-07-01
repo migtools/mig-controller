@@ -368,7 +368,7 @@ func (t *Task) labelImageStreams(client compat.Client, itemsUpdated int) (int, e
 		options := k8sclient.InNamespace(ns)
 		err := client.List(context.TODO(), &imageStreamList, options)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return itemsUpdated, err
 		}
 		total := len(imageStreamList.Items)

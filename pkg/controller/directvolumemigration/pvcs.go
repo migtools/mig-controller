@@ -104,12 +104,27 @@ func (t *Task) createDestinationPVCs() error {
 		if pvc.TargetName != "" {
 			destName = pvc.TargetName
 		}
+
+		annotations := map[string]string{}
+		// If a kubevirt disk PVC, copy annotations to destination PVC
+		if srcPVC.Annotations != nil && srcPVC.Annotations["cdi.kubevirt.io/storage.contentType"] == "kubevirt" {
+			annotations = srcPVC.Annotations
+			// Ensure that when we create a matching DataVolume, it will adopt this PVC
+			annotations["cdi.kubevirt.io/storage.populatedFor"] = destName
+			// Remove annotations indicating the PVC is bound or provisioned
+			delete(annotations, "pv.kubernetes.io/bind-completed")
+			delete(annotations, "volume.beta.kubernetes.io/storage-provisioner")
+			delete(annotations, "pv.kubernetes.io/bound-by-controller")
+			delete(annotations, "volume.kubernetes.io/storage-provisioner")
+		}
+
 		// Create pvc on destination with same metadata + spec
 		destPVC := corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      destName,
-				Namespace: destNs,
-				Labels:    pvcLabels,
+				Name:        destName,
+				Namespace:   destNs,
+				Labels:      pvcLabels,
+				Annotations: annotations,
 			},
 			Spec: newSpec,
 		}

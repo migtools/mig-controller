@@ -38,7 +38,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("storage")
+var (
+	sink = logging.WithName("storage")
+	log  = sink.Real
+)
 
 // Add creates a new MigStorage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -61,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigStorage
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigStorage{}},
+		source.Kind(mgr.GetCache(), &migapi.MigStorage{}),
 		&handler.EnqueueRequestForObject{},
 		&StoragePredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -84,8 +87,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to Secrets referenced by MigStorage.
 	err = c.Watch(
-		&source.Kind{Type: &kapi.Secret{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &kapi.Secret{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigStorage{})
 		}),
 	)
@@ -109,7 +112,8 @@ type ReconcileMigStorage struct {
 
 func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log = logging.WithName("storage", "migStorage", request.Name)
+	sink := logging.WithName("storage", "migStorage", request.Name)
+	log = sink.Real
 
 	// Fetch the MigStorage instance
 	storage := &migapi.MigStorage{}
@@ -118,7 +122,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
 		}
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -139,7 +143,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 		storage.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), storage)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	}()
@@ -150,7 +154,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 	// Validations.
 	err = r.validate(ctx, storage)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -169,7 +173,7 @@ func (r *ReconcileMigStorage) Reconcile(ctx context.Context, request reconcile.R
 	storage.MarkReconciled()
 	err = r.Update(context.TODO(), storage)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

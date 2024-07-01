@@ -2,7 +2,8 @@ package model
 
 import (
 	"encoding/json"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // Pod model
@@ -44,7 +45,7 @@ func (m Pod) List(db DB, options ListOptions) ([]*Pod, error) {
 	list := []*Pod{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

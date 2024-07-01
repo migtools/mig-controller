@@ -51,13 +51,14 @@ const (
 	CreatedBy = "CreatedBy"
 )
 
-// define maximum waiting time for mig analytic to be ready
-var migAnalyticsTimeout = 2 * time.Minute
-
-var log = logging.WithName("plan")
-
-// Application settings.
-var Settings = &settings.Settings
+var (
+	sink = logging.WithName("plan")
+	log  = sink.Real
+	// Application settings.
+	Settings = &settings.Settings
+	// define maximum waiting time for mig analytic to be ready
+	migAnalyticsTimeout = 2 * time.Minute
+)
 
 // Add creates a new MigPlan Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -79,8 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to MigPlan
-	err = c.Watch(&source.Kind{
-		Type: &migapi.MigPlan{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.MigPlan{}),
 		&handler.EnqueueRequestForObject{},
 		&PlanPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -92,8 +92,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigClusters referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&ClusterPredicate{
@@ -105,8 +105,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigStorage referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigStorage{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigStorage{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&StoragePredicate{
@@ -118,8 +118,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to Mighooks referenced by MigPlans
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigHook{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigHook{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.MigPlan{})
 		}),
 		&HookPredicate{
@@ -131,8 +131,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigMigrations.
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigMigration{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigMigration{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return MigrationRequests(a, migapi.OpenshiftMigrationNamespace)
 		}),
 		&MigrationPredicate{
@@ -196,7 +196,7 @@ type ReconcileMigPlan struct {
 
 func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log = logging.WithName("plan", "migPlan", request.Name)
+	log = logging.WithName("plan", "migPlan", request.Name).Real
 
 	// Fetch the MigPlan instance
 	plan := &migapi.MigPlan{}
@@ -205,7 +205,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
 		}
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, err
 	}
 
@@ -228,7 +228,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 		plan.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), plan)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	}()
@@ -236,7 +236,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	// Plan closed.
 	closed, err := r.handleClosed(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 	if closed {
@@ -249,7 +249,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	// Plan Suspended
 	err = r.planSuspended(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -257,7 +257,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	if Settings.EnableIntelligentPVResize {
 		err = r.ensureMigAnalytics(ctx, plan)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -265,21 +265,21 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	// Set excluded resources on Status.
 	err = r.setExcludedResourceList(plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validations.
 	err = r.validate(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// PV discovery
 	err = r.updatePvs(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -287,21 +287,21 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	nfsValidation := NfsValidation{Plan: plan}
 	err = nfsValidation.Run(r.Client)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Validate PV actions.
 	err = r.validatePvSelections(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Storage
 	err = r.ensureStorage(ctx, plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -309,7 +309,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	if Settings.EnableIntelligentPVResize {
 		migAnalytic, err := r.checkIfMigAnalyticsReady(ctx, plan)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 		if migAnalytic != nil {
@@ -343,7 +343,7 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	plan.MarkReconciled()
 	err = r.Update(context.TODO(), plan)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

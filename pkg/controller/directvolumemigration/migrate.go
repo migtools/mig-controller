@@ -59,7 +59,7 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())
-		log.Trace(err)
+		sink.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}

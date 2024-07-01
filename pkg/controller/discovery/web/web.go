@@ -18,6 +18,7 @@ import (
 	auth "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -26,7 +27,10 @@ import (
 var Settings = &settings.Settings
 
 // Shared logger.
-var Log *logging.Logger
+var (
+	sink = logging.WithName("web")
+	log  = sink.Real
+)
 
 // Root - all routes.
 const (
@@ -68,7 +72,7 @@ func (w *WebServer) buildOrigins() {
 	for _, r := range Settings.Discovery.CORS.AllowedOrigins {
 		expr, err := regexp.Compile(r)
 		if err != nil {
-			Log.Error(
+			log.Error(
 				err,
 				"origin not valid",
 				"expr",
@@ -76,7 +80,7 @@ func (w *WebServer) buildOrigins() {
 			continue
 		}
 		w.allowedOrigins = append(w.allowedOrigins, expr)
-		Log.Info(
+		log.Info(
 			"Added allowed origin.",
 			"expr",
 			r)
@@ -232,6 +236,13 @@ func (w *WebServer) addRoutes(r *gin.Engine) {
 				},
 			},
 		},
+		VirtualMachineHandler{
+			ClusterScoped: ClusterScoped{
+				BaseHandler: BaseHandler{
+					container: w.Container,
+				},
+			},
+		},
 	}
 	for _, h := range handlers {
 		h.AddRoutes(r)
@@ -246,7 +257,7 @@ func (w *WebServer) allow(origin string) bool {
 		}
 	}
 
-	Log.Info("Denied.", "origin", origin)
+	log.Info("Denied.", "origin", origin)
 
 	return false
 }
@@ -300,7 +311,7 @@ func (h *BaseHandler) setToken(ctx *gin.Context) int {
 		return http.StatusOK
 	}
 
-	Log.Info("`Authorization: Bearer <token>` header required but not found.")
+	log.Info("`Authorization: Bearer <token>` header required but not found.")
 
 	return http.StatusBadRequest
 }
@@ -340,12 +351,17 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 	codec := serializer.NewCodecFactory(scheme.Scheme)
 	gvk, err := apiutil.GVKForObject(&sar, scheme.Scheme)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return http.StatusInternalServerError
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, restCfg, codec)
+	httpClient, err := rest.HTTPClientFor(restCfg)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
+		return http.StatusInternalServerError
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, restCfg, codec, httpClient)
+	if err != nil {
+		sink.Trace(err)
 		return http.StatusInternalServerError
 	}
 	var status int
@@ -363,7 +379,7 @@ func (h *BaseHandler) allow(sar auth.SelfSubjectAccessReview) int {
 			return http.StatusOK
 		}
 	default:
-		Log.Info("Unexpected SAR reply", "status", status)
+		log.Info("Unexpected SAR reply", "status", status)
 	}
 
 	return http.StatusForbidden

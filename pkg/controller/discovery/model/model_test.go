@@ -2,19 +2,19 @@ package model
 
 import (
 	"fmt"
-	"github.com/konveyor/controller/pkg/logging"
-	"github.com/onsi/gomega"
 	"os"
 	pathlib "path"
 	"testing"
+
+	"github.com/konveyor/controller/pkg/logging"
+	"github.com/onsi/gomega"
 )
 
 var uid = 0
 
 func init() {
 	Settings.Load()
-	log := logging.WithName("Test")
-	Log = log
+	log = logging.WithName("Test").Real
 }
 
 func UID() string {

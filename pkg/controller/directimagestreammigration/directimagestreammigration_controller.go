@@ -35,7 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("directimagestream")
+var (
+	sink = logging.WithName("directimagestream")
+	log  = sink.Real
+)
 
 // Add creates a new DirectImageStreamMigration Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -61,7 +64,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to DirectImageStreamMigration
-	err = c.Watch(&source.Kind{Type: &migapi.DirectImageStreamMigration{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &migapi.DirectImageStreamMigration{}),
 		&handler.EnqueueRequestForObject{},
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace})
 	if err != nil {
@@ -70,8 +73,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigClusters referenced by DirectImageMigrations
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigCluster{}},
-		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+		source.Kind(mgr.GetCache(), &migapi.MigCluster{}),
+		handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
 			return migref.GetRequests(a, migapi.OpenshiftMigrationNamespace, migapi.DirectImageStreamMigration{})
 		}),
 		&migref.MigrationNamespacePredicate{Namespace: migapi.OpenshiftMigrationNamespace},
@@ -101,7 +104,8 @@ type ReconcileDirectImageStreamMigration struct {
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=migration.openshift.io,resources=directimagestreammigrations/status,verbs=get;update;patch
 func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	log = logging.WithName("directimagestream", "dism", request.Name)
+	sink := logging.WithName("directimagestream", "dism", request.Name)
+	log := sink.Real
 	// Fetch the DirectImageStreamMigration instance
 	imageStreamMigration := &migapi.DirectImageStreamMigration{}
 	err := r.Get(context.TODO(), request.NamespacedName, imageStreamMigration)
@@ -118,7 +122,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	// Set MigMigration name key on logger
 	migration, err := imageStreamMigration.GetMigrationForDISM(r)
 	if migration != nil {
-		log.Real = log.WithValues("migMigration", migration.Name)
+		log = log.WithValues("migMigration", migration.Name)
 	}
 
 	// Set up jaeger tracing, add to ctx
@@ -139,7 +143,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	// Validation
 	err = r.validate(ctx, imageStreamMigration)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -149,7 +153,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	if !imageStreamMigration.Status.HasBlockerCondition() {
 		requeueAfter, err = r.migrate(ctx, imageStreamMigration)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -167,7 +171,7 @@ func (r *ReconcileDirectImageStreamMigration) Reconcile(ctx context.Context, req
 	imageStreamMigration.MarkReconciled()
 	err = r.Update(context.TODO(), imageStreamMigration)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

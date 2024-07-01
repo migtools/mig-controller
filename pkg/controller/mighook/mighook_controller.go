@@ -35,7 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var log = logging.WithName("hook")
+var (
+	sink = logging.WithName("hook")
+	log  = sink.Real
+)
 
 // Add creates a new MigHook Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -58,7 +61,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MigHook
 	err = c.Watch(
-		&source.Kind{Type: &migapi.MigHook{}},
+		source.Kind(mgr.GetCache(), &migapi.MigHook{}),
 		&handler.EnqueueRequestForObject{},
 		&HookPredicate{
 			Namespace: migapi.OpenshiftMigrationNamespace,
@@ -83,7 +86,7 @@ type ReconcileMigHook struct {
 
 func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
-	log = logging.WithName("hook", "migHook", request.Name)
+	log = logging.WithName("hook", "migHook", request.Name).Real
 
 	// Fetch the MigHook instance
 	hook := &migapi.MigHook{}
@@ -92,7 +95,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 		if errors.IsNotFound(err) {
 			return reconcile.Result{Requeue: false}, nil
 		}
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -113,7 +116,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 		hook.Status.SetReconcileFailed(err)
 		err := r.Update(context.TODO(), hook)
 		if err != nil {
-			log.Trace(err)
+			sink.Trace(err)
 			return
 		}
 	}()
@@ -124,7 +127,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 	// Validations.
 	err = r.validate(ctx, hook)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 
@@ -140,7 +143,7 @@ func (r *ReconcileMigHook) Reconcile(ctx context.Context, request reconcile.Requ
 	hook.MarkReconciled()
 	err = r.Update(context.TODO(), hook)
 	if err != nil {
-		log.Trace(err)
+		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/controller/pkg/logging"
+	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -21,13 +23,11 @@ type PVC struct {
 
 func (r *PVC) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &v1.PersistentVolumeClaim{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &v1.PersistentVolumeClaim{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -41,11 +41,11 @@ func (r *PVC) Reconcile() error {
 	}
 	err := sr.Reconcile(r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.hasReconciled = true
-	Log.Info(
+	log.Info(
 		"PVC (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -60,9 +60,16 @@ func (r *PVC) Reconcile() error {
 func (r *PVC) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PersistentVolumeClaimList{}
-	err := r.ds.Client.List(context.TODO(), &onCluster)
+	sel, err := labels.Parse("!" + v1alpha1.MigMigrationLabel)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
+		return nil, err
+	}
+	err = r.ds.Client.List(context.TODO(), &onCluster, &client.ListOptions{
+		LabelSelector: sel,
+	})
+	if err != nil {
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
@@ -88,7 +95,7 @@ func (r *PVC) GetStored() ([]model.Model, error) {
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, pvc := range list {
@@ -103,7 +110,6 @@ func (r *PVC) GetStored() ([]model.Model, error) {
 //
 
 func (r *PVC) Create(e event.CreateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.PersistentVolumeClaim)
 	if !cast {
 		return false
@@ -120,7 +126,6 @@ func (r *PVC) Create(e event.CreateEvent) bool {
 }
 
 func (r *PVC) Update(e event.UpdateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*v1.PersistentVolumeClaim)
 	if !cast {
 		return false
@@ -137,7 +142,6 @@ func (r *PVC) Update(e event.UpdateEvent) bool {
 }
 
 func (r *PVC) Delete(e event.DeleteEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*v1.PersistentVolumeClaim)
 	if !cast {
 		return false

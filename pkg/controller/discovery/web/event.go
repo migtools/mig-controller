@@ -47,7 +47,7 @@ func (h EventHandler) List(ctx *gin.Context) {
 			Page: &h.page,
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -88,7 +88,7 @@ func (h EventHandler) Get(ctx *gin.Context) {
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}

@@ -69,6 +69,14 @@ func (r ReconcileMigAnalytic) validatePlan(analytic *migapi.MigAnalytic) error {
 		return nil
 	} else if err != nil {
 		return liberr.Wrap(err)
+	} else {
+		analytic.Status.SetCondition(migapi.Condition{
+			Type:     InvalidPlanRef,
+			Status:   False,
+			Reason:   "",
+			Category: Critical,
+			Message:  "",
+		})
 	}
 
 	//NotReady
@@ -80,9 +88,14 @@ func (r ReconcileMigAnalytic) validatePlan(analytic *migapi.MigAnalytic) error {
 			Category: Critical,
 			Message:  fmt.Sprintf("Waiting %d seconds for referenced MigPlan to become ready.", RequeueInterval),
 		})
-		return nil
-	} else if err != nil {
-		return liberr.Wrap(err)
+	} else if plan.Status.IsReady() {
+		analytic.Status.SetCondition(migapi.Condition{
+			Type:     Postponed,
+			Status:   False,
+			Reason:   "",
+			Category: Critical,
+			Message:  "",
+		})
 	}
 
 	return nil

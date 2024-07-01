@@ -51,7 +51,7 @@ func (h *MigrationHandler) Prepare(ctx *gin.Context) int {
 		err := h.migration.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				Log.Trace(err)
+				sink.Trace(err)
 				return http.StatusInternalServerError
 			} else {
 				return http.StatusNotFound
@@ -93,13 +93,13 @@ func (h MigrationHandler) List(ctx *gin.Context) {
 	collection := model.Migration{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	list, err := collection.List(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -126,7 +126,7 @@ func (h MigrationHandler) Get(ctx *gin.Context) {
 	err := h.migration.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
