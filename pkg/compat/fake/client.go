@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	virtv1 "kubevirt.io/api/core/v1"
+	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -104,6 +105,9 @@ func getSchemeForFakeClient() (*runtime.Scheme, error) {
 		return nil, err
 	}
 	if err := virtv1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, err
+	}
+	if err := cdiv1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, err
 	}
 	return scheme.Scheme, nil

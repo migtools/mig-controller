@@ -22,16 +22,25 @@ import (
 
 	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	dvmFinalizer = "migration.openshift.io/directvolumemigrationfinalizer"
 )
 
 var (
@@ -47,7 +56,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileDirectVolumeMigration{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileDirectVolumeMigration{Config: mgr.GetConfig(), Client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -86,6 +95,7 @@ var _ reconcile.Reconciler = &ReconcileDirectVolumeMigration{}
 
 // ReconcileDirectVolumeMigration reconciles a DirectVolumeMigration object
 type ReconcileDirectVolumeMigration struct {
+	*rest.Config
 	client.Client
 	scheme *runtime.Scheme
 	tracer opentracing.Tracer
@@ -104,6 +114,8 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 	// Set values
 	tracer := logging.WithName("directvolume", "dvm", request.Name)
 	log := tracer.Real
+	// Default to PollReQ, can be overridden by r.migrate phase-specific ReQ interval
+	requeueAfter := time.Duration(PollReQ)
 
 	// Fetch the DirectVolumeMigration instance
 	direct := &migapi.DirectVolumeMigration{}
@@ -120,6 +132,9 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 
 	// Set MigMigration name key on logger
 	migration, err := direct.GetMigrationForDVM(r)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 	if migration != nil {
 		log = log.WithValues("migMigration", migration.Name)
 	}
@@ -131,8 +146,32 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 		defer reconcileSpan.Finish()
 	}
 
-	// Check if completed
-	if direct.Status.Phase == Completed {
+	if direct.DeletionTimestamp != nil {
+		sourceDeleted, err := r.cleanupSourceResourcesInNamespace(direct)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		targetDeleted, err := r.cleanupTargetResourcesInNamespaces(direct)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if sourceDeleted && targetDeleted {
+			log.V(5).Info("DirectVolumeMigration resources deleted. removing finalizer")
+			// Remove finalizer
+			RemoveFinalizer(direct, dvmFinalizer)
+		} else {
+			// Requeue
+			log.V(5).Info("Requeing waiting for cleanup", "after", requeueAfter)
+			return reconcile.Result{RequeueAfter: requeueAfter}, nil
+		}
+	} else {
+		// Add finalizer
+		AddFinalizer(direct, dvmFinalizer)
+	}
+
+	// Check if completed and return if not deleted, otherwise need to update to
+	// remove the finalizer.
+	if direct.Status.Phase == Completed && direct.DeletionTimestamp == nil {
 		return reconcile.Result{Requeue: false}, nil
 	}
 
@@ -146,10 +185,7 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	// Default to PollReQ, can be overridden by r.migrate phase-specific ReQ interval
-	requeueAfter := time.Duration(PollReQ)
-
-	if !direct.Status.HasBlockerCondition() {
+	if !direct.Status.HasBlockerCondition() && direct.DeletionTimestamp == nil {
 		requeueAfter, err = r.migrate(ctx, direct)
 		if err != nil {
 			tracer.Trace(err)
@@ -181,4 +217,141 @@ func (r *ReconcileDirectVolumeMigration) Reconcile(ctx context.Context, request 
 
 	// Done
 	return reconcile.Result{Requeue: false}, nil
+}
+
+// AddFinalizer adds a finalizer to a resource
+func AddFinalizer(obj metav1.Object, name string) {
+	if HasFinalizer(obj, name) {
+		return
+	}
+
+	obj.SetFinalizers(append(obj.GetFinalizers(), name))
+}
+
+// RemoveFinalizer removes a finalizer from a resource
+func RemoveFinalizer(obj metav1.Object, name string) {
+	if !HasFinalizer(obj, name) {
+		return
+	}
+
+	var finalizers []string
+	for _, f := range obj.GetFinalizers() {
+		if f != name {
+			finalizers = append(finalizers, f)
+		}
+	}
+
+	obj.SetFinalizers(finalizers)
+}
+
+// HasFinalizer returns true if a resource has a specific finalizer
+func HasFinalizer(object metav1.Object, value string) bool {
+	for _, f := range object.GetFinalizers() {
+		if f == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *ReconcileDirectVolumeMigration) cleanupSourceResourcesInNamespace(direct *migapi.DirectVolumeMigration) (bool, error) {
+	sourceCluster, err := direct.GetSourceCluster(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Cleanup source resources
+	client, err := sourceCluster.GetClient(r)
+	if err != nil {
+		return false, err
+	}
+
+	liveMigrationCanceled, err := r.cancelLiveMigrations(client, direct)
+	if err != nil {
+		return false, err
+	}
+
+	completed, err := r.cleanupResourcesInNamespaces(client, direct.GetUID(), direct.GetSourceNamespaces())
+	return completed && liveMigrationCanceled, err
+}
+
+func (r *ReconcileDirectVolumeMigration) cancelLiveMigrations(client compat.Client, direct *migapi.DirectVolumeMigration) (bool, error) {
+	if direct.IsCutover() && direct.IsLiveMigrate() {
+		// Cutover and live migration is enabled, attempt to cancel migrations in progress.
+		namespaces := direct.GetSourceNamespaces()
+		allLiveMigrationCompleted := true
+		for _, ns := range namespaces {
+			volumeVmMap, err := getRunningVmVolumeMap(client, ns)
+			if err != nil {
+				return false, err
+			}
+			vmVolumeMap := make(map[string]*vmVolumes)
+			for i := range direct.Spec.PersistentVolumeClaims {
+				sourceName := direct.Spec.PersistentVolumeClaims[i].Name
+				targetName := direct.Spec.PersistentVolumeClaims[i].TargetName
+				vmName, found := volumeVmMap[sourceName]
+				if !found {
+					continue
+				}
+				volumes := vmVolumeMap[vmName]
+				if volumes == nil {
+					volumes = &vmVolumes{
+						sourceVolumes: []string{sourceName},
+						targetVolumes: []string{targetName},
+					}
+				} else {
+					volumes.sourceVolumes = append(volumes.sourceVolumes, sourceName)
+					volumes.targetVolumes = append(volumes.targetVolumes, targetName)
+				}
+				vmVolumeMap[vmName] = volumes
+			}
+			vmNames := make([]string, 0)
+			for vmName, volumes := range vmVolumeMap {
+				if err := cancelLiveMigration(client, vmName, ns, volumes, log); err != nil {
+					return false, err
+				}
+				vmNames = append(vmNames, vmName)
+			}
+			migrated, err := liveMigrationsCompleted(client, ns, vmNames)
+			if err != nil {
+				return false, err
+			}
+			allLiveMigrationCompleted = allLiveMigrationCompleted && migrated
+		}
+		return allLiveMigrationCompleted, nil
+	}
+	return true, nil
+}
+
+func (r *ReconcileDirectVolumeMigration) cleanupTargetResourcesInNamespaces(direct *migapi.DirectVolumeMigration) (bool, error) {
+	destinationCluster, err := direct.GetDestinationCluster(r)
+	if err != nil {
+		return false, err
+	}
+
+	// Cleanup source resources
+	client, err := destinationCluster.GetClient(r)
+	if err != nil {
+		return false, err
+	}
+	return r.cleanupResourcesInNamespaces(client, direct.GetUID(), direct.GetDestinationNamespaces())
+}
+
+func (r *ReconcileDirectVolumeMigration) cleanupResourcesInNamespaces(client compat.Client, uid types.UID, namespaces []string) (bool, error) {
+	selector := labels.SelectorFromSet(map[string]string{
+		"directvolumemigration": string(uid),
+	})
+
+	sourceDeleted := true
+	for _, ns := range namespaces {
+		if err := findAndDeleteNsResources(client, ns, selector, log); err != nil {
+			return false, err
+		}
+		err, deleted := areRsyncNsResourcesDeleted(client, ns, selector, log)
+		if err != nil {
+			return false, err
+		}
+		sourceDeleted = sourceDeleted && deleted
+	}
+	return sourceDeleted, nil
 }
