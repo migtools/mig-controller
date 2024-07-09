@@ -5,22 +5,22 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
-	v1 "k8s.io/api/core/v1"
+	virtv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// A collection of k8s PV resources.
-type PV struct {
+// A collection of k8s VirtualMachine resources.
+type VirtualMachine struct {
 	// Base
 	BaseCollection
 }
 
-func (r *PV) AddWatch(dsController controller.Controller) error {
+func (r *VirtualMachine) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		source.Kind(r.ds.manager.GetCache(), &v1.PersistentVolume{}),
+		source.Kind(r.ds.manager.GetCache(), &virtv1.VirtualMachine{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
@@ -31,7 +31,7 @@ func (r *PV) AddWatch(dsController controller.Controller) error {
 	return nil
 }
 
-func (r *PV) Reconcile() error {
+func (r *VirtualMachine) Reconcile() error {
 	mark := time.Now()
 	sr := SimpleReconciler{
 		Db: r.ds.Container.Db,
@@ -43,7 +43,7 @@ func (r *PV) Reconcile() error {
 	}
 	r.hasReconciled = true
 	log.Info(
-		"PV (collection) reconciled.",
+		"VirtualMachine (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
 		"name",
@@ -54,30 +54,30 @@ func (r *PV) Reconcile() error {
 	return nil
 }
 
-func (r *PV) GetDiscovered() ([]model.Model, error) {
+func (r *VirtualMachine) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
-	onCluster := v1.PersistentVolumeList{}
+	onCluster := virtv1.VirtualMachineList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
 		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
-		pv := &model.PV{
+		vm := &model.VirtualMachine{
 			Base: model.Base{
 				Cluster: r.ds.Cluster.PK,
 			},
 		}
-		pv.With(&discovered)
-		models = append(models, pv)
+		vm.With(&discovered)
+		models = append(models, vm)
 	}
 
 	return models, nil
 }
 
-func (r *PV) GetStored() ([]model.Model, error) {
+func (r *VirtualMachine) GetStored() ([]model.Model, error) {
 	models := []model.Model{}
-	list, err := model.PV{
+	list, err := model.VirtualMachine{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
@@ -88,8 +88,8 @@ func (r *PV) GetStored() ([]model.Model, error) {
 		sink.Trace(err)
 		return nil, err
 	}
-	for _, pv := range list {
-		models = append(models, pv)
+	for _, vm := range list {
+		models = append(models, vm)
 	}
 
 	return models, nil
@@ -99,54 +99,54 @@ func (r *PV) GetStored() ([]model.Model, error) {
 // Predicate methods.
 //
 
-func (r *PV) Create(e event.CreateEvent) bool {
-	object, cast := e.Object.(*v1.PersistentVolume)
+func (r *VirtualMachine) Create(e event.CreateEvent) bool {
+	object, cast := e.Object.(*virtv1.VirtualMachine)
 	if !cast {
 		return false
 	}
-	pv := model.PV{
+	vm := model.VirtualMachine{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pv.With(object)
-	r.ds.Create(&pv)
+	vm.With(object)
+	r.ds.Create(&vm)
 
 	return false
 }
 
-func (r *PV) Update(e event.UpdateEvent) bool {
-	object, cast := e.ObjectNew.(*v1.PersistentVolume)
+func (r *VirtualMachine) Update(e event.UpdateEvent) bool {
+	object, cast := e.ObjectNew.(*virtv1.VirtualMachine)
 	if !cast {
 		return false
 	}
-	pv := model.PV{
+	vm := model.VirtualMachine{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pv.With(object)
-	r.ds.Update(&pv)
+	vm.With(object)
+	r.ds.Update(&vm)
 
 	return false
 }
 
-func (r *PV) Delete(e event.DeleteEvent) bool {
-	object, cast := e.Object.(*v1.PersistentVolume)
+func (r *VirtualMachine) Delete(e event.DeleteEvent) bool {
+	object, cast := e.Object.(*virtv1.VirtualMachine)
 	if !cast {
 		return false
 	}
-	pv := model.PV{
+	vm := model.VirtualMachine{
 		Base: model.Base{
 			Cluster: r.ds.Cluster.PK,
 		},
 	}
-	pv.With(object)
-	r.ds.Delete(&pv)
+	vm.With(object)
+	r.ds.Delete(&vm)
 
 	return false
 }
 
-func (r *PV) Generic(e event.GenericEvent) bool {
+func (r *VirtualMachine) Generic(e event.GenericEvent) bool {
 	return false
 }

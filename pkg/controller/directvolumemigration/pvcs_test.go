@@ -6,7 +6,7 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	testlog "github.com/go-logr/logr/testing"
+	testlog "github.com/go-logr/logr/testr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/settings"
@@ -51,7 +51,7 @@ func Test_CreateDestinationPVCsNewPVCMigrationOwner(t *testing.T) {
 		},
 		TargetName: "target-pvc1",
 	})
-	task.Log = testlog.TestLogger{T: t}
+	task.Log = testlog.New(t)
 	err := task.createDestinationPVCs()
 	Expect(err).NotTo(HaveOccurred())
 	resPvc := &kapi.PersistentVolumeClaim{}
@@ -89,7 +89,7 @@ func Test_CreateDestinationPVCsNewPVCDVMOwnerOtherNS(t *testing.T) {
 		TargetName:      "target-pvc1",
 		TargetNamespace: testNamespace2,
 	})
-	task.Log = testlog.TestLogger{T: t}
+	task.Log = testlog.New(t)
 	task.Owner.SetUID(types.UID("5555-6666-7777-8888"))
 	err := task.createDestinationPVCs()
 	Expect(err).NotTo(HaveOccurred())
@@ -137,7 +137,7 @@ func Test_CreateDestinationPVCsExpandPVSize(t *testing.T) {
 		},
 		TargetName: "target-pvc1",
 	})
-	task.Log = testlog.TestLogger{T: t}
+	task.Log = testlog.New(t)
 	err := task.createDestinationPVCs()
 	Expect(err).NotTo(HaveOccurred())
 	resPvc := &kapi.PersistentVolumeClaim{}
@@ -182,7 +182,7 @@ func Test_CreateDestinationPVCsExpandProposedPVSize(t *testing.T) {
 		},
 		TargetName: "target-pvc1",
 	})
-	task.Log = testlog.TestLogger{T: t}
+	task.Log = testlog.New(t)
 	err := task.createDestinationPVCs()
 	Expect(err).NotTo(HaveOccurred())
 	resPvc := &kapi.PersistentVolumeClaim{}
@@ -222,7 +222,7 @@ func Test_CreateDestinationPVCsExistingTargetPVC(t *testing.T) {
 		},
 		TargetName: "target-pvc1",
 	})
-	task.Log = testlog.TestLogger{T: t}
+	task.Log = testlog.New(t)
 	err := task.createDestinationPVCs()
 	Expect(err).NotTo(HaveOccurred())
 	resPvc := &kapi.PersistentVolumeClaim{}
@@ -254,13 +254,13 @@ func createSourcePvc(name, namespace string) *kapi.PersistentVolumeClaim {
 		},
 		Spec: kapi.PersistentVolumeClaimSpec{
 			AccessModes: []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
-			Resources: kapi.ResourceRequirements{
+			Resources: kapi.VolumeResourceRequirements{
 				Requests: kapi.ResourceList{
 					kapi.ResourceStorage: resource.MustParse("1Gi"),
 				},
 			},
 			DataSource:    &kapi.TypedLocalObjectReference{},
-			DataSourceRef: &kapi.TypedLocalObjectReference{},
+			DataSourceRef: &kapi.TypedObjectReference{},
 		},
 	}
 }

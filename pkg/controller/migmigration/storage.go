@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	ocappsv1 "github.com/openshift/api/apps/v1"
@@ -15,7 +16,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
+	virtv1 "kubevirt.io/api/core/v1"
+	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -65,8 +70,14 @@ func (p pvcNameMapping) ExistsAsValue(destName string) bool {
 // - statefulsets
 // - jobs
 // - cronjobs
+// - virtual machines
 func (t *Task) swapPVCReferences() (reasons []string, err error) {
 	client, err := t.getDestinationClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	restConfig, err := t.getDestinationRestConfig()
 	if err != nil {
 		err = liberr.Wrap(err)
 		return
@@ -114,6 +125,11 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 	if len(failedStatefulSetNames) > 0 {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on StatefulSets [%s]", strings.Join(failedStatefulSetNames, ",")))
+	}
+	failedVirtualMachineSwaps := t.swapVirtualMachinePVCRefs(client, restConfig, mapping)
+	if len(failedVirtualMachineSwaps) > 0 {
+		reasons = append(reasons,
+			fmt.Sprintf("Failed updating PVC references on VirtualMachines [%s]", strings.Join(failedVirtualMachineSwaps, ",")))
 	}
 	return
 }
@@ -395,7 +411,7 @@ func (t *Task) swapReplicaSetsPVCRefs(client k8sclient.Client, mapping pvcNameMa
 		}
 		for _, replicaset := range list.Items {
 			if len(replicaset.OwnerReferences) > 0 {
-				t.Log.Info("Unquiesce skipping ReplicaSet, has OwnerReferences",
+				t.Log.Info("swap pvc skipping ReplicaSet, has OwnerReferences",
 					"namespace", replicaset.Namespace, "replicaset", replicaset.Name)
 				continue
 			}
@@ -598,7 +614,7 @@ func (t *Task) swapCronJobsPVCRefs(client k8sclient.Client, mapping pvcNameMappi
 				// Only unsuspend if our suspend annotation is present
 				if _, exist := cronJob.Annotations[migapi.SuspendAnnotation]; exist {
 					delete(cronJob.Annotations, migapi.SuspendAnnotation)
-					cronJob.Spec.Suspend = pointer.BoolPtr(false)
+					cronJob.Spec.Suspend = ptr.To[bool](false)
 				}
 			}
 			for _, volume := range cronJob.Spec.JobTemplate.Spec.Template.Spec.Volumes {
@@ -619,10 +635,69 @@ func (t *Task) swapCronJobsPVCRefs(client k8sclient.Client, mapping pvcNameMappi
 	return
 }
 
+func (t *Task) swapVirtualMachinePVCRefs(client k8sclient.Client, restConfig *rest.Config, mapping pvcNameMapping) (failedVirtualMachines []string) {
+	for _, ns := range t.destinationNamespaces() {
+		list := &virtv1.VirtualMachineList{}
+		options := k8sclient.InNamespace(ns)
+		if err := client.List(context.TODO(), list, options); err != nil {
+			t.Log.Error(err, "failed listing virtual machines", "namespace", ns)
+			continue
+		}
+		for _, vm := range list.Items {
+			for i, volume := range vm.Spec.Template.Spec.Volumes {
+				if volume.PersistentVolumeClaim != nil {
+					if isFailed := updatePVCRef(&vm.Spec.Template.Spec.Volumes[i].PersistentVolumeClaim.PersistentVolumeClaimVolumeSource, vm.Namespace, mapping); isFailed {
+						failedVirtualMachines = append(failedVirtualMachines, fmt.Sprintf("%s/%s", vm.Namespace, vm.Name))
+					}
+				}
+				if volume.DataVolume != nil {
+					isFailed, err := updateDataVolumeRef(client, vm.Spec.Template.Spec.Volumes[i].DataVolume, vm.Namespace, mapping, t.Log)
+					if err != nil || isFailed {
+						failedVirtualMachines = append(failedVirtualMachines, fmt.Sprintf("%s/%s", vm.Namespace, vm.Name))
+					} else {
+						// Update datavolume template if it exists.
+						for i, dvt := range vm.Spec.DataVolumeTemplates {
+							if destinationDVName, exists := mapping.Get(ns, dvt.Name); exists {
+								vm.Spec.DataVolumeTemplates[i].Name = destinationDVName
+							}
+						}
+					}
+				}
+			}
+			for _, dvt := range vm.Spec.DataVolumeTemplates {
+				t.Log.Info("DataVolumeTemplate", "dv", dvt)
+			}
+			for _, volume := range vm.Spec.Template.Spec.Volumes {
+				if volume.DataVolume != nil {
+					t.Log.Info("datavolume", "dv", volume.DataVolume)
+				}
+			}
+			if shouldStartVM(&vm) {
+				if !isVMActive(&vm, client) {
+					restClient, err := t.createRestClient(restConfig)
+					if err != nil {
+						t.Log.Error(err, "failed creating rest client", "namespace", vm.Namespace, "name", vm.Name)
+					}
+					if err := t.startVM(&vm, client, restClient); err != nil {
+						t.Log.Error(err, "failed starting VM", "namespace", vm.Namespace, "name", vm.Name)
+						failedVirtualMachines = append(failedVirtualMachines, fmt.Sprintf("%s/%s", vm.Namespace, vm.Name))
+					}
+				}
+			} else {
+				if err := client.Update(context.Background(), &vm); err != nil {
+					t.Log.Error(err, "failed updating VM", "namespace", vm.Namespace, "name", vm.Name)
+					failedVirtualMachines = append(failedVirtualMachines, fmt.Sprintf("%s/%s", vm.Namespace, vm.Name))
+				}
+			}
+		}
+	}
+	return
+}
+
 // updatePVCRef given a PVCSource, namespace and a mapping of pvc names, swaps the claim
 // present in the pvc source with the mapped pvc name found in the mapping
 // returns whether the swap was successful or not
-func updatePVCRef(pvcSource *v1.PersistentVolumeClaimVolumeSource, ns string, mapping pvcNameMapping) (isFailed bool) {
+func updatePVCRef(pvcSource *v1.PersistentVolumeClaimVolumeSource, ns string, mapping pvcNameMapping) bool {
 	if pvcSource != nil {
 		originalName := pvcSource.ClaimName
 		if destinationPVCName, exists := mapping.Get(ns, originalName); exists {
@@ -637,4 +712,46 @@ func updatePVCRef(pvcSource *v1.PersistentVolumeClaimVolumeSource, ns string, ma
 		}
 	}
 	return false
+}
+
+func updateDataVolumeRef(client k8sclient.Client, dv *virtv1.DataVolumeSource, ns string, mapping pvcNameMapping, log logr.Logger) (bool, error) {
+	if dv != nil {
+		log.Info("Updating DataVolume reference", "namespace", ns, "name", dv.Name)
+		originalName := dv.Name
+		originalDv := &cdiv1.DataVolume{}
+		if err := client.Get(context.Background(), k8sclient.ObjectKey{Namespace: ns, Name: originalName}, originalDv); err != nil {
+			log.Error(err, "failed getting DataVolume", "namespace", ns, "name", originalName)
+			return true, err
+		}
+
+		if destinationDVName, exists := mapping.Get(ns, originalName); exists {
+			log.Info("Found DataVolume mapping", "namespace", ns, "name", originalName, "destination", destinationDVName)
+			dv.Name = destinationDVName
+			// Create adopting datavolume.
+			adoptingDV := originalDv.DeepCopy()
+			adoptingDV.Name = destinationDVName
+			if adoptingDV.Annotations == nil {
+				adoptingDV.Annotations = make(map[string]string)
+			}
+			adoptingDV.Annotations["cdi.kubevirt.io/allowClaimAdoption"] = "true"
+			adoptingDV.ResourceVersion = ""
+			adoptingDV.ManagedFields = nil
+			adoptingDV.UID = ""
+
+			err := client.Create(context.Background(), adoptingDV)
+			if err != nil && !errors.IsAlreadyExists(err) {
+				log.Error(err, "failed creating DataVolume", "namespace", ns, "name", destinationDVName)
+				return true, err
+			}
+		} else {
+			log.Info("DataVolume reference already updated", "namespace", ns, "name", originalName)
+			// attempt to figure out whether the current DV reference
+			// already points to the new migrated PVC. This is needed to
+			// guarantee idempotency of the operation
+			if !mapping.ExistsAsValue(originalName) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

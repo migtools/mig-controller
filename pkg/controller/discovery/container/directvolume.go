@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/controller/pkg/logging"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -21,13 +20,11 @@ type DirectVolumeMigration struct {
 
 func (r *DirectVolumeMigration) AddWatch(dsController controller.Controller) error {
 	err := dsController.Watch(
-		&source.Kind{
-			Type: &migapi.DirectVolumeMigration{},
-		},
+		source.Kind(r.ds.manager.GetCache(), &migapi.DirectVolumeMigration{}),
 		&handler.EnqueueRequestForObject{},
 		r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -41,11 +38,11 @@ func (r *DirectVolumeMigration) Reconcile() error {
 	}
 	err := sr.Reconcile(r)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	r.hasReconciled = true
-	Log.Info(
+	log.Info(
 		"DirectVolumeMigration (collection) reconciled.",
 		"ns",
 		r.ds.Cluster.Namespace,
@@ -62,7 +59,7 @@ func (r *DirectVolumeMigration) GetDiscovered() ([]model.Model, error) {
 	onCluster := migapi.DirectVolumeMigrationList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, discovered := range onCluster.Items {
@@ -80,7 +77,7 @@ func (r *DirectVolumeMigration) GetStored() ([]model.Model, error) {
 		r.ds.Container.Db,
 		model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, dv := range list {
@@ -95,7 +92,6 @@ func (r *DirectVolumeMigration) GetStored() ([]model.Model, error) {
 //
 
 func (r *DirectVolumeMigration) Create(e event.CreateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
@@ -108,7 +104,6 @@ func (r *DirectVolumeMigration) Create(e event.CreateEvent) bool {
 }
 
 func (r *DirectVolumeMigration) Update(e event.UpdateEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.ObjectNew.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false
@@ -121,7 +116,6 @@ func (r *DirectVolumeMigration) Update(e event.UpdateEvent) bool {
 }
 
 func (r *DirectVolumeMigration) Delete(e event.DeleteEvent) bool {
-	Log = logging.WithName("discovery")
 	object, cast := e.Object.(*migapi.DirectVolumeMigration)
 	if !cast {
 		return false

@@ -44,7 +44,7 @@ func (m Backup) List(db DB, options ListOptions) ([]*Backup, error) {
 	list := []*Backup{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
@@ -115,7 +115,7 @@ func (m Restore) List(db DB, options ListOptions) ([]*Restore, error) {
 	list := []*Restore{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
@@ -186,7 +186,7 @@ func (m PodVolumeBackup) List(db DB, options ListOptions) ([]*PodVolumeBackup, e
 	list := []*PodVolumeBackup{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {
@@ -257,7 +257,7 @@ func (m PodVolumeRestore) List(db DB, options ListOptions) ([]*PodVolumeRestore,
 	list := []*PodVolumeRestore{}
 	listed, err := Table{db}.List(&m, options)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	for _, intPtr := range listed {

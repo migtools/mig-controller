@@ -50,11 +50,11 @@ func (r *ReconcileDirectImageMigration) migrate(ctx context.Context, imageMigrat
 			log.V(4).Info("Conflict error during task.Run, requeueing.")
 			return FastReQ, nil
 		}
-		log.Info("Phase execution failed.",
+		task.Log.Info("Phase execution failed.",
 			"phase", task.Phase,
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())
-		log.Trace(err)
+		sink.Trace(err)
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}

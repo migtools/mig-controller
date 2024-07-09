@@ -137,7 +137,7 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 				StorageClass: getStorageClassName(pv),
 				Supported: migapi.Supported{
 					Actions:     r.getSupportedActions(pv, claim),
-					CopyMethods: r.getSupportedCopyMethods(pv),
+					CopyMethods: r.getSupportedCopyMethods(),
 				},
 				Selection: selection,
 				PVC:       claim,
@@ -415,7 +415,7 @@ func (r *ReconcileMigPlan) getSupportedActions(pv core.PersistentVolume, claim m
 // Determine the supported PV copy methods.
 // This is static for now but should eventually take into account
 // src volume type and dest cluster available storage classes
-func (r *ReconcileMigPlan) getSupportedCopyMethods(pv core.PersistentVolume) []string {
+func (r *ReconcileMigPlan) getSupportedCopyMethods() []string {
 	return []string{
 		migapi.PvFilesystemCopyMethod,
 		migapi.PvBlockCopyMethod,

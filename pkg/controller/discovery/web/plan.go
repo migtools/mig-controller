@@ -66,7 +66,7 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 		err := h.plan.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				Log.Trace(err)
+				sink.Trace(err)
 				return http.StatusInternalServerError
 			} else {
 				return http.StatusNotFound
@@ -90,7 +90,7 @@ func (h *PlanHandler) Prepare(ctx *gin.Context) int {
 		err := h.migration.Get(h.container.Db)
 		if err != nil {
 			if err != sql.ErrNoRows {
-				Log.Trace(err)
+				sink.Trace(err)
 				return http.StatusInternalServerError
 			} else {
 				return http.StatusNotFound
@@ -128,13 +128,13 @@ func (h PlanHandler) List(ctx *gin.Context) {
 	collection := model.Plan{}
 	count, err := collection.Count(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	list, err := collection.List(db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
@@ -161,7 +161,7 @@ func (h PlanHandler) Get(ctx *gin.Context) {
 	err := h.plan.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
@@ -192,7 +192,7 @@ func (h PlanHandler) Tree(ctx *gin.Context) {
 	root, err := tree.Build()
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			ctx.Status(http.StatusInternalServerError)
 			return
 		} else {
@@ -267,13 +267,13 @@ type PlanTree struct {
 func (t *PlanTree) Build() (*TreeNode, error) {
 	err := t.setCluster()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 	root := t.getRoot()
 	err = t.addMigrations(root)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return nil, err
 	}
 
@@ -303,7 +303,7 @@ func (t *PlanTree) setCluster() error {
 	}
 	err := cluster.Get(t.db)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	t.cluster.source = cluster
@@ -315,7 +315,7 @@ func (t *PlanTree) setCluster() error {
 	}
 	err = cluster.Get(t.db)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	t.cluster.destination = cluster
@@ -358,7 +358,7 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -387,32 +387,32 @@ func (t *PlanTree) addMigrations(parent *TreeNode) error {
 
 		err = t.addBackups(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addRestores(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addDirectVolumes(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addDirectImages(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addMigrationPods(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addHooks(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -436,7 +436,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -453,7 +453,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		}
 		err := t.addPvBackups(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		// Add move and snapshot PVCs if this is a stage backup
@@ -461,7 +461,7 @@ func (t *PlanTree) addBackups(migration *model.Migration, parent *TreeNode) erro
 		if found {
 			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return err
 			}
 		}
@@ -499,7 +499,7 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, paren
 		}
 		list, err := collection.List(t.db, model.ListOptions{})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		for _, m := range list {
@@ -515,7 +515,7 @@ func (t *PlanTree) addMoveAndSnapshotPVCsForCluster(cluster model.Cluster, paren
 					}
 					err := t.addPVForPVC(cluster, m, &node)
 					if err != nil {
-						Log.Trace(err)
+						sink.Trace(err)
 						return err
 					}
 					parent.Children = append(parent.Children, node)
@@ -547,7 +547,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -569,7 +569,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		}
 		err := t.addPvRestores(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		// Add move and snapshot PVCs if this is a stage restore
@@ -577,7 +577,7 @@ func (t *PlanTree) addRestores(migration *model.Migration, parent *TreeNode) err
 		if found {
 			err = t.addMoveAndSnapshotPVCsForCluster(cluster, &node)
 			if err != nil {
-				Log.Trace(err)
+				sink.Trace(err)
 				return err
 			}
 		}
@@ -615,7 +615,7 @@ func (t *PlanTree) addMigrationPodsForCluster(cluster model.Cluster, migration *
 		cLabel.Name: cLabel.Value,
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -648,7 +648,7 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -661,17 +661,17 @@ func (t *PlanTree) addDirectVolumes(migration *model.Migration, parent *TreeNode
 		}
 		err := t.addDirectVolumeProgresses(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addDirectVolumePods(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		err = t.addDirectVolumeRoutes(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -693,7 +693,7 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 	collection := model.Hook{}
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -713,7 +713,7 @@ func (t *PlanTree) addHooks(migration *model.Migration, parent *TreeNode) error 
 				}
 				err := t.addHookJobsForCluster(m, migration, &node)
 				if err != nil {
-					Log.Trace(err)
+					sink.Trace(err)
 					return err
 				}
 				parent.Children = append(parent.Children, node)
@@ -749,7 +749,7 @@ func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migr
 		"owner":   string(migrationObject.UID),
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -762,7 +762,7 @@ func (t *PlanTree) addHookJobsForCluster(hook *model.Hook, migration *model.Migr
 		}
 		err := t.addJobPodsForCluster(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -784,7 +784,7 @@ func (t *PlanTree) addJobPodsForCluster(cluster model.Cluster, job *model.Job, p
 		"job-name": string(jobObject.Name),
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -811,7 +811,7 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -824,7 +824,7 @@ func (t *PlanTree) addDirectImages(migration *model.Migration, parent *TreeNode)
 		}
 		err := t.addDirectImageStreams(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -843,7 +843,7 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -858,14 +858,14 @@ func (t *PlanTree) addDirectVolumeProgresses(directVolume *model.DirectVolumeMig
 		// Add linked PVCs
 		err := t.addDirectVolumeProgressPVCs(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
 		// Add linked Pods
 		err = t.addDirectVolumeProgressPods(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -902,7 +902,7 @@ func (t *PlanTree) addDirectVolumePodsForCluster(cluster model.Cluster, directVo
 		cLabel.Name: cLabel.Value,
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -974,7 +974,7 @@ func (t *PlanTree) addDirectVolumeProgressPodsForCluster(cluster model.Cluster,
 	}
 	list, err := collection.List(t.db, model.ListOptions{Labels: podSelector})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for i, m := range list {
@@ -1029,7 +1029,7 @@ func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 	}
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1047,7 +1047,7 @@ func (t *PlanTree) addDirectVolumeProgressPVCForCluster(cluster model.Cluster,
 
 		err := t.addPVForPVC(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -1084,7 +1084,7 @@ func (t *PlanTree) addDirectVolumeRoutesForCluster(cluster model.Cluster, direct
 		cLabel.Name: cLabel.Value,
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1117,7 +1117,7 @@ func (t *PlanTree) addDirectImageStreams(directImage *model.DirectImageMigration
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1161,7 +1161,7 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1188,7 +1188,7 @@ func (t *PlanTree) addPvBackups(backup *model.Backup, parent *TreeNode) error {
 
 		err = t.addPVCsForPVB(m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -1211,7 +1211,7 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 		},
 	})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1238,7 +1238,7 @@ func (t *PlanTree) addPvRestores(restore *model.Restore, parent *TreeNode) error
 
 		err = t.addPVCsForPVR(m, restore, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 		parent.Children = append(parent.Children, node)
@@ -1262,7 +1262,7 @@ func (t *PlanTree) addPVCsForPVR(pvr *model.PodVolumeRestore, restore *model.Res
 	}
 	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1276,7 +1276,7 @@ func (t *PlanTree) addPVCsForPVR(pvr *model.PodVolumeRestore, restore *model.Res
 
 		err = t.addPVForPVC(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -1298,7 +1298,7 @@ func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) erro
 		"migration.openshift.io/migrated-by-backup": backup.DecodeObject().Name,
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1312,7 +1312,7 @@ func (t *PlanTree) addPVCsForBackup(backup *model.Backup, parent *TreeNode) erro
 
 		err = t.addPVForPVC(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -1334,7 +1334,7 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 		migapi.MigBackupLabel: restore.DecodeObject().Spec.BackupName,
 	}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1348,7 +1348,7 @@ func (t *PlanTree) addPVCsForRestore(restore *model.Restore, parent *TreeNode) e
 
 		err = t.addPVForPVC(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -1373,7 +1373,7 @@ func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) e
 	}
 	list, err := collection.List(t.db, model.ListOptions{Labels: model.Labels{}})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1387,7 +1387,7 @@ func (t *PlanTree) addPVCsForPVB(pvb *model.PodVolumeBackup, parent *TreeNode) e
 
 		err = t.addPVForPVC(cluster, m, &node)
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return err
 		}
 
@@ -1412,7 +1412,7 @@ func (t *PlanTree) addPVForPVC(cluster model.Cluster, pvc *model.PVC, parent *Tr
 	}
 	list, err := collection.List(t.db, model.ListOptions{})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	for _, m := range list {
@@ -1441,17 +1441,17 @@ func (p *PlanPods) With(ctx *gin.Context, h *PlanHandler) error {
 	p.Controller, err = p.buildController(ctx, h)
 	object := h.plan.DecodeObject()
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	p.Source, err = p.buildPods(h, object.Spec.SrcMigClusterRef)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 	p.Destination, err = p.buildPods(h, object.Spec.DestMigClusterRef)
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		return err
 	}
 
@@ -1475,7 +1475,7 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod,
 			},
 		})
 	if err != nil {
-		Log.Trace(err)
+		sink.Trace(err)
 		ctx.Status(http.StatusInternalServerError)
 		return nil, err
 	}
@@ -1486,7 +1486,7 @@ func (p *PlanPods) buildController(ctx *gin.Context, h *PlanHandler) ([]PlanPod,
 	cluster, err := m.GetCluster(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		} else {
 			return pods, nil
@@ -1513,7 +1513,7 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod
 	err := cluster.Get(h.container.Db)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		} else {
 			return nil, nil
@@ -1535,7 +1535,7 @@ func (p *PlanPods) buildPods(h *PlanHandler, ref *v1.ObjectReference) ([]PlanPod
 				Labels: lb,
 			})
 		if err != nil {
-			Log.Trace(err)
+			sink.Trace(err)
 			return nil, err
 		}
 		for _, model := range podModels {

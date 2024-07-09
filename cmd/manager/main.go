@@ -32,11 +32,15 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	virtv1 "kubevirt.io/api/core/v1"
+	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 func main() {
@@ -58,7 +62,11 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	log.Info("setting up manager")
-	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	mgr, err := manager.New(cfg, manager.Options{
+		Metrics: server.Options{
+			BindAddress: "0",
+		},
+	})
 	if err != nil {
 		log.Error(err, "unable to set up overall controller manager")
 		os.Exit(1)
@@ -94,6 +102,14 @@ func main() {
 	}
 	if err := conversion.RegisterConversions(mgr.GetScheme()); err != nil {
 		log.Error(err, "unable to register nessesary conversions")
+		os.Exit(1)
+	}
+	if err := virtv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add KubeVirt APIs to scheme")
+		os.Exit(1)
+	}
+	if err := cdiv1.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "unable to add CDI APIs to scheme")
 		os.Exit(1)
 	}
 
