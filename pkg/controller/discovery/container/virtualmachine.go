@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	virtv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -19,15 +20,17 @@ type VirtualMachine struct {
 }
 
 func (r *VirtualMachine) AddWatch(dsController controller.Controller) error {
-	err := dsController.Watch(
-		source.Kind(r.ds.manager.GetCache(), &virtv1.VirtualMachine{}),
-		&handler.EnqueueRequestForObject{},
-		r)
-	if err != nil {
-		sink.Trace(err)
-		return err
+	err := r.ds.Client.List(context.TODO(), &virtv1.VirtualMachineList{})
+	if !meta.IsNoMatchError(err) {
+		err := dsController.Watch(
+			source.Kind(r.ds.manager.GetCache(), &virtv1.VirtualMachine{}),
+			&handler.EnqueueRequestForObject{},
+			r)
+		if err != nil {
+			sink.Trace(err)
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -58,9 +61,11 @@ func (r *VirtualMachine) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := virtv1.VirtualMachineList{}
 	err := r.ds.Client.List(context.TODO(), &onCluster)
-	if err != nil {
+	if err != nil && !meta.IsNoMatchError(err) {
 		sink.Trace(err)
 		return nil, err
+	} else if meta.IsNoMatchError(err) {
+		return models, nil
 	}
 	for _, discovered := range onCluster.Items {
 		vm := &model.VirtualMachine{
