@@ -17,6 +17,7 @@ import (
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	virtv1 "kubevirt.io/api/core/v1"
@@ -640,6 +641,9 @@ func (t *Task) swapVirtualMachinePVCRefs(client k8sclient.Client, restConfig *re
 		list := &virtv1.VirtualMachineList{}
 		options := k8sclient.InNamespace(ns)
 		if err := client.List(context.TODO(), list, options); err != nil {
+			if k8smeta.IsNoMatchError(err) {
+				continue
+			}
 			t.Log.Error(err, "failed listing virtual machines", "namespace", ns)
 			continue
 		}

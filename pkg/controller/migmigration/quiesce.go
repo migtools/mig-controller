@@ -15,6 +15,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -845,6 +846,9 @@ func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.I
 			&list,
 			options)
 		if err != nil {
+			if meta.IsNoMatchError(err) {
+				continue
+			}
 			return liberr.Wrap(err)
 		}
 		for _, vm := range list.Items {
@@ -894,6 +898,9 @@ func (t *Task) unQuiesceVirtualMachines(client k8sclient.Client, restClient rest
 			&list,
 			options)
 		if err != nil {
+			if meta.IsNoMatchError(err) {
+				continue
+			}
 			return liberr.Wrap(err)
 		}
 		for _, vm := range list.Items {
