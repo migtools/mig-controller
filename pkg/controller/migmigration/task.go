@@ -722,11 +722,13 @@ func (t *Task) Run(ctx context.Context) error {
 			return liberr.Wrap(err)
 		}
 	case CreateDirectVolumeMigration:
-		err := t.createDirectVolumeMigration()
-		if err != nil {
-			return liberr.Wrap(err)
+		if t.hasDirectVolumes() {
+			err := t.createDirectVolumeMigration()
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
-		if err = t.next(); err != nil {
+		if err := t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
 	case WaitForDirectVolumeMigrationToComplete:
@@ -1677,11 +1679,7 @@ func (t *Task) hasDirectVolumes() bool {
 	if t.PlanResources.MigPlan.Spec.IndirectVolumeMigration {
 		return false
 	}
-	pvcList := t.getDirectVolumeClaimList()
-	if pvcList != nil {
-		return true
-	}
-	return false
+	return t.getDirectVolumeClaimList() != nil
 }
 
 // Get whether the associated plan has imagestreams to be migrated
