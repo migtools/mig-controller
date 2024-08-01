@@ -55,7 +55,7 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 		Spec: migapi.DirectVolumeMigrationSpec{
 			SrcMigClusterRef:            t.PlanResources.SrcMigCluster.GetObjectReference(),
 			DestMigClusterRef:           t.PlanResources.DestMigCluster.GetObjectReference(),
-			PersistentVolumeClaims:      *pvcList,
+			PersistentVolumeClaims:      pvcList,
 			CreateDestinationNamespaces: true,
 		},
 	}
@@ -202,7 +202,7 @@ func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 	return progress
 }
 
-func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
+func (t *Task) getDirectVolumeClaimList() []migapi.PVCToMigrate {
 	nsMapping := t.PlanResources.MigPlan.GetNamespaceMapping()
 	var pvcList []migapi.PVCToMigrate
 	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
@@ -227,7 +227,7 @@ func (t *Task) getDirectVolumeClaimList() *[]migapi.PVCToMigrate {
 			Verify:             pv.Selection.Verify,
 		})
 	}
-	return &pvcList
+	return pvcList
 }
 
 func (t *Task) deleteDirectVolumeMigrationResources() error {
