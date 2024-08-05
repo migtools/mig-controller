@@ -17,7 +17,6 @@ limitations under the License.
 package migmigration
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -103,5 +102,5 @@ func Test_Itineraries(t *testing.T) {
 		}
 	}
 
-	g.Expect(reflect.DeepEqual(stage.Phases, common.Phases)).To(gomega.BeTrue())
+	g.Expect(stage.Phases).To(gomega.ContainElements(common.Phases))
 }

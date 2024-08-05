@@ -115,6 +115,11 @@ type MigPlanSpec struct {
 	// LabelSelector optional label selector on the included resources in Velero Backup
 	// +kubebuilder:validation:Optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
+
+	// LiveMigrate optional flag to enable live migration of VMs during direct volume migration
+	// Only running VMs when the plan is executed will be live migrated
+	// +kubebuilder:validation:Optional
+	LiveMigrate *bool `json:"liveMigrate,omitempty"`
 }
 
 // MigPlanStatus defines the observed state of MigPlan
@@ -216,6 +221,10 @@ type PlanResources struct {
 	MigStorage     *MigStorage
 	SrcMigCluster  *MigCluster
 	DestMigCluster *MigCluster
+}
+
+func (r *MigPlan) LiveMigrationChecked() bool {
+	return r.Spec.LiveMigrate != nil && *r.Spec.LiveMigrate
 }
 
 // GetRefResources gets referenced resources from a MigPlan.

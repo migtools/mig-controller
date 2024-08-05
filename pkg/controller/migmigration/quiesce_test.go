@@ -362,6 +362,162 @@ func TestUnQuiesceVirtualMachine(t *testing.T) {
 	}
 }
 
+func TestEnsureDestinationQuiescedPodsTerminated(t *testing.T) {
+	tests := []struct {
+		name          string
+		client        compat.Client
+		task          *Task
+		allterminated bool
+	}{
+		{
+			name:   "no pods",
+			client: getFakeClientWithObjs(),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+		{
+			name:   "no pods with owner ref",
+			client: getFakeClientWithObjs(createPodWithOwner("pod", "tgt-namespace", "", "", "")),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+		{
+			name:   "pods with deployment owner ref",
+			client: getFakeClientWithObjs(createPodWithOwner("pod", "tgt-namespace", "v1", "ReplicaSet", "deployment")),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: false,
+		},
+		{
+			name:   "skipped pods with vm owner ref",
+			client: getFakeClientWithObjs(createPodWithOwnerAndPhase("pod", "tgt-namespace", "v1", "VirtualMachineInstance", "virt-launcher", corev1.PodSucceeded)),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.task.destinationClient = tt.client
+			allTerminated, err := tt.task.ensureDestinationQuiescedPodsTerminated()
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if allTerminated != tt.allterminated {
+				t.Errorf("ensureDestinationQuiescedPodsTerminated() allTerminated = %v, want %v", allTerminated, tt.allterminated)
+			}
+		})
+	}
+}
+
+func TestEnsureSourceQuiescedPodsTerminated(t *testing.T) {
+	tests := []struct {
+		name          string
+		client        compat.Client
+		task          *Task
+		allterminated bool
+	}{
+		{
+			name:   "no pods",
+			client: getFakeClientWithObjs(),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+		{
+			name:   "no pods with owner ref",
+			client: getFakeClientWithObjs(createPodWithOwner("pod", "src-namespace", "", "", "")),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+		{
+			name:   "pods with deployment owner ref",
+			client: getFakeClientWithObjs(createPodWithOwner("pod", "src-namespace", "v1", "ReplicationController", "controller")),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: false,
+		},
+		{
+			name:   "skipped pods with vm owner ref",
+			client: getFakeClientWithObjs(createPodWithOwnerAndPhase("pod", "src-namespace", "v1", "VirtualMachineInstance", "virt-launcher", corev1.PodFailed)),
+			task: &Task{
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: []string{"src-namespace:tgt-namespace"},
+						},
+					},
+				},
+			},
+			allterminated: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.task.sourceClient = tt.client
+			allTerminated, err := tt.task.ensureSourceQuiescedPodsTerminated()
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if allTerminated != tt.allterminated {
+				t.Errorf("ensureDestinationQuiescedPodsTerminated() allTerminated = %v, want %v", allTerminated, tt.allterminated)
+			}
+		})
+	}
+}
+
 func getFakeClientWithObjs(obj ...k8sclient.Object) compat.Client {
 	client, _ := fakecompat.NewFakeClient(obj...)
 	return client
@@ -401,17 +557,37 @@ func createVMWithAnnotation(name, namespace string, ann map[string]string) *virt
 }
 
 func createVirtlauncherPod(vmName, namespace string) *corev1.Pod {
-	return &corev1.Pod{
+	pod := createPodWithOwner(vmName+"-virt-launcher", namespace, "kubevirt.io/v1", "VirtualMachineInstance", vmName)
+	pod.Labels = map[string]string{
+		"kubevirt.io": "virt-launcher",
+	}
+	return pod
+}
+
+func createPodWithOwner(name, namespace, apiversion, kind, ownerName string) *corev1.Pod {
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      vmName + "-virt-launcher",
+			Name:      name,
 			Namespace: namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "kubevirt.io/v1",
-					Kind:       "VirtualMachineInstance",
-					Name:       vmName,
-				},
-			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
 		},
 	}
+	if apiversion != "" && kind != "" && ownerName != "" {
+		pod.OwnerReferences = []metav1.OwnerReference{
+			{
+				APIVersion: apiversion,
+				Kind:       kind,
+				Name:       ownerName,
+			},
+		}
+	}
+	return pod
+}
+
+func createPodWithOwnerAndPhase(name, namespace, apiversion, kind, ownerName string, phase corev1.PodPhase) *corev1.Pod {
+	pod := createPodWithOwner(name, namespace, apiversion, kind, ownerName)
+	pod.Status.Phase = phase
+	return pod
 }

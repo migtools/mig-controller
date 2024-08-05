@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	migrationv1alpha1 "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/onsi/gomega"
 	"golang.org/x/net/context"
@@ -27,6 +28,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	virtv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -81,4 +84,209 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	defer c.Delete(context.TODO(), instance)
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
+}
+
+func TestCleanupTargetResourcesInNamespaces(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	reconciler := &ReconcileDirectVolumeMigration{}
+	instance := &migrationv1alpha1.DirectVolumeMigration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: migrationv1alpha1.OpenshiftMigrationNamespace,
+			UID:       "1234",
+		},
+	}
+	client := getFakeClientWithObjs(
+		createDVMPod("namespace1", string(instance.GetUID())),
+		createDVMSecret("namespace1", string(instance.GetUID())),
+		createDVMSecret("namespace2", string(instance.GetUID())),
+	)
+
+	_, err := reconciler.cleanupResourcesInNamespaces(client, instance.GetUID(), []string{"namespace1", "namespace2"})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	// ensure the pod is gone
+	pod := &kapi.Pod{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "dvm-pod", Namespace: "namespace1"}, pod)
+	g.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
+
+	// ensure the secrets are gone
+	secret := &kapi.Secret{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "dvm-secret", Namespace: "namespace1"}, secret)
+	g.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
+	secret = &kapi.Secret{}
+	err = client.Get(context.TODO(), types.NamespacedName{Name: "dvm-secret", Namespace: "namespace2"}, secret)
+	g.Expect(apierrors.IsNotFound(err)).To(gomega.BeTrue())
+}
+
+func TestCancelLiveMigrationsStage(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	reconciler := &ReconcileDirectVolumeMigration{}
+	instance := &migrationv1alpha1.DirectVolumeMigration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: migrationv1alpha1.OpenshiftMigrationNamespace,
+			UID:       "1234",
+		},
+		Spec: migrationv1alpha1.DirectVolumeMigrationSpec{
+			MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeStage),
+		},
+	}
+	client := getFakeClientWithObjs()
+	allCompleted, err := reconciler.cancelLiveMigrations(client, instance)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(allCompleted).To(gomega.BeTrue())
+}
+
+func TestCancelLiveMigrationsCutoverAllCompleted(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	reconciler := &ReconcileDirectVolumeMigration{}
+	instance := &migrationv1alpha1.DirectVolumeMigration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: migrationv1alpha1.OpenshiftMigrationNamespace,
+			UID:       "1234",
+		},
+		Spec: migrationv1alpha1.DirectVolumeMigrationSpec{
+			MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+			LiveMigrate:   ptr.To[bool](true),
+			PersistentVolumeClaims: []migapi.PVCToMigrate{
+				{
+					ObjectReference: &kapi.ObjectReference{
+						Namespace: testNamespace,
+						Name:      "pvc1",
+					},
+					TargetNamespace: testNamespace,
+					TargetName:      "target-pvc1",
+				},
+				{
+					ObjectReference: &kapi.ObjectReference{
+						Namespace: testNamespace,
+						Name:      "pvc2",
+					},
+					TargetNamespace: testNamespace,
+					TargetName:      "target-pvc2",
+				},
+				{
+					ObjectReference: &kapi.ObjectReference{
+						Namespace: testNamespace,
+						Name:      "pvc3",
+					},
+					TargetNamespace: testNamespace,
+					TargetName:      "target-pvc3",
+				},
+				{
+					ObjectReference: &kapi.ObjectReference{
+						Namespace: testNamespace,
+						Name:      "pvc4",
+					},
+					TargetNamespace: testNamespace,
+					TargetName:      "target-pvc4",
+				},
+			},
+		},
+	}
+	client := getFakeClientWithObjs(
+		createVirtualMachineWithVolumes("vm1", testNamespace, []virtv1.Volume{
+			{
+				Name: "pvc1",
+				VolumeSource: virtv1.VolumeSource{
+					DataVolume: &virtv1.DataVolumeSource{
+						Name: "pvc1",
+					},
+				},
+			},
+		}),
+		createVirtlauncherPod("vm1", testNamespace, []string{"pvc1"}),
+		createVirtualMachineWithVolumes("vm2", testNamespace, []virtv1.Volume{
+			{
+				Name: "pvc2",
+				VolumeSource: virtv1.VolumeSource{
+					DataVolume: &virtv1.DataVolumeSource{
+						Name: "pvc2",
+					},
+				},
+			},
+			{
+				Name: "pvc3",
+				VolumeSource: virtv1.VolumeSource{
+					DataVolume: &virtv1.DataVolumeSource{
+						Name: "pvc3",
+					},
+				},
+			},
+		}),
+		createVirtlauncherPod("vm2", testNamespace, []string{"pvc2", "pvc3"}),
+		createVirtualMachine("vm3", testNamespace),
+	)
+	allCompleted, err := reconciler.cancelLiveMigrations(client, instance)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(allCompleted).To(gomega.BeTrue())
+}
+
+func TestCancelLiveMigrationsCutoverNotCompleted(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	reconciler := &ReconcileDirectVolumeMigration{}
+	instance := &migrationv1alpha1.DirectVolumeMigration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: migrationv1alpha1.OpenshiftMigrationNamespace,
+			UID:       "1234",
+		},
+		Spec: migrationv1alpha1.DirectVolumeMigrationSpec{
+			MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+			LiveMigrate:   ptr.To[bool](true),
+			PersistentVolumeClaims: []migapi.PVCToMigrate{
+				{
+					ObjectReference: &kapi.ObjectReference{
+						Namespace: testNamespace,
+						Name:      "pvc1",
+					},
+					TargetNamespace: testNamespace,
+					TargetName:      "target-pvc1",
+				},
+			},
+		},
+	}
+	client := getFakeClientWithObjs(
+		createVirtualMachineWithVolumes("vm1", testNamespace, []virtv1.Volume{
+			{
+				Name: "pvc1",
+				VolumeSource: virtv1.VolumeSource{
+					DataVolume: &virtv1.DataVolumeSource{
+						Name: "pvc1",
+					},
+				},
+			},
+		}),
+		createVirtlauncherPod("vm1", testNamespace, []string{"pvc1"}),
+		createInProgressVirtualMachineMigration("vmim", testNamespace, "vm1"),
+	)
+	allCompleted, err := reconciler.cancelLiveMigrations(client, instance)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	g.Expect(allCompleted).To(gomega.BeFalse())
+}
+
+func createDVMPod(namespace, uid string) *kapi.Pod {
+	return &kapi.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dvm-pod",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"directvolumemigration": uid,
+			},
+		},
+	}
+}
+
+func createDVMSecret(namespace, uid string) *kapi.Secret {
+	return &kapi.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dvm-secret",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"directvolumemigration": uid,
+			},
+		},
+	}
 }

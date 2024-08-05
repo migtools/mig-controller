@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/mig-controller/pkg/controller/migcluster"
 	"github.com/konveyor/mig-controller/pkg/health"
 	"github.com/konveyor/mig-controller/pkg/pods"
@@ -27,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
 
+	virtv1 "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -88,6 +92,9 @@ const (
 	HookPhaseUnknown                           = "HookPhaseUnknown"
 	HookPhaseDuplicate                         = "HookPhaseDuplicate"
 	IntraClusterMigration                      = "IntraClusterMigration"
+	KubeVirtNotInstalledSourceCluster          = "KubeVirtNotInstalledSourceCluster"
+	KubeVirtVersionNotSupported                = "KubeVirtVersionNotSupported"
+	KubeVirtStorageLiveMigrationNotEnabled     = "KubeVirtStorageLiveMigrationNotEnabled"
 )
 
 // Categories
@@ -115,6 +122,14 @@ const (
 	DuplicateNs            = "DuplicateNamespaces"
 	ConflictingNamespaces  = "ConflictingNamespaces"
 	ConflictingPermissions = "ConflictingPermissions"
+	NotSupported           = "NotSupported"
+)
+
+// Messages
+const (
+	KubeVirtNotInstalledSourceClusterMessage      = "KubeVirt is not installed on the source cluster"
+	KubeVirtVersionNotSupportedMessage            = "KubeVirt version does not support storage live migration, Virtual Machines will be stopped instead"
+	KubeVirtStorageLiveMigrationNotEnabledMessage = "KubeVirt storage live migration is not enabled, Virtual Machines will be stopped instead"
 )
 
 // Statuses
@@ -128,6 +143,13 @@ const (
 	openShiftMCSAnnotation       = "openshift.io/sa.scc.mcs"
 	openShiftSuppGroupAnnotation = "openshift.io/sa.scc.supplemental-groups"
 	openShiftUIDRangeAnnotation  = "openshift.io/sa.scc.uid-range"
+)
+
+// Valid kubevirt feature gates
+const (
+	VolumesUpdateStrategy = "VolumesUpdateStrategy"
+	VolumeMigrationConfig = "VolumeMigration"
+	VMLiveUpdateFeatures  = "VMLiveUpdateFeatures"
 )
 
 // Valid AccessMode values
@@ -223,6 +245,13 @@ func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) er
 	err = r.validateOperatorVersions(ctx, plan)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+
+	if plan.LiveMigrationChecked() {
+		// Live migration possible
+		if err := r.validateLiveMigrationPossible(ctx, plan); err != nil {
+			return liberr.Wrap(err)
+		}
 	}
 	return nil
 }
@@ -1523,7 +1552,7 @@ func (r ReconcileMigPlan) validatePodHealth(ctx context.Context, plan *migapi.Mi
 	return nil
 }
 
-func (r ReconcileMigPlan) validateHooks(ctx context.Context, plan *migapi.MigPlan) error {
+func (r *ReconcileMigPlan) validateHooks(ctx context.Context, plan *migapi.MigPlan) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateHooks")
 		defer span.Finish()
@@ -1624,6 +1653,127 @@ func (r ReconcileMigPlan) validateHooks(ctx context.Context, plan *migapi.MigPla
 	}
 
 	return nil
+}
+
+func (r *ReconcileMigPlan) validateLiveMigrationPossible(ctx context.Context, plan *migapi.MigPlan) error {
+	// Check if kubevirt is installed, if not installed, return nil
+	srcCluster, err := plan.GetSourceCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if err := r.validateCluster(ctx, srcCluster, plan); err != nil {
+		return liberr.Wrap(err)
+	}
+	dstCluster, err := plan.GetDestinationCluster(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return r.validateCluster(ctx, dstCluster, plan)
+}
+
+func (r *ReconcileMigPlan) validateCluster(ctx context.Context, cluster *migapi.MigCluster, plan *migapi.MigPlan) error {
+	if cluster == nil || !cluster.Status.IsReady() {
+		return nil
+	}
+	srcClient, err := cluster.GetClient(r)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	if err := r.validateKubeVirtInstalled(ctx, srcClient, plan); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileMigPlan) validateKubeVirtInstalled(ctx context.Context, client compat.Client, plan *migapi.MigPlan) error {
+	if !plan.LiveMigrationChecked() {
+		return nil
+	}
+	kubevirtList := &virtv1.KubeVirtList{}
+	if err := client.List(ctx, kubevirtList); err != nil {
+		return liberr.Wrap(err)
+	}
+	if len(kubevirtList.Items) == 0 || len(kubevirtList.Items) > 1 {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     KubeVirtNotInstalledSourceCluster,
+			Status:   True,
+			Reason:   NotFound,
+			Category: Advisory,
+			Message:  KubeVirtNotInstalledSourceClusterMessage,
+		})
+		return nil
+	}
+	kubevirt := kubevirtList.Items[0]
+	operatorVersion := kubevirt.Status.OperatorVersion
+	major, minor, bugfix, err := parseKubeVirtOperatorSemver(operatorVersion)
+	if err != nil {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     KubeVirtVersionNotSupported,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Warn,
+			Message:  KubeVirtVersionNotSupportedMessage,
+		})
+		return nil
+	}
+	log.V(3).Info("KubeVirt operator version", "major", major, "minor", minor, "bugfix", bugfix)
+	// Check if kubevirt operator version is at least 1.3.0 if live migration is enabled.
+	if major < 1 || (major == 1 && minor < 3) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     KubeVirtVersionNotSupported,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Warn,
+			Message:  KubeVirtVersionNotSupportedMessage,
+		})
+		return nil
+	}
+	// Check if the appropriate feature gates are enabled
+	if kubevirt.Spec.Configuration.VMRolloutStrategy == nil ||
+		*kubevirt.Spec.Configuration.VMRolloutStrategy != virtv1.VMRolloutStrategyLiveUpdate ||
+		kubevirt.Spec.Configuration.DeveloperConfiguration == nil ||
+		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumesUpdateStrategy) ||
+		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumeMigrationConfig) ||
+		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VMLiveUpdateFeatures) {
+		plan.Status.SetCondition(migapi.Condition{
+			Type:     KubeVirtStorageLiveMigrationNotEnabled,
+			Status:   True,
+			Reason:   NotSupported,
+			Category: Warn,
+			Message:  KubeVirtStorageLiveMigrationNotEnabledMessage,
+		})
+		return nil
+	}
+	return nil
+}
+
+func parseKubeVirtOperatorSemver(operatorVersion string) (int, int, int, error) {
+	// example versions: v1.1.1-106-g0be1a2073, or: v1.3.0-beta.0.202+f8efa57713ba76-dirty
+	tokens := strings.Split(operatorVersion, ".")
+	if len(tokens) < 3 {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("version string was not in semver format, != 3 tokens"))
+	}
+
+	if tokens[0][0] == 'v' {
+		tokens[0] = tokens[0][1:]
+	}
+	major, err := strconv.Atoi(tokens[0])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("major version could not be parsed as integer"))
+	}
+
+	minor, err := strconv.Atoi(tokens[1])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("minor version could not be parsed as integer"))
+	}
+
+	bugfixTokens := strings.Split(tokens[2], "-")
+	bugfix, err := strconv.Atoi(bugfixTokens[0])
+	if err != nil {
+		return -1, -1, -1, liberr.Wrap(fmt.Errorf("bugfix version could not be parsed as integer"))
+	}
+
+	return major, minor, bugfix, nil
 }
 
 func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode kapi.PersistentVolumeAccessMode) bool {

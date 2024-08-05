@@ -10,10 +10,12 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/crane-lib/state_transfer/endpoint"
 	routeendpoint "github.com/konveyor/crane-lib/state_transfer/endpoint/route"
@@ -36,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/set"
+	virtv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -63,11 +67,6 @@ const (
 
 // ensureRsyncEndpoints ensures that new Endpoints are created for Rsync and Blockrsync Transfers
 func (t *Task) ensureRsyncEndpoints() error {
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	blockdvmLabels := t.buildDVMLabels()
@@ -76,7 +75,8 @@ func (t *Task) ensureRsyncEndpoints() error {
 
 	hostnames := []string{}
 	if t.EndpointType == migapi.NodePort {
-		hostnames, err = getWorkerNodeHostnames(destClient)
+		var err error
+		hostnames, err = getWorkerNodeHostnames(t.destinationClient)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -120,7 +120,7 @@ func (t *Task) ensureRsyncEndpoints() error {
 			if err != nil {
 				t.Log.Info("failed to get cluster_subdomain, attempting to get cluster's ingress domain", "error", err)
 				ingressConfig := &configv1.Ingress{}
-				err = destClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
+				err = t.destinationClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, ingressConfig)
 				if err != nil {
 					t.Log.Error(err, "failed to retrieve cluster's ingress domain, extremely long namespace names will cause route creation failure")
 				} else {
@@ -148,12 +148,10 @@ func (t *Task) ensureRsyncEndpoints() error {
 			)
 		}
 
-		err = endpoint.Create(destClient)
-		if err != nil {
+		if err := endpoint.Create(t.destinationClient); err != nil {
 			return liberr.Wrap(err)
 		}
-		err = blockEndpoint.Create(destClient)
-		if err != nil {
+		if err := blockEndpoint.Create(t.destinationClient); err != nil {
 			return liberr.Wrap(err)
 		}
 	}
@@ -250,6 +248,9 @@ func (t *Task) getRsyncClientMutations(srcClient compat.Client, destClient compa
 	if err != nil {
 		return nil, liberr.Wrap(err)
 	}
+	if migration == nil {
+		return transferOptions, nil
+	}
 
 	containerMutation.SecurityContext, err = t.getSecurityContext(srcClient, namespace, migration)
 	if err != nil {
@@ -280,6 +281,9 @@ func (t *Task) getRsyncTransferServerMutations(client compat.Client, namespace s
 	migration, err := t.Owner.GetMigrationForDVM(t.Client)
 	if err != nil {
 		return nil, liberr.Wrap(err)
+	}
+	if migration == nil {
+		return transferOptions, nil
 	}
 
 	containerMutation.SecurityContext, err = t.getSecurityContext(client, namespace, migration)
@@ -402,22 +406,12 @@ func (t *Task) getSecurityContext(client compat.Client, namespace string, migrat
 
 // ensureRsyncTransferServer ensures that server component of the Transfer is created
 func (t *Task) ensureRsyncTransferServer() error {
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	nsMap, err := t.getNamespacedPVCPairs()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
 
-	err = t.buildDestinationLimitRangeMap(nsMap, destClient)
+	err = t.buildDestinationLimitRangeMap(nsMap, t.destinationClient)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -427,16 +421,16 @@ func (t *Task) ensureRsyncTransferServer() error {
 		return liberr.Wrap(err)
 	}
 
-	if err := t.ensureFilesystemRsyncTransferServer(srcClient, destClient, nsMap, transportOptions); err != nil {
+	if err := t.ensureFilesystemRsyncTransferServer(nsMap, transportOptions); err != nil {
 		return err
 	}
-	if err := t.ensureBlockRsyncTransferServer(srcClient, destClient, nsMap, transportOptions); err != nil {
+	if err := t.ensureBlockRsyncTransferServer(nsMap, transportOptions); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Task) ensureFilesystemRsyncTransferServer(srcClient, destClient compat.Client, nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
+func (t *Task) ensureFilesystemRsyncTransferServer(nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -444,12 +438,12 @@ func (t *Task) ensureFilesystemRsyncTransferServer(srcClient, destClient compat.
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
 		)
-		endpoints, err := t.getEndpoints(destClient, destNs)
+		endpoints, err := t.getEndpoints(t.destinationClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		stunnelTransport, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, "fs", nnPair, endpoints[0], transportOptions)
+			t.sourceClient, t.destinationClient, "fs", nnPair, endpoints[0], transportOptions)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -464,21 +458,21 @@ func (t *Task) ensureFilesystemRsyncTransferServer(srcClient, destClient compat.
 			if err != nil {
 				return liberr.Wrap(err)
 			}
-			mutations, err := t.getRsyncTransferServerMutations(destClient, destNs)
+			mutations, err := t.getRsyncTransferServerMutations(t.destinationClient, destNs)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 			rsyncOptions = append(rsyncOptions, mutations...)
 			rsyncOptions = append(rsyncOptions, rsynctransfer.WithDestinationPodLabels(labels))
 			transfer, err := rsynctransfer.NewTransfer(
-				stunnelTransport, endpoints[0], srcClient, destClient, filesystemPvcList, t.Log, rsyncOptions...)
+				stunnelTransport, endpoints[0], t.sourceClient, t.destinationClient, filesystemPvcList, t.Log, rsyncOptions...)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 			if transfer == nil {
 				return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
 			}
-			err = transfer.CreateServer(destClient)
+			err = transfer.CreateServer(t.destinationClient)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -487,7 +481,7 @@ func (t *Task) ensureFilesystemRsyncTransferServer(srcClient, destClient compat.
 	return nil
 }
 
-func (t *Task) ensureBlockRsyncTransferServer(srcClient, destClient compat.Client, nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
+func (t *Task) ensureBlockRsyncTransferServer(nsMap map[string][]transfer.PVCPair, transportOptions *transport.Options) error {
 	for bothNs, pvcPairs := range nsMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -495,18 +489,25 @@ func (t *Task) ensureBlockRsyncTransferServer(srcClient, destClient compat.Clien
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: srcNs},
 			types.NamespacedName{Name: DirectVolumeMigrationRsyncTransfer, Namespace: destNs},
 		)
-		endpoints, err := t.getEndpoints(destClient, destNs)
+		endpoints, err := t.getEndpoints(t.destinationClient, destNs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 		stunnelTransports, err := stunneltransport.GetTransportFromKubeObjects(
-			srcClient, destClient, "block", nnPair, endpoints[1], transportOptions)
+			t.sourceClient, t.destinationClient, "block", nnPair, endpoints[1], transportOptions)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+
 		blockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvcPairs...)
 		if err != nil {
 			return liberr.Wrap(err)
+		}
+		if t.PlanResources.MigPlan.LiveMigrationChecked() {
+			blockOrVMPvcList, err = t.filterRunningVMs(blockOrVMPvcList)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
 		}
 		if len(blockOrVMPvcList) > 0 {
 			labels := t.buildDVMLabels()
@@ -521,14 +522,14 @@ func (t *Task) ensureBlockRsyncTransferServer(srcClient, destClient compat.Clien
 			}
 
 			transfer, err := blockrsynctransfer.NewTransfer(
-				stunnelTransports, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, transferOptions)
+				stunnelTransports, endpoints[1], t.sourceClient, t.destinationClient, blockOrVMPvcList, t.Log, transferOptions)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
 			if transfer == nil {
 				return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
 			}
-			err = transfer.CreateServer(destClient)
+			err = transfer.CreateServer(t.destinationClient)
 			if err != nil {
 				return liberr.Wrap(err)
 			}
@@ -537,9 +538,29 @@ func (t *Task) ensureBlockRsyncTransferServer(srcClient, destClient compat.Clien
 	return nil
 }
 
+// Return only PVCPairs that are NOT associated with a running VM
+func (t *Task) filterRunningVMs(unfilteredPVCPairs []transfer.PVCPair) ([]transfer.PVCPair, error) {
+	runningVMPairs := []transfer.PVCPair{}
+	ns := set.New[string]()
+	for _, pvcPair := range unfilteredPVCPairs {
+		ns.Insert(pvcPair.Source().Claim().Namespace)
+	}
+	nsVolumes, err := t.getRunningVMVolumes(ns.SortedList())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pvcPair := range unfilteredPVCPairs {
+		if !slices.Contains(nsVolumes, fmt.Sprintf("%s/%s", pvcPair.Source().Claim().Namespace, pvcPair.Source().Claim().Name)) {
+			runningVMPairs = append(runningVMPairs, pvcPair)
+		}
+	}
+	return runningVMPairs, nil
+}
+
 func (t *Task) createRsyncTransferClients(srcClient compat.Client,
-	destClient compat.Client, nsMap map[string][]transfer.PVCPair) (*rsyncClientOperationStatusList, error) {
-	statusList := &rsyncClientOperationStatusList{}
+	destClient compat.Client, nsMap map[string][]transfer.PVCPair) (*migrationOperationStatusList, error) {
+	statusList := &migrationOperationStatusList{}
 
 	pvcNodeMap, err := t.getPVCNodeNameMap(srcClient)
 	if err != nil {
@@ -624,7 +645,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			)
 			if lastObservedOperationStatus.IsComplete() {
 				statusList.Add(
-					rsyncClientOperationStatus{
+					migrationOperationStatus{
 						failed:    lastObservedOperationStatus.Failed,
 						succeeded: lastObservedOperationStatus.Succeeded,
 						operation: lastObservedOperationStatus,
@@ -634,7 +655,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			}
 
 			newOperation := lastObservedOperationStatus
-			currentStatus := rsyncClientOperationStatus{
+			currentStatus := migrationOperationStatus{
 				operation: newOperation,
 			}
 			pod, err := t.getLatestPodForOperation(srcClient, *lastObservedOperationStatus)
@@ -654,10 +675,19 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			}
 			blockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvc)
 			if err != nil {
-				t.Log.Error(err, "failed creating PVC pair", "pvc", newOperation)
+				t.Log.Error(err, "failed creating block PVC pair", "pvc", newOperation)
 				currentStatus.AddError(err)
 				statusList.Add(currentStatus)
 				continue
+			}
+			if t.PlanResources.MigPlan.LiveMigrationChecked() {
+				blockOrVMPvcList, err = t.filterRunningVMs(blockOrVMPvcList)
+				if err != nil {
+					t.Log.Error(err, "failed filtering block PVC pairs", "pvc", newOperation)
+					currentStatus.AddError(err)
+					statusList.Add(currentStatus)
+					continue
+				}
 			}
 
 			// Force schedule Rsync Pod on the application node
@@ -699,7 +729,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 			if pod != nil {
 				newOperation.CurrentAttempt, _ = strconv.Atoi(pod.Labels[RsyncAttemptLabel])
 				updateOperationStatus(&currentStatus, pod)
-				if currentStatus.failed && currentStatus.operation.CurrentAttempt < GetRsyncPodBackOffLimit(*t.Owner) {
+				if currentStatus.failed && currentStatus.operation.CurrentAttempt < GetRsyncPodBackOffLimit(t.Owner) {
 					// since we have not yet attempted all retries,
 					// reset the failed status and set the pending status
 					currentStatus.failed = false
@@ -726,6 +756,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 							SourcePodMeta: transfer.ResourceMetadata{
 								Labels: labels,
 							},
+							NodeName: nodeName,
 						}
 						transfer, err := blockrsynctransfer.NewTransfer(
 							blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, &transferOptions)
@@ -793,6 +824,8 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					transferOptions.SourcePodMeta = transfer.ResourceMetadata{
 						Labels: labels,
 					}
+					transferOptions.NodeName = nodeName
+
 					transfer, err := blockrsynctransfer.NewTransfer(
 						blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, transferOptions)
 					if err != nil {
@@ -809,7 +842,6 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				}
 			}
 			statusList.Add(currentStatus)
-			t.Log.Info("adding status of pvc", "pvc", currentStatus.operation, "errors", currentStatus.errors)
 		}
 	}
 	return statusList, nil
@@ -818,7 +850,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 func (t *Task) createClientPodForTransfer(
 	name, namespace string,
 	tr transfer.Transfer,
-	currentStatus *rsyncClientOperationStatus) *rsyncClientOperationStatus {
+	currentStatus *migrationOperationStatus) *migrationOperationStatus {
 	if tr == nil {
 		currentStatus.AddError(
 			fmt.Errorf("transfer %s/%s not found", namespace, name))
@@ -833,12 +865,6 @@ func (t *Task) createClientPodForTransfer(
 }
 
 func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
-	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return false, nil, err
-	}
-
 	pvcMap := t.getPVCNamespaceMap()
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
@@ -847,7 +873,7 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 	for bothNs, _ := range pvcMap {
 		ns := getDestNs(bothNs)
 		pods := corev1.PodList{}
-		err = destClient.List(
+		err := t.destinationClient.List(
 			context.TODO(),
 			&pods,
 			&k8sclient.ListOptions{
@@ -861,7 +887,7 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 			if pod.Status.Phase != corev1.PodRunning {
 				// Log abnormal events for Rsync transfer Pod if any are found
 				migevent.LogAbnormalEventsForResource(
-					destClient, t.Log,
+					t.destinationClient, t.Log,
 					"Found abnormal event for Rsync transfer Pod on destination cluster",
 					types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
 					pod.UID, "Pod")
@@ -960,16 +986,6 @@ func (p pvcWithSecurityContextInfo) Get(srcClaimName string, srcClaimNamespace s
 // With namespace mapping, the destination cluster namespace may be different than that in the source cluster.
 // This function maps PVCs to the appropriate src:dest namespace pairs.
 func (t *Task) getNamespacedPVCPairs() (map[string][]transfer.PVCPair, error) {
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return nil, err
-	}
-
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return nil, err
-	}
-
 	nsMap := map[string][]transfer.PVCPair{}
 	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
 		srcNs := pvc.Namespace
@@ -978,12 +994,12 @@ func (t *Task) getNamespacedPVCPairs() (map[string][]transfer.PVCPair, error) {
 			destNs = pvc.TargetNamespace
 		}
 		srcPvc := corev1.PersistentVolumeClaim{}
-		err := srcClient.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: srcNs}, &srcPvc)
+		err := t.sourceClient.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: srcNs}, &srcPvc)
 		if err != nil {
 			return nil, err
 		}
 		destPvc := corev1.PersistentVolumeClaim{}
-		err = destClient.Get(context.TODO(), types.NamespacedName{Name: pvc.TargetName, Namespace: destNs}, &destPvc)
+		err = t.destinationClient.Get(context.TODO(), types.NamespacedName{Name: pvc.TargetName, Namespace: destNs}, &destPvc)
 		if err != nil {
 			return nil, err
 		}
@@ -1062,10 +1078,6 @@ func getDestNs(bothNs string) string {
 func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 	messages := []string{}
 	// Get client for destination
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return false, messages, err
-	}
 	nsMap := t.getPVCNamespaceMap()
 	for bothNs := range nsMap {
 		namespace := getDestNs(bothNs)
@@ -1075,13 +1087,12 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 			route := routev1.Route{}
 
 			key := types.NamespacedName{Name: DirectVolumeMigrationRsyncTransferRoute, Namespace: namespace}
-			err = destClient.Get(context.TODO(), key, &route)
-			if err != nil {
+			if err := t.destinationClient.Get(context.TODO(), key, &route); err != nil {
 				return false, messages, err
 			}
 			// Logs abnormal events related to route if any are found
 			migevent.LogAbnormalEventsForResource(
-				destClient, t.Log,
+				t.destinationClient, t.Log,
 				"Found abnormal event for Rsync Route on destination cluster",
 				types.NamespacedName{Namespace: route.Namespace, Name: route.Name},
 				route.UID, "Route")
@@ -1110,8 +1121,7 @@ func (t *Task) areRsyncRoutesAdmitted() (bool, []string, error) {
 				messages = append(messages, message)
 			}
 		default:
-			_, err = t.getEndpoints(destClient, namespace)
-			if err != nil {
+			if _, err := t.getEndpoints(t.destinationClient, namespace); err != nil {
 				t.Log.Info("rsync transfer service is not healthy", "namespace", namespace)
 				messages = append(messages, fmt.Sprintf("rsync transfer service is not healthy in namespace %s", namespace))
 			}
@@ -1318,7 +1328,17 @@ func (t *Task) createPVProgressCR() error {
 	labels := t.Owner.GetCorrelationLabels()
 	for bothNs, vols := range pvcMap {
 		ns := getSourceNs(bothNs)
+		volumeNames, err := t.getRunningVMVolumes([]string{ns})
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 		for _, vol := range vols {
+			matchString := fmt.Sprintf("%s/%s", ns, vol.Name)
+			if t.PlanResources.MigPlan.LiveMigrationChecked() &&
+				slices.Contains(volumeNames, matchString) {
+				t.Log.V(3).Info("Skipping Rsync Progress CR creation for running VM", "volume", matchString)
+				continue
+			}
 			dvmp := migapi.DirectVolumeMigrationProgress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
@@ -1365,79 +1385,189 @@ func getMD5Hash(s string) string {
 // hasAllProgressReportingCompleted reads DVMP CR and status of Rsync Operations present for all PVCs and generates progress information in CR status
 // returns True when progress reporting for all Rsync Pods is complete
 func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
-	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
-	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
-	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
-	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
-	unknownPods := []*migapi.PodProgress{}
-	var pendingSinceTimeLimitPods []string
+	// Keep current progress in case looking up progress fails, this way we don't wipe out
+	// the progress until next time the update succeeds.
+	currentProgress := t.getCurrentLiveMigrationProgress()
+	t.resetProgressCounters()
 	pvcMap := t.getPVCNamespaceMap()
 	for bothNs, vols := range pvcMap {
 		ns := getSourceNs(bothNs)
+		if err := t.populateVMMappings(ns); err != nil {
+			return false, err
+		}
 		for _, vol := range vols {
-			operation := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
-				Namespace: ns,
-				Name:      vol.Name,
-			})
-			dvmp := migapi.DirectVolumeMigrationProgress{}
-			err := t.Client.Get(context.TODO(), types.NamespacedName{
-				Name:      getMD5Hash(t.Owner.Name + vol.Name + ns),
-				Namespace: migapi.OpenshiftMigrationNamespace,
-			}, &dvmp)
-			if err != nil {
-				return false, err
-			}
-			podProgress := &migapi.PodProgress{
-				ObjectReference: &corev1.ObjectReference{
-					Namespace: ns,
-					Name:      dvmp.Status.PodName,
-				},
-				PVCReference: &corev1.ObjectReference{
-					Namespace: ns,
-					Name:      vol.Name,
-				},
-				LastObservedProgressPercent: dvmp.Status.TotalProgressPercentage,
-				LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
-				TotalElapsedTime:            dvmp.Status.RsyncElapsedTime,
-			}
-			switch {
-			case dvmp.Status.PodPhase == corev1.PodRunning:
-				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
-			case operation.Failed:
-				t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, podProgress)
-			case dvmp.Status.PodPhase == corev1.PodSucceeded:
-				t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, podProgress)
-			case dvmp.Status.PodPhase == corev1.PodPending:
-				t.Owner.Status.PendingPods = append(t.Owner.Status.PendingPods, podProgress)
-				if dvmp.Status.CreationTimestamp != nil {
-					if time.Now().UTC().Sub(dvmp.Status.CreationTimestamp.Time.UTC()) > PendingPodWarningTimeLimit {
-						pendingSinceTimeLimitPods = append(pendingSinceTimeLimitPods, fmt.Sprintf("%s/%s", podProgress.Namespace, podProgress.Name))
+			matchString := fmt.Sprintf("%s/%s", ns, vol.Name)
+			if t.PlanResources.MigPlan.LiveMigrationChecked() &&
+				slices.Contains(t.VirtualMachineMappings.runningVMVolumeNames, matchString) {
+				// Only count skipped during staging. During cutover we need to live migrate
+				// PVCs for running VMs. For reporting purposes we won't count skipped PVCs
+				// here since they will get reported with the live migration status.
+				if !(t.Owner.IsCutover() || t.Owner.IsRollback()) {
+					t.Owner.SkipVolume(vol.Name, ns)
+				} else {
+					if err := t.updateVolumeLiveMigrationProgressStatus(vol.Name, ns, currentProgress); err != nil {
+						return false, err
 					}
 				}
-			case dvmp.Status.PodPhase == "":
-				unknownPods = append(unknownPods, podProgress)
-			case !operation.Failed:
-				t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
+			} else {
+				// On rollback we are only interested in live migration volumes, skip the rest
+				if t.Owner.IsRollback() {
+					t.Owner.SkipVolume(vol.Name, ns)
+				}
+				if err := t.updateRsyncProgressStatus(vol.Name, ns); err != nil {
+					return false, err
+				}
 			}
 		}
 	}
 
-	isCompleted := len(t.Owner.Status.SuccessfulPods)+len(t.Owner.Status.FailedPods) == len(t.Owner.Spec.PersistentVolumeClaims)
-	isAnyPending := len(t.Owner.Status.PendingPods) > 0
-	isAnyRunning := len(t.Owner.Status.RunningPods) > 0
-	isAnyUnknown := len(unknownPods) > 0
-	if len(pendingSinceTimeLimitPods) > 0 {
-		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingSinceTimeLimitPods[:], ", "))
-		t.Log.Info(pendingMessage)
-		t.Owner.Status.SetCondition(migapi.Condition{
-			Type:     RsyncClientPodsPending,
-			Status:   migapi.True,
-			Reason:   "PodStuckInContainerCreating",
-			Category: migapi.Warn,
-			Message:  pendingMessage,
-		})
+	return t.Owner.AllReportingCompleted(), nil
+}
+
+func (t *Task) updateVolumeLiveMigrationProgressStatus(volumeName, namespace string, currentProgress map[string]*migapi.LiveMigrationProgress) error {
+	matchString := fmt.Sprintf("%s/%s", namespace, volumeName)
+
+	liveMigrationProgress := &migapi.LiveMigrationProgress{
+		VMName:      "",
+		VMNamespace: namespace,
+		PVCReference: &corev1.ObjectReference{
+			Namespace: namespace,
+			Name:      volumeName,
+		},
+		TotalElapsedTime:            nil,
+		LastObservedProgressPercent: "",
 	}
-	return !isAnyRunning && !isAnyPending && !isAnyUnknown && isCompleted, nil
+	// Look up VirtualMachineInstanceMigration CR to get the status of the migration
+	if vmim, exists := t.VirtualMachineMappings.volumeVMIMMap[matchString]; exists {
+		liveMigrationProgress.VMName = vmim.Spec.VMIName
+		elapsedTime := getVMIMElapsedTime(vmim)
+		liveMigrationProgress.TotalElapsedTime = &elapsedTime
+		if vmim.Status.MigrationState.FailureReason != "" {
+			liveMigrationProgress.Message = vmim.Status.MigrationState.FailureReason
+		}
+		switch vmim.Status.Phase {
+		case virtv1.MigrationSucceeded:
+			liveMigrationProgress.LastObservedProgressPercent = "100%"
+			t.Owner.Status.SuccessfulLiveMigrations = append(t.Owner.Status.SuccessfulLiveMigrations, liveMigrationProgress)
+		case virtv1.MigrationFailed:
+
+			t.Owner.Status.FailedLiveMigrations = append(t.Owner.Status.FailedLiveMigrations, liveMigrationProgress)
+		case virtv1.MigrationRunning:
+			progressPercent, err := t.getLastObservedProgressPercent(vmim.Spec.VMIName, namespace, currentProgress)
+			if err != nil {
+				return err
+			}
+			liveMigrationProgress.LastObservedProgressPercent = progressPercent
+			t.Owner.Status.RunningLiveMigrations = append(t.Owner.Status.RunningLiveMigrations, liveMigrationProgress)
+		case virtv1.MigrationPending:
+			t.Owner.Status.PendingLiveMigrations = append(t.Owner.Status.PendingLiveMigrations, liveMigrationProgress)
+		}
+	} else {
+		// VMIM doesn't exist, check if the VMI is in error.
+		vmName := t.VirtualMachineMappings.volumeVMNameMap[volumeName]
+		message, err := virtualMachineMigrationStatus(t.sourceClient, vmName, namespace, t.Log)
+		if err != nil {
+			return err
+		}
+		liveMigrationProgress.VMName = vmName
+		if message != "" {
+			vmMatchString := fmt.Sprintf("%s/%s", namespace, vmName)
+			liveMigrationProgress.Message = message
+			if currentProgress[vmMatchString] != nil && currentProgress[vmMatchString].TotalElapsedTime != nil {
+				liveMigrationProgress.TotalElapsedTime = currentProgress[vmMatchString].TotalElapsedTime
+			} else {
+				if t.Owner.Status.StartTimestamp != nil {
+					dvmStart := *t.Owner.Status.StartTimestamp
+					liveMigrationProgress.TotalElapsedTime = &metav1.Duration{
+						Duration: time.Since(dvmStart.Time),
+					}
+				}
+			}
+			t.Owner.Status.FailedLiveMigrations = append(t.Owner.Status.FailedLiveMigrations, liveMigrationProgress)
+		} else {
+			t.Owner.Status.PendingLiveMigrations = append(t.Owner.Status.PendingLiveMigrations, liveMigrationProgress)
+		}
+	}
+	return nil
+}
+
+func (t *Task) updateRsyncProgressStatus(volumeName, namespace string) error {
+	operation := t.Owner.Status.GetRsyncOperationStatusForPVC(&corev1.ObjectReference{
+		Namespace: namespace,
+		Name:      volumeName,
+	})
+	dvmp := migapi.DirectVolumeMigrationProgress{}
+	err := t.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      getMD5Hash(t.Owner.Name + volumeName + namespace),
+		Namespace: migapi.OpenshiftMigrationNamespace,
+	}, &dvmp)
+	if err != nil && !k8serror.IsNotFound(err) {
+		return err
+	} else if k8serror.IsNotFound(err) {
+		return nil
+	}
+	podProgress := &migapi.PodProgress{
+		ObjectReference: &corev1.ObjectReference{
+			Namespace: namespace,
+			Name:      dvmp.Status.PodName,
+		},
+		PVCReference: &corev1.ObjectReference{
+			Namespace: namespace,
+			Name:      volumeName,
+		},
+		LastObservedProgressPercent: dvmp.Status.TotalProgressPercentage,
+		LastObservedTransferRate:    dvmp.Status.LastObservedTransferRate,
+		TotalElapsedTime:            dvmp.Status.RsyncElapsedTime,
+	}
+	switch {
+	case dvmp.Status.PodPhase == corev1.PodRunning:
+		t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
+	case operation.Failed:
+		t.Owner.Status.FailedPods = append(t.Owner.Status.FailedPods, podProgress)
+	case dvmp.Status.PodPhase == corev1.PodSucceeded:
+		t.Owner.Status.SuccessfulPods = append(t.Owner.Status.SuccessfulPods, podProgress)
+	case dvmp.Status.PodPhase == corev1.PodPending:
+		t.Owner.Status.PendingPods = append(t.Owner.Status.PendingPods, podProgress)
+		if dvmp.Status.CreationTimestamp != nil {
+			if time.Now().UTC().Sub(dvmp.Status.CreationTimestamp.Time.UTC()) > PendingPodWarningTimeLimit {
+				t.Owner.Status.PendingSinceTimeLimitPods = append(t.Owner.Status.PendingSinceTimeLimitPods, podProgress)
+			}
+		}
+	case dvmp.Status.PodPhase == "":
+		t.Owner.Status.UnknownPods = append(t.Owner.Status.UnknownPods, podProgress)
+	case !operation.Failed:
+		t.Owner.Status.RunningPods = append(t.Owner.Status.RunningPods, podProgress)
+	}
+	return nil
+}
+
+func (t *Task) resetProgressCounters() {
+	t.Owner.Status.RunningPods = []*migapi.PodProgress{}
+	t.Owner.Status.FailedPods = []*migapi.PodProgress{}
+	t.Owner.Status.SuccessfulPods = []*migapi.PodProgress{}
+	t.Owner.Status.PendingPods = []*migapi.PodProgress{}
+	t.Owner.Status.UnknownPods = []*migapi.PodProgress{}
+	t.Owner.Status.RunningLiveMigrations = []*migapi.LiveMigrationProgress{}
+	t.Owner.Status.FailedLiveMigrations = []*migapi.LiveMigrationProgress{}
+	t.Owner.Status.SuccessfulLiveMigrations = []*migapi.LiveMigrationProgress{}
+	t.Owner.Status.PendingLiveMigrations = []*migapi.LiveMigrationProgress{}
+}
+
+func (t *Task) getCurrentLiveMigrationProgress() map[string]*migapi.LiveMigrationProgress {
+	currentProgress := make(map[string]*migapi.LiveMigrationProgress)
+	for _, progress := range t.Owner.Status.RunningLiveMigrations {
+		currentProgress[fmt.Sprintf("%s/%s", progress.VMNamespace, progress.VMName)] = progress
+	}
+	for _, progress := range t.Owner.Status.FailedLiveMigrations {
+		currentProgress[fmt.Sprintf("%s/%s", progress.VMNamespace, progress.VMName)] = progress
+	}
+	for _, progress := range t.Owner.Status.SuccessfulLiveMigrations {
+		currentProgress[fmt.Sprintf("%s/%s", progress.VMNamespace, progress.VMName)] = progress
+	}
+	for _, progress := range t.Owner.Status.PendingLiveMigrations {
+		currentProgress[fmt.Sprintf("%s/%s", progress.VMNamespace, progress.VMName)] = progress
+	}
+	return currentProgress
 }
 
 func (t *Task) hasAllRsyncClientPodsTimedOut() (bool, error) {
@@ -1489,29 +1619,17 @@ func (t *Task) isAllRsyncClientPodsNoRouteToHost() (bool, error) {
 
 // Delete rsync resources
 func (t *Task) deleteRsyncResources() error {
-	// Get client for source + destination
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return err
-	}
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err
-	}
-
 	t.Log.Info("Checking for stale Rsync resources on source MigCluster",
 		"migCluster",
 		path.Join(t.Owner.Spec.SrcMigClusterRef.Namespace, t.Owner.Spec.SrcMigClusterRef.Name))
 	t.Log.Info("Checking for stale Rsync resources on destination MigCluster",
 		"migCluster",
 		path.Join(t.Owner.Spec.DestMigClusterRef.Namespace, t.Owner.Spec.DestMigClusterRef.Name))
-	err = t.findAndDeleteResources(srcClient, destClient, t.getPVCNamespaceMap())
-	if err != nil {
+	if err := t.findAndDeleteResources(t.sourceClient, t.destinationClient, t.getPVCNamespaceMap()); err != nil {
 		return err
 	}
 
-	err = t.deleteRsyncPassword()
-	if err != nil {
+	if err := t.deleteRsyncPassword(); err != nil {
 		return err
 	}
 
@@ -1521,68 +1639,49 @@ func (t *Task) deleteRsyncResources() error {
 
 	t.Log.Info("Checking for stale DVMP resources on host MigCluster",
 		"migCluster", "host")
-	err = t.deleteProgressReportingCRs(t.Client)
-	if err != nil {
+	if err := t.deleteProgressReportingCRs(t.Client); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *Task) waitForRsyncResourcesDeleted() (error, bool) {
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return err, false
-	}
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return err, false
-	}
+func (t *Task) waitForRsyncResourcesDeleted() (bool, error) {
 	t.Log.Info("Checking if Rsync resource deletion has completed on source and destination MigClusters")
-	err, deleted := t.areRsyncResourcesDeleted(srcClient, destClient, t.getPVCNamespaceMap())
-	if err != nil {
-		return err, false
-	}
-	if !deleted {
-		return nil, false
-	}
-	return nil, true
-}
-
-func (t *Task) areRsyncResourcesDeleted(srcClient, destClient compat.Client, pvcMap map[string][]pvcMapElement) (error, bool) {
+	pvcMap := t.getPVCNamespaceMap()
 	selector := labels.SelectorFromSet(map[string]string{
 		"app": DirectVolumeMigrationRsyncTransfer,
 	})
-	for bothNs, _ := range pvcMap {
+	for bothNs := range pvcMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
 		t.Log.Info("Searching source namespace for leftover Rsync Pods, ConfigMaps, "+
 			"Services, Secrets, Routes with label.",
 			"searchNamespace", srcNs,
 			"labelSelector", selector)
-		err, areDeleted := t.areRsyncNsResourcesDeleted(srcClient, srcNs, selector)
+		err, areDeleted := areRsyncNsResourcesDeleted(t.sourceClient, srcNs, selector, t.Log)
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		if !areDeleted {
-			return nil, false
+			return false, nil
 		}
 		t.Log.Info("Searching destination namespace for leftover Rsync Pods, ConfigMaps, "+
 			"Services, Secrets, Routes with label.",
 			"searchNamespace", destNs,
 			"labelSelector", selector)
-		err, areDeleted = t.areRsyncNsResourcesDeleted(destClient, destNs, selector)
+		err, areDeleted = areRsyncNsResourcesDeleted(t.destinationClient, destNs, selector, t.Log)
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		if !areDeleted {
-			return nil, false
+			return false, nil
 		}
 	}
-	return nil, true
+	return true, nil
 }
 
-func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selector labels.Selector) (error, bool) {
+func areRsyncNsResourcesDeleted(client compat.Client, ns string, selector labels.Selector, log logr.Logger) (error, bool) {
 	podList := corev1.PodList{}
 	cmList := corev1.ConfigMapList{}
 	svcList := corev1.ServiceList{}
@@ -1601,7 +1700,7 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 		return err, false
 	}
 	if len(podList.Items) > 0 {
-		t.Log.Info("Found stale Rsync Pod.",
+		log.Info("Found stale Rsync Pod.",
 			"pod", path.Join(podList.Items[0].Namespace, podList.Items[0].Name),
 			"podPhase", podList.Items[0].Status.Phase)
 		return nil, false
@@ -1618,7 +1717,7 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 		return err, false
 	}
 	if len(secretList.Items) > 0 {
-		t.Log.Info("Found stale Rsync Secret.",
+		log.Info("Found stale Rsync Secret.",
 			"secret", path.Join(secretList.Items[0].Namespace, secretList.Items[0].Name))
 		return nil, false
 	}
@@ -1634,7 +1733,7 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 		return err, false
 	}
 	if len(cmList.Items) > 0 {
-		t.Log.Info("Found stale Rsync ConfigMap.",
+		log.Info("Found stale Rsync ConfigMap.",
 			"configMap", path.Join(cmList.Items[0].Namespace, cmList.Items[0].Name))
 		return nil, false
 	}
@@ -1650,7 +1749,7 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 		return err, false
 	}
 	if len(svcList.Items) > 0 {
-		t.Log.Info("Found stale Rsync Service.",
+		log.Info("Found stale Rsync Service.",
 			"service", path.Join(svcList.Items[0].Namespace, svcList.Items[0].Name))
 		return nil, false
 	}
@@ -1667,7 +1766,7 @@ func (t *Task) areRsyncNsResourcesDeleted(client compat.Client, ns string, selec
 		return err, false
 	}
 	if len(routeList.Items) > 0 {
-		t.Log.Info("Found stale Rsync Route.",
+		log.Info("Found stale Rsync Route.",
 			"route", path.Join(routeList.Items[0].Namespace, routeList.Items[0].Name))
 		return nil, false
 	}
@@ -1685,11 +1784,11 @@ func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMa
 	for bothNs := range pvcMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
-		err := t.findAndDeleteNsResources(srcClient, srcNs, selector)
+		err := findAndDeleteNsResources(srcClient, srcNs, selector, t.Log)
 		if err != nil {
 			return err
 		}
-		err = t.findAndDeleteNsResources(destClient, destNs, selector)
+		err = findAndDeleteNsResources(destClient, destNs, selector, t.Log)
 		if err != nil {
 			return err
 		}
@@ -1697,7 +1796,7 @@ func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMa
 	return nil
 }
 
-func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selector labels.Selector) error {
+func findAndDeleteNsResources(client compat.Client, ns string, selector labels.Selector, log logr.Logger) error {
 	podList := corev1.PodList{}
 	cmList := corev1.ConfigMapList{}
 	svcList := corev1.ServiceList{}
@@ -1765,7 +1864,7 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 
 	// Delete pods
 	for _, pod := range podList.Items {
-		t.Log.Info("Deleting stale DVM Pod",
+		log.Info("Deleting stale DVM Pod",
 			"pod", path.Join(pod.Namespace, pod.Name))
 		err = client.Delete(context.TODO(), &pod, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -1775,7 +1874,7 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 
 	// Delete secrets
 	for _, secret := range secretList.Items {
-		t.Log.Info("Deleting stale DVM Secret",
+		log.Info("Deleting stale DVM Secret",
 			"secret", path.Join(secret.Namespace, secret.Name))
 		err = client.Delete(context.TODO(), &secret, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -1785,7 +1884,7 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 
 	// Delete routes
 	for _, route := range routeList.Items {
-		t.Log.Info("Deleting stale DVM Route",
+		log.Info("Deleting stale DVM Route",
 			"route", path.Join(route.Namespace, route.Name))
 		err = client.Delete(context.TODO(), &route, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -1795,7 +1894,7 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 
 	// Delete svcs
 	for _, svc := range svcList.Items {
-		t.Log.Info("Deleting stale DVM Service",
+		log.Info("Deleting stale DVM Service",
 			"service", path.Join(svc.Namespace, svc.Name))
 		err = client.Delete(context.TODO(), &svc, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -1805,7 +1904,7 @@ func (t *Task) findAndDeleteNsResources(client compat.Client, ns string, selecto
 
 	// Delete configmaps
 	for _, cm := range cmList.Items {
-		t.Log.Info("Deleting stale DVM ConfigMap",
+		log.Info("Deleting stale DVM ConfigMap",
 			"configMap", path.Join(cm.Namespace, cm.Name))
 		err = client.Delete(context.TODO(), &cm, k8sclient.PropagationPolicy(metav1.DeletePropagationBackground))
 		if err != nil && !k8serror.IsNotFound(err) {
@@ -1855,7 +1954,7 @@ func isPrivilegedLabelPresent(client compat.Client, namespace string) (bool, err
 	return false, nil
 }
 
-func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
+func GetRsyncPodBackOffLimit(dvm *migapi.DirectVolumeMigration) int {
 	overriddenBackOffLimit := settings.Settings.DvmOpts.RsyncOpts.BackOffLimit
 	// when both the spec and the overridden backoff limits are not set, use default
 	if dvm.Spec.BackOffLimit == 0 && overriddenBackOffLimit == 0 {
@@ -1873,41 +1972,160 @@ func GetRsyncPodBackOffLimit(dvm migapi.DirectVolumeMigration) int {
 // returns whether or not all operations are completed, whether any of the operation is failed, and a list of failure reasons
 func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 	var failureReasons []string
-	destClient, err := t.getDestinationClient()
-	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
-	}
-	srcClient, err := t.getSourceClient()
-	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
-	}
 	pvcMap, err := t.getNamespacedPVCPairs()
 	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
+		return false, false, failureReasons, err
 	}
-	err = t.buildSourceLimitRangeMap(pvcMap, srcClient)
+	err = t.buildSourceLimitRangeMap(pvcMap, t.sourceClient)
 	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
+		return false, false, failureReasons, err
 	}
-	status, err := t.createRsyncTransferClients(srcClient, destClient, pvcMap)
-	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
+	var (
+		status *migrationOperationStatusList
+		progressCompleted,
+		rsyncOperationsCompleted,
+		anyRsyncFailed bool
+	)
+
+	if !t.Owner.IsRollback() {
+		t.Log.V(3).Info("Creating Rsync Transfer Clients")
+		status, err = t.createRsyncTransferClients(t.sourceClient, t.destinationClient, pvcMap)
+		if err != nil {
+			return false, false, failureReasons, err
+		}
+		t.podPendingSinceTimeLimit()
 	}
 	// report progress of pods
-	progressCompleted, err := t.hasAllProgressReportingCompleted()
+	progressCompleted, err = t.hasAllProgressReportingCompleted()
 	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
+		return false, false, failureReasons, err
 	}
-	operationsCompleted, anyFailed, failureReasons, err := t.processRsyncOperationStatus(status, []error{})
-	if err != nil {
-		return false, false, failureReasons, liberr.Wrap(err)
+	migrationOperationsCompleted := true
+	anyMigrationFailed := false
+	if t.Owner.IsCutover() || t.Owner.IsRollback() {
+		liveMigrationPVCMap := pvcMap
+		if t.Owner.IsRollback() {
+			// Swap source and destination PVCs for rollback
+			liveMigrationPVCMap = swapSourceDestination(pvcMap)
+		}
+		var migrationFailureReasons []string
+		if t.Owner.IsLiveMigrate() {
+			t.Log.V(3).Info("Starting live migrations")
+			// Doing a cutover or rollback, start any live migrations if needed.
+			failureReasons, err = t.startLiveMigrations(liveMigrationPVCMap)
+			if err != nil {
+				return false, len(failureReasons) > 0, failureReasons, err
+			}
+			migrationOperationsCompleted, anyMigrationFailed, migrationFailureReasons, err = t.processMigrationOperationStatus(pvcMap, t.sourceClient)
+			if err != nil {
+				return false, len(migrationFailureReasons) > 0, migrationFailureReasons, err
+			}
+			failureReasons = append(failureReasons, migrationFailureReasons...)
+		}
 	}
-	return operationsCompleted && progressCompleted, anyFailed, failureReasons, nil
+
+	if !t.Owner.IsRollback() {
+		var rsyncFailureReasons []string
+		rsyncOperationsCompleted, anyRsyncFailed, rsyncFailureReasons, err = t.processRsyncOperationStatus(status, []error{})
+		if err != nil {
+			return false, len(failureReasons) > 0, failureReasons, err
+		}
+		failureReasons = append(failureReasons, rsyncFailureReasons...)
+	} else {
+		rsyncOperationsCompleted = true
+	}
+	t.Log.V(3).Info("Migration Operations Completed", "MigrationOperationsCompleted", migrationOperationsCompleted, "RsyncOperationsCompleted", rsyncOperationsCompleted, "ProgressCompleted", progressCompleted)
+	return migrationOperationsCompleted && rsyncOperationsCompleted && progressCompleted, anyRsyncFailed || anyMigrationFailed, failureReasons, nil
+}
+
+func swapSourceDestination(pvcMap map[string][]transfer.PVCPair) map[string][]transfer.PVCPair {
+	swappedMap := make(map[string][]transfer.PVCPair)
+	for bothNs, volumes := range pvcMap {
+		swappedVolumes := make([]transfer.PVCPair, 0)
+		for _, volume := range volumes {
+			swappedVolumes = append(swappedVolumes, transfer.NewPVCPair(volume.Destination().Claim(), volume.Source().Claim()))
+		}
+		ns := getSourceNs(bothNs)
+		destNs := getDestNs(bothNs)
+		swappedMap[fmt.Sprintf("%s:%s", destNs, ns)] = swappedVolumes
+	}
+	return swappedMap
+}
+
+func (t *Task) podPendingSinceTimeLimit() {
+	if len(t.Owner.Status.PendingSinceTimeLimitPods) > 0 {
+		pendingPods := make([]string, 0)
+		for _, pod := range t.Owner.Status.PendingSinceTimeLimitPods {
+			pendingPods = append(pendingPods, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+		}
+
+		pendingMessage := fmt.Sprintf("Rsync Client Pods [%s] are stuck in Pending state for more than 10 mins", strings.Join(pendingPods[:], ", "))
+		t.Owner.Status.SetCondition(migapi.Condition{
+			Type:     RsyncClientPodsPending,
+			Status:   migapi.True,
+			Reason:   "PodStuckInContainerCreating",
+			Category: migapi.Warn,
+			Message:  pendingMessage,
+		})
+	}
+}
+
+// Count the number of VMs, and the number of migrations in error/completed. If they match total isComplete needs to be true
+// returns:
+// isComplete: whether all migrations are completed, false if no pvc pairs are found
+// anyFailed: whether any of the migrations failed
+// failureReasons: list of failure reasons
+// error: error if any
+func (t *Task) processMigrationOperationStatus(nsMap map[string][]transfer.PVCPair, sourceClient k8sclient.Client) (bool, bool, []string, error) {
+	isComplete, anyFailed, failureReasons := false, false, make([]string, 0)
+	vmVolumeMap := make(map[string]vmVolumes)
+
+	for k, v := range nsMap {
+		namespace, err := getNamespace(k)
+		if err != nil {
+			failureReasons = append(failureReasons, err.Error())
+			return isComplete, anyFailed, failureReasons, err
+		}
+		volumeVmMap, err := getRunningVmVolumeMap(sourceClient, namespace)
+		if err != nil {
+			failureReasons = append(failureReasons, err.Error())
+			return isComplete, anyFailed, failureReasons, err
+		}
+		for _, pvcPair := range v {
+			if vmName, found := volumeVmMap[pvcPair.Source().Claim().Name]; found {
+				vmVolumeMap[vmName] = vmVolumes{
+					sourceVolumes: append(vmVolumeMap[vmName].sourceVolumes, pvcPair.Source().Claim().Name),
+					targetVolumes: append(vmVolumeMap[vmName].targetVolumes, pvcPair.Destination().Claim().Name),
+				}
+			}
+		}
+		isComplete = true
+		completeCount := 0
+		failedCount := 0
+		for vmName := range vmVolumeMap {
+			message, err := virtualMachineMigrationStatus(sourceClient, vmName, namespace, t.Log)
+			if err != nil {
+				failureReasons = append(failureReasons, message)
+				return isComplete, anyFailed, failureReasons, err
+			}
+			if message == "" {
+				// Completed
+				completeCount++
+			} else {
+				// Failed
+				failedCount++
+				anyFailed = true
+				failureReasons = append(failureReasons, message)
+			}
+		}
+		isComplete = true
+	}
+	return isComplete, anyFailed, failureReasons, nil
 }
 
 // processRsyncOperationStatus processes status of Rsync operations by reading the status list
 // returns whether all operations are completed and whether any of the operation is failed
-func (t *Task) processRsyncOperationStatus(status *rsyncClientOperationStatusList, garbageCollectionErrors []error) (bool, bool, []string, error) {
+func (t *Task) processRsyncOperationStatus(status *migrationOperationStatusList, garbageCollectionErrors []error) (bool, bool, []string, error) {
 	isComplete, anyFailed, failureReasons := false, false, make([]string, 0)
 	if status.AllCompleted() {
 		isComplete = true
@@ -1916,7 +2134,7 @@ func (t *Task) processRsyncOperationStatus(status *rsyncClientOperationStatusLis
 		if status.Failed() > 0 {
 			anyFailed = true
 			// attempt to categorize failures in any of the special failure categories we defined
-			failureReasons, err := t.reportAdvancedErrorHeuristics()
+			failureReasons, err := t.reportAdvancedRsyncErrorHeuristics()
 			if err != nil {
 				return isComplete, anyFailed, failureReasons, liberr.Wrap(err)
 			}
@@ -1964,7 +2182,7 @@ func (t *Task) processRsyncOperationStatus(status *rsyncClientOperationStatusLis
 // for all errored pods, attempts to determine whether the errors fall into any
 // of the special categories we can identify and reports them as conditions
 // returns reasons and error for reconcile decisions
-func (t *Task) reportAdvancedErrorHeuristics() ([]string, error) {
+func (t *Task) reportAdvancedRsyncErrorHeuristics() ([]string, error) {
 	reasons := make([]string, 0)
 	// check if the pods are failing due to a network misconfiguration causing Stunnel to timeout
 	isStunnelTimeout, err := t.hasAllRsyncClientPodsTimedOut()
@@ -2007,8 +2225,8 @@ func (t *Task) reportAdvancedErrorHeuristics() ([]string, error) {
 	return reasons, nil
 }
 
-// rsyncClientOperationStatus defines status of one Rsync operation
-type rsyncClientOperationStatus struct {
+// migrationOperationStatus defines status of one Rsync operation
+type migrationOperationStatus struct {
 	operation *migapi.RsyncOperation
 	// When set,.means that all attempts have been exhausted resulting in a failure
 	failed bool
@@ -2024,33 +2242,33 @@ type rsyncClientOperationStatus struct {
 
 // HasErrors Checks whether there were errors in processing this operation
 // presence of errors indicates that the status information may not be accurate, demands a retry
-func (e *rsyncClientOperationStatus) HasErrors() bool {
+func (e *migrationOperationStatus) HasErrors() bool {
 	return len(e.errors) > 0
 }
 
-func (e *rsyncClientOperationStatus) AddError(err error) {
+func (e *migrationOperationStatus) AddError(err error) {
 	if e.errors == nil {
 		e.errors = make([]error, 0)
 	}
 	e.errors = append(e.errors, err)
 }
 
-// rsyncClientOperationStatusList managed list of all ongoing Rsync operations
-type rsyncClientOperationStatusList struct {
+// migrationOperationStatusList managed list of all ongoing Rsync operations
+type migrationOperationStatusList struct {
 	// ops list of operations
-	ops []rsyncClientOperationStatus
+	ops []migrationOperationStatus
 }
 
-func (r *rsyncClientOperationStatusList) Add(s rsyncClientOperationStatus) {
+func (r *migrationOperationStatusList) Add(s migrationOperationStatus) {
 	if r.ops == nil {
-		r.ops = make([]rsyncClientOperationStatus, 0)
+		r.ops = make([]migrationOperationStatus, 0)
 	}
 	r.ops = append(r.ops, s)
 }
 
 // AllCompleted checks whether all of the Rsync attempts are in a terminal state
 // If true, reconcile can move to next phase
-func (r *rsyncClientOperationStatusList) AllCompleted() bool {
+func (r *migrationOperationStatusList) AllCompleted() bool {
 	for _, attempt := range r.ops {
 		if attempt.pending || attempt.running || attempt.HasErrors() {
 			return false
@@ -2060,7 +2278,7 @@ func (r *rsyncClientOperationStatusList) AllCompleted() bool {
 }
 
 // AnyErrored checks whether any of the operation is resulting in an error
-func (r *rsyncClientOperationStatusList) AnyErrored() bool {
+func (r *migrationOperationStatusList) AnyErrored() bool {
 	for _, attempt := range r.ops {
 		if attempt.HasErrors() {
 			return true
@@ -2070,7 +2288,7 @@ func (r *rsyncClientOperationStatusList) AnyErrored() bool {
 }
 
 // Failed returns number of failed operations
-func (r *rsyncClientOperationStatusList) Failed() int {
+func (r *migrationOperationStatusList) Failed() int {
 	i := 0
 	for _, attempt := range r.ops {
 		if attempt.failed {
@@ -2081,7 +2299,7 @@ func (r *rsyncClientOperationStatusList) Failed() int {
 }
 
 // Succeeded returns number of failed operations
-func (r *rsyncClientOperationStatusList) Succeeded() int {
+func (r *migrationOperationStatusList) Succeeded() int {
 	i := 0
 	for _, attempt := range r.ops {
 		if attempt.succeeded {
@@ -2092,7 +2310,7 @@ func (r *rsyncClientOperationStatusList) Succeeded() int {
 }
 
 // Pending returns number of pending operations
-func (r *rsyncClientOperationStatusList) Pending() int {
+func (r *migrationOperationStatusList) Pending() int {
 	i := 0
 	for _, attempt := range r.ops {
 		if attempt.pending {
@@ -2103,7 +2321,7 @@ func (r *rsyncClientOperationStatusList) Pending() int {
 }
 
 // Running returns number of running operations
-func (r *rsyncClientOperationStatusList) Running() int {
+func (r *migrationOperationStatusList) Running() int {
 	i := 0
 	for _, attempt := range r.ops {
 		if attempt.running {
@@ -2161,7 +2379,7 @@ func (t *Task) getLatestPodForOperation(client compat.Client, operation migapi.R
 }
 
 // updateOperationStatus given a Rsync Pod and operation status, updates operation status with pod status
-func updateOperationStatus(status *rsyncClientOperationStatus, pod *corev1.Pod) {
+func updateOperationStatus(status *migrationOperationStatus, pod *corev1.Pod) {
 	switch pod.Status.Phase {
 	case corev1.PodFailed:
 		status.failed = true

@@ -25,7 +25,7 @@ const (
 func Test_CreateDestinationPVCsNewPVCMigrationOwner(t *testing.T) {
 	RegisterTestingT(t)
 	migPlan := createMigPlan()
-	sourcePVC := createSourcePvc("pvc1", testNamespace)
+	sourcePVC := createPvc("pvc1", testNamespace)
 	client := getFakeCompatClient(&migapi.MigCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster",
@@ -68,7 +68,7 @@ func Test_CreateDestinationPVCsNewPVCMigrationOwner(t *testing.T) {
 func Test_CreateDestinationPVCsNewPVCDVMOwnerOtherNS(t *testing.T) {
 	RegisterTestingT(t)
 	migPlan := createMigPlan()
-	sourcePVC := createSourcePvc("pvc1", testNamespace)
+	sourcePVC := createPvc("pvc1", testNamespace)
 	client := getFakeCompatClient(&migapi.MigCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster",
@@ -110,7 +110,7 @@ func Test_CreateDestinationPVCsExpandPVSize(t *testing.T) {
 	settings.Settings.DvmOpts.EnablePVResizing = true
 	defer func() { settings.Settings.DvmOpts.EnablePVResizing = false }()
 	migPlan := createMigPlan()
-	sourcePVC := createSourcePvc("pvc1", testNamespace)
+	sourcePVC := createPvc("pvc1", testNamespace)
 	migPlan.Spec.PersistentVolumes.List = append(migPlan.Spec.PersistentVolumes.List, migapi.PV{
 		PVC: migapi.PVC{
 			Namespace: testNamespace,
@@ -154,7 +154,7 @@ func Test_CreateDestinationPVCsExpandProposedPVSize(t *testing.T) {
 	settings.Settings.DvmOpts.EnablePVResizing = true
 	defer func() { settings.Settings.DvmOpts.EnablePVResizing = false }()
 	migPlan := createMigPlan()
-	sourcePVC := createSourcePvc("pvc1", testNamespace)
+	sourcePVC := createPvc("pvc1", testNamespace)
 	migPlan.Spec.PersistentVolumes.List = append(migPlan.Spec.PersistentVolumes.List, migapi.PV{
 		PVC: migapi.PVC{
 			Namespace: testNamespace,
@@ -197,7 +197,7 @@ func Test_CreateDestinationPVCsExpandProposedPVSize(t *testing.T) {
 func Test_CreateDestinationPVCsExistingTargetPVC(t *testing.T) {
 	RegisterTestingT(t)
 	migPlan := createMigPlan()
-	sourcePVC := createSourcePvc("pvc1", testNamespace)
+	sourcePVC := createPvc("pvc1", testNamespace)
 	client := getFakeCompatClient(&migapi.MigCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cluster",
@@ -246,7 +246,7 @@ func createMigPlan() *migapi.MigPlan {
 	}
 }
 
-func createSourcePvc(name, namespace string) *kapi.PersistentVolumeClaim {
+func createPvc(name, namespace string) *kapi.PersistentVolumeClaim {
 	return &kapi.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

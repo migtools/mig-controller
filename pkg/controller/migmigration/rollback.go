@@ -18,18 +18,19 @@ import (
 // Delete namespace and cluster-scoped resources on dest cluster
 func (t *Task) deleteMigrated() error {
 	// Delete 'deployer' and 'hooks' Pods that DeploymentConfig leaves behind upon DC deletion.
-	err := t.deleteDeploymentConfigLeftoverPods()
-	if err != nil {
+	if err := t.deleteDeploymentConfigLeftoverPods(); err != nil {
 		return liberr.Wrap(err)
 	}
 
-	err = t.deleteMigratedNamespaceScopedResources()
-	if err != nil {
+	if err := t.deleteMigratedNamespaceScopedResources(); err != nil {
 		return liberr.Wrap(err)
 	}
 
-	err = t.deleteMovedNfsPVs()
-	if err != nil {
+	if err := t.deleteMovedNfsPVs(); err != nil {
+		return liberr.Wrap(err)
+	}
+
+	if err := t.deleteLiveMigrationCompletedPods(); err != nil {
 		return liberr.Wrap(err)
 	}
 
@@ -225,6 +226,66 @@ func (t *Task) deleteMovedNfsPVs() error {
 	}
 
 	return nil
+}
+
+// Completed virt-launcher pods remain after migration is complete. These pods reference
+// the migrated PVCs and prevent the PVCs from being deleted. This function deletes
+// the completed virt-launcher pods.
+func (t *Task) deleteLiveMigrationCompletedPods() error {
+	if t.PlanResources.MigPlan.LiveMigrationChecked() {
+		// Possible live migrations were performed, check for completed virt-launcher pods.
+		destClient, err := t.getDestinationClient()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		namespaceVolumeNamesMap := t.getDestinationVolumeNames()
+		for _, namespace := range t.destinationNamespaces() {
+			pods := corev1.PodList{}
+			destClient.List(context.TODO(), &pods, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(map[string]string{
+				"kubevirt.io": "virt-launcher",
+			}))
+			for _, pod := range pods.Items {
+				if !t.isLiveMigrationCompletedPod(&pod, namespaceVolumeNamesMap[namespace]) {
+					continue
+				}
+				t.Log.V(3).Info("Deleting virt-launcher pod that has completed live migration", "namespace", pod.Namespace, "name", pod.Name)
+				err := destClient.Delete(context.TODO(), &pod)
+				if err != nil && !k8serror.IsNotFound(err) {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) getDestinationVolumeNames() map[string][]string {
+	namespaceVolumeNamesMap := make(map[string][]string)
+	pvcs := t.getDirectVolumeClaimList()
+	for _, pvc := range pvcs {
+		namespaceVolumeNamesMap[pvc.Namespace] = append(namespaceVolumeNamesMap[pvc.Namespace], pvc.TargetName)
+	}
+	return namespaceVolumeNamesMap
+}
+
+func (t *Task) isLiveMigrationCompletedPod(pod *corev1.Pod, volumeNames []string) bool {
+	if len(pod.Spec.Volumes) == 0 {
+		return false
+	}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			found := false
+			for _, volumeName := range volumeNames {
+				if volumeName == volume.PersistentVolumeClaim.ClaimName {
+					found = true
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+	}
+	return pod.Status.Phase == corev1.PodSucceeded
 }
 
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {

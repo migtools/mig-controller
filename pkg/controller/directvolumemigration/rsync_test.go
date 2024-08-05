@@ -18,14 +18,22 @@ import (
 	fakecompat "github.com/konveyor/mig-controller/pkg/compat/fake"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/utils/ptr"
+	virtv1 "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	testVolume = "test-volume"
+	testDVM    = "test-dvm"
 )
 
 func getTestRsyncPodForPVC(podName string, pvcName string, ns string, attemptNo string, timestamp time.Time) *corev1.Pod {
@@ -668,7 +676,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 		Owner  *migapi.DirectVolumeMigration
 	}
 	type args struct {
-		status                  rsyncClientOperationStatusList
+		status                  migrationOperationStatusList
 		garbageCollectionErrors []error
 	}
 	tests := []struct {
@@ -688,7 +696,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				Client: getFakeCompatClient(),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-dvm", Namespace: "openshift-migration",
+						Name: testDVM, Namespace: "openshift-migration",
 					},
 					Status: migapi.DirectVolumeMigrationStatus{
 						Conditions: migapi.Conditions{
@@ -700,8 +708,8 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				},
 			},
 			args: args{
-				status: rsyncClientOperationStatusList{
-					ops: []rsyncClientOperationStatus{
+				status: migrationOperationStatusList{
+					ops: []migrationOperationStatus{
 						{errors: []error{fmt.Errorf("failed creating pod")}},
 					},
 				},
@@ -718,7 +726,7 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				Client: getFakeCompatClient(),
 				Owner: &migapi.DirectVolumeMigration{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-dvm", Namespace: "openshift-migration",
+						Name: testDVM, Namespace: "openshift-migration",
 					},
 					Status: migapi.DirectVolumeMigrationStatus{
 						Conditions: migapi.Conditions{
@@ -730,8 +738,8 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 				},
 			},
 			args: args{
-				status: rsyncClientOperationStatusList{
-					ops: []rsyncClientOperationStatus{
+				status: migrationOperationStatusList{
+					ops: []migrationOperationStatus{
 						{errors: []error{fmt.Errorf("failed creating pod")}},
 					},
 				},
@@ -768,6 +776,926 @@ func TestTask_processRsyncOperationStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTask_processMigrationOperationStatus(t *testing.T) {
+	tests := []struct {
+		name                   string
+		nsMap                  map[string][]transfer.PVCPair
+		expectCompleted        bool
+		expectFailed           bool
+		expectedFailureReasons []string
+		client                 compat.Client
+		wantErr                bool
+	}{
+		{
+			name:                   "empty namespace pair",
+			nsMap:                  map[string][]transfer.PVCPair{},
+			expectedFailureReasons: []string{},
+			client:                 getFakeCompatClient(),
+		},
+		{
+			name: "invalid namespace pair",
+			nsMap: map[string][]transfer.PVCPair{
+				testNamespace: {
+					transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			client:                 getFakeCompatClient(),
+			expectedFailureReasons: []string{"invalid namespace pair: test-namespace"},
+			wantErr:                true,
+		},
+		{
+			name: "no running VMs",
+			nsMap: map[string][]transfer.PVCPair{
+				testNamespace + ":" + testNamespace: {
+					transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			client:                 getFakeCompatClient(),
+			expectedFailureReasons: []string{},
+			expectCompleted:        true,
+		},
+		{
+			name: "running VMs, no matching volumes",
+			nsMap: map[string][]transfer.PVCPair{
+				testNamespace + ":" + testNamespace: {
+					transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			client:                 getFakeCompatClient(createVirtualMachine("vm", testNamespace), createVirtlauncherPod("vm", testNamespace, []string{"dv"})),
+			expectedFailureReasons: []string{},
+			expectCompleted:        true,
+		},
+		{
+			name: "running VMs, no matching volumes",
+			nsMap: map[string][]transfer.PVCPair{
+				testNamespace + ":" + testNamespace: {
+					transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			client: getFakeCompatClient(
+				createVirtualMachine("vm", testNamespace),
+				createVirtlauncherPod("vm", testNamespace, []string{"pvc1"}),
+				createVirtualMachineInstance("vm", testNamespace, virtv1.Running),
+			),
+			expectedFailureReasons: []string{},
+			expectCompleted:        true,
+		},
+		{
+			name: "failed migration, no matching volumes",
+			nsMap: map[string][]transfer.PVCPair{
+				testNamespace + ":" + testNamespace: {
+					transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			client: getFakeCompatClient(
+				createVirtualMachine("vm", testNamespace),
+				createVirtlauncherPod("vm", testNamespace, []string{"pvc1"}),
+				createVirtualMachineInstance("vm", testNamespace, virtv1.Failed),
+				createCanceledVirtualMachineMigration("vmim", testNamespace, "vm", virtv1.MigrationAbortSucceeded),
+			),
+			expectCompleted:        true,
+			expectFailed:           true,
+			expectedFailureReasons: []string{"Migration canceled"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.sourceClient = tt.client
+			isComplete, anyFailed, failureReasons, err := task.processMigrationOperationStatus(tt.nsMap, task.sourceClient)
+			if err != nil && !tt.wantErr {
+				t.Errorf("Unexpected() error = %v", err)
+				t.FailNow()
+			} else if err == nil && tt.wantErr {
+				t.Errorf("Expected error, got nil")
+				t.FailNow()
+			}
+			if isComplete != tt.expectCompleted {
+				t.Errorf("Expected completed to be %t, got %t", tt.expectCompleted, isComplete)
+				t.FailNow()
+			}
+			if anyFailed != tt.expectFailed {
+				t.Errorf("Expected failed to be %t, got %t", tt.expectFailed, anyFailed)
+				t.FailNow()
+			}
+			if !reflect.DeepEqual(failureReasons, tt.expectedFailureReasons) {
+				t.Errorf("Unexpected() got = %v, want %v", failureReasons, tt.expectedFailureReasons)
+				t.FailNow()
+			}
+		})
+	}
+}
+
+func TestTask_podPendingSinceTimeLimit(t *testing.T) {
+	tests := []struct {
+		name              string
+		dvm               *migapi.DirectVolumeMigration
+		expectedCondition *migapi.Condition
+	}{
+		{
+			name: "No pending pods",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					PendingSinceTimeLimitPods: []*migapi.PodProgress{},
+				},
+			},
+			expectedCondition: nil,
+		},
+		{
+			name: "Pending pods",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					PendingSinceTimeLimitPods: []*migapi.PodProgress{
+						{
+							ObjectReference: &corev1.ObjectReference{
+								Name:      "test-pod",
+								Namespace: testNamespace,
+							},
+						},
+					},
+				},
+			},
+			expectedCondition: &migapi.Condition{
+				Type:     RsyncClientPodsPending,
+				Status:   migapi.True,
+				Reason:   "PodStuckInContainerCreating",
+				Category: migapi.Warn,
+				Message:  "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{
+				Owner: tt.dvm,
+			}
+			task.podPendingSinceTimeLimit()
+			if tt.expectedCondition != nil {
+				if !tt.dvm.Status.HasCondition(tt.expectedCondition.Type) {
+					t.Errorf("Condition %s not found", tt.expectedCondition.Type)
+				}
+			} else {
+				if tt.dvm.Status.HasCondition(RsyncClientPodsPending) {
+					t.Errorf("Condition %s found", RsyncClientPodsPending)
+				}
+			}
+		})
+	}
+}
+
+func TestTask_swapSourceDestination(t *testing.T) {
+	tests := []struct {
+		name        string
+		pvcMap      map[string][]transfer.PVCPair
+		expectedMap map[string][]transfer.PVCPair
+	}{
+		{
+			name:        "empty map",
+			pvcMap:      map[string][]transfer.PVCPair{},
+			expectedMap: map[string][]transfer.PVCPair{},
+		},
+		{
+			name: "one namespace, one pair",
+			pvcMap: map[string][]transfer.PVCPair{
+				"foo:bar": {transfer.NewPVCPair(createPvc("pvc1", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+			expectedMap: map[string][]transfer.PVCPair{
+				"bar:foo": {transfer.NewPVCPair(createPvc("pvc2", testNamespace), createPvc("pvc1", testNamespace))},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := swapSourceDestination(tt.pvcMap)
+			if !reflect.DeepEqual(out, tt.expectedMap) {
+				t.Errorf("swapSourceDestination() = %v, want %v", out, tt.expectedMap)
+			}
+		})
+	}
+}
+
+func TestTask_runRsyncOperations(t *testing.T) {
+	tests := []struct {
+		name            string
+		client          compat.Client
+		dvm             *migapi.DirectVolumeMigration
+		expectComplete  bool
+		expectFailed    bool
+		expectedReasons []string
+	}{
+		{
+			name:   "no PVCs, stage migration type",
+			client: getFakeCompatClient(),
+			dvm: &migapi.DirectVolumeMigration{
+				Spec: migapi.DirectVolumeMigrationSpec{
+					PersistentVolumeClaims: []migapi.PVCToMigrate{},
+					MigrationType:          ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeStage),
+				},
+			},
+			expectComplete: true,
+		},
+		{
+			name:   "no PVCs, cutover migration type, no live migration",
+			client: getFakeCompatClient(),
+			dvm: &migapi.DirectVolumeMigration{
+				Spec: migapi.DirectVolumeMigrationSpec{
+					PersistentVolumeClaims: []migapi.PVCToMigrate{},
+					MigrationType:          ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+				},
+			},
+			expectComplete: true,
+		},
+		{
+			name:   "no PVCs, cutover migration type, live migration",
+			client: getFakeCompatClient(),
+			dvm: &migapi.DirectVolumeMigration{
+				Spec: migapi.DirectVolumeMigrationSpec{
+					PersistentVolumeClaims: []migapi.PVCToMigrate{},
+					MigrationType:          ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+					LiveMigrate:            ptr.To[bool](true),
+				},
+			},
+		},
+		{
+			name:   "no PVCs, rollback migration type, live migration",
+			client: getFakeCompatClient(),
+			dvm: &migapi.DirectVolumeMigration{
+				Spec: migapi.DirectVolumeMigrationSpec{
+					PersistentVolumeClaims: []migapi.PVCToMigrate{},
+					MigrationType:          ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeRollback),
+					LiveMigrate:            ptr.To[bool](true),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.sourceClient = tt.client
+			task.destinationClient = tt.client
+			task.Client = tt.client
+			task.Owner = tt.dvm
+			completed, failed, reasons, err := task.runRsyncOperations()
+			if err != nil {
+				t.Errorf("runRsyncOperations() error = %v", err)
+				t.FailNow()
+			}
+			if completed != tt.expectComplete {
+				t.Errorf("Expected completed to be %t, got %t", tt.expectComplete, completed)
+				t.FailNow()
+			}
+			if failed != tt.expectFailed {
+				t.Errorf("Expected failed to be %t, got %t", tt.expectFailed, failed)
+				t.FailNow()
+			}
+			if len(reasons) != len(tt.expectedReasons) {
+				t.Errorf("%v is not the same length as %v", reasons, tt.expectedReasons)
+				t.FailNow()
+			}
+			for i, s := range reasons {
+				if s != tt.expectedReasons[i] {
+					t.Errorf("%s is not equal to %s", s, tt.expectedReasons[i])
+					t.FailNow()
+				}
+			}
+		})
+	}
+}
+
+func TestTask_getCurrentLiveMigrationProgress(t *testing.T) {
+	tests := []struct {
+		name             string
+		dvm              *migapi.DirectVolumeMigration
+		expectedProgress map[string]*migapi.LiveMigrationProgress
+	}{
+		{
+			name: "no progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{},
+			},
+			expectedProgress: map[string]*migapi.LiveMigrationProgress{},
+		},
+		{
+			name: "live migration progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					RunningLiveMigrations: []*migapi.LiveMigrationProgress{
+						{
+							VMName:      "test-vm",
+							VMNamespace: testNamespace,
+						},
+						{
+							VMName:      "test-vm-2",
+							VMNamespace: testNamespace,
+						},
+					},
+				},
+			},
+			expectedProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/test-vm", testNamespace): {
+					VMName:      "test-vm",
+					VMNamespace: testNamespace,
+				},
+				fmt.Sprintf("%s/test-vm-2", testNamespace): {
+					VMName:      "test-vm-2",
+					VMNamespace: testNamespace,
+				},
+			},
+		},
+		{
+			name: "failed live migration progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					FailedLiveMigrations: []*migapi.LiveMigrationProgress{
+						{
+							VMName:      "test-vm",
+							VMNamespace: testNamespace,
+						},
+					},
+				},
+			},
+			expectedProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/test-vm", testNamespace): {
+					VMName:      "test-vm",
+					VMNamespace: testNamespace,
+				},
+			},
+		},
+		{
+			name: "successful live migration progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					SuccessfulLiveMigrations: []*migapi.LiveMigrationProgress{
+						{
+							VMName:      "test-vm",
+							VMNamespace: testNamespace,
+						},
+					},
+				},
+			},
+			expectedProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/test-vm", testNamespace): {
+					VMName:      "test-vm",
+					VMNamespace: testNamespace,
+				},
+			},
+		},
+		{
+			name: "pending live migration progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					PendingLiveMigrations: []*migapi.LiveMigrationProgress{
+						{
+							VMName:      "test-vm",
+							VMNamespace: testNamespace,
+						},
+					},
+				},
+			},
+			expectedProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/test-vm", testNamespace): {
+					VMName:      "test-vm",
+					VMNamespace: testNamespace,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.Owner = tt.dvm
+			progress := task.getCurrentLiveMigrationProgress()
+			if len(progress) != len(tt.expectedProgress) {
+				t.Errorf("getCurrentLiveMigrationProgress() = %v, want %v", progress, tt.expectedProgress)
+				t.FailNow()
+			}
+			for k, v := range progress {
+				if !reflect.DeepEqual(v, tt.expectedProgress[k]) {
+					t.Errorf("getCurrentLiveMigrationProgress() = %v, want %v", progress, tt.expectedProgress)
+					t.FailNow()
+				}
+			}
+		})
+	}
+}
+
+func TestTask_updateRsyncProgressStatus(t *testing.T) {
+	tests := []struct {
+		name                   string
+		dvm                    *migapi.DirectVolumeMigration
+		volumeName             string
+		client                 compat.Client
+		expectedSuccessfulPods []*migapi.PodProgress
+		expectedFailedPods     []*migapi.PodProgress
+		expectedRunningPods    []*migapi.PodProgress
+		expectedPendingPods    []*migapi.PodProgress
+		expectedUnknownPods    []*migapi.PodProgress
+		expectedPendingSince   []*migapi.PodProgress
+	}{
+		{
+			name: "no progress",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(),
+		},
+		{
+			name: "running pod progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodRunning)),
+			expectedRunningPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "failed pod progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status: migapi.DirectVolumeMigrationStatus{
+					RsyncOperations: []*migapi.RsyncOperation{
+						{
+							Failed: true,
+							PVCReference: &corev1.ObjectReference{
+								Namespace: testNamespace,
+								Name:      testVolume,
+							},
+						},
+					},
+				},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodFailed)),
+			expectedFailedPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "failed pod, operation hasn't failed progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodFailed)),
+			expectedRunningPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "pending pod, progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodPending)),
+			expectedPendingPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "pending pod older than 10 minutes, progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createOldDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodPending)),
+			expectedPendingPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+			expectedPendingSince: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "unknown pod, progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, "")),
+			expectedUnknownPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+		{
+			name: "successful pod, progress exists",
+			dvm: &migapi.DirectVolumeMigration{
+				ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: testNamespace},
+				Status:     migapi.DirectVolumeMigrationStatus{},
+			},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createDirectVolumeMigrationProgress(testDVM, testVolume, testNamespace, corev1.PodSucceeded)),
+			expectedSuccessfulPods: []*migapi.PodProgress{
+				createExpectedPodProgress(),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.Client = tt.client
+			task.Owner = tt.dvm
+			err := task.updateRsyncProgressStatus(tt.volumeName, testNamespace)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				t.FailNow()
+			}
+			if len(tt.expectedSuccessfulPods) != len(tt.dvm.Status.SuccessfulPods) {
+				t.Errorf("Expected %d successful pods, got %d", len(tt.expectedSuccessfulPods), len(tt.dvm.Status.SuccessfulPods))
+				t.FailNow()
+			}
+			if len(tt.expectedFailedPods) != len(tt.dvm.Status.FailedPods) {
+				t.Errorf("Expected %d failed pods, got %d", len(tt.expectedFailedPods), len(tt.dvm.Status.FailedPods))
+				t.FailNow()
+			}
+			if len(tt.expectedRunningPods) != len(tt.dvm.Status.RunningPods) {
+				t.Errorf("Expected %d running pods, got %d", len(tt.expectedRunningPods), len(tt.dvm.Status.RunningPods))
+				t.FailNow()
+			}
+			if len(tt.expectedPendingPods) != len(tt.dvm.Status.PendingPods) {
+				t.Errorf("Expected %d pending pods, got %d", len(tt.expectedPendingPods), len(tt.dvm.Status.PendingPods))
+				t.FailNow()
+			}
+			if len(tt.expectedUnknownPods) != len(tt.dvm.Status.UnknownPods) {
+				t.Errorf("Expected %d unknown pods, got %d", len(tt.expectedUnknownPods), len(tt.dvm.Status.UnknownPods))
+				t.FailNow()
+			}
+			if len(tt.expectedPendingSince) != len(tt.dvm.Status.PendingSinceTimeLimitPods) {
+				t.Errorf("Expected %d pending since pods, got %d", len(tt.expectedPendingSince), len(tt.dvm.Status.PendingSinceTimeLimitPods))
+				t.FailNow()
+			}
+		})
+	}
+}
+
+func TestTask_updateVolumeLiveMigrationProgressStatus(t *testing.T) {
+	tests := []struct {
+		name                             string
+		dvm                              *migapi.DirectVolumeMigration
+		volumeName                       string
+		client                           compat.Client
+		virtualMachineMappings           VirtualMachineMappings
+		existingProgress                 map[string]*migapi.LiveMigrationProgress
+		expectedSuccessfulLiveMigrations []*migapi.LiveMigrationProgress
+		expectedFailedLiveMigrations     []*migapi.LiveMigrationProgress
+		expectedRunningLiveMigrations    []*migapi.LiveMigrationProgress
+		expectedPendingLiveMigrations    []*migapi.LiveMigrationProgress
+		promQuery                        func(context.Context, string, time.Time, ...prometheusv1.Option) (model.Value, prometheusv1.Warnings, error)
+	}{
+		{
+			name:             "no progress",
+			dvm:              &migapi.DirectVolumeMigration{},
+			volumeName:       testVolume,
+			client:           getFakeCompatClient(),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{},
+			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+		},
+		{
+			name:             "failed vmim with failure reason",
+			dvm:              &migapi.DirectVolumeMigration{},
+			volumeName:       testVolume,
+			client:           getFakeCompatClient(),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{},
+			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMIMMap: map[string]*virtv1.VirtualMachineInstanceMigration{
+					fmt.Sprintf("%s/%s", testNamespace, testVolume): {
+						Status: virtv1.VirtualMachineInstanceMigrationStatus{
+							MigrationState: &virtv1.VirtualMachineInstanceMigrationState{
+								FailureReason: "test failure",
+							},
+							Phase: virtv1.MigrationFailed,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:             "successful vmim without failure reason",
+			dvm:              &migapi.DirectVolumeMigration{},
+			volumeName:       testVolume,
+			client:           getFakeCompatClient(),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{},
+			expectedSuccessfulLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMIMMap: map[string]*virtv1.VirtualMachineInstanceMigration{
+					fmt.Sprintf("%s/%s", testNamespace, testVolume): {
+						Status: virtv1.VirtualMachineInstanceMigrationStatus{
+							MigrationState: &virtv1.VirtualMachineInstanceMigrationState{},
+							Phase:          virtv1.MigrationSucceeded,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:             "running vmim without failure reason",
+			dvm:              &migapi.DirectVolumeMigration{},
+			volumeName:       testVolume,
+			client:           getFakeCompatClient(),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{},
+			expectedRunningLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMIMMap: map[string]*virtv1.VirtualMachineInstanceMigration{
+					fmt.Sprintf("%s/%s", testNamespace, testVolume): {
+						Status: virtv1.VirtualMachineInstanceMigrationStatus{
+							MigrationState: &virtv1.VirtualMachineInstanceMigrationState{},
+							Phase:          virtv1.MigrationRunning,
+						},
+					},
+				},
+			},
+			promQuery: func(ctx context.Context, query string, ts time.Time, opts ...prometheusv1.Option) (model.Value, prometheusv1.Warnings, error) {
+				return &model.String{
+					Value: "=> 59.3 @",
+				}, nil, nil
+			},
+		},
+		{
+			name:             "pending vmim without failure reason",
+			dvm:              &migapi.DirectVolumeMigration{},
+			volumeName:       testVolume,
+			client:           getFakeCompatClient(),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{},
+			expectedPendingLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMIMMap: map[string]*virtv1.VirtualMachineInstanceMigration{
+					fmt.Sprintf("%s/%s", testNamespace, testVolume): {
+						Status: virtv1.VirtualMachineInstanceMigrationStatus{
+							MigrationState: &virtv1.VirtualMachineInstanceMigrationState{},
+							Phase:          virtv1.MigrationPending,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "no vmim, but VMI exists",
+			dvm:        &migapi.DirectVolumeMigration{},
+			volumeName: testVolume,
+			client:     getFakeCompatClient(createVirtualMachineInstance("test-vm", testNamespace, virtv1.Running)),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/%s", testNamespace, "test-vm"): createExpectedLiveMigrationProgress(nil),
+			},
+			expectedPendingLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMNameMap: map[string]string{
+					testVolume: "test-vm",
+				},
+			},
+		},
+		{
+			name:       "no vmim, but VMI exists, unable to live migrate",
+			dvm:        &migapi.DirectVolumeMigration{},
+			volumeName: testVolume,
+			client: getFakeCompatClient(createVirtualMachineInstanceWithConditions("test-vm", testNamespace, []virtv1.VirtualMachineInstanceCondition{
+				{
+					Type:   virtv1.VirtualMachineInstanceVolumesChange,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:    virtv1.VirtualMachineInstanceIsMigratable,
+					Status:  corev1.ConditionFalse,
+					Message: "Unable to live migrate because of the test reason",
+				},
+			})),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/%s", testNamespace, "test-vm"): createExpectedLiveMigrationProgress(&metav1.Duration{
+					Duration: time.Second * 10,
+				}),
+			},
+			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMNameMap: map[string]string{
+					testVolume: "test-vm",
+				},
+			},
+		},
+		{
+			name: "no vmim, but VMI exists, unable to live migrate",
+			dvm: &migapi.DirectVolumeMigration{
+				Status: migapi.DirectVolumeMigrationStatus{
+					StartTimestamp: &metav1.Time{Time: time.Now().Add(-time.Minute * 11)},
+				},
+			},
+			volumeName: testVolume,
+			client: getFakeCompatClient(createVirtualMachineInstanceWithConditions("test-vm", testNamespace, []virtv1.VirtualMachineInstanceCondition{
+				{
+					Type:   virtv1.VirtualMachineInstanceVolumesChange,
+					Status: corev1.ConditionTrue,
+				},
+				{
+					Type:    virtv1.VirtualMachineInstanceIsMigratable,
+					Status:  corev1.ConditionFalse,
+					Message: "Unable to live migrate because of the test reason",
+				},
+			})),
+			existingProgress: map[string]*migapi.LiveMigrationProgress{
+				fmt.Sprintf("%s/%s", testNamespace, "test-vm"): createExpectedLiveMigrationProgress(nil),
+			},
+			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
+				createExpectedLiveMigrationProgress(nil),
+			},
+			virtualMachineMappings: VirtualMachineMappings{
+				volumeVMNameMap: map[string]string{
+					testVolume: "test-vm",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.sourceClient = tt.client
+			task.Client = tt.client
+			task.Owner = tt.dvm
+			task.PrometheusAPI = prometheusv1.NewAPI(nil)
+			task.PromQuery = tt.promQuery
+			task.VirtualMachineMappings = tt.virtualMachineMappings
+			err := task.updateVolumeLiveMigrationProgressStatus(tt.volumeName, testNamespace, tt.existingProgress)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				t.FailNow()
+			}
+			if len(tt.expectedSuccessfulLiveMigrations) != len(tt.dvm.Status.SuccessfulLiveMigrations) {
+				t.Errorf("Expected %d successful live migrations, got %d", len(tt.expectedSuccessfulLiveMigrations), len(tt.dvm.Status.SuccessfulLiveMigrations))
+				t.FailNow()
+			}
+			if len(tt.expectedFailedLiveMigrations) != len(tt.dvm.Status.FailedLiveMigrations) {
+				t.Errorf("Expected %d failed live migrations, got %d", len(tt.expectedFailedLiveMigrations), len(tt.dvm.Status.FailedLiveMigrations))
+				t.FailNow()
+			}
+			if len(tt.expectedRunningLiveMigrations) != len(tt.dvm.Status.RunningLiveMigrations) {
+				t.Errorf("Expected %d running live migrations, got %d", len(tt.expectedRunningLiveMigrations), len(tt.dvm.Status.RunningPods))
+				t.FailNow()
+			}
+			if len(tt.expectedPendingLiveMigrations) != len(tt.dvm.Status.PendingLiveMigrations) {
+				t.Errorf("Expected %d pending live migrations, got %d", len(tt.expectedPendingLiveMigrations), len(tt.dvm.Status.PendingLiveMigrations))
+				t.FailNow()
+			}
+		})
+	}
+}
+
+func TestTask_filterRunningVMs(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   compat.Client
+		input    []transfer.PVCPair
+		expected []transfer.PVCPair
+	}{
+		{
+			name:     "no input",
+			client:   getFakeCompatClient(),
+			input:    []transfer.PVCPair{},
+			expected: []transfer.PVCPair{},
+		},
+		{
+			name: "single PVCPair with running VM",
+			client: getFakeCompatClient(createVirtualMachineWithVolumes("test-vm", testNamespace, []virtv1.Volume{
+				{
+					Name: "source",
+					VolumeSource: virtv1.VolumeSource{
+						PersistentVolumeClaim: &virtv1.PersistentVolumeClaimVolumeSource{
+							PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "source",
+							},
+						},
+					},
+				},
+			}),
+				createVirtlauncherPod("test-vm", testNamespace, []string{"source"}),
+			),
+			input: []transfer.PVCPair{
+				transfer.NewPVCPair(createPvc("source", testNamespace), createPvc("target", testNamespace)),
+			},
+			expected: []transfer.PVCPair{},
+		},
+		{
+			name: "two PVCPairs one running VM, one without",
+			client: getFakeCompatClient(createVirtualMachineWithVolumes("test-vm", testNamespace, []virtv1.Volume{
+				{
+					Name: "source",
+					VolumeSource: virtv1.VolumeSource{
+						PersistentVolumeClaim: &virtv1.PersistentVolumeClaimVolumeSource{
+							PersistentVolumeClaimVolumeSource: corev1.PersistentVolumeClaimVolumeSource{
+								ClaimName: "source",
+							},
+						},
+					},
+				},
+			}),
+				createVirtlauncherPod("test-vm", testNamespace, []string{"source"}),
+			),
+			input: []transfer.PVCPair{
+				transfer.NewPVCPair(createPvc("source", testNamespace), createPvc("target", testNamespace)),
+				transfer.NewPVCPair(createPvc("source-remain", testNamespace), createPvc("target-remain", testNamespace)),
+			},
+			expected: []transfer.PVCPair{
+				transfer.NewPVCPair(createPvc("source-remain", testNamespace), createPvc("target-remain", testNamespace)),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{}
+			task.sourceClient = tt.client
+			out, err := task.filterRunningVMs(tt.input)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				t.FailNow()
+			}
+			if len(out) != len(tt.expected) {
+				t.Errorf("Expected %d, got %d", len(tt.expected), len(out))
+				t.FailNow()
+			}
+			for i, p := range out {
+				if p.Source().Claim().Name != tt.expected[i].Source().Claim().Name {
+					t.Errorf("Expected %s, got %s", tt.expected[i].Source().Claim().Name, p.Source().Claim().Name)
+					t.FailNow()
+				}
+				if p.Destination().Claim().Name != tt.expected[i].Destination().Claim().Name {
+					t.Errorf("Expected %s, got %s", tt.expected[i].Destination().Claim().Name, p.Destination().Claim().Name)
+					t.FailNow()
+				}
+			}
+		})
+	}
+}
+
+func createExpectedLiveMigrationProgress(elapsedTime *metav1.Duration) *migapi.LiveMigrationProgress {
+	return &migapi.LiveMigrationProgress{
+		VMName:           "test-vm",
+		VMNamespace:      testNamespace,
+		TotalElapsedTime: elapsedTime,
+	}
+}
+
+func createExpectedPodProgress() *migapi.PodProgress {
+	return &migapi.PodProgress{
+		ObjectReference: &corev1.ObjectReference{
+			Namespace: testNamespace,
+			Name:      "test-pod",
+		},
+		PVCReference: &corev1.ObjectReference{
+			Namespace: testNamespace,
+			Name:      testVolume,
+		},
+		LastObservedProgressPercent: "23%",
+		LastObservedTransferRate:    "10MiB/s",
+		TotalElapsedTime:            &metav1.Duration{Duration: time.Second * 10},
+	}
+}
+
+func createDirectVolumeMigrationProgress(dvmName, volumeName, namespace string, podPhase corev1.PodPhase) *migapi.DirectVolumeMigrationProgress {
+	return &migapi.DirectVolumeMigrationProgress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      getMD5Hash(dvmName + volumeName + namespace),
+			Namespace: migapi.OpenshiftMigrationNamespace,
+		},
+		Spec: migapi.DirectVolumeMigrationProgressSpec{},
+		Status: migapi.DirectVolumeMigrationProgressStatus{
+			RsyncPodStatus: migapi.RsyncPodStatus{
+				PodPhase:                 podPhase,
+				PodName:                  "test-pod",
+				LastObservedTransferRate: "10MiB/s",
+			},
+			TotalProgressPercentage: "23",
+			RsyncElapsedTime: &metav1.Duration{
+				Duration: time.Second * 10,
+			},
+		},
+	}
+}
+
+func createOldDirectVolumeMigrationProgress(dvmName, volumeName, namespace string, podPhase corev1.PodPhase) *migapi.DirectVolumeMigrationProgress {
+	dvmp := createDirectVolumeMigrationProgress(dvmName, volumeName, namespace, podPhase)
+	dvmp.Status.CreationTimestamp = &metav1.Time{Time: time.Now().Add(-time.Minute * 11)}
+	return dvmp
 }
 
 func getPVCPair(name string, namespace string, volumeMode corev1.PersistentVolumeMode) transfer.PVCPair {
@@ -916,31 +1844,31 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 		fields       fields
 		wantPods     []*corev1.Pod
 		wantErr      bool
-		wantReturn   rsyncClientOperationStatusList
+		wantReturn   migrationOperationStatusList
 		wantCRStatus []*migapi.RsyncOperation
 	}{
 		{
 			name: "when there are 0 existing Rsync Pods in source and no PVCs to migrate, status list should be empty",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				DestClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				DestClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
 			wantPods:     []*corev1.Pod{},
 			wantErr:      false,
-			wantReturn:   rsyncClientOperationStatusList{},
+			wantReturn:   migrationOperationStatusList{},
 			wantCRStatus: []*migapi.RsyncOperation{},
 		},
 		{
 			name: "when there are 0 existing Rsync Pods in source and 1 new fs PVC is provided as input, 1 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				DestClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				DestClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				PVCPairMap: map[string][]transfer.PVCPair{
@@ -953,16 +1881,16 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 				getTestRsyncPodForPVC("pod-0", "pvc-0", "test-ns", "1", metav1.Now().Time),
 			},
 			wantErr:      false,
-			wantReturn:   rsyncClientOperationStatusList{},
+			wantReturn:   migrationOperationStatusList{},
 			wantCRStatus: []*migapi.RsyncOperation{},
 		},
 		{
 			name: "when there are 0 existing Rsync Pods in source and 1 new block PVC is provided as input, 1 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				DestClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				DestClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				PVCPairMap: map[string][]transfer.PVCPair{
@@ -975,16 +1903,16 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 				getTestRsyncPodForPVC("pod-0", "pvc-0", "test-ns", "1", metav1.Now().Time),
 			},
 			wantErr:      false,
-			wantReturn:   rsyncClientOperationStatusList{},
+			wantReturn:   migrationOperationStatusList{},
 			wantCRStatus: []*migapi.RsyncOperation{},
 		},
 		{
 			name: "when there are 0 existing Rsync Pods in source and 2 new fs PVCs and one block PVC are provided as input, 3 Rsync Pod must be created in source namespace",
 			fields: fields{
-				SrcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				DestClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				SrcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				DestClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				PVCPairMap: map[string][]transfer.PVCPair{
@@ -1001,7 +1929,7 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 				getTestRsyncPodForPVC("pod-0", "pvc-0", "ns-02", "1", metav1.Now().Time),
 			},
 			wantErr:      false,
-			wantReturn:   rsyncClientOperationStatusList{},
+			wantReturn:   migrationOperationStatusList{},
 			wantCRStatus: []*migapi.RsyncOperation{},
 		},
 	}
@@ -1011,6 +1939,13 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 				Log:    log.WithName("test-logger"),
 				Client: tt.fields.DestClient,
 				Owner:  tt.fields.Owner,
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							LiveMigrate: ptr.To[bool](false),
+						},
+					},
+				},
 			}
 			got, err := tr.createRsyncTransferClients(tt.fields.SrcClient, tt.fields.DestClient, tt.fields.PVCPairMap)
 			if (err != nil) != tt.wantErr {
@@ -1085,7 +2020,7 @@ func Test_getSecurityContext(t *testing.T) {
 			fields: fields{
 				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				Migration: &migapi.MigMigration{
@@ -1118,7 +2053,7 @@ func Test_getSecurityContext(t *testing.T) {
 			fields: fields{
 				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				Migration: &migapi.MigMigration{
@@ -1149,7 +2084,7 @@ func Test_getSecurityContext(t *testing.T) {
 			fields: fields{
 				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				Migration: &migapi.MigMigration{
@@ -1180,7 +2115,7 @@ func Test_getSecurityContext(t *testing.T) {
 			fields: fields{
 				client: getFakeCompatClientWithVersion(1, 24),
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 				Migration: &migapi.MigMigration{
@@ -1238,8 +2173,10 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 		checkRoute   bool
 	}{
 		{
-			name:    "error getting destination client",
-			fields:  fields{},
+			name: "error getting destination client",
+			fields: fields{
+				owner: &migapi.DirectVolumeMigration{},
+			},
 			wantErr: true,
 		},
 		{
@@ -1249,7 +2186,7 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 				destClient:   getFakeCompatClient(createNode("worker1"), createNode("worker2")),
 				endpointType: migapi.NodePort,
 				owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec: migapi.DirectVolumeMigrationSpec{
 						BackOffLimit: 2,
 						PersistentVolumeClaims: []migapi.PVCToMigrate{
@@ -1269,7 +2206,16 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 				destClient:   getFakeCompatClient(createMigCluster("test-cluster"), createClusterIngress()),
 				endpointType: migapi.Route,
 				owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name: "migmigration",
+							},
+						},
+						UID: "test-uid",
+					},
 					Spec: migapi.DirectVolumeMigrationSpec{
 						BackOffLimit: 2,
 						PersistentVolumeClaims: []migapi.PVCToMigrate{
@@ -1292,7 +2238,16 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 				destClient:   getFakeCompatClient(createMigCluster("test-cluster")),
 				endpointType: migapi.Route,
 				owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name: "migmigration",
+							},
+						},
+						UID: "test-uid",
+					},
 					Spec: migapi.DirectVolumeMigrationSpec{
 						BackOffLimit: 2,
 						PersistentVolumeClaims: []migapi.PVCToMigrate{
@@ -1315,7 +2270,16 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 				destClient:   getFakeCompatClientWithSubdomain(createMigCluster("test-cluster")),
 				endpointType: migapi.Route,
 				owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name: "migmigration",
+							},
+						},
+						UID: "test-uid",
+					},
 					Spec: migapi.DirectVolumeMigrationSpec{
 						BackOffLimit: 2,
 						PersistentVolumeClaims: []migapi.PVCToMigrate{
@@ -1363,7 +2327,7 @@ func Test_ensureRsyncEndpoints(t *testing.T) {
 	}
 }
 
-func verifyServiceHealthy(name, namespace, appLabel string, c client.Client, t *testing.T) {
+func verifyServiceHealthy(name, namespace, appLabel string, c k8sclient.Client, t *testing.T) {
 	service := &corev1.Service{}
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, service); err != nil {
 		t.Fatalf("ensureRsyncEndpoints() failed to get rsync service in namespace %s", namespace)
@@ -1377,7 +2341,7 @@ func verifyServiceHealthy(name, namespace, appLabel string, c client.Client, t *
 	}
 }
 
-func verifyRouteHealthy(name, namespace, appLabel string, c client.Client, t *testing.T) {
+func verifyRouteHealthy(name, namespace, appLabel string, c k8sclient.Client, t *testing.T) {
 	route := &routev1.Route{}
 	if err := c.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, route); err != nil {
 		if !k8serrors.IsNotFound(err) {
@@ -1417,15 +2381,15 @@ func Test_ensureFilesystemRsyncTransferServer(t *testing.T) {
 		{
 			name: "get single pvc filesystem server pod",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						getPVCPair("pvc", "test-ns", corev1.PersistentVolumeFilesystem),
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1434,15 +2398,15 @@ func Test_ensureFilesystemRsyncTransferServer(t *testing.T) {
 		{
 			name: "no filesystem pod available, no server pods",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						getPVCPair("pvc", "test-ns", corev1.PersistentVolumeBlock),
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1450,15 +2414,15 @@ func Test_ensureFilesystemRsyncTransferServer(t *testing.T) {
 		{
 			name: "error with invalid PVCPair",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						invalidPVCPair{},
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1470,10 +2434,11 @@ func Test_ensureFilesystemRsyncTransferServer(t *testing.T) {
 			tr := &Task{
 				Log:               log.WithName("test-logger"),
 				destinationClient: tt.fields.destClient,
+				sourceClient:      tt.fields.srcClient,
 				Owner:             tt.fields.Owner,
 				Client:            tt.fields.destClient,
 			}
-			if err := tr.ensureFilesystemRsyncTransferServer(tt.fields.srcClient, tt.fields.destClient, tt.fields.PVCPairMap, tt.fields.transportOptions); err != nil && !tt.wantErr {
+			if err := tr.ensureFilesystemRsyncTransferServer(tt.fields.PVCPairMap, tt.fields.transportOptions); err != nil && !tt.wantErr {
 				t.Fatalf("ensureFilesystemRsyncTransferServer() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			// Verify the server pod is created in the destination namespace
@@ -1512,15 +2477,15 @@ func Test_ensureBlockRsyncTransferServer(t *testing.T) {
 		{
 			name: "get single pvc block server pod",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						getPVCPair("pvc", "test-ns", corev1.PersistentVolumeBlock),
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1529,15 +2494,15 @@ func Test_ensureBlockRsyncTransferServer(t *testing.T) {
 		{
 			name: "no block pod available, no server pods",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						getPVCPair("pvc", "test-ns", corev1.PersistentVolumeFilesystem),
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1545,15 +2510,15 @@ func Test_ensureBlockRsyncTransferServer(t *testing.T) {
 		{
 			name: "error with invalid PVCPair",
 			fields: fields{
-				srcClient:  getFakeCompatClient(getDependencies("test-ns", "test-dvm")...),
-				destClient: getFakeCompatClient(append(getDependencies("test-ns", "test-dvm"), migration)...),
+				srcClient:  getFakeCompatClient(getDependencies("test-ns", testDVM)...),
+				destClient: getFakeCompatClient(append(getDependencies("test-ns", testDVM), migration)...),
 				PVCPairMap: map[string][]transfer.PVCPair{
 					"test-ns": {
 						invalidPVCPair{},
 					},
 				},
 				Owner: &migapi.DirectVolumeMigration{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-dvm", Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
 					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
 				},
 			},
@@ -1565,10 +2530,18 @@ func Test_ensureBlockRsyncTransferServer(t *testing.T) {
 			tr := &Task{
 				Log:               log.WithName("test-logger"),
 				destinationClient: tt.fields.destClient,
+				sourceClient:      tt.fields.srcClient,
 				Owner:             tt.fields.Owner,
 				Client:            tt.fields.destClient,
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							LiveMigrate: ptr.To[bool](false),
+						},
+					},
+				},
 			}
-			if err := tr.ensureBlockRsyncTransferServer(tt.fields.srcClient, tt.fields.destClient, tt.fields.PVCPairMap, tt.fields.transportOptions); err != nil && !tt.wantErr {
+			if err := tr.ensureBlockRsyncTransferServer(tt.fields.PVCPairMap, tt.fields.transportOptions); err != nil && !tt.wantErr {
 				t.Fatalf("ensureBlockRsyncTransferServer() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			// Verify the server pod is created in the destination namespace

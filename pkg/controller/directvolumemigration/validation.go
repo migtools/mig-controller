@@ -28,6 +28,7 @@ const (
 	Running                         = "Running"
 	Failed                          = "Failed"
 	RsyncClientPodsPending          = "RsyncClientPodsPending"
+	LiveMigrationsPending           = "LiveMigrationsPending"
 	Succeeded                       = "Succeeded"
 	SourceToDestinationNetworkError = "SourceToDestinationNetworkError"
 	FailedCreatingRsyncPods         = "FailedCreatingRsyncPods"
@@ -43,6 +44,7 @@ const (
 	NotReady           = "NotReady"
 	RsyncTimeout       = "RsyncTimedOut"
 	RsyncNoRouteToHost = "RsyncNoRouteToHost"
+	NotSupported       = "NotSupported"
 )
 
 // Messages
@@ -75,28 +77,25 @@ const (
 )
 
 // Validate the direct resource
-func (r ReconcileDirectVolumeMigration) validate(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+func (r *ReconcileDirectVolumeMigration) validate(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		var span opentracing.Span
 		span, ctx = opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validate")
 		defer span.Finish()
 	}
-	err := r.validateSrcCluster(ctx, direct)
-	if err != nil {
+	if err := r.validateSrcCluster(ctx, direct); err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validateDestCluster(ctx, direct)
-	if err != nil {
+	if err := r.validateDestCluster(ctx, direct); err != nil {
 		return liberr.Wrap(err)
 	}
-	err = r.validatePVCs(ctx, direct)
-	if err != nil {
+	if err := r.validatePVCs(ctx, direct); err != nil {
 		return liberr.Wrap(err)
 	}
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validateSrcCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+func (r *ReconcileDirectVolumeMigration) validateSrcCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateSrcCluster")
 		defer span.Finish()
@@ -146,7 +145,7 @@ func (r ReconcileDirectVolumeMigration) validateSrcCluster(ctx context.Context, 
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validateDestCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+func (r *ReconcileDirectVolumeMigration) validateDestCluster(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validateDestCluster")
 		defer span.Finish()
@@ -198,11 +197,11 @@ func (r ReconcileDirectVolumeMigration) validateDestCluster(ctx context.Context,
 // TODO: Validate that storage class mappings have valid storage class selections
 // Leaving as TODO because this is technically already validated from the
 // migplan, so not necessary from directvolumemigration controller to be fair
-func (r ReconcileDirectVolumeMigration) validateStorageClassMappings(direct *migapi.DirectVolumeMigration) error {
+func (r *ReconcileDirectVolumeMigration) validateStorageClassMappings(direct *migapi.DirectVolumeMigration) error {
 	return nil
 }
 
-func (r ReconcileDirectVolumeMigration) validatePVCs(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
+func (r *ReconcileDirectVolumeMigration) validatePVCs(ctx context.Context, direct *migapi.DirectVolumeMigration) error {
 	if opentracing.SpanFromContext(ctx) != nil {
 		span, _ := opentracing.StartSpanFromContextWithTracer(ctx, r.tracer, "validatePVCs")
 		defer span.Finish()

@@ -17,7 +17,7 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (t *Task) createDirectVolumeMigration() error {
+func (t *Task) createDirectVolumeMigration(migType *migapi.DirectVolumeMigrationType) error {
 	existingDvm, err := t.getDirectVolumeMigration()
 	if err != nil {
 		return err
@@ -31,11 +31,13 @@ func (t *Task) createDirectVolumeMigration() error {
 	if dvm == nil {
 		return errors.New("failed to build directvolumeclaim list")
 	}
+	if migType != nil {
+		dvm.Spec.MigrationType = migType
+	}
 	t.Log.Info("Creating DirectVolumeMigration on host cluster",
 		"directVolumeMigration", path.Join(dvm.Namespace, dvm.Name))
 	err = t.Client.Create(context.TODO(), dvm)
 	return err
-
 }
 
 func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
@@ -45,6 +47,10 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 	pvcList := t.getDirectVolumeClaimList()
 	if pvcList == nil {
 		return nil
+	}
+	migrationType := migapi.MigrationTypeStage
+	if t.Owner.Spec.QuiescePods {
+		migrationType = migapi.MigrationTypeFinal
 	}
 	dvm := &migapi.DirectVolumeMigration{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,6 +63,8 @@ func (t *Task) buildDirectVolumeMigration() *migapi.DirectVolumeMigration {
 			DestMigClusterRef:           t.PlanResources.DestMigCluster.GetObjectReference(),
 			PersistentVolumeClaims:      pvcList,
 			CreateDestinationNamespaces: true,
+			LiveMigrate:                 t.PlanResources.MigPlan.Spec.LiveMigrate,
+			MigrationType:               &migrationType,
 		},
 	}
 	migapi.SetOwnerReference(t.Owner, t.Owner, dvm)
@@ -86,29 +94,15 @@ func (t *Task) getDirectVolumeMigration() (*migapi.DirectVolumeMigration, error)
 // Check if the DVM has completed.
 // Returns if it has completed, why it failed, and it's progress results
 func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigration) (completed bool, failureReasons, progress []string) {
-	totalVolumes := len(dvm.Spec.PersistentVolumeClaims)
-	successfulPods := 0
-	failedPods := 0
-	runningPods := 0
-	if dvm.Status.SuccessfulPods != nil {
-		successfulPods = len(dvm.Status.SuccessfulPods)
-	}
-	if dvm.Status.FailedPods != nil {
-		failedPods = len(dvm.Status.FailedPods)
-	}
-	if dvm.Status.RunningPods != nil {
-		runningPods = len(dvm.Status.RunningPods)
-	}
-
 	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed",
-		totalVolumes,
-		successfulPods,
-		runningPods,
-		failedPods)
+		len(dvm.Spec.PersistentVolumeClaims),
+		len(dvm.Status.SuccessfulPods)+len(dvm.Status.SuccessfulLiveMigrations),
+		len(dvm.Status.RunningPods)+len(dvm.Status.FailedLiveMigrations),
+		len(dvm.Status.FailedPods)+len(dvm.Status.RunningLiveMigrations))
 	switch {
-	//case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
-	//	// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
-	case dvm.Status.Phase == dvmc.Completed && dvm.Status.Itinerary == "VolumeMigration" && dvm.Status.HasCondition(dvmc.Succeeded):
+	// case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
+	// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
+	case dvm.Status.Phase == dvmc.Completed && (dvm.Status.Itinerary == dvmc.VolumeMigrationItinerary || dvm.Status.Itinerary == dvmc.VolumeMigrationRollbackItinerary) && dvm.Status.HasCondition(dvmc.Succeeded):
 		// completed successfully
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.HasCondition(dvmc.Failed):
@@ -117,14 +111,14 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	default:
 		progress = append(progress, volumeProgress)
 	}
-	progress = append(progress, t.getDVMPodProgress(*dvm)...)
+	progress = append(progress, t.getDVMProgress(dvm)...)
 
 	// sort the progress report so we dont have flapping for the same progress info
 	sort.Strings(progress)
 	return completed, failureReasons, progress
 }
 
-func (t *Task) getWarningForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.Condition, error) {
+func (t *Task) getWarningForDVM(dvm *migapi.DirectVolumeMigration) *migapi.Condition {
 	conditions := dvm.Status.Conditions.FindConditionByCategory(dvmc.Warn)
 	if len(conditions) > 0 {
 		return &migapi.Condition{
@@ -133,10 +127,10 @@ func (t *Task) getWarningForDVM(dvm *migapi.DirectVolumeMigration) (*migapi.Cond
 			Reason:   migapi.NotReady,
 			Category: migapi.Warn,
 			Message:  joinConditionMessages(conditions),
-		}, nil
+		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func joinConditionMessages(conditions []*migapi.Condition) string {
@@ -160,7 +154,12 @@ func (t *Task) setDirectVolumeMigrationFailureWarning(dvm *migapi.DirectVolumeMi
 	})
 }
 
-func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
+func (t *Task) getDVMProgress(dvm *migapi.DirectVolumeMigration) []string {
+	progress := getDVMPodProgress(dvm)
+	return append(progress, getDVMLiveMigrationProgress(dvm)...)
+}
+
+func getDVMPodProgress(dvm *migapi.DirectVolumeMigration) []string {
 	progress := []string{}
 	podProgressIterator := map[string][]*migapi.PodProgress{
 		"Pending":   dvm.Status.PendingPods,
@@ -198,6 +197,44 @@ func (t *Task) getDVMPodProgress(dvm migapi.DirectVolumeMigration) []string {
 			}
 			progress = append(progress, p)
 		}
+	}
+	return progress
+}
+
+// Live migration progress
+func getDVMLiveMigrationProgress(dvm *migapi.DirectVolumeMigration) []string {
+	progress := []string{}
+	if dvm == nil {
+		return progress
+	}
+	liveMigrationProgressIterator := map[string][]*migapi.LiveMigrationProgress{
+		"Running":   dvm.Status.RunningLiveMigrations,
+		"Completed": dvm.Status.SuccessfulLiveMigrations,
+		"Failed":    dvm.Status.FailedLiveMigrations,
+		"Pending":   dvm.Status.PendingLiveMigrations,
+	}
+	for state, liveMigrations := range liveMigrationProgressIterator {
+		for _, liveMigration := range liveMigrations {
+			p := fmt.Sprintf(
+				"[%s] Live Migration %s: %s",
+				liveMigration.PVCReference.Name,
+				path.Join(liveMigration.VMNamespace, liveMigration.VMName),
+				state)
+			if liveMigration.Message != "" {
+				p += fmt.Sprintf(" %s", liveMigration.Message)
+			}
+			if liveMigration.LastObservedProgressPercent != "" {
+				p += fmt.Sprintf(" %s", liveMigration.LastObservedProgressPercent)
+			}
+			if liveMigration.LastObservedTransferRate != "" {
+				p += fmt.Sprintf(" (Transfer rate %s)", liveMigration.LastObservedTransferRate)
+			}
+			if liveMigration.TotalElapsedTime != nil {
+				p += fmt.Sprintf(" (%s)", liveMigration.TotalElapsedTime.Duration.Round(time.Second))
+			}
+			progress = append(progress, p)
+		}
+
 	}
 	return progress
 }

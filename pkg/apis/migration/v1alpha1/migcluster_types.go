@@ -804,6 +804,13 @@ var accessModeList = []provisionerAccessModes{
 			kapi.PersistentVolumeBlock:      {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
 		},
 	},
+	provisionerAccessModes{
+		Provisioner: "csi.kubevirt.io",
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
+			kapi.PersistentVolumeBlock:      {kapi.ReadWriteOnce},
+		},
+	},
 }
 
 // Get the list of k8s StorageClasses from the cluster.
