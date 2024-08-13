@@ -12,7 +12,11 @@ import (
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/opentracing/opentracing-go"
+	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
+	virtv1 "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -23,27 +27,28 @@ var NoReQ = time.Duration(0)
 
 // Phases
 const (
-	Created                              = ""
-	Started                              = "Started"
-	Prepare                              = "Prepare"
-	CleanStaleRsyncResources             = "CleanStaleRsyncResources"
-	CreateDestinationNamespaces          = "CreateDestinationNamespaces"
-	DestinationNamespacesCreated         = "DestinationNamespacesCreated"
-	CreateDestinationPVCs                = "CreateDestinationPVCs"
-	DestinationPVCsCreated               = "DestinationPVCsCreated"
-	CreateStunnelConfig                  = "CreateStunnelConfig"
-	CreateRsyncConfig                    = "CreateRsyncConfig"
-	CreateRsyncRoute                     = "CreateRsyncRoute"
-	EnsureRsyncRouteAdmitted             = "EnsureRsyncRouteAdmitted"
-	CreateRsyncTransferPods              = "CreateRsyncTransferPods"
-	WaitForRsyncTransferPodsRunning      = "WaitForRsyncTransferPodsRunning"
-	CreatePVProgressCRs                  = "CreatePVProgressCRs"
-	RunRsyncOperations                   = "RunRsyncOperations"
-	DeleteRsyncResources                 = "DeleteRsyncResources"
-	WaitForRsyncResourcesTerminated      = "WaitForRsyncResourcesTerminated"
-	WaitForStaleRsyncResourcesTerminated = "WaitForStaleRsyncResourcesTerminated"
-	Completed                            = "Completed"
-	MigrationFailed                      = "MigrationFailed"
+	Created                                     = ""
+	Started                                     = "Started"
+	Prepare                                     = "Prepare"
+	CleanStaleRsyncResources                    = "CleanStaleRsyncResources"
+	CreateDestinationNamespaces                 = "CreateDestinationNamespaces"
+	DestinationNamespacesCreated                = "DestinationNamespacesCreated"
+	CreateDestinationPVCs                       = "CreateDestinationPVCs"
+	DestinationPVCsCreated                      = "DestinationPVCsCreated"
+	CreateStunnelConfig                         = "CreateStunnelConfig"
+	CreateRsyncConfig                           = "CreateRsyncConfig"
+	CreateRsyncRoute                            = "CreateRsyncRoute"
+	EnsureRsyncRouteAdmitted                    = "EnsureRsyncRouteAdmitted"
+	CreateRsyncTransferPods                     = "CreateRsyncTransferPods"
+	WaitForRsyncTransferPodsRunning             = "WaitForRsyncTransferPodsRunning"
+	CreatePVProgressCRs                         = "CreatePVProgressCRs"
+	RunRsyncOperations                          = "RunRsyncOperations"
+	DeleteRsyncResources                        = "DeleteRsyncResources"
+	WaitForRsyncResourcesTerminated             = "WaitForRsyncResourcesTerminated"
+	WaitForStaleRsyncResourcesTerminated        = "WaitForStaleRsyncResourcesTerminated"
+	Completed                                   = "Completed"
+	MigrationFailed                             = "MigrationFailed"
+	DeleteStaleVirtualMachineInstanceMigrations = "DeleteStaleVirtualMachineInstanceMigrations"
 )
 
 // labels
@@ -65,6 +70,13 @@ const (
 	DirectVolumeMigrationRsyncClient             = "rsync-client"
 	DirectVolumeMigrationStunnel                 = "stunnel"
 	MigratedByDirectVolumeMigration              = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
+)
+
+// Itinerary names
+const (
+	VolumeMigrationItinerary         = "VolumeMigration"
+	VolumeMigrationFailedItinerary   = "VolumeMigrationFailed"
+	VolumeMigrationRollbackItinerary = "VolumeMigrationRollback"
 )
 
 // Flags
@@ -104,7 +116,7 @@ func (r Itinerary) progressReport(phase string) (string, int, int) {
 }
 
 var VolumeMigration = Itinerary{
-	Name: "VolumeMigration",
+	Name: VolumeMigrationItinerary,
 	Steps: []Step{
 		{phase: Created},
 		{phase: Started},
@@ -115,6 +127,7 @@ var VolumeMigration = Itinerary{
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
 		{phase: DestinationPVCsCreated},
+		{phase: DeleteStaleVirtualMachineInstanceMigrations},
 		{phase: CreateRsyncRoute},
 		{phase: EnsureRsyncRouteAdmitted},
 		{phase: CreateRsyncConfig},
@@ -130,9 +143,23 @@ var VolumeMigration = Itinerary{
 }
 
 var FailedItinerary = Itinerary{
-	Name: "VolumeMigrationFailed",
+	Name: VolumeMigrationFailedItinerary,
 	Steps: []Step{
 		{phase: MigrationFailed},
+		{phase: Completed},
+	},
+}
+
+var RollbackItinerary = Itinerary{
+	Name: VolumeMigrationRollbackItinerary,
+	Steps: []Step{
+		{phase: Created},
+		{phase: Started},
+		{phase: Prepare},
+		{phase: CleanStaleRsyncResources},
+		{phase: DeleteStaleVirtualMachineInstanceMigrations},
+		{phase: WaitForStaleRsyncResourcesTerminated},
+		{phase: RunRsyncOperations},
 		{phase: Completed},
 	},
 }
@@ -149,8 +176,10 @@ var FailedItinerary = Itinerary{
 type Task struct {
 	Log                          logr.Logger
 	Client                       k8sclient.Client
+	PrometheusAPI                prometheusv1.API
 	sourceClient                 compat.Client
 	destinationClient            compat.Client
+	restConfig                   *rest.Config
 	Owner                        *migapi.DirectVolumeMigration
 	SSHKeys                      *sshKeys
 	EndpointType                 migapi.EndpointType
@@ -164,9 +193,10 @@ type Task struct {
 	SparseFileMap                sparseFilePVCMap
 	SourceLimitRangeMapping      limitRangeMap
 	DestinationLimitRangeMapping limitRangeMap
-
-	Tracer        opentracing.Tracer
-	ReconcileSpan opentracing.Span
+	VirtualMachineMappings       VirtualMachineMappings
+	PromQuery                    func(ctx context.Context, query string, ts time.Time, opts ...prometheusv1.Option) (model.Value, prometheusv1.Warnings, error)
+	Tracer                       opentracing.Tracer
+	ReconcileSpan                opentracing.Span
 }
 
 type limitRangeMap map[string]corev1.LimitRange
@@ -176,17 +206,51 @@ type sshKeys struct {
 	PrivateKey *rsa.PrivateKey
 }
 
+type VirtualMachineMappings struct {
+	volumeVMIMMap        map[string]*virtv1.VirtualMachineInstanceMigration
+	volumeVMNameMap      map[string]string
+	runningVMVolumeNames []string
+}
+
 func (t *Task) init() error {
 	t.RsyncRoutes = make(map[string]string)
 	t.Requeue = FastReQ
 	if t.failed() {
 		t.Itinerary = FailedItinerary
+	} else if t.Owner.IsRollback() {
+		t.Itinerary = RollbackItinerary
 	} else {
 		t.Itinerary = VolumeMigration
 	}
 	if t.Itinerary.Name != t.Owner.Status.Itinerary {
 		t.Phase = t.Itinerary.Steps[0].phase
 	}
+	// Initialize the source and destination clients
+	_, err := t.getSourceClient()
+	if err != nil {
+		return err
+	}
+	_, err = t.getDestinationClient()
+	return err
+}
+
+func (t *Task) populateVMMappings(namespace string) error {
+	t.VirtualMachineMappings = VirtualMachineMappings{}
+	volumeVMIMMap, err := t.getVolumeVMIMInNamespaces([]string{namespace})
+	if err != nil {
+		return err
+	}
+	volumeVMMap, err := getRunningVmVolumeMap(t.sourceClient, namespace)
+	if err != nil {
+		return err
+	}
+	volumeNames, err := t.getRunningVMVolumes([]string{namespace})
+	if err != nil {
+		return err
+	}
+	t.VirtualMachineMappings.volumeVMIMMap = volumeVMIMMap
+	t.VirtualMachineMappings.volumeVMNameMap = volumeVMMap
+	t.VirtualMachineMappings.runningVMVolumeNames = volumeNames
 	return nil
 }
 
@@ -209,11 +273,7 @@ func (t *Task) Run(ctx context.Context) error {
 
 	// Run the current phase.
 	switch t.Phase {
-	case Created, Started:
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case Prepare:
+	case Created, Started, Prepare:
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
@@ -377,7 +437,7 @@ func (t *Task) Run(ctx context.Context) error {
 
 				msg := fmt.Sprintf("Rsync Transfer Pod(s) on destination cluster have not started Running within 3 minutes. "+
 					"Run these command(s) to check Pod warning events: [%s]",
-					fmt.Sprintf("%s", strings.Join(nonRunningPodStrings, ", ")))
+					strings.Join(nonRunningPodStrings, ", "))
 
 				t.Log.Info(msg)
 				t.Owner.Status.SetCondition(
@@ -425,8 +485,15 @@ func (t *Task) Run(ctx context.Context) error {
 		if err = t.next(); err != nil {
 			return liberr.Wrap(err)
 		}
+	case DeleteStaleVirtualMachineInstanceMigrations:
+		if err := t.deleteStaleVirtualMachineInstanceMigrations(); err != nil {
+			return liberr.Wrap(err)
+		}
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
 	case WaitForStaleRsyncResourcesTerminated, WaitForRsyncResourcesTerminated:
-		err, deleted := t.waitForRsyncResourcesDeleted()
+		deleted, err := t.waitForRsyncResourcesDeleted()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -436,6 +503,7 @@ func (t *Task) Run(ctx context.Context) error {
 				return liberr.Wrap(err)
 			}
 		}
+
 		t.Log.Info("Stale Rsync resources are still terminating. Waiting.")
 		t.Requeue = PollReQ
 	case Completed:
@@ -528,6 +596,7 @@ func (t *Task) getSourceClient() (compat.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	t.sourceClient = client
 	return client, nil
 }
 
@@ -547,6 +616,7 @@ func (t *Task) getDestinationClient() (compat.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	t.destinationClient = client
 	return client, nil
 }
 

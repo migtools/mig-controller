@@ -29,8 +29,7 @@ const (
 	vmSubresourceURLFmt = "/apis/subresources.kubevirt.io/%s/namespaces/%s/virtualmachines/%s/%s"
 )
 
-// Quiesce applications on source cluster
-func (t *Task) quiesceApplications() error {
+func (t *Task) quiesceSourceApplications() error {
 	client, err := t.getSourceClient()
 	if err != nil {
 		return liberr.Wrap(err)
@@ -39,7 +38,24 @@ func (t *Task) quiesceApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceCronJobs(client)
+	return t.quiesceApplications(client, restConfig)
+}
+
+func (t *Task) quiesceDestinationApplications() error {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	restConfig, err := t.getDestinationRestConfig()
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	return t.quiesceApplications(client, restConfig)
+}
+
+// Quiesce applications on source cluster
+func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config) error {
+	err := t.quiesceCronJobs(client)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -67,15 +83,16 @@ func (t *Task) quiesceApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	restClient, err := t.createRestClient(restConfig)
-	if err != nil {
-		return liberr.Wrap(err)
+	if !t.PlanResources.MigPlan.LiveMigrationChecked() {
+		restClient, err := t.createRestClient(restConfig)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.quiesceVirtualMachines(client, restClient)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
-	err = t.quiesceVirtualMachines(client, restClient)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	return nil
 }
 
@@ -88,7 +105,7 @@ func (t *Task) unQuiesceSrcApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	t.Log.Info("Unquiescing applications on source cluster.")
+	t.Log.V(3).Info("Unquiescing applications on source cluster.")
 	err = t.unQuiesceApplications(srcClient, restConfig, t.sourceNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
@@ -105,7 +122,7 @@ func (t *Task) unQuiesceDestApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	t.Log.Info("Unquiescing applications on destination cluster.")
+	t.Log.V(3).Info("Unquiescing applications on destination cluster.")
 	err = t.unQuiesceApplications(destClient, restConfig, t.destinationNamespaces())
 	if err != nil {
 		return liberr.Wrap(err)
@@ -143,15 +160,16 @@ func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Conf
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	restClient, err := t.createRestClient(restConfig)
-	if err != nil {
-		return liberr.Wrap(err)
+	if !t.PlanResources.MigPlan.LiveMigrationChecked() {
+		restClient, err := t.createRestClient(restConfig)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		err = t.unQuiesceVirtualMachines(client, restClient, namespaces)
+		if err != nil {
+			return liberr.Wrap(err)
+		}
 	}
-	err = t.unQuiesceVirtualMachines(client, restClient, namespaces)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-
 	return nil
 }
 
@@ -971,27 +989,41 @@ func (t *Task) startVM(vm *virtv1.VirtualMachine, client k8sclient.Client, restC
 	return nil
 }
 
+func (t *Task) ensureSourceQuiescedPodsTerminated() (bool, error) {
+	client, err := t.getSourceClient()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	return t.ensureQuiescedPodsTerminated(client, t.sourceNamespaces())
+}
+
+func (t *Task) ensureDestinationQuiescedPodsTerminated() (bool, error) {
+	client, err := t.getDestinationClient()
+	if err != nil {
+		return false, liberr.Wrap(err)
+	}
+	return t.ensureQuiescedPodsTerminated(client, t.destinationNamespaces())
+}
+
 // Ensure scaled down pods have terminated.
 // Returns: `true` when all pods terminated.
-func (t *Task) ensureQuiescedPodsTerminated() (bool, error) {
+func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []string) (bool, error) {
 	kinds := map[string]bool{
 		"ReplicationController": true,
 		"StatefulSet":           true,
 		"ReplicaSet":            true,
 		"DaemonSet":             true,
 		"Job":                   true,
-		"VirtualMachine":        true,
+	}
+	if !t.PlanResources.MigPlan.LiveMigrationChecked() {
+		kinds["VirtualMachineInstance"] = true
 	}
 	skippedPhases := map[v1.PodPhase]bool{
 		v1.PodSucceeded: true,
 		v1.PodFailed:    true,
 		v1.PodUnknown:   true,
 	}
-	client, err := t.getSourceClient()
-	if err != nil {
-		return false, liberr.Wrap(err)
-	}
-	for _, ns := range t.sourceNamespaces() {
+	for _, ns := range namespaces {
 		list := v1.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(

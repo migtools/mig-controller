@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"slices"
 
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,22 +66,43 @@ type DirectVolumeMigrationSpec struct {
 
 	// Specifies if progress reporting CRs needs to be deleted or not
 	DeleteProgressReportingCRs bool `json:"deleteProgressReportingCRs,omitempty"`
+
+	// Specifies if any volumes associated with a VM should be live storage migrated instead of offline migrated
+	LiveMigrate *bool `json:"liveMigrate,omitempty"`
+
+	// Specifies if this is the final DVM in the migration plan
+	MigrationType *DirectVolumeMigrationType `json:"migrationType,omitempty"`
 }
+
+type DirectVolumeMigrationType string
+
+const (
+	MigrationTypeStage    DirectVolumeMigrationType = "Stage"
+	MigrationTypeFinal    DirectVolumeMigrationType = "CutOver"
+	MigrationTypeRollback DirectVolumeMigrationType = "Rollback"
+)
 
 // DirectVolumeMigrationStatus defines the observed state of DirectVolumeMigration
 type DirectVolumeMigrationStatus struct {
-	Conditions       `json:","`
-	ObservedDigest   string            `json:"observedDigest"`
-	StartTimestamp   *metav1.Time      `json:"startTimestamp,omitempty"`
-	PhaseDescription string            `json:"phaseDescription"`
-	Phase            string            `json:"phase,omitempty"`
-	Itinerary        string            `json:"itinerary,omitempty"`
-	Errors           []string          `json:"errors,omitempty"`
-	SuccessfulPods   []*PodProgress    `json:"successfulPods,omitempty"`
-	FailedPods       []*PodProgress    `json:"failedPods,omitempty"`
-	RunningPods      []*PodProgress    `json:"runningPods,omitempty"`
-	PendingPods      []*PodProgress    `json:"pendingPods,omitempty"`
-	RsyncOperations  []*RsyncOperation `json:"rsyncOperations,omitempty"`
+	Conditions                `json:","`
+	ObservedDigest            string                   `json:"observedDigest"`
+	StartTimestamp            *metav1.Time             `json:"startTimestamp,omitempty"`
+	PhaseDescription          string                   `json:"phaseDescription"`
+	Phase                     string                   `json:"phase,omitempty"`
+	Itinerary                 string                   `json:"itinerary,omitempty"`
+	Errors                    []string                 `json:"errors,omitempty"`
+	SuccessfulPods            []*PodProgress           `json:"successfulPods,omitempty"`
+	FailedPods                []*PodProgress           `json:"failedPods,omitempty"`
+	RunningPods               []*PodProgress           `json:"runningPods,omitempty"`
+	PendingPods               []*PodProgress           `json:"pendingPods,omitempty"`
+	UnknownPods               []*PodProgress           `json:"unknownPods,omitempty"`
+	PendingSinceTimeLimitPods []*PodProgress           `json:"pendingSinceTimeLimitPods,omitempty"`
+	SuccessfulLiveMigrations  []*LiveMigrationProgress `json:"successfulLiveMigration,omitempty"`
+	RunningLiveMigrations     []*LiveMigrationProgress `json:"runningLiveMigration,omitempty"`
+	PendingLiveMigrations     []*LiveMigrationProgress `json:"pendingLiveMigration,omitempty"`
+	FailedLiveMigrations      []*LiveMigrationProgress `json:"failedLiveMigration,omitempty"`
+	RsyncOperations           []*RsyncOperation        `json:"rsyncOperations,omitempty"`
+	SkippedVolumes            []string                 `json:"skippedVolumes,omitempty"`
 }
 
 // GetRsyncOperationStatusForPVC returns RsyncOperation from status for matching PVC, creates new one if doesn't exist already
@@ -117,6 +139,42 @@ func (ds *DirectVolumeMigrationStatus) AddRsyncOperation(podStatus *RsyncOperati
 	ds.RsyncOperations = append(ds.RsyncOperations, podStatus)
 }
 
+func (dvm *DirectVolumeMigration) IsCompleted() bool {
+	return len(dvm.Status.SuccessfulPods)+
+		len(dvm.Status.FailedPods)+
+		len(dvm.Status.SkippedVolumes)+
+		len(dvm.Status.SuccessfulLiveMigrations)+
+		len(dvm.Status.FailedLiveMigrations) == len(dvm.Spec.PersistentVolumeClaims)
+}
+
+func (dvm *DirectVolumeMigration) IsCutover() bool {
+	return dvm.Spec.MigrationType != nil && *dvm.Spec.MigrationType == MigrationTypeFinal
+}
+
+func (dvm *DirectVolumeMigration) IsRollback() bool {
+	return dvm.Spec.MigrationType != nil && *dvm.Spec.MigrationType == MigrationTypeRollback
+}
+
+func (dvm *DirectVolumeMigration) IsStage() bool {
+	return dvm.Spec.MigrationType != nil && *dvm.Spec.MigrationType == MigrationTypeStage
+}
+
+func (dvm *DirectVolumeMigration) SkipVolume(volumeName, namespace string) {
+	dvm.Status.SkippedVolumes = append(dvm.Status.SkippedVolumes, fmt.Sprintf("%s/%s", namespace, volumeName))
+}
+
+func (dvm *DirectVolumeMigration) IsLiveMigrate() bool {
+	return dvm.Spec.LiveMigrate != nil && *dvm.Spec.LiveMigrate
+}
+
+func (dvm *DirectVolumeMigration) AllReportingCompleted() bool {
+	isCompleted := dvm.IsCompleted()
+	isAnyPending := len(dvm.Status.PendingPods) > 0 || len(dvm.Status.PendingLiveMigrations) > 0
+	isAnyRunning := len(dvm.Status.RunningPods) > 0 || len(dvm.Status.RunningLiveMigrations) > 0
+	isAnyUnknown := len(dvm.Status.UnknownPods) > 0
+	return !isAnyRunning && !isAnyPending && !isAnyUnknown && isCompleted
+}
+
 // TODO: Explore how to reliably get stunnel+rsync logs/status reported back to
 // DirectVolumeMigrationStatus
 
@@ -149,6 +207,16 @@ type PodProgress struct {
 	LastObservedProgressPercent string                `json:"lastObservedProgressPercent,omitempty"`
 	LastObservedTransferRate    string                `json:"lastObservedTransferRate,omitempty"`
 	TotalElapsedTime            *metav1.Duration      `json:"totalElapsedTime,omitempty"`
+}
+
+type LiveMigrationProgress struct {
+	VMName                      string                `json:"vmName,omitempty"`
+	VMNamespace                 string                `json:"vmNamespace,omitempty"`
+	PVCReference                *kapi.ObjectReference `json:"pvcRef,omitempty"`
+	LastObservedProgressPercent string                `json:"lastObservedProgressPercent,omitempty"`
+	LastObservedTransferRate    string                `json:"lastObservedTransferRate,omitempty"`
+	TotalElapsedTime            *metav1.Duration      `json:"totalElapsedTime,omitempty"`
+	Message                     string                `json:"message,omitempty"`
 }
 
 // RsyncOperation defines observed state of an Rsync Operation
@@ -203,6 +271,26 @@ func (r *DirectVolumeMigration) GetDestinationCluster(client k8sclient.Client) (
 
 func (r *DirectVolumeMigration) GetMigrationForDVM(client k8sclient.Client) (*MigMigration, error) {
 	return GetMigrationForDVM(client, r.OwnerReferences)
+}
+
+func (r *DirectVolumeMigration) GetSourceNamespaces() []string {
+	namespaces := []string{}
+	for _, pvc := range r.Spec.PersistentVolumeClaims {
+		if pvc.Namespace != "" && !slices.Contains(namespaces, pvc.Namespace) {
+			namespaces = append(namespaces, pvc.Namespace)
+		}
+	}
+	return namespaces
+}
+
+func (r *DirectVolumeMigration) GetDestinationNamespaces() []string {
+	namespaces := []string{}
+	for _, pvc := range r.Spec.PersistentVolumeClaims {
+		if pvc.TargetNamespace != "" && !slices.Contains(namespaces, pvc.TargetNamespace) {
+			namespaces = append(namespaces, pvc.TargetNamespace)
+		}
+	}
+	return namespaces
 }
 
 // Add (de-duplicated) errors.

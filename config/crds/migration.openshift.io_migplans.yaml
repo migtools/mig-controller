@@ -275,6 +275,11 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              liveMigrate:
+                description: LiveMigrate optional flag to enable live migration of
+                  VMs during direct volume migration Only running VMs when the plan
+                  is executed will be live migrated
+                type: boolean
               migStorageRef:
                 description: "ObjectReference contains enough information to let you
                   inspect or modify the referred object. --- New uses of this type
