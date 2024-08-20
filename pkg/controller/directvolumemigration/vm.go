@@ -36,7 +36,10 @@ const (
 	progressQuery    = "kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} / (kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} + kubevirt_vmi_migration_data_remaining_bytes{name=\"%s\"}) * 100"
 )
 
-var ErrVolumesDoNotMatch = errors.New("volumes do not match")
+var (
+	ErrVolumesDoNotMatch    = errors.New("volumes do not match")
+	ErrNamespacesDoNotMatch = errors.New("source and target namespaces must match")
+)
 
 type vmVolumes struct {
 	sourceVolumes []string
@@ -91,7 +94,7 @@ func getNamespace(colonDelimitedString string) (string, error) {
 		return "", fmt.Errorf("invalid namespace pair: %s", colonDelimitedString)
 	}
 	if namespacePair[0] != namespacePair[1] && namespacePair[0] != "" {
-		return "", fmt.Errorf("source and target namespaces must match: %s", colonDelimitedString)
+		return "", ErrNamespacesDoNotMatch
 	}
 	return namespacePair[0], nil
 }
@@ -545,8 +548,10 @@ func (t *Task) deleteStaleVirtualMachineInstanceMigrations() error {
 
 	for namespacePair := range pvcMap {
 		namespace, err := getNamespace(namespacePair)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrNamespacesDoNotMatch) {
 			return err
+		} else if errors.Is(err, ErrNamespacesDoNotMatch) {
+			continue
 		}
 		vmMap, err := getVMNamesInNamespace(t.sourceClient, namespace)
 		if err != nil {
