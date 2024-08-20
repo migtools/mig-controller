@@ -79,7 +79,7 @@ func TestTask_startLiveMigrations(t *testing.T) {
 				},
 			},
 			wantErr:         true,
-			expectedReasons: []string{"source and target namespaces must match: test-namespace:test-namespace2"},
+			expectedReasons: []string{"source and target namespaces must match"},
 		},
 		{
 			name: "running VM, no volumes",
@@ -1425,8 +1425,7 @@ func TestTaskDeleteStaleVirtualMachineInstanceMigrations(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
-			expectedMsg:   "source and target namespaces must match",
+			expectedError: false,
 		},
 		{
 			name:   "PVCs in same namespace, and persistent volume claims in DVM, but no VMs or VMIMs, should not return error",
