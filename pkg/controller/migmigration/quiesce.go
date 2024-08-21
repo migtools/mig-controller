@@ -38,7 +38,7 @@ func (t *Task) quiesceSourceApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	return t.quiesceApplications(client, restConfig)
+	return t.quiesceApplications(client, restConfig, t.sourceNamespaces())
 }
 
 func (t *Task) quiesceDestinationApplications() error {
@@ -50,36 +50,36 @@ func (t *Task) quiesceDestinationApplications() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	return t.quiesceApplications(client, restConfig)
+	return t.quiesceApplications(client, restConfig, t.destinationNamespaces())
 }
 
 // Quiesce applications on source cluster
-func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config) error {
-	err := t.quiesceCronJobs(client)
+func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
+	err := t.quiesceCronJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeploymentConfigs(client)
+	err = t.quiesceDeploymentConfigs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeployments(client)
+	err = t.quiesceDeployments(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceStatefulSets(client)
+	err = t.quiesceStatefulSets(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceReplicaSets(client)
+	err = t.quiesceReplicaSets(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDaemonSets(client)
+	err = t.quiesceDaemonSets(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceJobs(client)
+	err = t.quiesceJobs(client, namespaces)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -88,7 +88,7 @@ func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		err = t.quiesceVirtualMachines(client, restClient)
+		err = t.quiesceVirtualMachines(client, restClient, namespaces)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -174,8 +174,8 @@ func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Conf
 }
 
 // Scales down DeploymentConfig on source cluster
-func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -278,9 +278,9 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 }
 
 // Scales down all Deployments
-func (t *Task) quiesceDeployments(client k8sclient.Client) error {
+func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string) error {
 	zero := int32(0)
-	for _, ns := range t.sourceNamespaces() {
+	for _, ns := range namespaces {
 		list := appsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -372,9 +372,9 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all StatefulSets.
-func (t *Task) quiesceStatefulSets(client k8sclient.Client) error {
+func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string) error {
 	zero := int32(0)
-	for _, ns := range t.sourceNamespaces() {
+	for _, ns := range namespaces {
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -456,9 +456,9 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 }
 
 // Scales down all ReplicaSets.
-func (t *Task) quiesceReplicaSets(client k8sclient.Client) error {
+func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string) error {
 	zero := int32(0)
-	for _, ns := range t.sourceNamespaces() {
+	for _, ns := range namespaces {
 		list := appsv1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -547,8 +547,8 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all DaemonSets.
-func (t *Task) quiesceDaemonSets(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -634,8 +634,8 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 }
 
 // Suspends all CronJobs
-func (t *Task) quiesceCronJobs(client compat.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 
 		if client.MinorVersion() < 21 {
 			list := batchv1beta.CronJobList{}
@@ -757,8 +757,8 @@ func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) erro
 }
 
 // Scales down all Jobs
-func (t *Task) quiesceJobs(client k8sclient.Client) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -855,8 +855,8 @@ func (t *Task) createRestClient(restConfig *rest.Config) (rest.Interface, error)
 }
 
 // Scales down all Virtual Machines
-func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface) error {
-	for _, ns := range t.sourceNamespaces() {
+func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string) error {
+	for _, ns := range namespaces {
 		list := virtv1.VirtualMachineList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -994,7 +994,7 @@ func (t *Task) ensureSourceQuiescedPodsTerminated() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	return t.ensureQuiescedPodsTerminated(client, t.sourceNamespaces())
+	return t.ensureQuiescedPodsTerminated(client, t.sourceNamespaces(), "source")
 }
 
 func (t *Task) ensureDestinationQuiescedPodsTerminated() (bool, error) {
@@ -1002,12 +1002,12 @@ func (t *Task) ensureDestinationQuiescedPodsTerminated() (bool, error) {
 	if err != nil {
 		return false, liberr.Wrap(err)
 	}
-	return t.ensureQuiescedPodsTerminated(client, t.destinationNamespaces())
+	return t.ensureQuiescedPodsTerminated(client, t.destinationNamespaces(), "destination")
 }
 
 // Ensure scaled down pods have terminated.
 // Returns: `true` when all pods terminated.
-func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []string) (bool, error) {
+func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []string, clusterType string) (bool, error) {
 	kinds := map[string]bool{
 		"ReplicationController": true,
 		"StatefulSet":           true,
@@ -1042,7 +1042,7 @@ func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []s
 			}
 			for _, ref := range pod.OwnerReferences {
 				if _, found := kinds[ref.Kind]; found {
-					t.Log.Info("Found quiesced Pod on source cluster"+
+					t.Log.Info("Found quiesced Pod on "+clusterType+" cluster"+
 						" that has not yet terminated. Waiting.",
 						"pod", path.Join(pod.Namespace, pod.Name),
 						"podPhase", pod.Status.Phase)

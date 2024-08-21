@@ -108,7 +108,7 @@ func TestQuiesceVirtualMachine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.task.quiesceVirtualMachines(tt.client, tt.restClient); err != nil && !tt.wantErr {
+			if err := tt.task.quiesceVirtualMachines(tt.client, tt.restClient, tt.task.sourceNamespaces()); err != nil && !tt.wantErr {
 				t.Errorf("quiesceVirtualMachines() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err == nil && tt.wantErr {
 				t.Errorf("quiesceVirtualMachines() error = %v, wantErr %v", err, tt.wantErr)
