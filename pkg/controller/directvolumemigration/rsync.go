@@ -1395,6 +1395,7 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 		if err := t.populateVMMappings(ns); err != nil {
 			return false, err
 		}
+		t.Owner.Status.SkippedVolumes = []string{}
 		for _, vol := range vols {
 			matchString := fmt.Sprintf("%s/%s", ns, vol.Name)
 			if t.PlanResources.MigPlan.LiveMigrationChecked() &&
@@ -1420,7 +1421,6 @@ func (t *Task) hasAllProgressReportingCompleted() (bool, error) {
 			}
 		}
 	}
-
 	return t.Owner.AllReportingCompleted(), nil
 }
 

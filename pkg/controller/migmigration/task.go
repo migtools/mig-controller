@@ -125,6 +125,7 @@ const (
 	HasPreRestoreHooks  = 0x4000  // True when postbackup hooks exist
 	HasPostRestoreHooks = 0x8000  // True when postbackup hooks exist
 	StorageConversion   = 0x10000 // True when the migration is a storage conversion
+	LiveVmMigration     = 0x20000 // True when the migration is a live vm migration
 )
 
 // Migration steps
@@ -299,8 +300,8 @@ var RollbackItinerary = Itinerary{
 		{Name: QuiesceDestinationApplications, Step: StepCleanupMigrated, all: DirectVolume | EnableVolume},
 		{Name: EnsureDestQuiesced, Step: StepCleanupMigrated, all: DirectVolume | EnableVolume},
 		{Name: SwapPVCReferences, Step: StepCleanupMigrated, all: StorageConversion},
-		{Name: CreateDirectVolumeMigrationRollback, Step: StepRollbackLiveMigration, all: DirectVolume | EnableVolume},
-		{Name: WaitForDirectVolumeMigrationRollbackToComplete, Step: StepRollbackLiveMigration, all: DirectVolume | EnableVolume},
+		{Name: CreateDirectVolumeMigrationRollback, Step: StepRollbackLiveMigration, all: DirectVolume | EnableVolume | LiveVmMigration},
+		{Name: WaitForDirectVolumeMigrationRollbackToComplete, Step: StepRollbackLiveMigration, all: DirectVolume | EnableVolume | LiveVmMigration},
 		{Name: DeleteMigrated, Step: StepCleanupMigrated},
 		{Name: EnsureMigratedDeleted, Step: StepCleanupMigrated},
 		{Name: UnQuiesceSrcApplications, Step: StepCleanupUnquiesce},
@@ -1387,6 +1388,9 @@ func (t *Task) allFlags(phase Phase) (bool, error) {
 	if phase.all&IndirectImage != 0 && !t.indirectImageMigration() {
 		return false, nil
 	}
+	if phase.all&LiveVmMigration != 0 && !t.liveVolumeMigration() {
+		return false, nil
+	}
 	if phase.all&EnableImage != 0 && t.PlanResources.MigPlan.IsImageMigrationDisabled() {
 		return false, nil
 	}
@@ -1771,6 +1775,10 @@ func (t *Task) indirectVolumeMigration() bool {
 // There must exist a set of direct volumes for this to return true
 func (t *Task) directVolumeMigration() bool {
 	return !t.indirectVolumeMigration() && t.hasDirectVolumes()
+}
+
+func (t *Task) liveVolumeMigration() bool {
+	return t.PlanResources.MigPlan.Spec.LiveMigrate != nil && *t.PlanResources.MigPlan.Spec.LiveMigrate
 }
 
 // Returns true if the migration requires a stage backup

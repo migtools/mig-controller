@@ -328,6 +328,9 @@ func (r *ReconcileDirectVolumeMigration) cleanupTargetResourcesInNamespaces(dire
 	if err != nil {
 		return false, err
 	}
+	if destinationCluster == nil {
+		return false, nil
+	}
 
 	// Cleanup source resources
 	client, err := destinationCluster.GetClient(r)
