@@ -868,7 +868,10 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 	pvcMap := t.getPVCNamespaceMap()
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
+	delete(dvmLabels, "app")
 	selector := labels.SelectorFromSet(dvmLabels)
+	appRequirement, _ := labels.NewRequirement("app", selection.In, []string{DirectVolumeMigrationRsyncTransfer, DirectVolumeMigrationRsyncTransferBlock})
+	selector.Add(*appRequirement)
 
 	for bothNs, _ := range pvcMap {
 		ns := getDestNs(bothNs)
@@ -1180,7 +1183,7 @@ func (t *Task) getRsyncPassword() (string, error) {
 		Namespace: migapi.OpenshiftMigrationNamespace,
 	}
 	t.Log.Info("Getting Rsync Password from Secret on host MigCluster",
-		"secret", path.Join(rsyncSecret.Namespace, rsyncSecret.Name))
+		"secret", path.Join(key.Namespace, key.Name))
 	err := t.Client.Get(context.TODO(), key, &rsyncSecret)
 	if k8serror.IsNotFound(err) {
 		t.Log.Info("Rsync Password Secret is not found on host MigCluster",
