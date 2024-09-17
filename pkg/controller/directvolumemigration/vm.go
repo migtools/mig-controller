@@ -359,6 +359,19 @@ func CreateNewDataVolume(client k8sclient.Client, sourceDvName, targetDvName, ns
 	adoptingDV.Spec.Source = &cdiv1.DataVolumeSource{
 		Blank: &cdiv1.DataVolumeBlankImage{},
 	}
+	if adoptingDV.Spec.Storage != nil {
+		if _, ok := adoptingDV.Spec.Storage.Resources.Requests[corev1.ResourceStorage]; !ok {
+			// DV doesn't have a size specified, look it up from the matching PVC.
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err := client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: ns, Name: sourceDvName}, pvc); err != nil {
+				return err
+			}
+			adoptingDV.Spec.Storage.Resources = corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{},
+			}
+			adoptingDV.Spec.Storage.Resources.Requests[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+		}
+	}
 	err := client.Create(context.TODO(), adoptingDV)
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		log.Error(err, "Failed to create adopting datavolume", "namespace", ns, "name", targetDvName)
