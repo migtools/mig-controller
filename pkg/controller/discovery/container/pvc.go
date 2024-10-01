@@ -4,10 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/controller/discovery/model"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -60,14 +58,7 @@ func (r *PVC) Reconcile() error {
 func (r *PVC) GetDiscovered() ([]model.Model, error) {
 	models := []model.Model{}
 	onCluster := v1.PersistentVolumeClaimList{}
-	sel, err := labels.Parse("!" + v1alpha1.MigMigrationLabel)
-	if err != nil {
-		sink.Trace(err)
-		return nil, err
-	}
-	err = r.ds.Client.List(context.TODO(), &onCluster, &client.ListOptions{
-		LabelSelector: sel,
-	})
+	err := r.ds.Client.List(context.TODO(), &onCluster, &client.ListOptions{})
 	if err != nil {
 		sink.Trace(err)
 		return nil, err

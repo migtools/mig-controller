@@ -315,3 +315,164 @@ func TestMigPlan_EqualsRegistrySecret(t *testing.T) {
 		})
 	}
 }
+
+func TestMigPlan_HasConflict(t *testing.T) {
+	type args struct {
+		plan *MigPlan
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "Different refs",
+			args: args{
+				plan: &MigPlan{
+					Spec: MigPlanSpec{
+						SrcMigClusterRef: &kapi.ObjectReference{
+							Name:      "src",
+							Kind:      "MigCluster",
+							Namespace: "other",
+						},
+						DestMigClusterRef: &kapi.ObjectReference{
+							Name:      "dest",
+							Kind:      "MigCluster",
+							Namespace: "other",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "Different namespaces",
+			args: args{
+				plan: &MigPlan{
+					Spec: MigPlanSpec{
+						SrcMigClusterRef: &kapi.ObjectReference{
+							Name:      "src",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						DestMigClusterRef: &kapi.ObjectReference{
+							Name:      "dest",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						Namespaces: []string{
+							"ns-2",
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "Different pvs",
+			args: args{
+				plan: &MigPlan{
+					Spec: MigPlanSpec{
+						SrcMigClusterRef: &kapi.ObjectReference{
+							Name:      "src",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						DestMigClusterRef: &kapi.ObjectReference{
+							Name:      "dest",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						Namespaces: []string{
+							"ns-1",
+						},
+						PersistentVolumes: PersistentVolumes{
+							List: []PV{
+								{
+									Name:      "pv1",
+									Selection: Selection{Action: PvSkipAction},
+								},
+								{
+									Name:      "pv2",
+									Selection: Selection{Action: PvCopyAction},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "conflicting pvs",
+			args: args{
+				plan: &MigPlan{
+					Spec: MigPlanSpec{
+						SrcMigClusterRef: &kapi.ObjectReference{
+							Name:      "src",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						DestMigClusterRef: &kapi.ObjectReference{
+							Name:      "dest",
+							Kind:      "MigCluster",
+							Namespace: "default",
+						},
+						Namespaces: []string{
+							"ns-1",
+						},
+						PersistentVolumes: PersistentVolumes{
+							List: []PV{
+								{
+									Name:      "pv1",
+									Selection: Selection{Action: PvCopyAction},
+								},
+								{
+									Name:      "pv2",
+									Selection: Selection{Action: PvCopyAction},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &MigPlan{
+				Spec: MigPlanSpec{
+					SrcMigClusterRef: &kapi.ObjectReference{
+						Name:      "src",
+						Kind:      "MigCluster",
+						Namespace: "default",
+					},
+					DestMigClusterRef: &kapi.ObjectReference{
+						Name:      "dest",
+						Kind:      "MigCluster",
+						Namespace: "default",
+					},
+					Namespaces: []string{
+						"ns-1",
+					},
+					PersistentVolumes: PersistentVolumes{
+						List: []PV{
+							{
+								Name:      "pv1",
+								Selection: Selection{Action: PvCopyAction},
+							},
+							{
+								Name:      "pv2",
+								Selection: Selection{Action: PvSkipAction},
+							},
+						},
+					},
+				},
+			}
+			if got := r.HasConflict(tt.args.plan); got != tt.want {
+				t.Errorf("EqualsRegistrySecret() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

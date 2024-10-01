@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -241,6 +242,12 @@ func (r *ReconcileMigPlan) Reconcile(ctx context.Context, request reconcile.Requ
 	}
 	if closed {
 		return reconcile.Result{Requeue: false}, nil
+	}
+
+	if plan.Status.Suffix == nil {
+		// Generate suffix
+		suffix := rand.String(4)
+		plan.Status.Suffix = &suffix
 	}
 
 	// Begin staging conditions.
