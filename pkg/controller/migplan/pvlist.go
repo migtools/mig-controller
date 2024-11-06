@@ -21,7 +21,7 @@ type PvMap map[k8sclient.ObjectKey]core.PersistentVolume
 type Claims []migapi.PVC
 
 var (
-	suffixMatcher = regexp.MustCompile("(.*)-mig-([[:alpha:]]{4})$")
+	suffixMatcher = regexp.MustCompile(`(.*)-mig-([\d|[:alpha:]]{4})$`)
 )
 
 // Update the PVs listed on the plan.
@@ -251,30 +251,31 @@ func (r *ReconcileMigPlan) getPvMap(client k8sclient.Client, plan *migapi.MigPla
 func getMappedNameForPVC(pvcRef *core.ObjectReference, podList []core.Pod, plan *migapi.MigPlan) string {
 	pvcName := pvcRef.Name
 	existingPVC := plan.Spec.FindPVC(pvcRef.Namespace, pvcRef.Name)
-	if existingPVC != nil &&
-		(existingPVC.GetSourceName() != existingPVC.GetTargetName()) {
-		pvcName = fmt.Sprintf("%s:%s", pvcRef.Name, existingPVC.GetTargetName())
+	if existingPVC != nil && (existingPVC.GetSourceName() != existingPVC.GetTargetName()) {
+		if !isStorageConversionPlan(plan) {
+			pvcName = fmt.Sprintf("%s:%s", pvcRef.Name, existingPVC.GetTargetName())
+		} else {
+			pvcName = existingPVC.GetTargetName()
+		}
 	}
 	// if plan is for storage conversion, create a new unique name for the destination PVC
-	if isStorageConversionPlan(plan) &&
-		(existingPVC == nil || existingPVC.GetSourceName() == existingPVC.GetTargetName()) {
+	if isStorageConversionPlan(plan) {
+		pvcName = trimSuffix(pvcName)
 		// we cannot append a suffix when pvcName itself is 247 characters or more because:
 		// 1. total length of new pvc name cannot exceed 253 characters
 		// 2. we append '-mig-' char before prefix and pvc names cannot end with '-'
 		if len(pvcName) > 247 {
-			return pvcName
-		} else {
-			destName := pvcName
-			destName = trimSuffix(destName)
-			destName = fmt.Sprintf("%s-mig-%s", destName, plan.GetSuffix())
-			if isStatefulSet, setName := isStatefulSetVolume(pvcRef, podList); isStatefulSet {
-				destName = getStatefulSetVolumeName(pvcName, setName, plan)
-			}
-			if len(destName) > 253 {
-				destName = destName[:253]
-			}
-			return fmt.Sprintf("%s:%s", pvcName, destName)
+			pvcName = pvcName[:247]
 		}
+		if isStatefulSet, setName := isStatefulSetVolume(pvcRef, podList); isStatefulSet {
+			pvcName = getStatefulSetVolumeName(pvcName, setName, plan)
+		} else {
+			pvcName = fmt.Sprintf("%s-mig-%s", pvcName, plan.GetSuffix())
+		}
+		if len(pvcName) > 253 {
+			pvcName = pvcName[:253]
+		}
+		return fmt.Sprintf("%s:%s", pvcRef.Name, pvcName)
 	}
 	return pvcName
 }
@@ -376,7 +377,7 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 	}
 
 	alreadyMigrated := func(pvc core.PersistentVolumeClaim) bool {
-		if planuid, exists := pvc.Labels[migapi.MigMigrationLabel]; exists {
+		if planuid, exists := pvc.Labels[migapi.MigPlanLabel]; exists {
 			if planuid == string(plan.UID) {
 				return true
 			}

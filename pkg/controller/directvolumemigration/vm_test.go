@@ -40,19 +40,20 @@ const (
 
 func TestTask_startLiveMigrations(t *testing.T) {
 	tests := []struct {
-		name            string
-		task            *Task
-		client          compat.Client
-		pairMap         map[string][]transfer.PVCPair
-		expectedReasons []string
-		wantErr         bool
+		name             string
+		task             *Task
+		client           compat.Client
+		pairMap          map[string][]transfer.PVCPair
+		expectedReasons  []string
+		expectedVMUpdate bool
+		wantErr          bool
 	}{
 		{
 			name: "same namespace, no volumes",
 			task: &Task{
 				Owner: &v1alpha1.DirectVolumeMigration{
 					Spec: v1alpha1.DirectVolumeMigrationSpec{
-						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeRollback),
+						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeFinal),
 					},
 				},
 			},
@@ -86,7 +87,7 @@ func TestTask_startLiveMigrations(t *testing.T) {
 			task: &Task{
 				Owner: &v1alpha1.DirectVolumeMigration{
 					Spec: v1alpha1.DirectVolumeMigrationSpec{
-						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeRollback),
+						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeFinal),
 					},
 				},
 			},
@@ -122,13 +123,14 @@ func TestTask_startLiveMigrations(t *testing.T) {
 					transfer.NewPVCPair(createPvc("dv", testNamespace), createPvc("dv2", testNamespace)),
 				},
 			},
+			expectedVMUpdate: true,
 		},
 		{
 			name: "running VM, no matching volume",
 			task: &Task{
 				Owner: &v1alpha1.DirectVolumeMigration{
 					Spec: v1alpha1.DirectVolumeMigrationSpec{
-						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeRollback),
+						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeFinal),
 					},
 				},
 			},
@@ -148,18 +150,49 @@ func TestTask_startLiveMigrations(t *testing.T) {
 					transfer.NewPVCPair(createPvc("dv", testNamespace), createPvc("dv2", testNamespace)),
 				},
 			},
-			wantErr:         false,
-			expectedReasons: []string{"source and target volumes do not match for VM vm"},
+			wantErr:          false,
+			expectedVMUpdate: false,
+			expectedReasons:  []string{"source and target volumes do not match for VM vm"},
+		},
+		{
+			name: "running VM, but offline migration in progress",
+			task: &Task{
+				Owner: &v1alpha1.DirectVolumeMigration{
+					Spec: v1alpha1.DirectVolumeMigrationSpec{
+						MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeFinal),
+					},
+				},
+			},
+			client: getFakeClientWithObjs(createVirtualMachineWithVolumes("vm", testNamespace, []virtv1.Volume{
+				{
+					Name: "dv",
+					VolumeSource: virtv1.VolumeSource{
+						DataVolume: &virtv1.DataVolumeSource{
+							Name: "dv",
+						},
+					},
+				},
+			}), createVirtlauncherPod("vm", testNamespace, []string{"dv"}),
+				createDataVolume("dv", testNamespace),
+				createBlockRsyncPod("blockrsync", testNamespace, &Task{
+					Owner: &v1alpha1.DirectVolumeMigration{
+						Spec: v1alpha1.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeFinal),
+						},
+					},
+				}, []string{"dv"})),
+			pairMap: map[string][]transfer.PVCPair{
+				testNamespace + ":" + testNamespace: {
+					transfer.NewPVCPair(createPvc("dv", testNamespace), createPvc("dv2", testNamespace)),
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.task.Owner.Spec.MigrationType == nil || tt.task.Owner.Spec.MigrationType == ptr.To[v1alpha1.DirectVolumeMigrationType](v1alpha1.MigrationTypeRollback) {
-				tt.task.sourceClient = tt.client
-			} else {
-				tt.task.destinationClient = tt.client
-			}
+			tt.task.sourceClient = tt.client
+			tt.task.destinationClient = tt.client
 			reasons, err := tt.task.startLiveMigrations(tt.pairMap)
 			if err != nil && !tt.wantErr {
 				t.Errorf("unexpected error: %v", err)
@@ -175,6 +208,23 @@ func TestTask_startLiveMigrations(t *testing.T) {
 			for i, r := range reasons {
 				if r != tt.expectedReasons[i] {
 					t.Errorf("expected %v, got %v", tt.expectedReasons, reasons)
+					t.FailNow()
+				}
+			}
+			vm := &virtv1.VirtualMachine{}
+			err = tt.client.Get(context.Background(), k8sclient.ObjectKey{Name: "vm", Namespace: testNamespace}, vm)
+			if err != nil && !k8serrors.IsNotFound(err) {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			if tt.expectedVMUpdate {
+				if vm.Spec.UpdateVolumesStrategy == nil || *vm.Spec.UpdateVolumesStrategy != virtv1.UpdateVolumesStrategyMigration {
+					t.Errorf("expected update volumes strategy to be migration")
+					t.FailNow()
+				}
+			} else {
+				if vm.Spec.UpdateVolumesStrategy != nil {
+					t.Errorf("expected update volumes strategy to be nil")
 					t.FailNow()
 				}
 			}
@@ -385,16 +435,19 @@ func TestVirtualMachineMigrationStatus(t *testing.T) {
 		name           string
 		client         k8sclient.Client
 		expectedStatus string
+		wantErr        bool
 	}{
 		{
 			name:           "In progress VMIM",
 			client:         getFakeClientWithObjs(createInProgressVirtualMachineMigration("vmim", testNamespace, "vm")),
 			expectedStatus: fmt.Sprintf("VMI %s not found in namespace %s", "vm", testNamespace),
+			wantErr:        true,
 		},
 		{
 			name:           "No VMIM or VMI",
 			client:         getFakeClientWithObjs(),
 			expectedStatus: fmt.Sprintf("VMI %s not found in namespace %s", "vm", testNamespace),
+			wantErr:        true,
 		},
 		{
 			name:           "Failed VMIM with message",
@@ -459,7 +512,7 @@ func TestVirtualMachineMigrationStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status, err := virtualMachineMigrationStatus(tt.client, "vm", testNamespace, log.WithName(tt.name))
-			if err != nil {
+			if err != nil && !tt.wantErr {
 				t.Errorf("unexpected error: %v", err)
 				t.FailNow()
 			}
@@ -1755,6 +1808,43 @@ func createVirtlauncherPod(vmName, namespace string, dataVolumes []string) *core
 					Kind: "VirtualMachineInstance",
 				},
 			},
+		},
+		Spec: corev1.PodSpec{},
+	}
+	for _, dv := range dataVolumes {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: dv,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: dv,
+				},
+			},
+		})
+	}
+	return pod
+}
+
+func createRunningBlockRsyncPod(podName, namespace string, t *Task, dataVolumes []string) *corev1.Pod {
+	pod := createBlockRsyncPod(podName, namespace, t, dataVolumes)
+	pod.Status.Phase = corev1.PodRunning
+	return pod
+}
+
+func createCompletedBlockRsyncPod(podName, namespace string, t *Task, dataVolumes []string) *corev1.Pod {
+	pod := createBlockRsyncPod(podName, namespace, t, dataVolumes)
+	pod.Status.Phase = corev1.PodSucceeded
+	return pod
+}
+
+func createBlockRsyncPod(podName, namespace string, t *Task, dataVolumes []string) *corev1.Pod {
+	blockdvmLabels := t.buildDVMLabels()
+	blockdvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	blockdvmLabels["purpose"] = DirectVolumeMigrationRsync
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			Labels:    blockdvmLabels,
 		},
 		Spec: corev1.PodSpec{},
 	}
