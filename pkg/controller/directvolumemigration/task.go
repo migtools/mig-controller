@@ -70,6 +70,7 @@ const (
 	DirectVolumeMigrationRsyncClient             = "rsync-client"
 	DirectVolumeMigrationStunnel                 = "stunnel"
 	MigratedByDirectVolumeMigration              = "migration.openshift.io/migrated-by-directvolumemigration" // (dvm UID)
+	MigrationSourceFor                           = "migration.openshift.io/source-for-directvolumemigration"  // (dvm UID)
 )
 
 // Itinerary names

@@ -10,6 +10,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	"github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
@@ -385,6 +386,15 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 		return false
 	}
 
+	migrationSourceOtherPlan := func(pvc core.PersistentVolumeClaim) bool {
+		if planuid, exists := pvc.Labels[directvolumemigration.MigrationSourceFor]; exists {
+			if planuid != string(plan.UID) {
+				return true
+			}
+		}
+		return false
+	}
+
 	isStorageConversionPlan := isStorageConversionPlan(plan)
 
 	for _, pod := range runningPods.Items {
@@ -398,7 +408,7 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 			continue
 		}
 
-		if isStorageConversionPlan && alreadyMigrated(pvc) {
+		if isStorageConversionPlan && (alreadyMigrated(pvc) || migrationSourceOtherPlan(pvc)) {
 			continue
 		}
 
