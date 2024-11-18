@@ -252,7 +252,7 @@ func Test_getMappedNameForPVC(t *testing.T) {
 					},
 				},
 			},
-			want: strings.Repeat("b", 252),
+			want: strings.Repeat("b", 252) + ":" + strings.Repeat("b", 247) + "-mig-a",
 		},
 		{
 			name: "Migration plan is a storage conversion plan, with 247 length pvc name",
@@ -277,7 +277,7 @@ func Test_getMappedNameForPVC(t *testing.T) {
 					},
 				},
 			},
-			want: fmt.Sprintf("%s:%s", strings.Repeat("b", 247), strings.Repeat("b", 247)+"-mig-a"),
+			want: strings.Repeat("b", 247) + ":" + strings.Repeat("b", 247) + "-mig-a",
 		},
 		{
 			name: "Migration plan is a storage conversion plan, with a statefulset volume",
@@ -434,7 +434,16 @@ func Test_getMappedNameForPVC(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getMappedNameForPVC(tt.args.pvcRef, tt.args.podList, tt.args.migPlan); got != tt.want {
+			got := getMappedNameForPVC(tt.args.pvcRef, tt.args.podList, tt.args.migPlan)
+			gotSplit := strings.Split(got, ":")
+			gotTarget := gotSplit[0]
+			if len(gotSplit) > 1 {
+				gotTarget = gotSplit[1]
+			}
+			if len(gotTarget) > 253 {
+				t.Errorf("getMappedNameForPVC() = %v, want %v", len(got), 253)
+			}
+			if got != tt.want {
 				t.Errorf("getMappedNameForPVC() = %v, want %v", got, tt.want)
 			}
 		})

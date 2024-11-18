@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	virtv1 "kubevirt.io/api/core/v1"
@@ -34,6 +35,7 @@ const (
 	prometheusURLKey = "PROMETHEUS_URL"
 	prometheusRoute  = "prometheus-k8s"
 	progressQuery    = "kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} / (kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} + kubevirt_vmi_migration_data_remaining_bytes{name=\"%s\"}) * 100"
+	VMIKind          = "VirtualMachineInstance"
 )
 
 var (
@@ -73,6 +75,12 @@ func (t *Task) startLiveMigrations(nsMap map[string][]transfer.PVCPair) ([]strin
 			}
 		}
 		for vmName, volumes := range vmVolumeMap {
+			// Ignore live migration if there is an ongoing offline migration.
+			if hasCurrentOffline, err := t.currentOfflineMigration(namespace, &volumes); err != nil {
+				return reasons, err
+			} else if hasCurrentOffline {
+				continue
+			}
 			if err := t.storageLiveMigrateVM(vmName, namespace, &volumes); err != nil {
 				switch err {
 				case ErrVolumesDoNotMatch:
@@ -86,6 +94,41 @@ func (t *Task) startLiveMigrations(nsMap map[string][]transfer.PVCPair) ([]strin
 		}
 	}
 	return reasons, nil
+}
+
+func (t *Task) currentOfflineMigration(namespace string, volumes *vmVolumes) (bool, error) {
+	blockdvmLabels := t.buildDVMLabels()
+	blockdvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	blockdvmLabels["purpose"] = DirectVolumeMigrationRsync
+	// find block rsync pods based on the volumes
+	sourceRsyncPods := &corev1.PodList{}
+	if err := t.sourceClient.List(context.TODO(), sourceRsyncPods, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(blockdvmLabels)); err != nil {
+		return false, err
+	}
+	targetRsyncPods := &corev1.PodList{}
+	if err := t.destinationClient.List(context.TODO(), targetRsyncPods, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(blockdvmLabels)); err != nil {
+		return false, err
+	}
+	volumeSet := sets.NewString()
+	for _, volume := range volumes.sourceVolumes {
+		volumeSet.Insert(volume)
+	}
+	for _, volume := range volumes.targetVolumes {
+		volumeSet.Insert(volume)
+	}
+	for _, podList := range []*corev1.PodList{sourceRsyncPods, targetRsyncPods} {
+		for _, pod := range podList.Items {
+			for _, volume := range pod.Spec.Volumes {
+				if volume.VolumeSource.PersistentVolumeClaim != nil {
+					if volumeSet.Has(volume.VolumeSource.PersistentVolumeClaim.ClaimName) {
+						t.Log.V(3).Info("Found offline migration in progress for volumes", "volume", volume.VolumeSource.PersistentVolumeClaim.ClaimName, "namespace", namespace, "pod", pod.Name)
+						return true, nil
+					}
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 func getNamespace(colonDelimitedString string) (string, error) {
@@ -126,7 +169,7 @@ func getRunningVmVolumeMap(client k8sclient.Client, namespace string) (map[strin
 		client.List(context.TODO(), &podList, k8sclient.InNamespace(namespace))
 		for _, pod := range podList.Items {
 			for _, owner := range pod.OwnerReferences {
-				if owner.Name == vmName && owner.Kind == "VirtualMachineInstance" {
+				if owner.Name == vmName && owner.Kind == VMIKind {
 					for _, volume := range pod.Spec.Volumes {
 						if volume.PersistentVolumeClaim != nil {
 							volumesVmMap[volume.PersistentVolumeClaim.ClaimName] = vmName
@@ -205,6 +248,9 @@ func (t *Task) compareVolumes(vm *virtv1.VirtualMachine, volumes []string) bool 
 func findVirtualMachineInstanceMigration(client k8sclient.Client, vmName, namespace string) (*virtv1.VirtualMachineInstanceMigration, error) {
 	vmimList := &virtv1.VirtualMachineInstanceMigrationList{}
 	if err := client.List(context.TODO(), vmimList, k8sclient.InNamespace(namespace)); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	for _, vmim := range vmimList.Items {
@@ -241,11 +287,10 @@ func virtualMachineMigrationStatus(client k8sclient.Client, vmName, namespace st
 
 	vmi := &virtv1.VirtualMachineInstance{}
 	if err := client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vmi); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return fmt.Sprintf("VMI %s not found in namespace %s", vmName, namespace), nil
-		} else {
+		if !k8serrors.IsNotFound(err) {
 			return err.Error(), err
 		}
+		return fmt.Sprintf("VMI %s not found in namespace %s", vmName, namespace), err
 	}
 	volumeChange := false
 	liveMigrateable := false

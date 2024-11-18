@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	random "math/rand"
 	"path"
-	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/set"
 	virtv1 "kubevirt.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -503,6 +503,7 @@ func (t *Task) ensureBlockRsyncTransferServer(nsMap map[string][]transfer.PVCPai
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		blockOrVMPvcList = t.filterCompletedPairs(blockOrVMPvcList)
 		if t.PlanResources.MigPlan.LiveMigrationChecked() {
 			blockOrVMPvcList, err = t.filterRunningVMs(blockOrVMPvcList)
 			if err != nil {
@@ -530,12 +531,29 @@ func (t *Task) ensureBlockRsyncTransferServer(nsMap map[string][]transfer.PVCPai
 				return fmt.Errorf("transfer %s/%s not found", nnPair.Source().Namespace, nnPair.Source().Name)
 			}
 			err = transfer.CreateServer(t.destinationClient)
-			if err != nil {
+			if err != nil && !k8serror.IsAlreadyExists(err) {
 				return liberr.Wrap(err)
 			}
 		}
 	}
 	return nil
+}
+
+// Return only PVCPairs that are NOT completed yet
+func (t *Task) filterCompletedPairs(unfilteredPVCPairs []transfer.PVCPair) []transfer.PVCPair {
+	runningVMPairs := []transfer.PVCPair{}
+	successfulSet := set.New[string]()
+
+	for _, successfulPod := range t.Owner.Status.SuccessfulPods {
+		successfulSet.Insert(fmt.Sprintf("%s/%s", successfulPod.PVCReference.Namespace, successfulPod.PVCReference.Name))
+	}
+	successfulList := successfulSet.UnsortedList()
+	for _, pvcPair := range unfilteredPVCPairs {
+		if !slices.Contains(successfulList, fmt.Sprintf("%s/%s", pvcPair.Source().Claim().Namespace, pvcPair.Source().Claim().Name)) {
+			runningVMPairs = append(runningVMPairs, pvcPair)
+		}
+	}
+	return runningVMPairs
 }
 
 // Return only PVCPairs that are NOT associated with a running VM
@@ -633,6 +651,9 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
+		if err := t.deleteOfflineMigrationServerPod(destNs, pvcPairs); err != nil {
+			return nil, liberr.Wrap(err)
+		}
 
 		for _, pvc := range pvcPairs {
 			optionsForPvc := []rsynctransfer.TransferOption{}
@@ -673,15 +694,19 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 				statusList.Add(currentStatus)
 				continue
 			}
-			blockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvc)
+			uncompletedBlockOrVMPvcList, err := transfer.NewBlockOrVMDiskPVCPairList(pvc)
 			if err != nil {
 				t.Log.Error(err, "failed creating block PVC pair", "pvc", newOperation)
 				currentStatus.AddError(err)
 				statusList.Add(currentStatus)
 				continue
 			}
+			uncompletedBlockOrVMPvcList = t.filterCompletedPairs(uncompletedBlockOrVMPvcList)
+			unfilteredUncompletedBlockOrVMPvcList := transfer.PVCPairList{}
+			unfilteredUncompletedBlockOrVMPvcList = append(unfilteredUncompletedBlockOrVMPvcList, uncompletedBlockOrVMPvcList...)
+
 			if t.PlanResources.MigPlan.LiveMigrationChecked() {
-				blockOrVMPvcList, err = t.filterRunningVMs(blockOrVMPvcList)
+				uncompletedBlockOrVMPvcList, err = t.filterRunningVMs(uncompletedBlockOrVMPvcList)
 				if err != nil {
 					t.Log.Error(err, "failed filtering block PVC pairs", "pvc", newOperation)
 					currentStatus.AddError(err)
@@ -751,15 +776,16 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 							continue
 						}
 					}
-					if len(blockOrVMPvcList) > 0 {
+					if len(uncompletedBlockOrVMPvcList) > 0 {
 						transferOptions := blockrsynctransfer.TransferOptions{
 							SourcePodMeta: transfer.ResourceMetadata{
 								Labels: labels,
 							},
 							NodeName: nodeName,
 						}
+						transferOptions.SourcePodMeta.Labels["app"] = DirectVolumeMigrationRsyncTransferBlock
 						transfer, err := blockrsynctransfer.NewTransfer(
-							blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, &transferOptions)
+							blockStunnelTransport, endpoints[1], srcClient, destClient, uncompletedBlockOrVMPvcList, t.Log, &transferOptions)
 						if err != nil {
 							t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
 							currentStatus.AddError(err)
@@ -782,6 +808,26 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 						continue
 					}
 				} else {
+					// Check if PVC is now part of the running VMs PVs, if so we need to cancel the in progress rsync, and
+					// that should trigger a live migration or a new rsync operation after it stops the VM.
+					for _, pvcPair := range unfilteredUncompletedBlockOrVMPvcList {
+						if pvcPair.Source().Claim().Name == newOperation.PVCReference.Name && pvcPair.Source().Claim().Namespace == newOperation.PVCReference.Namespace {
+							runningVMVolumes, err := t.getRunningVMVolumes([]string{newOperation.PVCReference.Namespace})
+							if err != nil {
+								currentStatus.AddError(err)
+								continue
+							}
+							for _, runningVMVolume := range runningVMVolumes {
+								if runningVMVolume == fmt.Sprintf("%s/%s", newOperation.PVCReference.Namespace, newOperation.PVCReference.Name) {
+									t.Log.Info("Cancelling rsync operation for pvc", "pvc", newOperation.PVCReference.Name, "namespace", newOperation.PVCReference.Namespace, "label safe name", pvc.Source().LabelSafeName())
+									if err := t.cancelOfflineMigration(pvcPair.Source(), newOperation.PVCReference.Namespace); err != nil {
+										currentStatus.AddError(err)
+									}
+								}
+							}
+							continue
+						}
+					}
 					t.Log.Info("previous attempt of Rsync did not fail", "pvc", newOperation)
 					newOperation.Failed = currentStatus.failed
 					newOperation.Succeeded = currentStatus.succeeded
@@ -814,30 +860,43 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 						continue
 					}
 				}
-				if len(blockOrVMPvcList) > 0 {
-					transferOptions, err := t.getBlockRsyncTransferOptions()
+				if len(uncompletedBlockOrVMPvcList) > 0 {
+					destinationName := pvc.Destination().Claim().Name
+					serverPodsRunning, _, err := t.areRsyncTransferPodsRunning(destinationName)
 					if err != nil {
-						t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
 						currentStatus.AddError(err)
-						continue
 					}
-					transferOptions.SourcePodMeta = transfer.ResourceMetadata{
-						Labels: labels,
-					}
-					transferOptions.NodeName = nodeName
+					if serverPodsRunning {
+						if err := t.createPVProgressCR(); err != nil {
+							// createPVProgressCR doesn't return an error if it already exists
+							currentStatus.AddError(err)
+							continue
+						}
+						transferOptions, err := t.getBlockRsyncTransferOptions()
+						if err != nil {
+							t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
+							currentStatus.AddError(err)
+							continue
+						}
+						labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+						transferOptions.SourcePodMeta = transfer.ResourceMetadata{
+							Labels: labels,
+						}
+						transferOptions.NodeName = nodeName
 
-					transfer, err := blockrsynctransfer.NewTransfer(
-						blockStunnelTransport, endpoints[1], srcClient, destClient, blockOrVMPvcList, t.Log, transferOptions)
-					if err != nil {
-						t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
-						currentStatus.AddError(err)
-						continue
-					}
+						transfer, err := blockrsynctransfer.NewTransfer(
+							blockStunnelTransport, endpoints[1], srcClient, destClient, uncompletedBlockOrVMPvcList, t.Log, transferOptions)
+						if err != nil {
+							t.Log.Error(err, "failed creating block transfer", "pvc", currentStatus.operation)
+							currentStatus.AddError(err)
+							continue
+						}
 
-					if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
-						nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
-						statusList.Add(*currentStatus)
-						continue
+						if currentStatus := t.createClientPodForTransfer(nnPair.Source().Name,
+							nnPair.Source().Namespace, transfer, &currentStatus); currentStatus != nil {
+							statusList.Add(*currentStatus)
+							continue
+						}
 					}
 				}
 			}
@@ -845,6 +904,129 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 		}
 	}
 	return statusList, nil
+}
+
+// Cancel offline migration for a single PVC. This will delete the source pod, not the destination pod.
+func (t *Task) cancelOfflineMigration(source transfer.PVC, namespace string) error {
+	pvcMd5 := getMD5Hash(t.Owner.Name + source.Claim().Name + namespace)
+	labels := make(map[string]string)
+	labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	labels[migapi.RsyncPodIdentityLabel] = source.LabelSafeName()
+	podList := corev1.PodList{}
+	if err := t.sourceClient.List(context.TODO(), &podList,
+		k8sclient.InNamespace(namespace),
+		k8sclient.MatchingLabels(labels)); err != nil {
+		return err
+	}
+
+	for _, pod := range podList.Items {
+		for _, volumes := range pod.Spec.Volumes {
+			if volumes.PersistentVolumeClaim != nil && volumes.PersistentVolumeClaim.ClaimName == source.Claim().Name {
+				if (pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil) || pod.Status.Phase == corev1.PodSucceeded {
+					t.Log.V(3).Info("Deleting block rsync pod", "pod", path.Join(pod.Namespace, pod.Name), "pvc", path.Join(namespace, source.Claim().Name))
+					if err := t.sourceClient.Delete(context.TODO(), &pod); err != nil && !k8serror.IsNotFound(err) {
+						return err
+					}
+					t.Log.V(3).Info("Deleting DVM progress resource for PVC", "pvc", path.Join(namespace, source.Claim().Name))
+					if err := t.deleteDirectVolumeMigrationProgress(pvcMd5); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *Task) deleteDirectVolumeMigrationProgress(pvcMd5 string) error {
+	dvmp := migapi.DirectVolumeMigrationProgress{}
+	err := t.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      pvcMd5,
+		Namespace: migapi.OpenshiftMigrationNamespace,
+	}, &dvmp)
+	if err != nil && !k8serror.IsNotFound(err) {
+		return err
+	} else if err == nil {
+		return t.Client.Delete(context.TODO(), &dvmp)
+	}
+	return nil
+}
+
+// The offline blockrsync transfer server pod should only be deleted when all the transfers are complete
+// Or when one or more of the transfers have failed or when one or more of the transfers have switched to
+// live migration.
+func (t *Task) deleteOfflineMigrationServerPod(namespace string, pvcPairs []transfer.PVCPair) error {
+	labels := t.buildDVMLabels()
+	labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	serverPodList := corev1.PodList{}
+	if err := t.destinationClient.List(context.TODO(), &serverPodList, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(labels)); err != nil {
+		return err
+	}
+	destToSourcePVCMap := map[string]string{}
+	for _, pvcPair := range pvcPairs {
+		destToSourcePVCMap[pvcPair.Destination().Claim().Name] = pvcPair.Source().Claim().Name
+	}
+	for _, pod := range serverPodList.Items {
+		if strings.Contains(pod.Name, "blockrsync-server") && pod.DeletionTimestamp == nil {
+			completedBlockRsyncPvSet := getCompletedBlockRsyncPvSet(&t.Owner.Status)
+			allCompleted := true
+			for _, volumes := range pod.Spec.Volumes {
+				if volumes.PersistentVolumeClaim != nil {
+					if sourcePVCName, ok := destToSourcePVCMap[volumes.PersistentVolumeClaim.ClaimName]; ok {
+						allCompleted = allCompleted && completedBlockRsyncPvSet.Has(sourcePVCName)
+					} else if !ok {
+						allCompleted = false
+					}
+				}
+			}
+			if allCompleted {
+				t.Log.Info("Deleting block rsync server pod", "pod", path.Join(pod.Namespace, pod.Name))
+				if err := t.destinationClient.Delete(context.TODO(), &pod); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	t.Log.V(3).Info("No running block rsync server pod found")
+	return nil
+}
+
+// getCompletedBlockRsyncPvSet returns a map of PVCs that have completed. Either successfully or failed
+// Live migration pending PVCs are also considered completed from the blockrsync server perspective
+func getCompletedBlockRsyncPvSet(ds *migapi.DirectVolumeMigrationStatus) sets.Set[string] {
+	completedSet := sets.New[string]()
+	for _, progress := range ds.SuccessfulPods {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	for _, progress := range ds.FailedPods {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	for _, progress := range ds.SuccessfulLiveMigrations {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	for _, progress := range ds.FailedLiveMigrations {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	for _, progress := range ds.PendingLiveMigrations {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	for _, progress := range ds.RunningLiveMigrations {
+		if progress.PVCReference != nil {
+			completedSet.Insert(progress.PVCReference.Name)
+		}
+	}
+	return completedSet
 }
 
 func (t *Task) createClientPodForTransfer(
@@ -864,8 +1046,9 @@ func (t *Task) createClientPodForTransfer(
 	return nil
 }
 
-func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
+func (t *Task) areRsyncTransferPodsRunning(volumeNames ...string) (arePodsRunning bool, nonRunningPods []*corev1.Pod, e error) {
 	pvcMap := t.getPVCNamespaceMap()
+	containsAllVolumes := true
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
 	delete(dvmLabels, "app")
@@ -873,9 +1056,15 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 	appRequirement, _ := labels.NewRequirement("app", selection.In, []string{DirectVolumeMigrationRsyncTransfer, DirectVolumeMigrationRsyncTransferBlock})
 	selector.Add(*appRequirement)
 
-	for bothNs, _ := range pvcMap {
+	pods := corev1.PodList{}
+	hasOfflineTransfer := false
+	for bothNs, pvcMapElements := range pvcMap {
 		ns := getDestNs(bothNs)
-		pods := corev1.PodList{}
+		if offlineTransfer, err := t.hasOfflineMigration(ns, pvcMapElements); err != nil {
+			return false, nil, err
+		} else if offlineTransfer {
+			hasOfflineTransfer = true
+		}
 		err := t.destinationClient.List(
 			context.TODO(),
 			&pods,
@@ -914,13 +1103,45 @@ func (t *Task) areRsyncTransferPodsRunning() (arePodsRunning bool, nonRunningPod
 					"pod", path.Join(pod.Namespace, pod.Name),
 					"podPhase", pod.Status.Phase)
 				nonRunningPods = append(nonRunningPods, &pod)
+			} else {
+				// Ensure the pod contains the expected volumes.
+				for _, volumeName := range volumeNames {
+					hasVolume := false
+					for _, podVolume := range pod.Spec.Volumes {
+						if podVolume.PersistentVolumeClaim != nil && podVolume.PersistentVolumeClaim.ClaimName == volumeName {
+							hasVolume = true
+							break
+						}
+					}
+					if !hasVolume {
+						// Someone stopped a running VM, and we have to wait until the block rsync completes, so we can create
+						// a new rsync block server pod.
+						t.Log.Info("Running rsync server pod does not contain expected volume", "volume name", volumeName)
+					}
+					containsAllVolumes = containsAllVolumes && hasVolume
+				}
 			}
 		}
 	}
 	if len(nonRunningPods) > 0 {
 		return false, nonRunningPods, nil
 	}
-	return true, nil, nil
+	return (len(pods.Items) > 0 && containsAllVolumes) || !hasOfflineTransfer, nil, nil
+}
+
+func (t *Task) hasOfflineMigration(namespace string, pvcMapElements []pvcMapElement) (bool, error) {
+	ns := set.New[string]()
+	ns.Insert(namespace)
+	nsVolumes, err := t.getRunningVMVolumes(ns.SortedList())
+	if err != nil {
+		return false, err
+	}
+	for _, pvc := range pvcMapElements {
+		if !slices.Contains(nsVolumes, fmt.Sprintf("%s/%s", namespace, pvc.Name)) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (t *Task) createRsyncConfig() error {
@@ -1306,11 +1527,8 @@ func (t *Task) deleteInvalidPVProgressCR(dvmp *migapi.DirectVolumeMigrationProgr
 		}
 		// if podSelector doesn't have a required label, delete the CR
 		if existingDvmp.Spec.PodSelector != nil {
-			selector, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]
+			_, exists := existingDvmp.Spec.PodSelector[migapi.RsyncPodIdentityLabel]
 			if !exists {
-				shouldDelete = true
-			}
-			if !reflect.DeepEqual(selector, dvmp.Spec.PodSelector) {
 				shouldDelete = true
 			}
 		}
@@ -1441,7 +1659,7 @@ func (t *Task) updateVolumeLiveMigrationProgressStatus(volumeName, namespace str
 		LastObservedProgressPercent: "",
 	}
 	// Look up VirtualMachineInstanceMigration CR to get the status of the migration
-	if vmim, exists := t.VirtualMachineMappings.volumeVMIMMap[matchString]; exists {
+	if vmim, exists := t.VirtualMachineMappings.volumeVMIMMap[matchString]; exists && vmim != nil && vmim.Status.MigrationState != nil {
 		liveMigrationProgress.VMName = vmim.Spec.VMIName
 		elapsedTime := getVMIMElapsedTime(vmim)
 		liveMigrationProgress.TotalElapsedTime = &elapsedTime
@@ -1453,8 +1671,16 @@ func (t *Task) updateVolumeLiveMigrationProgressStatus(volumeName, namespace str
 			liveMigrationProgress.LastObservedProgressPercent = "100%"
 			t.Owner.Status.SuccessfulLiveMigrations = append(t.Owner.Status.SuccessfulLiveMigrations, liveMigrationProgress)
 		case virtv1.MigrationFailed:
-
-			t.Owner.Status.FailedLiveMigrations = append(t.Owner.Status.FailedLiveMigrations, liveMigrationProgress)
+			// Only set to failed if the VMI is there and not terminating
+			vmName := t.VirtualMachineMappings.volumeVMNameMap[volumeName]
+			vmi := &virtv1.VirtualMachineInstance{}
+			err := t.sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vmi)
+			if err != nil && !k8serror.IsNotFound(err) {
+				return err
+			}
+			if !k8serror.IsNotFound(err) && vmi.DeletionTimestamp == nil && vmi.Status.Phase == virtv1.Running {
+				t.Owner.Status.FailedLiveMigrations = append(t.Owner.Status.FailedLiveMigrations, liveMigrationProgress)
+			}
 		case virtv1.MigrationRunning:
 			progressPercent, err := t.getLastObservedProgressPercent(vmim.Spec.VMIName, namespace, currentProgress)
 			if err != nil {
@@ -1470,6 +1696,11 @@ func (t *Task) updateVolumeLiveMigrationProgressStatus(volumeName, namespace str
 		vmName := t.VirtualMachineMappings.volumeVMNameMap[volumeName]
 		message, err := virtualMachineMigrationStatus(t.sourceClient, vmName, namespace, t.Log)
 		if err != nil {
+			if k8serror.IsNotFound(err) {
+				t.Log.V(3).Info("VirtualMachineInstance not found", "vm", vmName, "namespace", namespace, "error", err)
+				// VMI doesn't exist, skip, so that an offline migration can start
+				return nil
+			}
 			return err
 		}
 		liveMigrationProgress.VMName = vmName
@@ -1507,6 +1738,7 @@ func (t *Task) updateRsyncProgressStatus(volumeName, namespace string) error {
 	if err != nil && !k8serror.IsNotFound(err) {
 		return err
 	} else if k8serror.IsNotFound(err) {
+		t.Log.Info("Rsync Progress CR not found", "volume", volumeName, "namespace", namespace, "operation", operation)
 		return nil
 	}
 	podProgress := &migapi.PodProgress{
@@ -1652,9 +1884,13 @@ func (t *Task) deleteRsyncResources() error {
 func (t *Task) waitForRsyncResourcesDeleted() (bool, error) {
 	t.Log.Info("Checking if Rsync resource deletion has completed on source and destination MigClusters")
 	pvcMap := t.getPVCNamespaceMap()
-	selector := labels.SelectorFromSet(map[string]string{
-		"app": DirectVolumeMigrationRsyncTransfer,
-	})
+	// Find all resources with the app label
+	// TODO: This label set should include a DVM run-specific UID.
+	req, err := labels.NewRequirement("app", selection.In, []string{DirectVolumeMigrationRsyncTransfer, DirectVolumeMigrationRsyncTransferBlock})
+	if err != nil {
+		return false, err
+	}
+	selector := labels.NewSelector().Add(*req)
 	for bothNs := range pvcMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
@@ -1795,6 +2031,109 @@ func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMa
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func findCompletedDestinationVolumes(sourceClient compat.Client, srcNs string, pvcPairs []transfer.PVCPair, selector labels.Selector, log logr.Logger) (sets.Set[string], error) {
+	podList := corev1.PodList{}
+	completedDestinationVolumes := sets.New[string]()
+	err := sourceClient.List(context.TODO(), &podList, &k8sclient.ListOptions{
+		Namespace:     srcNs,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return completedDestinationVolumes, err
+	}
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodSucceeded {
+			for _, vol := range pvcPairs {
+				for _, podVolumes := range pod.Spec.Volumes {
+					log.Info("Checking pod volumes", "podVolumes", podVolumes, "source", vol.Source().Claim().Name)
+					if podVolumes.PersistentVolumeClaim != nil && podVolumes.PersistentVolumeClaim.ClaimName == vol.Source().Claim().Name {
+						completedDestinationVolumes.Insert(vol.Destination().Claim().Name)
+					}
+				}
+			}
+		}
+	}
+	return completedDestinationVolumes, nil
+}
+
+func (t *Task) deleteCompletedSourceRsyncPods(completedSourceVolumeNames sets.Set[string], srcNs string, selector labels.Selector) error {
+	podList := corev1.PodList{}
+	err := t.sourceClient.List(context.TODO(), &podList, &k8sclient.ListOptions{
+		Namespace:     srcNs,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodSucceeded {
+			for _, volume := range pod.Spec.Volumes {
+				if volume.PersistentVolumeClaim != nil && completedSourceVolumeNames.Has(volume.PersistentVolumeClaim.ClaimName) {
+					//only delete pod once the DVMP is completely updated.
+					if complete, err := t.isDirectVolumeMigrationProgressCompleteForVolume(volume.PersistentVolumeClaim.ClaimName, srcNs); err != nil {
+						return err
+					} else if !complete {
+						continue
+					}
+					// All progress is updated, free to delete the source rsync pod
+					log.Info("Deleting completed Rsync Pod on source MigCluster", "pod", pod.Name)
+					err = t.sourceClient.Delete(context.TODO(), &pod)
+					if err != nil && !k8serror.IsNotFound(err) {
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) isDirectVolumeMigrationProgressCompleteForVolume(volumeName, srcNs string) (bool, error) {
+	dvmp := migapi.DirectVolumeMigrationProgress{}
+	md5Hash := getMD5Hash(t.Owner.Name + volumeName + srcNs)
+	if err := t.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      md5Hash,
+		Namespace: migapi.OpenshiftMigrationNamespace,
+	}, &dvmp); err != nil {
+		if k8serror.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	return dvmp.Status.PodPhase == corev1.PodSucceeded, nil
+}
+
+func (t *Task) findAndDeleteCompletedRsyncClientPods(srcNs string, pvcPairs []transfer.PVCPair, selector labels.Selector) error {
+	destToSourceMap := map[string]string{}
+	for _, pvcPair := range pvcPairs {
+		destToSourceMap[pvcPair.Destination().Claim().Name] = pvcPair.Source().Claim().Name
+	}
+	completedDestinationVolumes, err := findCompletedDestinationVolumes(t.sourceClient, srcNs, pvcPairs, selector, log)
+	if err != nil {
+		return err
+	}
+
+	for _, completedDestinationVolume := range completedDestinationVolumes.UnsortedList() {
+		if value, exists := destToSourceMap[completedDestinationVolume]; exists {
+			if err := t.updateRsyncProgressStatus(value, srcNs); err != nil {
+				return err
+			}
+		}
+	}
+
+	completedSourceVolumes := sets.New[string]()
+	for _, v := range completedDestinationVolumes.UnsortedList() {
+		if _, exists := destToSourceMap[v]; exists {
+			completedSourceVolumes.Insert(destToSourceMap[v])
+		}
+	}
+	err = t.deleteCompletedSourceRsyncPods(completedSourceVolumes, srcNs, selector)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -1990,6 +2329,29 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 		anyRsyncFailed bool
 	)
 
+	for bothNs, pvcPairs := range pvcMap {
+		dvmLabels := t.buildDVMLabels()
+		dvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
+		selector := labels.SelectorFromSet(dvmLabels)
+		srcNs := getSourceNs(bothNs)
+		if err := t.findAndDeleteCompletedRsyncClientPods(srcNs, pvcPairs, selector); err != nil {
+			return false, false, failureReasons, err
+		}
+	}
+
+	if t.Owner.IsLiveMigrate() && t.Owner.IsCutover() {
+		transportOptions, err := t.getStunnelOptions()
+		if err != nil {
+			return false, false, failureReasons, err
+		}
+		nsMap, err := t.getNamespacedPVCPairs()
+		if err != nil {
+			return false, false, failureReasons, err
+		}
+		if err := t.ensureBlockRsyncTransferServer(nsMap, transportOptions); err != nil {
+			return false, false, failureReasons, err
+		}
+	}
 	if !t.Owner.IsRollback() {
 		t.Log.V(3).Info("Creating Rsync Transfer Clients")
 		status, err = t.createRsyncTransferClients(t.sourceClient, t.destinationClient, pvcMap)
@@ -2013,7 +2375,6 @@ func (t *Task) runRsyncOperations() (bool, bool, []string, error) {
 		}
 		var migrationFailureReasons []string
 		if t.Owner.IsLiveMigrate() {
-			t.Log.V(3).Info("Starting live migrations")
 			// Doing a cutover or rollback, start any live migrations if needed.
 			failureReasons, err = t.startLiveMigrations(liveMigrationPVCMap)
 			if err != nil {
@@ -2108,7 +2469,13 @@ func (t *Task) processMigrationOperationStatus(nsMap map[string][]transfer.PVCPa
 		for vmName := range vmVolumeMap {
 			message, err := virtualMachineMigrationStatus(sourceClient, vmName, namespace, t.Log)
 			if err != nil {
-				failureReasons = append(failureReasons, message)
+				if !k8serror.IsNotFound(err) {
+					failedCount++
+					anyFailed = true
+					failureReasons = append(failureReasons, message)
+				} else {
+					t.Log.V(3).Info("Unable to update progress, VirtualMachineInstance not found", "vm", vmName, "namespace", namespace, "error", err)
+				}
 				return isComplete, anyFailed, failureReasons, err
 			}
 			if message == "" {

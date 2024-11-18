@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -32,8 +33,9 @@ import (
 )
 
 const (
-	testVolume = "test-volume"
-	testDVM    = "test-dvm"
+	testVolume              = "test-volume"
+	testDVM                 = "test-dvm"
+	offlineMigrationPodName = "offline-migration-pod"
 )
 
 func getTestRsyncPodForPVC(podName string, pvcName string, ns string, attemptNo string, timestamp time.Time) *corev1.Pod {
@@ -1358,15 +1360,12 @@ func TestTask_updateVolumeLiveMigrationProgressStatus(t *testing.T) {
 			volumeName:       testVolume,
 			client:           getFakeCompatClient(),
 			existingProgress: map[string]*migapi.LiveMigrationProgress{},
-			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
-				createExpectedLiveMigrationProgress(nil),
-			},
 		},
 		{
 			name:             "failed vmim with failure reason",
 			dvm:              &migapi.DirectVolumeMigration{},
 			volumeName:       testVolume,
-			client:           getFakeCompatClient(),
+			client:           getFakeCompatClient(createVirtualMachineInstance("test-vm", testNamespace, virtv1.Running)),
 			existingProgress: map[string]*migapi.LiveMigrationProgress{},
 			expectedFailedLiveMigrations: []*migapi.LiveMigrationProgress{
 				createExpectedLiveMigrationProgress(nil),
@@ -1381,6 +1380,9 @@ func TestTask_updateVolumeLiveMigrationProgressStatus(t *testing.T) {
 							Phase: virtv1.MigrationFailed,
 						},
 					},
+				},
+				volumeVMNameMap: map[string]string{
+					testVolume: "test-vm",
 				},
 			},
 		},
@@ -1936,9 +1938,11 @@ func TestTask_createRsyncTransferClients(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &Task{
-				Log:    log.WithName("test-logger"),
-				Client: tt.fields.DestClient,
-				Owner:  tt.fields.Owner,
+				Log:               log.WithName("test-logger"),
+				Client:            tt.fields.DestClient,
+				sourceClient:      tt.fields.SrcClient,
+				destinationClient: tt.fields.DestClient,
+				Owner:             tt.fields.Owner,
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
@@ -2557,6 +2561,583 @@ func Test_ensureBlockRsyncTransferServer(t *testing.T) {
 	}
 }
 
+func Test_filterCompletedPairs(t *testing.T) {
+	type fields struct {
+		Owner       *migapi.DirectVolumeMigration
+		PVCPairList []transfer.PVCPair
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []transfer.PVCPair
+	}{
+		{
+			name: "No completed pairs, no pairs",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
+				},
+				PVCPairList: []transfer.PVCPair{},
+			},
+			want: []transfer.PVCPair{},
+		},
+		{
+			name: "One completed pairs, 1 pair",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
+					Status: migapi.DirectVolumeMigrationStatus{
+						SuccessfulPods: []*migapi.PodProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Namespace: testNamespace,
+									Name:      "pvc",
+								},
+							},
+						},
+					},
+				},
+				PVCPairList: []transfer.PVCPair{
+					transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			want: []transfer.PVCPair{},
+		},
+		{
+			name: "No completed pairs, 1 pair",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
+				},
+				PVCPairList: []transfer.PVCPair{
+					transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)),
+				},
+			},
+			want: []transfer.PVCPair{
+				transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)),
+			},
+		},
+		{
+			name: "One completed pairs, 2 pairs",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{Name: testDVM, Namespace: migapi.OpenshiftMigrationNamespace, OwnerReferences: []metav1.OwnerReference{{Name: "migmigration"}}},
+					Spec:       migapi.DirectVolumeMigrationSpec{BackOffLimit: 2},
+					Status: migapi.DirectVolumeMigrationStatus{
+						SuccessfulPods: []*migapi.PodProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Namespace: testNamespace,
+									Name:      "pvc",
+								},
+							},
+						},
+					},
+				},
+				PVCPairList: []transfer.PVCPair{
+					transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)),
+					transfer.NewPVCPair(createPvc("pvc3", testNamespace), createPvc("pvc4", testNamespace)),
+				},
+			},
+			want: []transfer.PVCPair{
+				transfer.NewPVCPair(createPvc("pvc3", testNamespace), createPvc("pvc4", testNamespace)),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &Task{
+				Log:   log.WithName("test-logger"),
+				Owner: tt.fields.Owner,
+			}
+			got := tr.filterCompletedPairs(tt.fields.PVCPairList)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterCompletedPairs() = %v, want %v", got, tt.want)
+				t.FailNow()
+			}
+		})
+	}
+}
+
+func Test_cancelOfflineMigration(t *testing.T) {
+	type fields struct {
+		Owner        *migapi.DirectVolumeMigration
+		source       transfer.PVC
+		namespace    string
+		sourceClient compat.Client
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantPod bool
+	}{
+		{
+			name: "cancel without offline migration",
+			fields: fields{
+				Owner:        &migapi.DirectVolumeMigration{},
+				source:       transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source(),
+				namespace:    testNamespace,
+				sourceClient: getFakeCompatClient(),
+			},
+			wantPod: false,
+		},
+		{
+			name: "cancel with offline migration, no matching volumes",
+			fields: fields{
+				Owner:        &migapi.DirectVolumeMigration{},
+				source:       transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source(),
+				namespace:    testNamespace,
+				sourceClient: getFakeCompatClient(createOfflineMigrationPod(offlineMigrationPodName, transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source().LabelSafeName())),
+			},
+			wantPod: true,
+		},
+		{
+			name: "cancel with offline migration, matching volumes",
+			fields: fields{
+				Owner:        &migapi.DirectVolumeMigration{},
+				source:       transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source(),
+				namespace:    testNamespace,
+				sourceClient: getFakeCompatClient(createOfflineMigrationPod(offlineMigrationPodName, transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source().LabelSafeName(), "pvc")),
+			},
+			wantPod: false,
+		},
+		{
+			name: "cancel with offline migration, matching volumes, and progress",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testDVM,
+					},
+				},
+				source:    transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source(),
+				namespace: testNamespace,
+				sourceClient: getFakeCompatClient(createOfflineMigrationPod(offlineMigrationPodName, transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace)).Source().LabelSafeName(), "pvc"),
+					createDirectVolumeMigrationProgress(testDVM, "pvc", testNamespace, corev1.PodRunning)),
+			},
+			wantPod: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &Task{
+				Log:          log.WithName("test-logger"),
+				Owner:        tt.fields.Owner,
+				sourceClient: tt.fields.sourceClient,
+				Client:       tt.fields.sourceClient,
+			}
+			err := tr.cancelOfflineMigration(tt.fields.source, tt.fields.namespace)
+			if err != nil {
+				t.Errorf("cancelOfflineMigration() error = %v", err)
+				t.FailNow()
+			}
+			if !tt.wantPod {
+				pod := &corev1.Pod{}
+				if err := tt.fields.sourceClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: offlineMigrationPodName}, pod); err != nil {
+					if !k8serrors.IsNotFound(err) {
+						t.Fatalf("cancelOfflineMigration() found offline migration pod in namespace %s, went not expecting", testNamespace)
+					}
+				}
+				progress := &migapi.DirectVolumeMigrationProgressList{}
+				if err := tt.fields.sourceClient.List(context.TODO(), progress, k8sclient.InNamespace(migapi.OpenshiftMigrationNamespace)); err != nil {
+					t.Fatalf("cancelOfflineMigration() failed to list progress")
+				}
+				if len(progress.Items) > 0 {
+					t.Fatalf("cancelOfflineMigration() found progress when not expecting, %#v", progress.Items[0])
+				}
+			}
+		})
+	}
+}
+
+func Test_deleteOfflineMigrationServerPod(t *testing.T) {
+	type fields struct {
+		Owner             *migapi.DirectVolumeMigration
+		namespace         string
+		destinationClient compat.Client
+		pvcPairs          []transfer.PVCPair
+	}
+	tests := []struct {
+		name           string
+		fields         fields
+		wantRunningPod bool
+	}{
+		{
+			name: "no pvc pairs, no server pod",
+			fields: fields{
+				Owner:             &migapi.DirectVolumeMigration{},
+				namespace:         testNamespace,
+				destinationClient: getFakeCompatClient(),
+			},
+		},
+		{
+			name: "no pvc pairs, server pod without volumes",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+				},
+				namespace:         testNamespace,
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod()),
+			},
+		},
+		{
+			name: "pvc pair, server pod with mismatched volumes",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("missing-pvc")),
+			},
+			wantRunningPod: true,
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, but not completed",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+			wantRunningPod: true,
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, successful pod",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						SuccessfulPods: []*migapi.PodProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, failed pod",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						FailedPods: []*migapi.PodProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, successful live migration",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						SuccessfulLiveMigrations: []*migapi.LiveMigrationProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, failed live migration",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						FailedLiveMigrations: []*migapi.LiveMigrationProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, pending live migration",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						PendingLiveMigrations: []*migapi.LiveMigrationProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+		{
+			name: "pvc pair, server pod with matching volumes, running live migration",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testDVM,
+						Namespace: migapi.OpenshiftMigrationNamespace,
+						UID:       "0000",
+					},
+					Status: migapi.DirectVolumeMigrationStatus{
+						RunningLiveMigrations: []*migapi.LiveMigrationProgress{
+							{
+								PVCReference: &corev1.ObjectReference{
+									Name: "pvc",
+								},
+							},
+						},
+					},
+				},
+				namespace:         testNamespace,
+				pvcPairs:          []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+				destinationClient: getFakeCompatClient(createOfflineMigrationServerPod("pvc2")),
+			},
+		},
+	}
+	for _, tt := range tests {
+		tr := &Task{
+			Log:               log.WithName("test-logger"),
+			Owner:             tt.fields.Owner,
+			destinationClient: tt.fields.destinationClient,
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tr.deleteOfflineMigrationServerPod(tt.fields.namespace, tt.fields.pvcPairs); err != nil {
+				t.Errorf("deleteOfflineMigrationServerPod() error = %v", err)
+				t.FailNow()
+			}
+			pod := &corev1.Pod{}
+			err := tt.fields.destinationClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: "blockrsync-server"}, pod)
+			if err != nil {
+				if !k8serrors.IsNotFound(err) {
+					t.Fatalf("deleteOfflineMigrationServerPod() found offline migration pod in namespace %s, went not expecting", testNamespace)
+				} else if tt.wantRunningPod {
+					t.Fatalf("deleteOfflineMigrationServerPod() expected to find pod, but not found")
+				}
+			} else if !tt.wantRunningPod {
+				t.Fatalf("deleteOfflineMigrationServerPod() found pod when not expecting")
+			}
+		})
+	}
+}
+
+func Test_findAndDeleteCompletedRsyncClientPods(t *testing.T) {
+	type fields struct {
+		Owner           *migapi.DirectVolumeMigration
+		sourceNamespace string
+		sourceClient    compat.Client
+		sourcePodName   string
+		pvcPairs        []transfer.PVCPair
+	}
+	tests := []struct {
+		name           string
+		fields         fields
+		wantRunningPod bool
+	}{
+		{
+			name: "no pvc pairs, no completed source volumes, no completed destination volumes, no source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient:    getFakeCompatClient(),
+			},
+		},
+		{
+			name: "pvc pair, no completed source volumes, no completed destination volumes, no source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient:    getFakeCompatClient(),
+				pvcPairs:        []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+		},
+		{
+			name: "pvc pair, no completed source volumes, no completed destination volumes, running source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient: getFakeCompatClient(createRunningBlockRsyncPod("source", testNamespace, &Task{
+					Owner: &migapi.DirectVolumeMigration{
+						Spec: migapi.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+						},
+					},
+				}, nil)),
+				sourcePodName: "source",
+				pvcPairs:      []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+			wantRunningPod: true,
+		},
+		{
+			name: "pvc pair, no completed volumes, no completed destination volumes, completed source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient: getFakeCompatClient(createCompletedBlockRsyncPod("source", testNamespace, &Task{
+					Owner: &migapi.DirectVolumeMigration{
+						Spec: migapi.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+						},
+					},
+				}, nil)),
+				sourcePodName: "source",
+				pvcPairs:      []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+			wantRunningPod: true,
+		},
+		{
+			name: "pvc pair, completed source volumes, no completed destination volumes, completed source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient: getFakeCompatClient(createCompletedBlockRsyncPod("source", testNamespace, &Task{
+					Owner: &migapi.DirectVolumeMigration{
+						Spec: migapi.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+						},
+					},
+				}, []string{"pvc"})),
+				sourcePodName: "source",
+				pvcPairs:      []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+		},
+		{
+			name: "pvc pair, completed source volumes, no completed destination volumes, running source pod",
+			fields: fields{
+				Owner:           &migapi.DirectVolumeMigration{},
+				sourceNamespace: testNamespace,
+				sourceClient: getFakeCompatClient(createRunningBlockRsyncPod("source", testNamespace, &Task{
+					Owner: &migapi.DirectVolumeMigration{
+						Spec: migapi.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+						},
+					},
+				}, nil)),
+				sourcePodName: "source",
+				pvcPairs:      []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+			wantRunningPod: true,
+		},
+		{
+			name: "pvc pair, completed source volumes, no completed destination volumes, completed source pod, running DVMP",
+			fields: fields{
+				Owner: &migapi.DirectVolumeMigration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testDVM,
+					},
+				},
+				sourceNamespace: testNamespace,
+				sourceClient: getFakeCompatClient(createCompletedBlockRsyncPod("source", testNamespace, &Task{
+					Owner: &migapi.DirectVolumeMigration{
+						Spec: migapi.DirectVolumeMigrationSpec{
+							MigrationType: ptr.To[migapi.DirectVolumeMigrationType](migapi.MigrationTypeFinal),
+						},
+					},
+				}, []string{"pvc"}), createDirectVolumeMigrationProgress(testDVM, "pvc", testNamespace, corev1.PodRunning)),
+				sourcePodName: "source",
+				pvcPairs:      []transfer.PVCPair{transfer.NewPVCPair(createPvc("pvc", testNamespace), createPvc("pvc2", testNamespace))},
+			},
+			wantRunningPod: true,
+		},
+	}
+	for _, tt := range tests {
+		tr := &Task{
+			Log:          log.WithName("test-logger"),
+			Owner:        tt.fields.Owner,
+			sourceClient: tt.fields.sourceClient,
+			Client:       tt.fields.sourceClient,
+		}
+		dvmLabels := tr.buildDVMLabels()
+		dvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
+		selector := labels.SelectorFromSet(dvmLabels)
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tr.findAndDeleteCompletedRsyncClientPods(tt.fields.sourceNamespace, tt.fields.pvcPairs, selector); err != nil {
+				t.Errorf("findAndDeleteCompletedRsyncClientPods() error = %v", err)
+				t.FailNow()
+			}
+			pod := &corev1.Pod{}
+			err := tt.fields.sourceClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: tt.fields.sourcePodName}, pod)
+			if err != nil {
+				if !k8serrors.IsNotFound(err) {
+					t.Fatalf("findAndDeleteCompletedRsyncClientPods() found offline migration pod in namespace %s, went not expecting", testNamespace)
+				} else if tt.wantRunningPod {
+					t.Fatalf("findAndDeleteCompletedRsyncClientPods() expected to find pod, but not found")
+				}
+			} else if !tt.wantRunningPod {
+				t.Fatalf("findAndDeleteCompletedRsyncClientPods() found pod when not expecting")
+			}
+		})
+	}
+}
+
 func createNode(name string) *corev1.Node {
 	return &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2598,4 +3179,69 @@ func createClusterIngress() *configv1.Ingress {
 			Domain: "ingress.domain",
 		},
 	}
+}
+
+func createOfflineMigrationPod(name, labelSafeName string, volumes ...string) *corev1.Pod {
+	labels := make(map[string]string)
+	labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	labels[migapi.RsyncPodIdentityLabel] = labelSafeName
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testNamespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+	for _, v := range volumes {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: v,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: v,
+				},
+			},
+		})
+	}
+	return pod
+}
+
+func createOfflineMigrationServerPod(volumes ...string) *corev1.Pod {
+	labels := make(map[string]string)
+	labels["app"] = DirectVolumeMigrationRsyncTransferBlock
+	labels["directvolumemigration"] = "0000"
+	labels["owner"] = DirectVolumeMigration
+	labels[migapi.PartOfLabel] = migapi.Application
+	labels[migapi.MigPlanLabel] = string("")
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "blockrsync-server",
+			Namespace: testNamespace,
+			Labels:    labels,
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+	}
+	for _, v := range volumes {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: v,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: v,
+				},
+			},
+		})
+	}
+	return pod
 }
