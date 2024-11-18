@@ -11,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	ocappsv1 "github.com/openshift/api/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -138,6 +139,16 @@ func (t *Task) swapPVCReferences() (reasons []string, err error) {
 		reasons = append(reasons,
 			fmt.Sprintf("Failed updating PVC references on VirtualMachines [%s]", strings.Join(failedVirtualMachineSwaps, ",")))
 	}
+	sourceClient, err := t.getSourceClient()
+	if err != nil {
+		err = liberr.Wrap(err)
+		return
+	}
+	failedHandleSourceLabels := t.handleSourceLabels(sourceClient, mapping)
+	if len(failedHandleSourceLabels) > 0 {
+		reasons = append(reasons,
+			fmt.Sprintf("Failed updating labels on source PVCs [%s]", strings.Join(failedHandleSourceLabels, ",")))
+	}
 	return
 }
 
@@ -155,6 +166,43 @@ func (t *Task) getPVCNameMapping() pvcNameMapping {
 		}
 	}
 	return mapping
+}
+
+func (t *Task) handleSourceLabels(client k8sclient.Client, mapping pvcNameMapping) (failedPVCs []string) {
+	if t.rollback() {
+		return
+	}
+	for _, ns := range t.sourceNamespaces() {
+		list := v1.PersistentVolumeClaimList{}
+		options := k8sclient.InNamespace(ns)
+		err := client.List(
+			context.TODO(),
+			&list,
+			options)
+		if err != nil {
+			failedPVCs = append(failedPVCs, fmt.Sprintf("failed listing PVCs in namespace %s", ns))
+			continue
+		}
+		for _, pvc := range list.Items {
+			labels := pvc.Labels
+			if labels == nil {
+				labels = make(map[string]string)
+			}
+			if mapping.ExistsAsValue(pvc.Name) {
+				//Skip target PVCs if they are in the same namespace, ensure the label was not copied
+				//from the source PVC
+				delete(labels, directvolumemigration.MigrationSourceFor)
+			} else {
+				// Migration completed successfully, mark PVCs as migrated.
+				labels[directvolumemigration.MigrationSourceFor] = string(t.PlanResources.MigPlan.UID)
+			}
+			pvc.Labels = labels
+			if err := client.Update(context.TODO(), &pvc); err != nil {
+				failedPVCs = append(failedPVCs, fmt.Sprintf("failed to modify labels on PVC %s/%s", pvc.Namespace, pvc.Name))
+			}
+		}
+	}
+	return failedPVCs
 }
 
 func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMapping) (failedStatefulSets []string) {

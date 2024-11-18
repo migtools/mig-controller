@@ -7,11 +7,13 @@ import (
 
 	"github.com/go-logr/logr"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	"github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	virtv1 "kubevirt.io/api/core/v1"
@@ -388,6 +390,91 @@ func TestTask_swapVirtualMachinePVCRefs(t *testing.T) {
 	}
 }
 
+func TestTask_handleSourceLabels(t *testing.T) {
+	tests := []struct {
+		name                      string
+		pvcMapping                pvcNameMapping
+		client                    client.Client
+		rollback                  bool
+		namespaces                []string
+		expectedVolumesWithLabels []string
+	}{
+		{
+			name:       "Rollback, no PVCs, should do nothing",
+			client:     fake.NewClientBuilder().WithScheme(scheme.Scheme).Build(),
+			namespaces: []string{"ns-0:ns-0", "ns-1:ns-1"},
+			rollback:   true,
+		},
+		{
+			name: "PVCs in wrong namespaces, should do nothing",
+			client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(
+				createPersistentVolumeClaim("pvc-0", "ns-2", nil),
+			).Build(),
+			namespaces: []string{"ns-0:ns-0", "ns-1:ns-1"},
+		},
+		{
+			name: "PVCs in namespaces, should add label",
+			client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(
+				createPersistentVolumeClaim("pvc-0", "ns-0", nil),
+				createPersistentVolumeClaim("pvc-1", "ns-2", nil),
+			).Build(),
+			namespaces:                []string{"ns-0:ns-0", "ns-1:ns-1"},
+			expectedVolumesWithLabels: []string{"pvc-0"},
+		},
+		{
+			name: "PVCs in namespaces, with mapping, should remove label",
+			client: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(
+				createPersistentVolumeClaim("pvc-0", "ns-1", map[string]string{directvolumemigration.MigrationSourceFor: "mig-0"}),
+				createPersistentVolumeClaim("pvc-1", "ns-2", nil),
+			).Build(),
+			namespaces: []string{"ns-0:ns-0", "ns-1:ns-1"},
+			pvcMapping: pvcNameMapping{"ns-1/pvc-1": "pvc-0"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{
+						Rollback: tt.rollback,
+					},
+				},
+				PlanResources: &migapi.PlanResources{
+					MigPlan: &migapi.MigPlan{
+						Spec: migapi.MigPlanSpec{
+							Namespaces: tt.namespaces,
+						},
+					},
+				},
+			}
+			task.handleSourceLabels(tt.client, tt.pvcMapping)
+			pvcs := &corev1.PersistentVolumeClaimList{}
+			if err := tt.client.List(context.TODO(), pvcs); err != nil {
+				t.Errorf("Error listing PVCs: %v", err)
+				t.FailNow()
+			}
+			foundPVCs := sets.NewString()
+			for _, pvc := range pvcs.Items {
+				if pvc.Labels != nil {
+					if _, ok := pvc.Labels[directvolumemigration.MigrationSourceFor]; ok {
+						foundPVCs.Insert(pvc.Name)
+					}
+				}
+			}
+			for _, expectedVolume := range tt.expectedVolumesWithLabels {
+				if !foundPVCs.Has(expectedVolume) {
+					t.Errorf("Expected PVC %s to have labels", expectedVolume)
+					t.FailNow()
+				}
+			}
+			if len(foundPVCs) != len(tt.expectedVolumesWithLabels) {
+				t.Errorf("Expected %d PVCs with labels, found %d", len(tt.expectedVolumesWithLabels), len(foundPVCs))
+				t.FailNow()
+			}
+		})
+	}
+}
+
 func createVirtualMachine(name, namespace string, volumes []virtv1.Volume) *virtv1.VirtualMachine {
 	return &virtv1.VirtualMachine{
 		ObjectMeta: metav1.ObjectMeta{
@@ -432,4 +519,14 @@ func createVirtualMachineWithAnnotation(name, namespace, key, value string, volu
 	vm := createVirtualMachine(name, namespace, volumes)
 	vm.Annotations = map[string]string{key: value}
 	return vm
+}
+
+func createPersistentVolumeClaim(name, namespace string, labels map[string]string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+	}
 }
