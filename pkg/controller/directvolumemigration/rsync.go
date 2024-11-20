@@ -811,7 +811,7 @@ func (t *Task) createRsyncTransferClients(srcClient compat.Client,
 					// Check if PVC is now part of the running VMs PVs, if so we need to cancel the in progress rsync, and
 					// that should trigger a live migration or a new rsync operation after it stops the VM.
 					for _, pvcPair := range unfilteredUncompletedBlockOrVMPvcList {
-						if pvcPair.Source().Claim().Name == newOperation.PVCReference.Name && pvcPair.Source().Claim().Namespace == newOperation.PVCReference.Namespace {
+						if t.Owner.IsCutover() && pvcPair.Source().Claim().Name == newOperation.PVCReference.Name && pvcPair.Source().Claim().Namespace == newOperation.PVCReference.Namespace {
 							runningVMVolumes, err := t.getRunningVMVolumes([]string{newOperation.PVCReference.Namespace})
 							if err != nil {
 								currentStatus.AddError(err)
