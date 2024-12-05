@@ -25,7 +25,6 @@ var phaseDescriptions = map[string]string{
 	CreateDestinationNamespaces:          "Creating target namespaces",
 	DestinationNamespacesCreated:         "Checking if the target namespaces have been created.",
 	CreateDestinationPVCs:                "Creating PVCs in the target namespaces",
-	DestinationPVCsCreated:               "Checking whether the created PVCs are bound",
 	CreateRsyncRoute:                     "Creating one route for each namespace for Rsync on the target cluster",
 	CreateRsyncConfig:                    "Creating a config map and secrets on both the source and target clusters for Rsync configuration",
 	CreateStunnelConfig:                  "Creating a config map and secrets for Stunnel to connect to Rsync on the source and target clusters",
