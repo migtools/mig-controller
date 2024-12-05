@@ -98,6 +98,15 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 	plan.Status.DestStorageClasses = destStorageClasses
 
 	plan.Spec.BeginPvStaging()
+	// Build PV map.
+	pvMap, err := r.getPvMap(srcClient, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	claims, err := r.getClaims(srcClient, plan)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	if plan.IsResourceExcluded("persistentvolumeclaims") {
 		log.Info("PV Discovery: 'persistentvolumeclaims' found in MigPlan "+
 			"Status.ExcludedResources, ending PV discovery",
@@ -112,15 +121,6 @@ func (r *ReconcileMigPlan) updatePvs(ctx context.Context, plan *migapi.MigPlan) 
 		})
 		plan.Spec.PersistentVolumes.EndPvStaging()
 		return nil
-	}
-	// Build PV map.
-	pvMap, err := r.getPvMap(srcClient, plan)
-	if err != nil {
-		return liberr.Wrap(err)
-	}
-	claims, err := r.getClaims(srcClient, plan)
-	if err != nil {
-		return liberr.Wrap(err)
 	}
 	for _, claim := range claims {
 		key := k8sclient.ObjectKey{
@@ -412,9 +412,16 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 			continue
 		}
 
+		pv := plan.Spec.FindPv(migapi.PV{Name: pvc.Spec.VolumeName})
 		volumeMode := core.PersistentVolumeFilesystem
-		if pvc.Spec.VolumeMode != nil {
-			volumeMode = *pvc.Spec.VolumeMode
+		accessModes := pvc.Spec.AccessModes
+		if pv == nil {
+			if pvc.Spec.VolumeMode != nil {
+				volumeMode = *pvc.Spec.VolumeMode
+			}
+		} else {
+			volumeMode = pv.PVC.VolumeMode
+			accessModes = pv.PVC.AccessModes
 		}
 		claims = append(
 			claims, migapi.PVC{
@@ -423,7 +430,7 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 					Name:      pvc.Name,
 					Namespace: pvc.Namespace,
 				}, podList, plan),
-				AccessModes:  pvc.Spec.AccessModes,
+				AccessModes:  accessModes,
 				VolumeMode:   volumeMode,
 				HasReference: pvcInPodVolumes(pvc, podList),
 			})

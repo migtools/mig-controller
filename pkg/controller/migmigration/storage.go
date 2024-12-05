@@ -801,7 +801,7 @@ func updateDataVolumeRef(client k8sclient.Client, dv *virtv1.DataVolumeSource, n
 
 		if destinationDVName, exists := mapping.Get(ns, originalName); exists {
 			dv.Name = destinationDVName
-			err := dvmc.CreateNewDataVolume(client, originalDv.Name, destinationDVName, ns, log)
+			err := dvmc.CreateNewAdoptionDataVolume(client, originalDv.Name, destinationDVName, ns, log)
 			if err != nil && !errors.IsAlreadyExists(err) {
 				log.Error(err, "failed creating DataVolume", "namespace", ns, "name", destinationDVName)
 				return true, err

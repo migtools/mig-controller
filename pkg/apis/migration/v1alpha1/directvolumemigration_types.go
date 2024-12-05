@@ -41,6 +41,8 @@ type PVCToMigrate struct {
 	TargetStorageClass string `json:"targetStorageClass"`
 	// TargetAccessModes access modes of the migrated PVC in the target cluster
 	TargetAccessModes []kapi.PersistentVolumeAccessMode `json:"targetAccessModes"`
+	// TargetVolumeMode volume mode of the migrated PVC in the target cluster
+	TargetVolumeMode *kapi.PersistentVolumeMode `json:"targetVolumeMode,omitempty"`
 	// TargetNamespace namespace of the migrated PVC in the target cluster
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 	// TargetName name of the migrated PVC in the target cluster

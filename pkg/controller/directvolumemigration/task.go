@@ -34,7 +34,6 @@ const (
 	CreateDestinationNamespaces                 = "CreateDestinationNamespaces"
 	DestinationNamespacesCreated                = "DestinationNamespacesCreated"
 	CreateDestinationPVCs                       = "CreateDestinationPVCs"
-	DestinationPVCsCreated                      = "DestinationPVCsCreated"
 	CreateStunnelConfig                         = "CreateStunnelConfig"
 	CreateRsyncConfig                           = "CreateRsyncConfig"
 	CreateRsyncRoute                            = "CreateRsyncRoute"
@@ -127,7 +126,6 @@ var VolumeMigration = Itinerary{
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
-		{phase: DestinationPVCsCreated},
 		{phase: DeleteStaleVirtualMachineInstanceMigrations},
 		{phase: CreateRsyncRoute},
 		{phase: EnsureRsyncRouteAdmitted},
@@ -315,16 +313,6 @@ func (t *Task) Run(ctx context.Context) error {
 	case CreateDestinationPVCs:
 		// Create the PVCs on the destination
 		err := t.createDestinationPVCs()
-		if err != nil {
-			return liberr.Wrap(err)
-		}
-		t.Requeue = NoReQ
-		if err = t.next(); err != nil {
-			return liberr.Wrap(err)
-		}
-	case DestinationPVCsCreated:
-		// Get the PVCs on the destination and confirm they are bound
-		err := t.getDestinationPVCs()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
