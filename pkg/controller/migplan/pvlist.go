@@ -14,7 +14,9 @@ import (
 	migpods "github.com/konveyor/mig-controller/pkg/pods"
 	migref "github.com/konveyor/mig-controller/pkg/reference"
 	"github.com/opentracing/opentracing-go"
+	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -352,10 +354,14 @@ func isStorageConversionPlan(plan *migapi.MigPlan) bool {
 // Get a list of PVCs found within the specified namespaces.
 func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan) (Claims, error) {
 	claims := Claims{}
-	list := &core.PersistentVolumeClaimList{}
-	err := client.List(context.TODO(), list, &k8sclient.ListOptions{})
-	if err != nil {
-		return nil, liberr.Wrap(err)
+	pvcList := []core.PersistentVolumeClaim{}
+	for _, namespace := range plan.GetSourceNamespaces() {
+		list := &core.PersistentVolumeClaimList{}
+		err := client.List(context.TODO(), list, k8sclient.InNamespace(namespace))
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		pvcList = append(pvcList, list.Items...)
 	}
 
 	podList, err := migpods.ListTemplatePods(client, plan.GetSourceNamespaces())
@@ -363,19 +369,17 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 		return nil, liberr.Wrap(err)
 	}
 
-	runningPods := &core.PodList{}
-	err = client.List(context.TODO(), runningPods, &k8sclient.ListOptions{})
-	if err != nil {
-		return nil, liberr.Wrap(err)
-	}
-
-	inNamespaces := func(objNamespace string, namespaces []string) bool {
-		for _, ns := range namespaces {
-			if ns == objNamespace {
-				return true
+	for _, namespace := range plan.GetSourceNamespaces() {
+		pods := &core.PodList{}
+		err = client.List(context.TODO(), pods, k8sclient.InNamespace(namespace))
+		if err != nil {
+			return nil, liberr.Wrap(err)
+		}
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == core.PodRunning {
+				podList = append(podList, pod)
 			}
 		}
-		return false
 	}
 
 	alreadyMigrated := func(pvc core.PersistentVolumeClaim) bool {
@@ -398,17 +402,11 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 
 	isStorageConversionPlan := isStorageConversionPlan(plan)
 
-	for _, pod := range runningPods.Items {
-		if inNamespaces(pod.Namespace, plan.GetSourceNamespaces()) {
-			podList = append(podList, pod)
-		}
+	pvcToOwnerMap, err := r.createPVCToOwnerTypeMap(podList)
+	if err != nil {
+		return nil, liberr.Wrap(err)
 	}
-
-	for _, pvc := range list.Items {
-		if !inNamespaces(pvc.Namespace, plan.GetSourceNamespaces()) {
-			continue
-		}
-
+	for _, pvc := range pvcList {
 		if isStorageConversionPlan && (alreadyMigrated(pvc) || migrationSourceOtherPlan(pvc)) {
 			continue
 		}
@@ -434,9 +432,69 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 				AccessModes:  accessModes,
 				VolumeMode:   volumeMode,
 				HasReference: pvcInPodVolumes(pvc, podList),
+				OwnerType:    pvcToOwnerMap[pvc.Name],
 			})
 	}
 	return claims, nil
+}
+
+func (r *ReconcileMigPlan) createPVCToOwnerTypeMap(podList []core.Pod) (map[string]migapi.OwnerType, error) {
+	pvcToOwnerMap := make(map[string]migapi.OwnerType)
+	for _, pod := range podList {
+		for _, vol := range pod.Spec.Volumes {
+			if vol.PersistentVolumeClaim != nil {
+				// Only check for owner references if there is a single owner and the volume wasn't set already.
+				ownerType, ok := pvcToOwnerMap[vol.PersistentVolumeClaim.ClaimName]
+				if pod.OwnerReferences != nil && len(pod.OwnerReferences) == 1 {
+					for _, owner := range pod.OwnerReferences {
+						newOwnerType := migapi.Unknown
+						if owner.Kind == "StatefulSet" && owner.APIVersion == "apps/v1" {
+							newOwnerType = migapi.StatefulSet
+						} else if owner.Kind == "ReplicaSet" && owner.APIVersion == "apps/v1" {
+							// Check if the owner is a Deployment
+							replicaSet := &appsv1.ReplicaSet{}
+							if owner.Name != "" {
+								err := r.Client.Get(context.TODO(), k8sclient.ObjectKey{
+									Namespace: pod.Namespace,
+									Name:      owner.Name,
+								}, replicaSet)
+								if err != nil && !errors.IsNotFound(err) {
+									return nil, err
+								}
+							}
+							if len(replicaSet.OwnerReferences) == 1 && replicaSet.OwnerReferences[0].Kind == "Deployment" && replicaSet.OwnerReferences[0].APIVersion == "apps/v1" {
+								newOwnerType = migapi.Deployment
+							} else {
+								newOwnerType = migapi.ReplicaSet
+							}
+						} else if owner.Kind == "Deployment" && owner.APIVersion == "apps/v1" {
+							newOwnerType = migapi.Deployment
+						} else if owner.Kind == "DaemonSet" && owner.APIVersion == "apps/v1" {
+							newOwnerType = migapi.DaemonSet
+						} else if owner.Kind == "Job" && owner.APIVersion == "batch/v1" {
+							newOwnerType = migapi.Job
+						} else if owner.Kind == "CronJob" && owner.APIVersion == "batch/v1" {
+							newOwnerType = migapi.CronJob
+						} else if owner.Kind == "VirtualMachineInstance" && (owner.APIVersion == "kubevirt.io/v1" || owner.APIVersion == "kubevirt.io/v1alpha3") {
+							newOwnerType = migapi.VirtualMachine
+						} else if owner.Kind == "Pod" && strings.HasPrefix(pod.Name, "hp-") {
+							newOwnerType = migapi.VirtualMachine
+						} else {
+							newOwnerType = migapi.Unknown
+						}
+						if !ok {
+							pvcToOwnerMap[vol.PersistentVolumeClaim.ClaimName] = newOwnerType
+						} else if ownerType != newOwnerType {
+							pvcToOwnerMap[vol.PersistentVolumeClaim.ClaimName] = migapi.Unknown
+						}
+					}
+				} else {
+					pvcToOwnerMap[vol.PersistentVolumeClaim.ClaimName] = migapi.Unknown
+				}
+			}
+		}
+	}
+	return pvcToOwnerMap, nil
 }
 
 // Determine the supported PV actions.

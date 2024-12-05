@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func Test_getStatefulSetVolumeName(t *testing.T) {
@@ -448,4 +450,453 @@ func Test_getMappedNameForPVC(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_createPVCToOwnerTypeMap(t *testing.T) {
+	type args struct {
+		podList []corev1.Pod
+		migPlan ReconcileMigPlan
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]migapi.OwnerType
+		wantErr bool
+	}{
+		{
+			name: "empty podlist",
+			args: args{
+				podList: []corev1.Pod{},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{},
+		},
+		{
+			name: "pod with no owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-0",
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Unknown,
+			},
+		},
+		{
+			name: "pod with stateful set owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-0",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "StatefulSet",
+									APIVersion: "apps/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.StatefulSet,
+			},
+		},
+		{
+			name: "pod with deployment through replicaset owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "ReplicaSet",
+									APIVersion: "apps/v1",
+									Name:       "rs-0",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{
+					Client: fake.NewFakeClient(&appsv1.ReplicaSet{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "rs-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "Deployment",
+									APIVersion: "apps/v1",
+								},
+							},
+						},
+					}),
+				},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Deployment,
+			},
+		},
+		{
+			name: "pod with replicaset owner, replicaset not found, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "ReplicaSet",
+									APIVersion: "apps/v1",
+									Name:       "rs-0",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{
+					Client: fake.NewFakeClient(),
+				},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.ReplicaSet,
+			},
+		},
+		{
+			name: "pod with replicaset owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "ReplicaSet",
+									APIVersion: "apps/v1",
+									Name:       "rs-0",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{
+					Client: fake.NewFakeClient(&appsv1.ReplicaSet{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "rs-0",
+							Namespace: "default",
+						},
+					}),
+				},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.ReplicaSet,
+			},
+		},
+		{
+			name: "pod with deployment owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "Deployment",
+									APIVersion: "apps/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Deployment,
+			},
+		},
+		{
+			name: "pod with daemonset owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "DaemonSet",
+									APIVersion: "apps/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.DaemonSet,
+			},
+		},
+		{
+			name: "pod with job owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "Job",
+									APIVersion: "batch/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Job,
+			},
+		},
+		{
+			name: "pod with cron job owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "CronJob",
+									APIVersion: "batch/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.CronJob,
+			},
+		},
+		{
+			name: "pod with VMI owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "VirtualMachineInstance",
+									APIVersion: "kubevirt.io/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.VirtualMachine,
+			},
+		},
+		{
+			name: "pod with VMI owner, and multiple pvcs",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "VirtualMachineInstance",
+									APIVersion: "kubevirt.io/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0", "pvc-1", "pvc-2"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.VirtualMachine,
+				"pvc-1": migapi.VirtualMachine,
+				"pvc-2": migapi.VirtualMachine,
+			},
+		},
+		{
+			name: "hotplug pod with pod owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "hp-test",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "Pod",
+									APIVersion: "",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.VirtualMachine,
+			},
+		},
+		{
+			name: "pod with unknown owner, and single pvc",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "hp-test",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "Something",
+									APIVersion: "unknown",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Unknown,
+			},
+		},
+		{
+			name: "single pvc, owned by multiple pods with different types",
+			args: args{
+				podList: []corev1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "VirtualMachineInstance",
+									APIVersion: "kubevirt.io/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "pod-0",
+							Namespace: "default",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									Kind:       "DaemonSet",
+									APIVersion: "apps/v1",
+								},
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: createPodVolumes([]string{"pvc-0"}),
+						},
+					},
+				},
+				migPlan: ReconcileMigPlan{},
+			},
+			want: map[string]migapi.OwnerType{
+				"pvc-0": migapi.Unknown,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.args.migPlan.createPVCToOwnerTypeMap(tt.args.podList)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("createPVCToOwnerTypeMap() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for k, v := range got {
+				if tt.want[k] != v {
+					t.Errorf("createPVCToOwnerTypeMap() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func createPodVolumes(pvcNames []string) []corev1.Volume {
+	volumes := make([]corev1.Volume, len(pvcNames))
+	for _, pvcName := range pvcNames {
+		volumes = append(volumes, corev1.Volume{
+			Name: "pvcName",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		})
+	}
+	return volumes
 }

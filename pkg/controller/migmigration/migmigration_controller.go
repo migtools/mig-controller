@@ -243,7 +243,7 @@ func (r *ReconcileMigMigration) Reconcile(ctx context.Context, request reconcile
 	// Validate
 	err = r.validate(ctx, migration)
 	if err != nil {
-		log.Info("Validation failed, requeueing")
+		log.V(3).Info("Validation failed, requeueing")
 		sink.Trace(err)
 		return reconcile.Result{Requeue: true}, nil
 	}
