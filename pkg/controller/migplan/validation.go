@@ -150,10 +150,11 @@ const (
 	VolumesUpdateStrategy = "VolumesUpdateStrategy"
 	VolumeMigrationConfig = "VolumeMigration"
 	VMLiveUpdateFeatures  = "VMLiveUpdateFeatures"
+	storageProfile        = "auto"
 )
 
 // Valid AccessMode values
-var validAccessModes = []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany}
+var validAccessModes = []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany, storageProfile}
 
 // Validate the plan resource.
 func (r ReconcileMigPlan) validate(ctx context.Context, plan *migapi.MigPlan) error {
@@ -1782,7 +1783,7 @@ func containsAccessMode(modeList []kapi.PersistentVolumeAccessMode, accessMode k
 			return true
 		}
 	}
-	return false
+	return accessMode == storageProfile
 }
 
 // NFS validation

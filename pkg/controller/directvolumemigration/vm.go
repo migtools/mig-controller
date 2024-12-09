@@ -198,6 +198,26 @@ func getVMNamesInNamespace(client k8sclient.Client, namespace string) (map[strin
 	return vms, nil
 }
 
+func getVolumeNameToVmMap(client k8sclient.Client, namespace string) (map[string]string, error) {
+	volumeVmMap := make(map[string]string)
+	vmList := virtv1.VirtualMachineList{}
+	err := client.List(context.TODO(), &vmList, k8sclient.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+	for _, vm := range vmList.Items {
+		for _, volume := range vm.Spec.Template.Spec.Volumes {
+			if volume.PersistentVolumeClaim != nil {
+				volumeVmMap[volume.PersistentVolumeClaim.ClaimName] = vm.Name
+			}
+			if volume.DataVolume != nil {
+				volumeVmMap[volume.DataVolume.Name] = vm.Name
+			}
+		}
+	}
+	return volumeVmMap, nil
+}
+
 func (t *Task) storageLiveMigrateVM(vmName, namespace string, volumes *vmVolumes) error {
 	sourceClient := t.sourceClient
 	if t.Owner.IsRollback() {
@@ -365,7 +385,7 @@ func updateVM(client k8sclient.Client, vm *virtv1.VirtualMachine, sourceVolumes,
 			}
 			if volume.DataVolume != nil && volume.DataVolume.Name == sourceVolumes[i] {
 				log.V(5).Info("Updating DataVolume", "source", sourceVolumes[i], "target", targetVolumes[i])
-				if err := CreateNewDataVolume(client, sourceVolumes[i], targetVolumes[i], vmCopy.Namespace, log); err != nil {
+				if err := CreateNewAdoptionDataVolume(client, sourceVolumes[i], targetVolumes[i], vmCopy.Namespace, log); err != nil {
 					return err
 				}
 				vmCopy.Spec.Template.Spec.Volumes[j].DataVolume.Name = targetVolumes[i]
@@ -383,7 +403,53 @@ func updateVM(client k8sclient.Client, vm *virtv1.VirtualMachine, sourceVolumes,
 	return nil
 }
 
-func CreateNewDataVolume(client k8sclient.Client, sourceDvName, targetDvName, ns string, log logr.Logger) error {
+func createBlankDataVolumeFromPVC(client k8sclient.Client, targetPvc *corev1.PersistentVolumeClaim) error {
+	dv := &cdiv1.DataVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        targetPvc.Name,
+			Namespace:   targetPvc.Namespace,
+			Labels:      targetPvc.Labels,
+			Annotations: targetPvc.Annotations,
+		},
+		Spec: cdiv1.DataVolumeSpec{
+			Source: &cdiv1.DataVolumeSource{
+				Blank: &cdiv1.DataVolumeBlankImage{},
+			},
+			Storage: &cdiv1.StorageSpec{
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: targetPvc.Spec.Resources.Requests[corev1.ResourceStorage],
+					},
+				},
+				StorageClassName: targetPvc.Spec.StorageClassName,
+			},
+		},
+	}
+	if targetPvc.Spec.VolumeMode != nil && (*targetPvc.Spec.VolumeMode == corev1.PersistentVolumeBlock || *targetPvc.Spec.VolumeMode == corev1.PersistentVolumeFilesystem) {
+		dv.Spec.Storage.VolumeMode = targetPvc.Spec.VolumeMode
+	} else if targetPvc.Spec.VolumeMode != nil && *targetPvc.Spec.VolumeMode == "auto" {
+		dv.Spec.Storage.VolumeMode = nil
+	}
+	for _, accessMode := range targetPvc.Spec.AccessModes {
+		if accessMode == corev1.ReadWriteOnce || accessMode == corev1.ReadWriteMany {
+			dv.Spec.Storage.AccessModes = append(dv.Spec.Storage.AccessModes, accessMode)
+		}
+	}
+	if dv.Annotations == nil {
+		dv.Annotations = make(map[string]string)
+	}
+	dv.Annotations["cdi.kubevirt.io/allowClaimAdoption"] = "true"
+
+	if err := client.Create(context.TODO(), dv); err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func CreateNewAdoptionDataVolume(client k8sclient.Client, sourceDvName, targetDvName, ns string, log logr.Logger) error {
 	log.V(3).Info("Create new adopting datavolume from source datavolume", "namespace", ns, "source name", sourceDvName, "target name", targetDvName)
 	originalDv := &cdiv1.DataVolume{}
 	if err := client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: ns, Name: sourceDvName}, originalDv); err != nil {
