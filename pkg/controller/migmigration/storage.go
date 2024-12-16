@@ -264,7 +264,7 @@ func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMa
 				if t.rollback() {
 					if _, exists := set.Annotations[statefulSetUpdateAnnotation]; exists {
 						delete(set.Annotations, statefulSetUpdateAnnotation)
-						matcher := regexp.MustCompile(fmt.Sprintf("-%s$", migapi.StorageConversionPVCNamePrefix))
+						matcher := regexp.MustCompile(fmt.Sprintf("-mig-%s$", *t.PlanResources.MigPlan.Status.Suffix))
 						if matcher.MatchString(volumeTemplate.Name) {
 							formattedName = matcher.ReplaceAllString(volumeTemplate.Name, "")
 						}
@@ -281,7 +281,7 @@ func (t *Task) swapStatefulSetPVCRefs(client k8sclient.Client, mapping pvcNameMa
 						set.Annotations = make(map[string]string)
 					}
 					set.Annotations[statefulSetUpdateAnnotation] = migapi.True
-					formattedName = fmt.Sprintf("%s-%s", volumeTemplate.Name, migapi.StorageConversionPVCNamePrefix)
+					formattedName = fmt.Sprintf("%s-mig-%s", volumeTemplate.Name, *t.PlanResources.MigPlan.Status.Suffix)
 				}
 				updateContainerVolumeMounts := func(containers []v1.Container) {
 					for i := range containers {
@@ -731,16 +731,25 @@ func (t *Task) swapVirtualMachinePVCRef(client k8sclient.Client, restClient rest
 	if vm.Spec.Template == nil {
 		return "", nil
 	}
+	vmChanged := false
 	for i, volume := range vm.Spec.Template.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
+			originalName := vm.Spec.Template.Spec.Volumes[i].PersistentVolumeClaim.ClaimName
 			if isFailed := updatePVCRef(&vm.Spec.Template.Spec.Volumes[i].PersistentVolumeClaim.PersistentVolumeClaimVolumeSource, vm.Namespace, mapping); isFailed {
 				return fmt.Sprintf("%s/%s", vm.Namespace, vm.Name), nil
 			}
+			if _, exists := mapping.Get(vm.Namespace, originalName); exists {
+				vmChanged = true
+			}
 		}
 		if volume.DataVolume != nil {
+			originalName := vm.Spec.Template.Spec.Volumes[i].DataVolume.Name
 			isFailed, err := updateDataVolumeRef(client, vm.Spec.Template.Spec.Volumes[i].DataVolume, vm.Namespace, mapping, t.Log)
 			if err != nil || isFailed {
 				return fmt.Sprintf("%s/%s", vm.Namespace, vm.Name), err
+			}
+			if _, exists := mapping.Get(vm.Namespace, originalName); exists {
+				vmChanged = true
 			}
 			// Update datavolume template if it exists.
 			for i, dvt := range vm.Spec.DataVolumeTemplates {
@@ -750,7 +759,7 @@ func (t *Task) swapVirtualMachinePVCRef(client k8sclient.Client, restClient rest
 			}
 		}
 	}
-	if !isVMActive(vm, client) {
+	if vmChanged && !isVMActive(vm, client) {
 		if err := client.Update(context.Background(), vm); err != nil {
 			t.Log.Error(err, "failed updating VM", "namespace", vm.Namespace, "name", vm.Name)
 			return fmt.Sprintf("%s/%s", vm.Namespace, vm.Name), err
@@ -777,13 +786,6 @@ func updatePVCRef(pvcSource *v1.PersistentVolumeClaimVolumeSource, ns string, ma
 		originalName := pvcSource.ClaimName
 		if destinationPVCName, exists := mapping.Get(ns, originalName); exists {
 			pvcSource.ClaimName = destinationPVCName
-		} else {
-			// attempt to figure out whether the current PVC reference
-			// already points to the new migrated PVC. This is needed to
-			// guarantee idempotency of the operation
-			if !mapping.ExistsAsValue(originalName) {
-				return true
-			}
 		}
 	}
 	return false
@@ -805,13 +807,6 @@ func updateDataVolumeRef(client k8sclient.Client, dv *virtv1.DataVolumeSource, n
 			if err != nil && !errors.IsAlreadyExists(err) {
 				log.Error(err, "failed creating DataVolume", "namespace", ns, "name", destinationDVName)
 				return true, err
-			}
-		} else {
-			// attempt to figure out whether the current DV reference
-			// already points to the new migrated PVC. This is needed to
-			// guarantee idempotency of the operation
-			if !mapping.ExistsAsValue(originalName) {
-				return true, nil
 			}
 		}
 	}

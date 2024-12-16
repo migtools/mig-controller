@@ -61,7 +61,7 @@ func TestTask_updateDataVolumeRef(t *testing.T) {
 				Name: "dv-0",
 			},
 			ns:              "ns-0",
-			expectedFailure: true,
+			expectedFailure: false,
 			wantErr:         false,
 		},
 		{
@@ -195,7 +195,6 @@ func TestTask_swapVirtualMachinePVCRefs(t *testing.T) {
 					},
 				},
 			},
-			expectedFailures: []string{"ns-0/vm-0"},
 		},
 		{
 			name:       "VMs with PVCs, no mapping, should return all VMs",
@@ -213,7 +212,6 @@ func TestTask_swapVirtualMachinePVCRefs(t *testing.T) {
 					},
 				}),
 			},
-			expectedFailures: []string{"ns-0/vm-0"},
 		},
 		{
 			name:       "VMs with DVs, mapping to new name, should return no failures",

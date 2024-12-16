@@ -307,6 +307,7 @@ func getStatefulSetVolumeName(pvcName, setName string, plan *migapi.MigPlan) str
 			}
 		}
 	}
+	log.V(3).Info("Returning statefulset formatted Name", "formattedName", formattedName)
 	return formattedName
 }
 
