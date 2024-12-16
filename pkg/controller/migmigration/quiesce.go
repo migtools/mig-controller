@@ -15,9 +15,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	virtv1 "kubevirt.io/api/core/v1"
@@ -55,31 +57,32 @@ func (t *Task) quiesceDestinationApplications() error {
 
 // Quiesce applications on source cluster
 func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
-	err := t.quiesceCronJobs(client, namespaces)
+	selectedPVCs := t.getSelectedPVCs()
+	err := t.quiesceCronJobs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeploymentConfigs(client, namespaces)
+	err = t.quiesceDeploymentConfigs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeployments(client, namespaces)
+	err = t.quiesceDeployments(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceStatefulSets(client, namespaces)
+	err = t.quiesceStatefulSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceReplicaSets(client, namespaces)
+	err = t.quiesceReplicaSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDaemonSets(client, namespaces)
+	err = t.quiesceDaemonSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceJobs(client, namespaces)
+	err = t.quiesceJobs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -88,12 +91,29 @@ func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		err = t.quiesceVirtualMachines(client, restClient, namespaces)
+		err = t.quiesceVirtualMachines(client, restClient, namespaces, selectedPVCs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
 	}
 	return nil
+}
+
+func (t *Task) getSelectedPVCs() map[string]sets.Set[string] {
+	selected := make(map[string]sets.Set[string])
+	for _, pv := range t.PlanResources.MigPlan.Spec.PersistentVolumes.List {
+		if pv.Selection.Action == migapi.PvCopyAction {
+			if _, ok := selected[pv.PVC.Namespace]; !ok {
+				selected[pv.PVC.Namespace] = sets.New[string]()
+			}
+			if t.Owner.Spec.Rollback {
+				selected[pv.PVC.Namespace].Insert(pv.PVC.GetTargetName())
+			} else {
+				selected[pv.PVC.Namespace].Insert(pv.PVC.GetSourceName())
+			}
+		}
+	}
+	return selected
 }
 
 func (t *Task) unQuiesceSrcApplications() error {
@@ -132,31 +152,32 @@ func (t *Task) unQuiesceDestApplications() error {
 
 // Unquiesce applications using client and namespace list given
 func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
-	err := t.unQuiesceCronJobs(client, namespaces)
+	selectedPVCs := t.getSelectedPVCs()
+	err := t.unQuiesceCronJobs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeploymentConfigs(client, namespaces)
+	err = t.unQuiesceDeploymentConfigs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeployments(client, namespaces)
+	err = t.unQuiesceDeployments(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceStatefulSets(client, namespaces)
+	err = t.unQuiesceStatefulSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceReplicaSets(client, namespaces)
+	err = t.unQuiesceReplicaSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDaemonSets(client, namespaces)
+	err = t.unQuiesceDaemonSets(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceJobs(client, namespaces)
+	err = t.unQuiesceJobs(client, namespaces, selectedPVCs)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -165,7 +186,7 @@ func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Conf
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		err = t.unQuiesceVirtualMachines(client, restClient, namespaces)
+		err = t.unQuiesceVirtualMachines(client, restClient, namespaces, selectedPVCs)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
@@ -174,8 +195,11 @@ func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Conf
 }
 
 // Scales down DeploymentConfig on source cluster
-func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -186,25 +210,36 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []st
 			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
-			if dc.Annotations == nil {
-				dc.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, v := range dc.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil {
+					if selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+						shouldQuiesce = true
+						break
+					}
+				}
 			}
-			if dc.Spec.Replicas == 0 {
-				continue
-			}
-			dc.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
-			dc.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(dc.Spec.Paused)
-			t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig. "+
-				"Changing .Spec.Replicas from [%v->0]. "+
-				"Annotating with [%v: %v]",
-				dc.Spec.Replicas,
-				migapi.ReplicasAnnotation, dc.Spec.Replicas),
-				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
-			dc.Spec.Replicas = 0
-			dc.Spec.Paused = false
-			err = client.Update(context.TODO(), &dc)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				if dc.Annotations == nil {
+					dc.Annotations = make(map[string]string)
+				}
+				if dc.Spec.Replicas == 0 {
+					continue
+				}
+				dc.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(dc.Spec.Replicas), 10)
+				dc.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(dc.Spec.Paused)
+				t.Log.Info(fmt.Sprintf("Quiescing DeploymentConfig. "+
+					"Changing .Spec.Replicas from [%v->0]. "+
+					"Annotating with [%v: %v]",
+					dc.Spec.Replicas,
+					migapi.ReplicasAnnotation, dc.Spec.Replicas),
+					"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+				dc.Spec.Replicas = 0
+				dc.Spec.Paused = false
+				err = client.Update(context.TODO(), &dc)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -213,8 +248,11 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []st
 }
 
 // Scales DeploymentConfig back up on source cluster
-func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := ocappsv1.DeploymentConfigList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -225,51 +263,62 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
-			if dc.Annotations == nil {
-				continue
+			shouldunQuiesce := false
+			for _, v := range dc.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil {
+					if selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+						shouldunQuiesce = true
+						break
+					}
+				}
 			}
-			replicas, exist := dc.Annotations[migapi.ReplicasAnnotation]
-			if !exist {
-				continue
-			}
-			number, err := strconv.Atoi(replicas)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			delete(dc.Annotations, migapi.ReplicasAnnotation)
-			currentReplicas := dc.Spec.Replicas
-			// Only set replica count if currently 0
-			if dc.Spec.Replicas == 0 {
-				dc.Spec.Replicas = int32(number)
-			}
-			t.Log.Info(fmt.Sprintf("Unquiescing DeploymentConfig. "+
-				"Changing .Spec.Replicas from [%v->%v]. "+
-				"Removing Annotation [%v]",
-				currentReplicas, number,
-				migapi.ReplicasAnnotation),
-				"deploymentConfig", path.Join(dc.Namespace, dc.Name))
-			err = client.Update(context.TODO(), &dc)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-
-			// For Deployment Configs we have to set paused separately or pods wont launch
-			// We have to get the updated resource otherwise we just produce a conflict
-			ref := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
-			err = client.Get(context.TODO(), ref, &dc)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			if val, exists := dc.Annotations[migapi.PausedAnnotation]; exists {
-				dc.Spec.Paused, err = strconv.ParseBool(val)
+			if shouldunQuiesce {
+				if dc.Annotations == nil {
+					continue
+				}
+				replicas, exist := dc.Annotations[migapi.ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
 				if err != nil {
 					return liberr.Wrap(err)
 				}
-				delete(dc.Annotations, migapi.PausedAnnotation)
-			}
-			err = client.Update(context.TODO(), &dc)
-			if err != nil {
-				return liberr.Wrap(err)
+				delete(dc.Annotations, migapi.ReplicasAnnotation)
+				currentReplicas := dc.Spec.Replicas
+				// Only set replica count if currently 0
+				if dc.Spec.Replicas == 0 {
+					dc.Spec.Replicas = int32(number)
+				}
+				t.Log.Info(fmt.Sprintf("Unquiescing DeploymentConfig. "+
+					"Changing .Spec.Replicas from [%v->%v]. "+
+					"Removing Annotation [%v]",
+					currentReplicas, number,
+					migapi.ReplicasAnnotation),
+					"deploymentConfig", path.Join(dc.Namespace, dc.Name))
+				err = client.Update(context.TODO(), &dc)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+
+				// For Deployment Configs we have to set paused separately or pods wont launch
+				// We have to get the updated resource otherwise we just produce a conflict
+				ref := types.NamespacedName{Name: dc.Name, Namespace: dc.Namespace}
+				err = client.Get(context.TODO(), ref, &dc)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				if val, exists := dc.Annotations[migapi.PausedAnnotation]; exists {
+					dc.Spec.Paused, err = strconv.ParseBool(val)
+					if err != nil {
+						return liberr.Wrap(err)
+					}
+					delete(dc.Annotations, migapi.PausedAnnotation)
+				}
+				err = client.Update(context.TODO(), &dc)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -278,9 +327,12 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 }
 
 // Scales down all Deployments
-func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -291,25 +343,34 @@ func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string) 
 			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
-			if deployment.Annotations == nil {
-				deployment.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, v := range deployment.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			if *deployment.Spec.Replicas == zero {
-				continue
-			}
-			t.Log.Info(fmt.Sprintf("Quiescing Deployment. "+
-				"Changing spec.Replicas from [%v->0]. "+
-				"Annotating with [%v: %v]",
-				deployment.Spec.Replicas,
-				migapi.ReplicasAnnotation, deployment.Spec.Replicas),
-				"deployment", path.Join(deployment.Namespace, deployment.Name))
-			deployment.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
-			deployment.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(deployment.Spec.Paused)
-			deployment.Spec.Replicas = &zero
-			deployment.Spec.Paused = false
-			err = client.Update(context.TODO(), &deployment)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				if deployment.Annotations == nil {
+					deployment.Annotations = make(map[string]string)
+				}
+				if *deployment.Spec.Replicas == zero {
+					continue
+				}
+				t.Log.Info(fmt.Sprintf("Quiescing Deployment. "+
+					"Changing spec.Replicas from [%v->0]. "+
+					"Annotating with [%v: %v]",
+					deployment.Spec.Replicas,
+					migapi.ReplicasAnnotation, deployment.Spec.Replicas),
+					"deployment", path.Join(deployment.Namespace, deployment.Name))
+				deployment.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*deployment.Spec.Replicas), 10)
+				deployment.Annotations[migapi.PausedAnnotation] = strconv.FormatBool(deployment.Spec.Paused)
+				deployment.Spec.Replicas = &zero
+				deployment.Spec.Paused = false
+				err = client.Update(context.TODO(), &deployment)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -318,8 +379,11 @@ func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string) 
 }
 
 // Scales all Deployments back up
-func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.DeploymentList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -330,40 +394,49 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
-			if deployment.Annotations == nil {
-				deployment.Annotations = make(map[string]string)
+			shouldunQuiesce := false
+			for _, v := range deployment.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
 			}
-			replicas, exist := deployment.Annotations[migapi.ReplicasAnnotation]
-			if !exist {
-				continue
-			}
-			number, err := strconv.Atoi(replicas)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			if val, exists := deployment.Annotations[migapi.PausedAnnotation]; exists {
-				deployment.Spec.Paused, err = strconv.ParseBool(val)
+			if shouldunQuiesce {
+				if deployment.Annotations == nil {
+					deployment.Annotations = make(map[string]string)
+				}
+				replicas, exist := deployment.Annotations[migapi.ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
 				if err != nil {
 					return liberr.Wrap(err)
 				}
-				delete(deployment.Annotations, migapi.PausedAnnotation)
-			}
-			delete(deployment.Annotations, migapi.ReplicasAnnotation)
-			restoredReplicas := int32(number)
-			currentReplicas := deployment.Spec.Replicas
-			// Only change replica count if currently == 0
-			if *deployment.Spec.Replicas == 0 {
-				deployment.Spec.Replicas = &restoredReplicas
-			}
-			t.Log.Info(fmt.Sprintf("Unquiescing Deployment. "+
-				"Changing Spec.Replicas from [%v->%v]. "+
-				"Removing Annotation [%v]",
-				currentReplicas, restoredReplicas,
-				migapi.ReplicasAnnotation),
-				"deployment", path.Join(deployment.Namespace, deployment.Name))
-			err = client.Update(context.TODO(), &deployment)
-			if err != nil {
-				return liberr.Wrap(err)
+				if val, exists := deployment.Annotations[migapi.PausedAnnotation]; exists {
+					deployment.Spec.Paused, err = strconv.ParseBool(val)
+					if err != nil {
+						return liberr.Wrap(err)
+					}
+					delete(deployment.Annotations, migapi.PausedAnnotation)
+				}
+				delete(deployment.Annotations, migapi.ReplicasAnnotation)
+				restoredReplicas := int32(number)
+				currentReplicas := deployment.Spec.Replicas
+				// Only change replica count if currently == 0
+				if *deployment.Spec.Replicas == 0 {
+					deployment.Spec.Replicas = &restoredReplicas
+				}
+				t.Log.Info(fmt.Sprintf("Unquiescing Deployment. "+
+					"Changing Spec.Replicas from [%v->%v]. "+
+					"Removing Annotation [%v]",
+					currentReplicas, restoredReplicas,
+					migapi.ReplicasAnnotation),
+					"deployment", path.Join(deployment.Namespace, deployment.Name))
+				err = client.Update(context.TODO(), &deployment)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -372,9 +445,13 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all StatefulSets.
-func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
+		t.Log.Info("Checking StatefulSets", "namespace", ns)
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -384,24 +461,37 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string)
 		if err != nil {
 			return liberr.Wrap(err)
 		}
+		t.Log.Info("StatefulSets found", "count", len(list.Items))
 		for _, set := range list.Items {
-			t.Log.Info(fmt.Sprintf("Quiescing StatefulSet. "+
-				"Changing Spec.Replicas from [%v->%v]. "+
-				"Annotating with [%v: %v]",
-				set.Spec.Replicas, zero,
-				migapi.ReplicasAnnotation, set.Spec.Replicas),
-				"statefulSet", path.Join(set.Namespace, set.Name))
-			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, volumeTemplate := range set.Spec.VolumeClaimTemplates {
+				t.Log.Info("Checking StatefulSet volumes", "volume", volumeTemplate.Name, "kind", volumeTemplate.Kind)
+				key := fmt.Sprintf("%s-%s-0", volumeTemplate.Name, set.Name)
+				t.Log.Info("Checking StatefulSet volumes", "volume", key)
+				if selectedPVCs[ns].Has(key) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			if *set.Spec.Replicas == zero {
-				continue
-			}
-			set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
-			set.Spec.Replicas = &zero
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				t.Log.Info(fmt.Sprintf("Quiescing StatefulSet. "+
+					"Changing Spec.Replicas from [%v->%v]. "+
+					"Annotating with [%v: %v]",
+					set.Spec.Replicas, zero,
+					migapi.ReplicasAnnotation, set.Spec.Replicas),
+					"statefulSet", path.Join(set.Namespace, set.Name))
+				if set.Annotations == nil {
+					set.Annotations = make(map[string]string)
+				}
+				if *set.Spec.Replicas == zero {
+					continue
+				}
+				set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
+				set.Spec.Replicas = &zero
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -409,8 +499,11 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string)
 }
 
 // Scales all StatefulSets back up
-func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.StatefulSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -421,34 +514,43 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			if set.Annotations == nil {
-				continue
+			shouldunQuiesce := false
+			for _, v := range set.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
 			}
-			replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
-			if !exist {
-				continue
-			}
-			number, err := strconv.Atoi(replicas)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			delete(set.Annotations, migapi.ReplicasAnnotation)
-			restoredReplicas := int32(number)
+			if shouldunQuiesce {
+				if set.Annotations == nil {
+					continue
+				}
+				replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				delete(set.Annotations, migapi.ReplicasAnnotation)
+				restoredReplicas := int32(number)
 
-			t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet. "+
-				"Changing Spec.Replicas from [%v->%v]. "+
-				"Removing Annotation [%v].",
-				set.Spec.Replicas, replicas,
-				migapi.ReplicasAnnotation),
-				"statefulSet", path.Join(set.Namespace, set.Name))
+				t.Log.Info(fmt.Sprintf("Unquiescing StatefulSet. "+
+					"Changing Spec.Replicas from [%v->%v]. "+
+					"Removing Annotation [%v].",
+					set.Spec.Replicas, replicas,
+					migapi.ReplicasAnnotation),
+					"statefulSet", path.Join(set.Namespace, set.Name))
 
-			// Only change replica count if currently == 0
-			if *set.Spec.Replicas == 0 {
-				set.Spec.Replicas = &restoredReplicas
-			}
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+				// Only change replica count if currently == 0
+				if *set.Spec.Replicas == 0 {
+					set.Spec.Replicas = &restoredReplicas
+				}
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -456,9 +558,12 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 }
 
 // Scales down all ReplicaSets.
-func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -474,23 +579,32 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string) 
 					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
-			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, v := range set.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			if *set.Spec.Replicas == zero {
-				continue
-			}
-			set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
-			t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet. "+
-				"Changing Spec.Replicas from [%v->%v]. "+
-				"Setting Annotation [%v: %v]",
-				set.Spec.Replicas, zero,
-				migapi.ReplicasAnnotation, set.Spec.Replicas),
-				"replicaSet", path.Join(set.Namespace, set.Name))
-			set.Spec.Replicas = &zero
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				if set.Annotations == nil {
+					set.Annotations = make(map[string]string)
+				}
+				if *set.Spec.Replicas == zero {
+					continue
+				}
+				set.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*set.Spec.Replicas), 10)
+				t.Log.Info(fmt.Sprintf("Quiescing ReplicaSet. "+
+					"Changing Spec.Replicas from [%v->%v]. "+
+					"Setting Annotation [%v: %v]",
+					set.Spec.Replicas, zero,
+					migapi.ReplicasAnnotation, set.Spec.Replicas),
+					"replicaSet", path.Join(set.Namespace, set.Name))
+				set.Spec.Replicas = &zero
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -498,8 +612,11 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string) 
 }
 
 // Scales all ReplicaSets back up
-func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.ReplicaSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -515,31 +632,40 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
-			if set.Annotations == nil {
-				continue
+			shouldunQuiesce := false
+			for _, v := range set.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
 			}
-			replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
-			if !exist {
-				continue
-			}
-			number, err := strconv.Atoi(replicas)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			delete(set.Annotations, migapi.ReplicasAnnotation)
-			restoredReplicas := int32(number)
-			// Only change replica count if currently == 0
-			if *set.Spec.Replicas == 0 {
-				set.Spec.Replicas = &restoredReplicas
-			}
-			t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet. "+
-				"Changing Spec.Replicas from [%v->%v]. "+
-				"Removing Annotation [%v]",
-				0, restoredReplicas, migapi.ReplicasAnnotation),
-				"replicaSet", path.Join(set.Namespace, set.Name))
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldunQuiesce {
+				if set.Annotations == nil {
+					continue
+				}
+				replicas, exist := set.Annotations[migapi.ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				delete(set.Annotations, migapi.ReplicasAnnotation)
+				restoredReplicas := int32(number)
+				// Only change replica count if currently == 0
+				if *set.Spec.Replicas == 0 {
+					set.Spec.Replicas = &restoredReplicas
+				}
+				t.Log.Info(fmt.Sprintf("Unquiescing ReplicaSet. "+
+					"Changing Spec.Replicas from [%v->%v]. "+
+					"Removing Annotation [%v]",
+					0, restoredReplicas, migapi.ReplicasAnnotation),
+					"replicaSet", path.Join(set.Namespace, set.Name))
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -547,8 +673,11 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all DaemonSets.
-func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -559,28 +688,37 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string) e
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			if set.Annotations == nil {
-				set.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, v := range set.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			if set.Spec.Template.Spec.NodeSelector == nil {
-				set.Spec.Template.Spec.NodeSelector = map[string]string{}
-			} else if _, exist := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]; exist {
-				continue
-			}
-			selector, err := json.Marshal(set.Spec.Template.Spec.NodeSelector)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			set.Annotations[migapi.NodeSelectorAnnotation] = string(selector)
-			set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector] = "true"
-			t.Log.Info(fmt.Sprintf("Quiescing DaemonSet. "+
-				"Changing [Spec.Template.Spec.NodeSelector=%v:true]. "+
-				"Setting annotation [%v: %v]",
-				migapi.QuiesceNodeSelector, migapi.NodeSelectorAnnotation, string(selector)),
-				"daemonSet", path.Join(set.Namespace, set.Name))
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				if set.Annotations == nil {
+					set.Annotations = make(map[string]string)
+				}
+				if set.Spec.Template.Spec.NodeSelector == nil {
+					set.Spec.Template.Spec.NodeSelector = map[string]string{}
+				} else if _, exist := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]; exist {
+					continue
+				}
+				selector, err := json.Marshal(set.Spec.Template.Spec.NodeSelector)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				set.Annotations[migapi.NodeSelectorAnnotation] = string(selector)
+				set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector] = "true"
+				t.Log.Info(fmt.Sprintf("Quiescing DaemonSet. "+
+					"Changing [Spec.Template.Spec.NodeSelector=%v:true]. "+
+					"Setting annotation [%v: %v]",
+					migapi.QuiesceNodeSelector, migapi.NodeSelectorAnnotation, string(selector)),
+					"daemonSet", path.Join(set.Namespace, set.Name))
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -588,8 +726,11 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string) e
 }
 
 // Scales all DaemonSets back up
-func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := appsv1.DaemonSetList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -600,33 +741,42 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			if set.Annotations == nil {
-				continue
+			shouldunQuiesce := false
+			for _, v := range set.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
 			}
-			selector, exist := set.Annotations[migapi.NodeSelectorAnnotation]
-			if !exist {
-				continue
-			}
-			nodeSelector := map[string]string{}
-			err := json.Unmarshal([]byte(selector), &nodeSelector)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			// Only change node selector if set to our quiesce nodeselector
-			_, isQuiesced := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]
-			if !isQuiesced {
-				continue
-			}
-			delete(set.Annotations, migapi.NodeSelectorAnnotation)
-			set.Spec.Template.Spec.NodeSelector = nodeSelector
-			t.Log.Info(fmt.Sprintf("Unquiescing DaemonSet. "+
-				"Setting [Spec.Template.Spec.NodeSelector=%v]. "+
-				"Removing Annotation [%v].",
-				nodeSelector, migapi.NodeSelectorAnnotation),
-				"daemonSet", path.Join(set.Namespace, set.Name))
-			err = client.Update(context.TODO(), &set)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldunQuiesce {
+				if set.Annotations == nil {
+					continue
+				}
+				selector, exist := set.Annotations[migapi.NodeSelectorAnnotation]
+				if !exist {
+					continue
+				}
+				nodeSelector := map[string]string{}
+				err := json.Unmarshal([]byte(selector), &nodeSelector)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				// Only change node selector if set to our quiesce nodeselector
+				_, isQuiesced := set.Spec.Template.Spec.NodeSelector[migapi.QuiesceNodeSelector]
+				if !isQuiesced {
+					continue
+				}
+				delete(set.Annotations, migapi.NodeSelectorAnnotation)
+				set.Spec.Template.Spec.NodeSelector = nodeSelector
+				t.Log.Info(fmt.Sprintf("Unquiescing DaemonSet. "+
+					"Setting [Spec.Template.Spec.NodeSelector=%v]. "+
+					"Removing Annotation [%v].",
+					nodeSelector, migapi.NodeSelectorAnnotation),
+					"daemonSet", path.Join(set.Namespace, set.Name))
+				err = client.Update(context.TODO(), &set)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -634,131 +784,201 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string)
 }
 
 // Suspends all CronJobs
-func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string) error {
+func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
-
+		selectedPVCsInNS, exists := selectedPVCs[ns]
+		if !exists {
+			continue
+		}
 		if client.MinorVersion() < 21 {
-			list := batchv1beta.CronJobList{}
-			options := k8sclient.InNamespace(ns)
-			err := client.List(context.TODO(), &list, options)
-			if err != nil {
-				return liberr.Wrap(err)
+			if err := t.quiesecBetav1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+				return err
 			}
-			for _, r := range list.Items {
-				if r.Annotations == nil {
-					r.Annotations = make(map[string]string)
-				}
-				if r.Spec.Suspend == ptr.To[bool](true) {
-					continue
-				}
-				r.Annotations[migapi.SuspendAnnotation] = "true"
-				r.Spec.Suspend = ptr.To[bool](true)
-				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
-					"Setting [Spec.Suspend=true]. "+
-					"Setting Annotation [%v]: true",
-					migapi.SuspendAnnotation),
-					"job", path.Join(r.Namespace, r.Name))
-				err = client.Update(context.TODO(), &r)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-
 		} else {
-			list := batchv1.CronJobList{}
-			options := k8sclient.InNamespace(ns)
-			err := client.List(context.TODO(), &list, options)
-			if err != nil {
-				return liberr.Wrap(err)
+			if err := t.quiesecv1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+				return err
 			}
-			for _, r := range list.Items {
-				if r.Annotations == nil {
-					r.Annotations = make(map[string]string)
-				}
-				if r.Spec.Suspend == ptr.To[bool](true) {
-					continue
-				}
-				r.Annotations[migapi.SuspendAnnotation] = "true"
-				r.Spec.Suspend = ptr.To[bool](true)
-				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
-					"Setting [Spec.Suspend=true]. "+
-					"Setting Annotation [%v]: true",
-					migapi.SuspendAnnotation),
-					"job", path.Join(r.Namespace, r.Name))
-				err = client.Update(context.TODO(), &r)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-
 		}
 	}
 
+	return nil
+}
+
+func (t *Task) quiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+	list := batchv1.CronJobList{}
+	options := k8sclient.InNamespace(ns)
+	err := client.List(context.TODO(), &list, options)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, r := range list.Items {
+		shouldQuiesce := false
+		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
+				shouldQuiesce = true
+				break
+			}
+		}
+		if shouldQuiesce {
+			if r.Annotations == nil {
+				r.Annotations = make(map[string]string)
+			}
+			if r.Spec.Suspend == ptr.To[bool](true) {
+				continue
+			}
+			r.Annotations[migapi.SuspendAnnotation] = "true"
+			r.Spec.Suspend = ptr.To[bool](true)
+			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
+				"Setting [Spec.Suspend=true]. "+
+				"Setting Annotation [%v]: true",
+				migapi.SuspendAnnotation),
+				"job", path.Join(r.Namespace, r.Name))
+			err = client.Update(context.TODO(), &r)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) quiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+	list := batchv1beta.CronJobList{}
+	options := k8sclient.InNamespace(ns)
+	err := client.List(context.TODO(), &list, options)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, r := range list.Items {
+		shouldQuiesce := false
+		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
+				shouldQuiesce = true
+				break
+			}
+		}
+		if shouldQuiesce {
+			if r.Annotations == nil {
+				r.Annotations = make(map[string]string)
+			}
+			if r.Spec.Suspend == ptr.To[bool](true) {
+				continue
+			}
+			r.Annotations[migapi.SuspendAnnotation] = "true"
+			r.Spec.Suspend = ptr.To[bool](true)
+			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
+				"Setting [Spec.Suspend=true]. "+
+				"Setting Annotation [%v]: true",
+				migapi.SuspendAnnotation),
+				"job", path.Join(r.Namespace, r.Name))
+			err = client.Update(context.TODO(), &r)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
 	return nil
 }
 
 // Undo quiescence on all CronJobs
-func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string) error {
+func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		selectedPVCsInNS, exists := selectedPVCs[ns]
+		if !exists {
+			continue
+		}
 		if client.MinorVersion() < 21 {
-			list := batchv1beta.CronJobList{}
-			options := k8sclient.InNamespace(ns)
-			err := client.List(context.TODO(), &list, options)
-			if err != nil {
-				return liberr.Wrap(err)
+			if err := t.unquiesecBetav1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+				return err
 			}
-			for _, r := range list.Items {
-				if r.Annotations == nil {
-					continue
-				}
-				// Only unsuspend if our suspend annotation is present
-				if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
-					continue
-				}
-				delete(r.Annotations, migapi.SuspendAnnotation)
-				r.Spec.Suspend = ptr.To[bool](false)
-				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
-					"cronJob", path.Join(r.Namespace, r.Name))
-				err = client.Update(context.TODO(), &r)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-
 		} else {
-			list := batchv1.CronJobList{}
-			options := k8sclient.InNamespace(ns)
-			err := client.List(context.TODO(), &list, options)
-			if err != nil {
-				return liberr.Wrap(err)
+			if err := t.unquiesecv1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+				return err
 			}
-			for _, r := range list.Items {
-				if r.Annotations == nil {
-					continue
-				}
-				// Only unsuspend if our suspend annotation is present
-				if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
-					continue
-				}
-				delete(r.Annotations, migapi.SuspendAnnotation)
-				r.Spec.Suspend = ptr.To[bool](false)
-				t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
-					"cronJob", path.Join(r.Namespace, r.Name))
-				err = client.Update(context.TODO(), &r)
-				if err != nil {
-					return liberr.Wrap(err)
-				}
-			}
-
 		}
 	}
 
 	return nil
 }
 
+func (t *Task) unquiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+	list := batchv1beta.CronJobList{}
+	options := k8sclient.InNamespace(ns)
+	err := client.List(context.TODO(), &list, options)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, r := range list.Items {
+		shouldunQuiesce := false
+		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
+				shouldunQuiesce = true
+				break
+			}
+		}
+		if shouldunQuiesce {
+			if r.Annotations == nil {
+				continue
+			}
+			// Only unsuspend if our suspend annotation is present
+			if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
+				continue
+			}
+			delete(r.Annotations, migapi.SuspendAnnotation)
+			r.Spec.Suspend = ptr.To[bool](false)
+			t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
+				"cronJob", path.Join(r.Namespace, r.Name))
+			err = client.Update(context.TODO(), &r)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) unquiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+	list := batchv1.CronJobList{}
+	options := k8sclient.InNamespace(ns)
+	err := client.List(context.TODO(), &list, options)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
+	for _, r := range list.Items {
+		shouldunQuiesce := false
+		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
+				shouldunQuiesce = true
+				break
+			}
+		}
+		if shouldunQuiesce {
+			if r.Annotations == nil {
+				continue
+			}
+			// Only unsuspend if our suspend annotation is present
+			if _, exist := r.Annotations[migapi.SuspendAnnotation]; !exist {
+				continue
+			}
+			delete(r.Annotations, migapi.SuspendAnnotation)
+			r.Spec.Suspend = ptr.To[bool](false)
+			t.Log.Info("Unquiescing Cron Job. Setting [Spec.Suspend=false]",
+				"cronJob", path.Join(r.Namespace, r.Name))
+			err = client.Update(context.TODO(), &r)
+			if err != nil {
+				return liberr.Wrap(err)
+			}
+		}
+	}
+	return nil
+}
+
 // Scales down all Jobs
-func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string) error {
+func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -769,22 +989,31 @@ func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string) error {
 			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
-			if job.Annotations == nil {
-				job.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			for _, v := range job.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			if job.Spec.Parallelism == ptr.To[int32](0) {
-				continue
-			}
-			job.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
-			job.Spec.Parallelism = ptr.To[int32](0)
-			t.Log.Info(fmt.Sprintf("Quiescing Job. "+
-				"Setting [Spec.Parallelism=0]. "+
-				"Annotating with [%v: %v]",
-				migapi.ReplicasAnnotation, job.Spec.Parallelism),
-				"job", path.Join(job.Namespace, job.Name))
-			err = client.Update(context.TODO(), &job)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldQuiesce {
+				if job.Annotations == nil {
+					job.Annotations = make(map[string]string)
+				}
+				if job.Spec.Parallelism == ptr.To[int32](0) {
+					continue
+				}
+				job.Annotations[migapi.ReplicasAnnotation] = strconv.FormatInt(int64(*job.Spec.Parallelism), 10)
+				job.Spec.Parallelism = ptr.To[int32](0)
+				t.Log.Info(fmt.Sprintf("Quiescing Job. "+
+					"Setting [Spec.Parallelism=0]. "+
+					"Annotating with [%v: %v]",
+					migapi.ReplicasAnnotation, job.Spec.Parallelism),
+					"job", path.Join(job.Namespace, job.Name))
+				err = client.Update(context.TODO(), &job)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -793,8 +1022,11 @@ func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string) error {
 }
 
 // Scales all Jobs back up
-func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error {
+func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
 		list := batchv1.JobList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
@@ -805,31 +1037,40 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string) error
 			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
-			if job.Annotations == nil {
-				continue
+			shouldunQuiesce := false
+			for _, v := range job.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
 			}
-			replicas, exist := job.Annotations[migapi.ReplicasAnnotation]
-			if !exist {
-				continue
-			}
-			number, err := strconv.Atoi(replicas)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			delete(job.Annotations, migapi.ReplicasAnnotation)
-			parallelReplicas := int32(number)
-			// Only change parallelism if currently == 0
-			if *job.Spec.Parallelism == 0 {
-				job.Spec.Parallelism = &parallelReplicas
-			}
-			t.Log.Info(fmt.Sprintf("Unquiescing Job. "+
-				"Setting [Spec.Parallelism=%v]"+
-				"Removing Annotation [%v]",
-				parallelReplicas, migapi.ReplicasAnnotation),
-				"job", path.Join(job.Namespace, job.Name))
-			err = client.Update(context.TODO(), &job)
-			if err != nil {
-				return liberr.Wrap(err)
+			if shouldunQuiesce {
+				if job.Annotations == nil {
+					continue
+				}
+				replicas, exist := job.Annotations[migapi.ReplicasAnnotation]
+				if !exist {
+					continue
+				}
+				number, err := strconv.Atoi(replicas)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				delete(job.Annotations, migapi.ReplicasAnnotation)
+				parallelReplicas := int32(number)
+				// Only change parallelism if currently == 0
+				if *job.Spec.Parallelism == 0 {
+					job.Spec.Parallelism = &parallelReplicas
+				}
+				t.Log.Info(fmt.Sprintf("Unquiescing Job. "+
+					"Setting [Spec.Parallelism=%v]"+
+					"Removing Annotation [%v]",
+					parallelReplicas, migapi.ReplicasAnnotation),
+					"job", path.Join(job.Namespace, job.Name))
+				err = client.Update(context.TODO(), &job)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -855,7 +1096,7 @@ func (t *Task) createRestClient(restConfig *rest.Config) (rest.Interface, error)
 }
 
 // Scales down all Virtual Machines
-func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string) error {
+func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
 		list := virtv1.VirtualMachineList{}
 		options := k8sclient.InNamespace(ns)
@@ -873,32 +1114,48 @@ func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.I
 			if !isVMActive(&vm, client) {
 				continue
 			}
-			if vm.Annotations == nil {
-				vm.Annotations = make(map[string]string)
+			shouldQuiesce := false
+			if vm.Spec.Template == nil {
+				continue
 			}
-			if vm.Spec.RunStrategy != nil {
-				vm.Annotations[migapi.RunStrategyAnnotation] = string(*vm.Spec.RunStrategy)
+			for _, v := range vm.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldQuiesce = true
+					break
+				}
+				if v.DataVolume != nil && selectedPVCs[ns].Has(v.DataVolume.Name) {
+					shouldQuiesce = true
+					break
+				}
 			}
-			vm.Annotations[migapi.StartVMAnnotation] = "true"
-			err = client.Update(context.TODO(), &vm)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			t.Log.Info("Stopping Virtual Machine",
-				"vm", path.Join(vm.Namespace, vm.Name))
+			if shouldQuiesce {
+				if vm.Annotations == nil {
+					vm.Annotations = make(map[string]string)
+				}
+				if vm.Spec.RunStrategy != nil {
+					vm.Annotations[migapi.RunStrategyAnnotation] = string(*vm.Spec.RunStrategy)
+				}
+				vm.Annotations[migapi.StartVMAnnotation] = "true"
+				err = client.Update(context.TODO(), &vm)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				t.Log.Info("Stopping Virtual Machine",
+					"vm", path.Join(vm.Namespace, vm.Name))
 
-			stopOptions := &virtv1.StopOptions{
-				// 10 minutes grace period
-				GracePeriod: ptr.To[int64](600),
-			}
-			optsJson, err := json.Marshal(stopOptions)
-			if err != nil {
-				return liberr.Wrap(err)
-			}
-			uri := fmt.Sprintf(vmSubresourceURLFmt, virtv1.ApiStorageVersion, vm.Namespace, vm.Name, "stop")
-			err = restClient.Put().AbsPath(uri).Body(optsJson).Do(context.Background()).Error()
-			if err != nil {
-				return liberr.Wrap(err)
+				stopOptions := &virtv1.StopOptions{
+					// 10 minutes grace period
+					GracePeriod: ptr.To[int64](600),
+				}
+				optsJson, err := json.Marshal(stopOptions)
+				if err != nil {
+					return liberr.Wrap(err)
+				}
+				uri := fmt.Sprintf(vmSubresourceURLFmt, virtv1.ApiStorageVersion, vm.Namespace, vm.Name, "stop")
+				err = restClient.Put().AbsPath(uri).Body(optsJson).Do(context.Background()).Error()
+				if err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -907,7 +1164,7 @@ func (t *Task) quiesceVirtualMachines(client k8sclient.Client, restClient rest.I
 }
 
 // Start all Virtual Machines back up
-func (t *Task) unQuiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string) error {
+func (t *Task) unQuiesceVirtualMachines(client k8sclient.Client, restClient rest.Interface, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
 	for _, ns := range namespaces {
 		list := virtv1.VirtualMachineList{}
 		options := k8sclient.InNamespace(ns)
@@ -925,8 +1182,21 @@ func (t *Task) unQuiesceVirtualMachines(client k8sclient.Client, restClient rest
 			if isVMActive(&vm, client) || !shouldStartVM(&vm) {
 				continue
 			}
-			if err := t.startVM(&vm, client, restClient); err != nil {
-				return liberr.Wrap(err)
+			shouldunQuiesce := false
+			for _, v := range vm.Spec.Template.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					shouldunQuiesce = true
+					break
+				}
+				if v.DataVolume != nil && selectedPVCs[ns].Has(v.DataVolume.Name) {
+					shouldunQuiesce = true
+					break
+				}
+			}
+			if shouldunQuiesce {
+				if err := t.startVM(&vm, client, restClient); err != nil {
+					return liberr.Wrap(err)
+				}
 			}
 		}
 	}
@@ -1008,6 +1278,7 @@ func (t *Task) ensureDestinationQuiescedPodsTerminated() (bool, error) {
 // Ensure scaled down pods have terminated.
 // Returns: `true` when all pods terminated.
 func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []string, clusterType string) (bool, error) {
+	selectedPVCs := t.getSelectedPVCs()
 	kinds := map[string]bool{
 		"ReplicationController": true,
 		"StatefulSet":           true,
@@ -1024,16 +1295,28 @@ func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []s
 		v1.PodUnknown:   true,
 	}
 	for _, ns := range namespaces {
+		if _, ok := selectedPVCs[ns]; !ok {
+			continue
+		}
+		t.Log.Info("Checking namespace", "namespace", ns)
 		list := v1.PodList{}
 		options := k8sclient.InNamespace(ns)
 		err := client.List(
 			context.TODO(),
 			&list,
 			options)
-		if err != nil {
+		if err != nil && !k8serrors.IsNotFound(err) {
 			return false, liberr.Wrap(err)
 		}
 		for _, pod := range list.Items {
+			for _, v := range pod.Spec.Volumes {
+				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
+					t.Log.Info("Found pvc that matches, pod still running", "pvc", v.PersistentVolumeClaim.ClaimName)
+				} else if v.PersistentVolumeClaim != nil {
+					t.Log.Info("No pvc that matches", "pvc", v.PersistentVolumeClaim.ClaimName)
+					continue
+				}
+			}
 			if pod.Annotations == nil {
 				pod.Annotations = make(map[string]string)
 			}

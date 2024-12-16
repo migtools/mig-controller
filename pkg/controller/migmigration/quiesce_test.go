@@ -63,12 +63,30 @@ func TestQuiesceVirtualMachine(t *testing.T) {
 			name:   "If active virtual machines in namespace, quiesceVirtualMachines should call stop",
 			client: getFakeClientWithObjs(createVM(testVMName, "src-namespace"), createVirtlauncherPod(testVMName, "src-namespace")),
 			task: &Task{
+				//t.PlanResources.MigPlan.Spec.PersistentVolumes.List
 				PlanResources: &migapi.PlanResources{
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-datavolume",
+											Namespace: "src-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			restClient: getFakeRestClient(),
@@ -97,8 +115,25 @@ func TestQuiesceVirtualMachine(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-datavolume",
+											Namespace: "src-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			restClient: getFakeRestClient(),
@@ -108,7 +143,7 @@ func TestQuiesceVirtualMachine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.task.quiesceVirtualMachines(tt.client, tt.restClient, tt.task.sourceNamespaces()); err != nil && !tt.wantErr {
+			if err := tt.task.quiesceVirtualMachines(tt.client, tt.restClient, tt.task.sourceNamespaces(), tt.task.getSelectedPVCs()); err != nil && !tt.wantErr {
 				t.Errorf("quiesceVirtualMachines() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err == nil && tt.wantErr {
 				t.Errorf("quiesceVirtualMachines() error = %v, wantErr %v", err, tt.wantErr)
@@ -235,8 +270,25 @@ func TestUnQuiesceVirtualMachine(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-datavolume",
+											Namespace: "src-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			restClient: getFakeRestClient(),
@@ -283,8 +335,25 @@ func TestUnQuiesceVirtualMachine(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-datavolume",
+											Namespace: "tgt-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			restClient:   getFakeRestClient(),
@@ -303,8 +372,25 @@ func TestUnQuiesceVirtualMachine(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-datavolume",
+											Namespace: "tgt-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			restClient:          getFakeRestClient(),
@@ -316,7 +402,7 @@ func TestUnQuiesceVirtualMachine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := tt.task.unQuiesceVirtualMachines(tt.client, tt.restClient, tt.namespaces)
+			res := tt.task.unQuiesceVirtualMachines(tt.client, tt.restClient, tt.namespaces, tt.task.getSelectedPVCs())
 			if res != nil && !tt.wantErr {
 				t.Errorf("Expected no error, got %v", res)
 			}
@@ -405,8 +491,25 @@ func TestEnsureDestinationQuiescedPodsTerminated(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-pvc",
+											Namespace: "tgt-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			allterminated: false,
@@ -419,8 +522,25 @@ func TestEnsureDestinationQuiescedPodsTerminated(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-pvc",
+											Namespace: "tgt-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			allterminated: true,
@@ -483,8 +603,25 @@ func TestEnsureSourceQuiescedPodsTerminated(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-pvc",
+											Namespace: "src-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			allterminated: false,
@@ -497,8 +634,25 @@ func TestEnsureSourceQuiescedPodsTerminated(t *testing.T) {
 					MigPlan: &migapi.MigPlan{
 						Spec: migapi.MigPlanSpec{
 							Namespaces: []string{"src-namespace:tgt-namespace"},
+							PersistentVolumes: migapi.PersistentVolumes{
+								List: []migapi.PV{
+									{
+										Selection: migapi.Selection{
+											Action: migapi.PvCopyAction,
+										},
+										Name: "test-pv",
+										PVC: migapi.PVC{
+											Name:      "test-pvc",
+											Namespace: "src-namespace",
+										},
+									},
+								},
+							},
 						},
 					},
+				},
+				Owner: &migapi.MigMigration{
+					Spec: migapi.MigMigrationSpec{},
 				},
 			},
 			allterminated: true,
@@ -539,14 +693,28 @@ func createVM(name, namespace string) *virtv1.VirtualMachine {
 			Name:      name,
 			Namespace: namespace,
 		},
+		Spec: virtv1.VirtualMachineSpec{
+			Template: &virtv1.VirtualMachineInstanceTemplateSpec{
+				Spec: virtv1.VirtualMachineInstanceSpec{
+					Volumes: []virtv1.Volume{
+						{
+							Name: "test-volume",
+							VolumeSource: virtv1.VolumeSource{
+								DataVolume: &virtv1.DataVolumeSource{
+									Name: "test-datavolume",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
 func createVMWithRunStrategy(name, namespace string, runStrategy virtv1.VirtualMachineRunStrategy) *virtv1.VirtualMachine {
 	vm := createVM(name, namespace)
-	vm.Spec = virtv1.VirtualMachineSpec{
-		RunStrategy: ptr.To[virtv1.VirtualMachineRunStrategy](runStrategy),
-	}
+	vm.Spec.RunStrategy = ptr.To[virtv1.VirtualMachineRunStrategy](runStrategy)
 	return vm
 }
 
@@ -569,6 +737,18 @@ func createPodWithOwner(name, namespace, apiversion, kind, ownerName string) *co
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "test-volume",
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "test-pvc",
+						},
+					},
+				},
+			},
 		},
 		Status: corev1.PodStatus{
 			Phase: corev1.PodRunning,

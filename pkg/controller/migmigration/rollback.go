@@ -272,18 +272,18 @@ func (t *Task) isLiveMigrationCompletedPod(pod *corev1.Pod, volumeNames []string
 	if len(pod.Spec.Volumes) == 0 {
 		return false
 	}
+	found := false
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil {
-			found := false
 			for _, volumeName := range volumeNames {
 				if volumeName == volume.PersistentVolumeClaim.ClaimName {
 					found = true
 				}
 			}
-			if !found {
-				return false
-			}
 		}
+	}
+	if !found {
+		return false
 	}
 	return pod.Status.Phase == corev1.PodSucceeded
 }
