@@ -35,7 +35,7 @@ func (t *Task) createDirectVolumeMigration(migType *migapi.DirectVolumeMigration
 		dvm.Spec.MigrationType = migType
 	}
 	t.Log.Info("Creating DirectVolumeMigration on host cluster",
-		"directVolumeMigration", path.Join(dvm.Namespace, dvm.Name))
+		"directVolumeMigration", path.Join(dvm.Namespace, dvm.Name), "dvm", dvm)
 	err = t.Client.Create(context.TODO(), dvm)
 	return err
 }
@@ -247,6 +247,7 @@ func (t *Task) getDirectVolumeClaimList() []migapi.PVCToMigrate {
 			continue
 		}
 		accessModes := pv.PVC.AccessModes
+		volumeMode := pv.PVC.VolumeMode
 		// if the user overrides access modes, set up the destination PVC with user-defined
 		// access mode
 		if pv.Selection.AccessMode != "" {
@@ -259,6 +260,7 @@ func (t *Task) getDirectVolumeClaimList() []migapi.PVCToMigrate {
 			},
 			TargetStorageClass: pv.Selection.StorageClass,
 			TargetAccessModes:  accessModes,
+			TargetVolumeMode:   &volumeMode,
 			TargetNamespace:    nsMapping[pv.PVC.Namespace],
 			TargetName:         pv.PVC.GetTargetName(),
 			Verify:             pv.Selection.Verify,

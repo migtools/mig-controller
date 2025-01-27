@@ -849,7 +849,7 @@ func TestCreateNewDataVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := CreateNewDataVolume(tt.client, tt.sourceDv.Name, targetDv, testNamespace, log.WithName(tt.name))
+			err := CreateNewAdoptionDataVolume(tt.client, tt.sourceDv.Name, targetDv, testNamespace, log.WithName(tt.name))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				t.FailNow()
