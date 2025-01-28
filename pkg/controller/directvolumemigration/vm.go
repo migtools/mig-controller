@@ -36,6 +36,7 @@ const (
 	prometheusRoute  = "prometheus-k8s"
 	progressQuery    = "kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} / (kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} + kubevirt_vmi_migration_data_remaining_bytes{name=\"%s\"}) * 100"
 	VMIKind          = "VirtualMachineInstance"
+	PodKind          = "Pod"
 )
 
 var (
@@ -164,15 +165,31 @@ func getRunningVmVolumeMap(client k8sclient.Client, namespace string) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	podList := corev1.PodList{}
+	podNameMap := make(map[string]*corev1.Pod)
+	client.List(context.TODO(), &podList, k8sclient.InNamespace(namespace))
+	for _, pod := range podList.Items {
+		podNameMap[pod.Name] = &pod
+	}
+
 	for vmName := range vmMap {
-		podList := corev1.PodList{}
-		client.List(context.TODO(), &podList, k8sclient.InNamespace(namespace))
 		for _, pod := range podList.Items {
 			for _, owner := range pod.OwnerReferences {
 				if owner.Name == vmName && owner.Kind == VMIKind {
 					for _, volume := range pod.Spec.Volumes {
 						if volume.PersistentVolumeClaim != nil {
 							volumesVmMap[volume.PersistentVolumeClaim.ClaimName] = vmName
+						}
+					}
+				}
+				if owner.Kind == PodKind && strings.HasPrefix(owner.Name, "hp-") {
+					if ownerPod, ok := podNameMap[owner.Name]; ok {
+						if ownerPod.Name == owner.Name {
+							for _, volume := range pod.Spec.Volumes {
+								if volume.PersistentVolumeClaim != nil {
+									volumesVmMap[volume.PersistentVolumeClaim.ClaimName] = vmName
+								}
+							}
 						}
 					}
 				}
