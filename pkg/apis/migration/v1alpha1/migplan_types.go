@@ -885,6 +885,20 @@ type PV struct {
 	ProposedCapacity  resource.Quantity     `json:"proposedCapacity,omitempty"`
 }
 
+type OwnerType string
+
+const (
+	VirtualMachine   OwnerType = "VirtualMachine"
+	Deployment       OwnerType = "Deployment"
+	DeploymentConfig OwnerType = "DeploymentConfig"
+	StatefulSet      OwnerType = "StatefulSet"
+	ReplicaSet       OwnerType = "ReplicaSet"
+	DaemonSet        OwnerType = "DaemonSet"
+	Job              OwnerType = "Job"
+	CronJob          OwnerType = "CronJob"
+	Unknown          OwnerType = "Unknown"
+)
+
 // PVC
 type PVC struct {
 	Namespace    string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
@@ -892,6 +906,7 @@ type PVC struct {
 	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	VolumeMode   kapi.PersistentVolumeMode         `json:"volumeMode,omitempty"`
 	HasReference bool                              `json:"hasReference,omitempty"`
+	OwnerType    OwnerType                         `json:"ownerType,omitempty"`
 }
 
 // GetTargetName returns name of the target PVC

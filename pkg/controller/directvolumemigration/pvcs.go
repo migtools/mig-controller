@@ -116,6 +116,7 @@ func (t *Task) createDestinationDV(srcClient, destClient compat.Client, pvc miga
 		}
 	}
 	destPVC.Spec.Resources.Requests[corev1.ResourceStorage] = size
+	destPVC.Spec.VolumeMode = pvc.TargetVolumeMode
 	return createBlankDataVolumeFromPVC(destClient, destPVC)
 }
 
