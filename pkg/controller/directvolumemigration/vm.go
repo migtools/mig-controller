@@ -182,7 +182,7 @@ func getRunningVmVolumeMap(client k8sclient.Client, namespace string) (map[strin
 						}
 					}
 				}
-				if owner.Kind == PodKind && strings.HasPrefix(owner.Name, "hp-") {
+				if owner.Kind == PodKind && strings.HasPrefix(pod.Name, "hp-") {
 					if ownerPod, ok := podNameMap[owner.Name]; ok {
 						if ownerPod.Name == owner.Name {
 							for _, volume := range pod.Spec.Volumes {
