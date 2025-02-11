@@ -69,9 +69,11 @@ const (
 func (t *Task) ensureRsyncEndpoints() error {
 	dvmLabels := t.buildDVMLabels()
 	dvmLabels["purpose"] = DirectVolumeMigrationRsync
+	dvmLabels["anf_router"] = "inside"
 	blockdvmLabels := t.buildDVMLabels()
+	blockdvmLabels["anf_router"] = "inside"
 	blockdvmLabels["app"] = DirectVolumeMigrationRsyncTransferBlock
-	blockdvmLabels["purpose"] = DirectVolumeMigrationRsync
+	blockdvmLabels["purpose"] = DirectVolumeMigrationRsyncTransferBlock
 
 	hostnames := []string{}
 	if t.EndpointType == migapi.NodePort {
