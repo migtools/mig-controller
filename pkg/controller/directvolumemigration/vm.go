@@ -282,6 +282,54 @@ func (t *Task) compareVolumes(vm *virtv1.VirtualMachine, volumes []string) bool 
 	return foundCount == len(volumes)
 }
 
+func (t *Task) verifyVMs() error {
+	t.Log.Info("Verifying VMs are in expected state")
+	sourceClient := t.sourceClient
+	vmVolumeMap := make(map[string]vmVolumes)
+	namespaces := sets.NewString()
+	sourcePVCNames := sets.NewString()
+	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
+		namespaces.Insert(pvc.Namespace)
+		sourcePVCNames.Insert(pvc.Name)
+	}
+
+	for _, namespace := range namespaces.List() {
+		volumeVmMap, err := getRunningVmVolumeMap(sourceClient, namespace)
+		if err != nil {
+			t.Log.Info("Failed to get running VM volume map", "err", err)
+			return err
+		}
+		for _, pvcName := range sourcePVCNames.List() {
+			if vmName, found := volumeVmMap[pvcName]; found {
+				vmVolumeMap[vmName] = vmVolumes{
+					sourceVolumes: append(vmVolumeMap[vmName].sourceVolumes, pvcName),
+				}
+			}
+		}
+		for vmName, volumes := range vmVolumeMap {
+			vm := &virtv1.VirtualMachine{}
+			err := sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vm)
+			if err != nil {
+				t.Log.Info("Failed to get running VM", "err", err)
+				return err
+			}
+			for _, sourceVMVolume := range volumes.sourceVolumes {
+				foundVolume := false
+				for _, vmVolume := range vm.Spec.Template.Spec.Volumes {
+					if vmVolume.PersistentVolumeClaim != nil && vmVolume.PersistentVolumeClaim.ClaimName == sourceVMVolume || vmVolume.DataVolume != nil && vmVolume.DataVolume.Name == sourceVMVolume {
+						foundVolume = true
+						break
+					}
+				}
+				if !foundVolume {
+					return fmt.Errorf("volume %s not found in VM %s, it is an ephemeral volume, to fix unplug the volume and hotplug it with the persist flag", sourceVMVolume, vmName)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func findVirtualMachineInstanceMigration(client k8sclient.Client, vmName, namespace string) (*virtv1.VirtualMachineInstanceMigration, error) {
 	vmimList := &virtv1.VirtualMachineInstanceMigrationList{}
 	if err := client.List(context.TODO(), vmimList, k8sclient.InNamespace(namespace)); err != nil {

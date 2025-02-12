@@ -37,4 +37,5 @@ var phaseDescriptions = map[string]string{
 	RunRsyncOperations:                   "Running Rsync Pods to migrate Persistent Volume data",
 	MigrationFailed:                      "The migration attempt failed, please see errors for more details",
 	Completed:                            "Complete",
+	VerifyVMs:                            "Verifying the running source VMs can be migrated",
 }
