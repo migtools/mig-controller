@@ -47,6 +47,7 @@ const (
 	WaitForStaleRsyncResourcesTerminated        = "WaitForStaleRsyncResourcesTerminated"
 	Completed                                   = "Completed"
 	MigrationFailed                             = "MigrationFailed"
+	VerifyVMs                                   = "VerifyVMs"
 	DeleteStaleVirtualMachineInstanceMigrations = "DeleteStaleVirtualMachineInstanceMigrations"
 )
 
@@ -123,6 +124,7 @@ var VolumeMigration = Itinerary{
 		{phase: Prepare},
 		{phase: CleanStaleRsyncResources},
 		{phase: WaitForStaleRsyncResourcesTerminated},
+		{phase: VerifyVMs},
 		{phase: CreateDestinationNamespaces},
 		{phase: DestinationNamespacesCreated},
 		{phase: CreateDestinationPVCs},
@@ -281,6 +283,15 @@ func (t *Task) Run(ctx context.Context) error {
 		// deletion of rsync resources that are active vs stale. Using
 		// one label for both is the wrong approach.
 		err := t.deleteRsyncResources()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case VerifyVMs:
+		err := t.verifyVMs()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
