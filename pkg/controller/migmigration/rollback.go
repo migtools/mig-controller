@@ -238,14 +238,13 @@ func (t *Task) deleteLiveMigrationCompletedPods() error {
 		if err != nil {
 			return liberr.Wrap(err)
 		}
-		namespaceVolumeNamesMap := t.getDestinationVolumeNames()
 		for _, namespace := range t.destinationNamespaces() {
 			pods := corev1.PodList{}
 			destClient.List(context.TODO(), &pods, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(map[string]string{
 				"kubevirt.io": "virt-launcher",
 			}))
 			for _, pod := range pods.Items {
-				if !t.isLiveMigrationCompletedPod(&pod, namespaceVolumeNamesMap[namespace]) {
+				if pod.Status.Phase != corev1.PodSucceeded {
 					continue
 				}
 				t.Log.V(3).Info("Deleting virt-launcher pod that has completed live migration", "namespace", pod.Namespace, "name", pod.Name)
@@ -257,35 +256,6 @@ func (t *Task) deleteLiveMigrationCompletedPods() error {
 		}
 	}
 	return nil
-}
-
-func (t *Task) getDestinationVolumeNames() map[string][]string {
-	namespaceVolumeNamesMap := make(map[string][]string)
-	pvcs := t.getDirectVolumeClaimList()
-	for _, pvc := range pvcs {
-		namespaceVolumeNamesMap[pvc.Namespace] = append(namespaceVolumeNamesMap[pvc.Namespace], pvc.TargetName)
-	}
-	return namespaceVolumeNamesMap
-}
-
-func (t *Task) isLiveMigrationCompletedPod(pod *corev1.Pod, volumeNames []string) bool {
-	if len(pod.Spec.Volumes) == 0 {
-		return false
-	}
-	found := false
-	for _, volume := range pod.Spec.Volumes {
-		if volume.PersistentVolumeClaim != nil {
-			for _, volumeName := range volumeNames {
-				if volumeName == volume.PersistentVolumeClaim.ClaimName {
-					found = true
-				}
-			}
-		}
-	}
-	if !found {
-		return false
-	}
-	return pod.Status.Phase == corev1.PodSucceeded
 }
 
 func (t *Task) ensureMigratedResourcesDeleted() (bool, error) {

@@ -2023,7 +2023,7 @@ func (t *Task) findAndDeleteResources(srcClient, destClient compat.Client, pvcMa
 	for bothNs := range pvcMap {
 		srcNs := getSourceNs(bothNs)
 		destNs := getDestNs(bothNs)
-		err := findAndDeleteNsResources(srcClient, srcNs, selector, t.Log)
+		err = findAndDeleteNsResources(srcClient, srcNs, selector, t.Log)
 		if err != nil {
 			return err
 		}

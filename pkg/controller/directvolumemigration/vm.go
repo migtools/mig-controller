@@ -729,13 +729,24 @@ func (t *Task) getPrometheusURLFromConfig() (string, error) {
 	return "", nil
 }
 
-func (t *Task) deleteStaleVirtualMachineInstanceMigrations() error {
-	pvcMap, err := t.getNamespacedPVCPairs()
-	if err != nil {
-		return err
+func (t *Task) getNamespacesFromPlan() []string {
+	namespaces := sets.NewString()
+	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
+		srcNs := pvc.Namespace
+		destNs := srcNs
+		if pvc.TargetNamespace != "" {
+			destNs = pvc.TargetNamespace
+		}
+		bothNs := srcNs + ":" + destNs
+		namespaces.Insert(bothNs)
 	}
+	return namespaces.List()
+}
 
-	for namespacePair := range pvcMap {
+func (t *Task) deleteStaleVirtualMachineInstanceMigrations() error {
+	namespaces := t.getNamespacesFromPlan()
+
+	for _, namespacePair := range namespaces {
 		namespace, err := getNamespace(namespacePair)
 		if err != nil && !errors.Is(err, ErrNamespacesDoNotMatch) {
 			return err
