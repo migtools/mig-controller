@@ -79,6 +79,7 @@ func (r *ReconcileMigMigration) migrate(ctx context.Context, migration *migapi.M
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())
 		sink.Trace(err)
+
 		task.fail(MigrationFailed, []string{err.Error()})
 		return task.Requeue, nil
 	}

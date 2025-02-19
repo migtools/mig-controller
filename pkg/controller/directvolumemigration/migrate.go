@@ -2,6 +2,7 @@ package directvolumemigration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -60,8 +61,11 @@ func (r *ReconcileDirectVolumeMigration) migrate(ctx context.Context, direct *mi
 			"phaseDescription", task.getPhaseDescription(task.Phase),
 			"error", errorutil.Unwrap(err).Error())
 		sink.Trace(err)
-		task.fail(MigrationFailed, []string{err.Error()})
-		return task.Requeue, nil
+		if errors.Is(err, FatalPlanError) {
+			task.fail(MigrationFailed, Critical, []string{err.Error()})
+		} else {
+			task.fail(MigrationFailed, Warn, []string{err.Error()})
+		}
 	}
 
 	// Result

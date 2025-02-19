@@ -97,8 +97,8 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 	volumeProgress := fmt.Sprintf("%v total volumes; %v successful; %v running; %v failed",
 		len(dvm.Spec.PersistentVolumeClaims),
 		len(dvm.Status.SuccessfulPods)+len(dvm.Status.SuccessfulLiveMigrations),
-		len(dvm.Status.RunningPods)+len(dvm.Status.FailedLiveMigrations),
-		len(dvm.Status.FailedPods)+len(dvm.Status.RunningLiveMigrations))
+		len(dvm.Status.RunningPods)+len(dvm.Status.RunningLiveMigrations),
+		len(dvm.Status.FailedPods)+len(dvm.Status.FailedLiveMigrations))
 	switch {
 	// case dvm.Status.Phase != "" && dvm.Status.Phase != dvmc.Completed:
 	// TODO: Update this to check on the associated dvmp resources and build up a progress indicator back to
@@ -106,7 +106,11 @@ func (t *Task) hasDirectVolumeMigrationCompleted(dvm *migapi.DirectVolumeMigrati
 		// completed successfully
 		completed = true
 	case (dvm.Status.Phase == dvmc.MigrationFailed || dvm.Status.Phase == dvmc.Completed) && dvm.Status.HasCondition(dvmc.Failed):
-		failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
+		if dvm.Status.HasCriticalCondition(dvmc.Failed) {
+			failureReasons = append(failureReasons, dvm.Status.Errors...)
+		} else {
+			failureReasons = append(failureReasons, fmt.Sprintf("direct volume migration failed. %s", volumeProgress))
+		}
 		completed = true
 	default:
 		progress = append(progress, volumeProgress)

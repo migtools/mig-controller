@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	liberr "github.com/konveyor/controller/pkg/error"
 	"github.com/konveyor/crane-lib/state_transfer/transfer"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -42,6 +43,7 @@ const (
 var (
 	ErrVolumesDoNotMatch    = errors.New("volumes do not match")
 	ErrNamespacesDoNotMatch = errors.New("source and target namespaces must match")
+	FatalPlanError          = errors.New("fatal plan error")
 )
 
 type vmVolumes struct {
@@ -297,7 +299,7 @@ func (t *Task) verifyVMs() error {
 		volumeVmMap, err := getRunningVmVolumeMap(sourceClient, namespace)
 		if err != nil {
 			t.Log.Info("Failed to get running VM volume map", "err", err)
-			return err
+			return liberr.Wrap(FatalPlanError, err.Error())
 		}
 		for _, pvcName := range sourcePVCNames.List() {
 			if vmName, found := volumeVmMap[pvcName]; found {
@@ -311,7 +313,7 @@ func (t *Task) verifyVMs() error {
 			err := sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vm)
 			if err != nil {
 				t.Log.Info("Failed to get running VM", "err", err)
-				return err
+				return liberr.Wrap(FatalPlanError, err.Error())
 			}
 			for _, sourceVMVolume := range volumes.sourceVolumes {
 				foundVolume := false
@@ -322,7 +324,7 @@ func (t *Task) verifyVMs() error {
 					}
 				}
 				if !foundVolume {
-					return fmt.Errorf("volume %s not found in VM %s, it is an ephemeral volume, to fix unplug the volume and hotplug it with the persist flag", sourceVMVolume, vmName)
+					return liberr.Wrap(FatalPlanError, fmt.Sprintf("volume %s not found in VM %s, it is an ephemeral volume, to fix unplug the volume and hotplug it with the persist flag", sourceVMVolume, vmName))
 				}
 			}
 		}

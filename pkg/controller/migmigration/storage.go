@@ -197,7 +197,7 @@ func (t *Task) handleSourceLabels(client k8sclient.Client, mapping pvcNameMappin
 				labels[directvolumemigration.MigrationSourceFor] = string(t.PlanResources.MigPlan.UID)
 			}
 			pvc.Labels = labels
-			if err := client.Update(context.TODO(), &pvc); err != nil {
+			if err := client.Update(context.TODO(), &pvc); err != nil && !k8serrors.IsConflict(err) && !k8serrors.IsNotFound(err) {
 				failedPVCs = append(failedPVCs, fmt.Sprintf("failed to modify labels on PVC %s/%s", pvc.Namespace, pvc.Name))
 			}
 		}

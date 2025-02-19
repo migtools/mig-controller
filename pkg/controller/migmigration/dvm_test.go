@@ -57,6 +57,7 @@ func TestTask_hasDirectVolumeMigrationCompleted(t1 *testing.T) {
 							},
 						},
 					},
+					Errors: []string{"direct volume migration failed. 1 total volumes; 0 successful; 0 running; 1 failed"},
 				},
 			}},
 			wantProgress:       []string{"[pvc-0] ns/foo: Failed"},

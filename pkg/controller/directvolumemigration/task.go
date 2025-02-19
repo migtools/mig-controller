@@ -460,7 +460,7 @@ func (t *Task) Run(ctx context.Context) error {
 		if allCompleted {
 			t.Requeue = NoReQ
 			if anyFailed {
-				t.fail(MigrationFailed, failureReasons)
+				t.fail(MigrationFailed, Advisory, failureReasons)
 				return nil
 			}
 			if err = t.next(); err != nil {
@@ -557,25 +557,27 @@ func (t *Task) next() error {
 }
 
 // Phase fail.
-func (t *Task) fail(nextPhase string, reasons []string) {
+func (t *Task) fail(nextPhase, category string, reasons []string) {
 	t.addErrors(reasons)
 	t.Owner.AddErrors(t.Errors)
 	t.Owner.Status.SetCondition(migapi.Condition{
 		Type:     Failed,
 		Status:   True,
 		Reason:   t.Phase,
-		Category: Advisory,
+		Category: category,
 		Message:  FailedMessage,
 		Durable:  true,
 	})
-	t.Phase = nextPhase
+	if category == Critical {
+		t.Phase = MigrationFailed
+	} else {
+		t.Phase = nextPhase
+	}
 }
 
 // Add errors.
 func (t *Task) addErrors(errors []string) {
-	for _, error := range errors {
-		t.Errors = append(t.Errors, error)
-	}
+	t.Errors = append(t.Errors, errors...)
 }
 
 // Get whether the migration has failed
