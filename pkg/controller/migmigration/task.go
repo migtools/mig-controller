@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -11,6 +12,7 @@ import (
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
+	dvmc "github.com/konveyor/mig-controller/pkg/controller/directvolumemigration"
 	"github.com/konveyor/mig-controller/pkg/errorutil"
 	imagev1 "github.com/openshift/api/image/v1"
 	"github.com/opentracing/opentracing-go"
@@ -1919,6 +1921,9 @@ func (t *Task) waitForDVMToComplete(dvm *migapi.DirectVolumeMigration) error {
 		step.MarkCompleted()
 		if len(reasons) > 0 {
 			t.setDirectVolumeMigrationFailureWarning(dvm)
+			if dvm.Status.HasCriticalCondition(dvmc.Failed) {
+				return fmt.Errorf("DVM failed: %s", strings.Join(reasons, ", "))
+			}
 		}
 		if err := t.next(); err != nil {
 			return liberr.Wrap(err)

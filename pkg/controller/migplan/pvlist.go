@@ -17,6 +17,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -361,7 +362,18 @@ func (r *ReconcileMigPlan) getClaims(client compat.Client, plan *migapi.MigPlan)
 		if err != nil {
 			return nil, liberr.Wrap(err)
 		}
-		pvcList = append(pvcList, list.Items...)
+		for _, pvc := range list.Items {
+			// Skip PVCs that are created by the plan
+			if strings.HasSuffix(pvc.Name, "-mig-"+plan.GetSuffix()) {
+				continue
+			}
+			// Skip temporary PVCs owned by other PVCs.
+			owner := metav1.GetControllerOf(&pvc)
+			if owner != nil && owner.Kind == "PersistentVolumeClaim" {
+				continue
+			}
+			pvcList = append(pvcList, pvc)
+		}
 	}
 
 	podList, err := migpods.ListTemplatePods(client, plan.GetSourceNamespaces())

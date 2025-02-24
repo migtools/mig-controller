@@ -305,6 +305,7 @@ func TestTask_waitForDMVToComplete(t *testing.T) {
 							},
 						},
 					},
+					Errors: []string{"error"},
 				},
 			},
 			initialConditions: []migapi.Condition{},
