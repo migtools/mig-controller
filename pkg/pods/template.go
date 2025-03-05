@@ -9,6 +9,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	virtv1 "kubevirt.io/api/core/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -312,6 +313,9 @@ func listVirtualMachineTemplatePodsForNamespace(client k8sclient.Client, ns stri
 	list := virtv1.VirtualMachineList{}
 	err := client.List(context.TODO(), &list, k8sclient.InNamespace(ns))
 	if err != nil {
+		if meta.IsNoMatchError(err) {
+			return pods, nil
+		}
 		return nil, err
 	}
 	for _, vm := range list.Items {
