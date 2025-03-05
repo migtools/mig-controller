@@ -222,6 +222,9 @@ func getVolumeNameToVmMap(client k8sclient.Client, namespace string) (map[string
 	vmList := virtv1.VirtualMachineList{}
 	err := client.List(context.TODO(), &vmList, k8sclient.InNamespace(namespace))
 	if err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	for _, vm := range vmList.Items {
@@ -244,6 +247,9 @@ func (t *Task) storageLiveMigrateVM(vmName, namespace string, volumes *vmVolumes
 	}
 	vm := &virtv1.VirtualMachine{}
 	if err := sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vm); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil
+		}
 		return err
 	}
 	// Check if the source volumes match before attempting to migrate.
@@ -312,6 +318,9 @@ func (t *Task) verifyVMs() error {
 			vm := &virtv1.VirtualMachine{}
 			err := sourceClient.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vm)
 			if err != nil {
+				if meta.IsNoMatchError(err) {
+					return nil
+				}
 				t.Log.Info("Failed to get running VM", "err", err)
 				return liberr.Wrap(FatalPlanError, err.Error())
 			}
@@ -335,6 +344,9 @@ func (t *Task) verifyVMs() error {
 func findVirtualMachineInstanceMigration(client k8sclient.Client, vmName, namespace string) (*virtv1.VirtualMachineInstanceMigration, error) {
 	vmimList := &virtv1.VirtualMachineInstanceMigrationList{}
 	if err := client.List(context.TODO(), vmimList, k8sclient.InNamespace(namespace)); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
 		if k8serrors.IsNotFound(err) {
 			return nil, nil
 		}
@@ -401,6 +413,9 @@ func virtualMachineMigrationStatus(client k8sclient.Client, vmName, namespace st
 func cancelLiveMigration(client k8sclient.Client, vmName, namespace string, volumes *vmVolumes, log logr.Logger) error {
 	vm := &virtv1.VirtualMachine{}
 	if err := client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: vmName}, vm); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -414,6 +429,9 @@ func cancelLiveMigration(client k8sclient.Client, vmName, namespace string, volu
 func liveMigrationsCompleted(client k8sclient.Client, namespace string, vmNames []string) (bool, error) {
 	vmim := &virtv1.VirtualMachineInstanceMigrationList{}
 	if err := client.List(context.TODO(), vmim, k8sclient.InNamespace(namespace)); err != nil {
+		if meta.IsNoMatchError(err) {
+			return true, nil
+		}
 		return false, err
 	}
 	completed := true
@@ -569,6 +587,9 @@ func (t *Task) getVolumeVMIMInNamespaces(namespaces []string) (map[string]*virtv
 		for volumeName, vmName := range volumeVMMap {
 			vmimList := &virtv1.VirtualMachineInstanceMigrationList{}
 			if err := t.sourceClient.List(context.TODO(), vmimList, k8sclient.InNamespace(namespace)); err != nil {
+				if meta.IsNoMatchError(err) {
+					return nil, nil
+				}
 				return nil, err
 			}
 			for _, vmim := range vmimList.Items {
