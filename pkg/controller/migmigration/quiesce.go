@@ -57,32 +57,36 @@ func (t *Task) quiesceDestinationApplications() error {
 
 // Quiesce applications on source cluster
 func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
+	multiplePlans, err := t.checkMultiplePlans(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	selectedPVCs := t.getSelectedPVCs()
-	err := t.quiesceCronJobs(client, namespaces, selectedPVCs)
+	err = t.quiesceCronJobs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeploymentConfigs(client, namespaces, selectedPVCs)
+	err = t.quiesceDeploymentConfigs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDeployments(client, namespaces, selectedPVCs)
+	err = t.quiesceDeployments(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceStatefulSets(client, namespaces, selectedPVCs)
+	err = t.quiesceStatefulSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceReplicaSets(client, namespaces, selectedPVCs)
+	err = t.quiesceReplicaSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceDaemonSets(client, namespaces, selectedPVCs)
+	err = t.quiesceDaemonSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.quiesceJobs(client, namespaces, selectedPVCs)
+	err = t.quiesceJobs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -97,6 +101,33 @@ func (t *Task) quiesceApplications(client compat.Client, restConfig *rest.Config
 		}
 	}
 	return nil
+}
+
+func (t *Task) checkMultiplePlans(client compat.Client, namespaces []string) (bool, error) {
+	planList := &migapi.MigPlanList{}
+	if err := client.List(context.TODO(), planList); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return false, liberr.Wrap(err)
+		}
+		return false, nil
+	}
+	namespaceMap := make(map[string]int)
+	for _, plan := range planList.Items {
+		for _, ns := range plan.Spec.Namespaces {
+			if _, ok := namespaceMap[ns]; !ok {
+				namespaceMap[ns] = 1
+			} else {
+				namespaceMap[ns] = namespaceMap[ns] + 1
+			}
+		}
+	}
+	multiplePlans := false
+	for _, ns := range namespaces {
+		if count, ok := namespaceMap[ns]; ok && count > 1 {
+			multiplePlans = true
+		}
+	}
+	return multiplePlans, nil
 }
 
 func (t *Task) getSelectedPVCs() map[string]sets.Set[string] {
@@ -152,32 +183,36 @@ func (t *Task) unQuiesceDestApplications() error {
 
 // Unquiesce applications using client and namespace list given
 func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Config, namespaces []string) error {
+	multiplePlans, err := t.checkMultiplePlans(client, namespaces)
+	if err != nil {
+		return liberr.Wrap(err)
+	}
 	selectedPVCs := t.getSelectedPVCs()
-	err := t.unQuiesceCronJobs(client, namespaces, selectedPVCs)
+	err = t.unQuiesceCronJobs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeploymentConfigs(client, namespaces, selectedPVCs)
+	err = t.unQuiesceDeploymentConfigs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDeployments(client, namespaces, selectedPVCs)
+	err = t.unQuiesceDeployments(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceStatefulSets(client, namespaces, selectedPVCs)
+	err = t.unQuiesceStatefulSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceReplicaSets(client, namespaces, selectedPVCs)
+	err = t.unQuiesceReplicaSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceDaemonSets(client, namespaces, selectedPVCs)
+	err = t.unQuiesceDaemonSets(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	err = t.unQuiesceJobs(client, namespaces, selectedPVCs)
+	err = t.unQuiesceJobs(client, namespaces, selectedPVCs, multiplePlans)
 	if err != nil {
 		return liberr.Wrap(err)
 	}
@@ -195,9 +230,9 @@ func (t *Task) unQuiesceApplications(client compat.Client, restConfig *rest.Conf
 }
 
 // Scales down DeploymentConfig on source cluster
-func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := ocappsv1.DeploymentConfigList{}
@@ -210,7 +245,7 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []st
 			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, v := range dc.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil {
 					if selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
@@ -248,9 +283,9 @@ func (t *Task) quiesceDeploymentConfigs(client k8sclient.Client, namespaces []st
 }
 
 // Scales DeploymentConfig back up on source cluster
-func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := ocappsv1.DeploymentConfigList{}
@@ -263,7 +298,7 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 			return liberr.Wrap(err)
 		}
 		for _, dc := range list.Items {
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range dc.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil {
 					if selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
@@ -327,10 +362,10 @@ func (t *Task) unQuiesceDeploymentConfigs(client k8sclient.Client, namespaces []
 }
 
 // Scales down all Deployments
-func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.DeploymentList{}
@@ -343,7 +378,7 @@ func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string, 
 			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, v := range deployment.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldQuiesce = true
@@ -379,9 +414,9 @@ func (t *Task) quiesceDeployments(client k8sclient.Client, namespaces []string, 
 }
 
 // Scales all Deployments back up
-func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.DeploymentList{}
@@ -394,7 +429,7 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 			return liberr.Wrap(err)
 		}
 		for _, deployment := range list.Items {
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range deployment.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldunQuiesce = true
@@ -445,11 +480,11 @@ func (t *Task) unQuiesceDeployments(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all StatefulSets.
-func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
 		t.Log.Info("Checking StatefulSets", "namespace", ns)
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.StatefulSetList{}
@@ -463,7 +498,7 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string,
 		}
 		t.Log.Info("StatefulSets found", "count", len(list.Items))
 		for _, set := range list.Items {
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, volumeTemplate := range set.Spec.VolumeClaimTemplates {
 				t.Log.Info("Checking StatefulSet volumes", "volume", volumeTemplate.Name, "kind", volumeTemplate.Kind)
 				key := fmt.Sprintf("%s-%s-0", volumeTemplate.Name, set.Name)
@@ -499,9 +534,9 @@ func (t *Task) quiesceStatefulSets(client k8sclient.Client, namespaces []string,
 }
 
 // Scales all StatefulSets back up
-func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.StatefulSetList{}
@@ -514,7 +549,7 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range set.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldunQuiesce = true
@@ -558,10 +593,10 @@ func (t *Task) unQuiesceStatefulSets(client k8sclient.Client, namespaces []strin
 }
 
 // Scales down all ReplicaSets.
-func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	zero := int32(0)
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.ReplicaSetList{}
@@ -579,7 +614,7 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string, 
 					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, v := range set.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldQuiesce = true
@@ -612,9 +647,9 @@ func (t *Task) quiesceReplicaSets(client k8sclient.Client, namespaces []string, 
 }
 
 // Scales all ReplicaSets back up
-func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.ReplicaSetList{}
@@ -632,7 +667,7 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 					"replicaSet", path.Join(set.Namespace, set.Name))
 				continue
 			}
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range set.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldunQuiesce = true
@@ -673,9 +708,9 @@ func (t *Task) unQuiesceReplicaSets(client k8sclient.Client, namespaces []string
 }
 
 // Scales down all DaemonSets.
-func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.DaemonSetList{}
@@ -688,7 +723,7 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string, s
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, v := range set.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldQuiesce = true
@@ -726,9 +761,9 @@ func (t *Task) quiesceDaemonSets(client k8sclient.Client, namespaces []string, s
 }
 
 // Scales all DaemonSets back up
-func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := appsv1.DaemonSetList{}
@@ -741,7 +776,7 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string,
 			return liberr.Wrap(err)
 		}
 		for _, set := range list.Items {
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range set.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldunQuiesce = true
@@ -784,18 +819,18 @@ func (t *Task) unQuiesceDaemonSets(client k8sclient.Client, namespaces []string,
 }
 
 // Suspends all CronJobs
-func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
 		selectedPVCsInNS, exists := selectedPVCs[ns]
-		if !exists {
+		if !exists && multiplePlans {
 			continue
 		}
 		if client.MinorVersion() < 21 {
-			if err := t.quiesecBetav1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+			if err := t.quiesecBetav1CronJobs(ns, client, selectedPVCsInNS, multiplePlans); err != nil {
 				return err
 			}
 		} else {
-			if err := t.quiesecv1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+			if err := t.quiesecv1CronJobs(ns, client, selectedPVCsInNS, multiplePlans); err != nil {
 				return err
 			}
 		}
@@ -804,7 +839,7 @@ func (t *Task) quiesceCronJobs(client compat.Client, namespaces []string, select
 	return nil
 }
 
-func (t *Task) quiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+func (t *Task) quiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string], multiplePlans bool) error {
 	list := batchv1.CronJobList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), &list, options)
@@ -812,7 +847,7 @@ func (t *Task) quiesecv1CronJobs(ns string, client compat.Client, selectedPVCsIn
 		return liberr.Wrap(err)
 	}
 	for _, r := range list.Items {
-		shouldQuiesce := false
+		shouldQuiesce := !multiplePlans
 		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
 				shouldQuiesce = true
@@ -842,7 +877,7 @@ func (t *Task) quiesecv1CronJobs(ns string, client compat.Client, selectedPVCsIn
 	return nil
 }
 
-func (t *Task) quiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+func (t *Task) quiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string], multiplePlans bool) error {
 	list := batchv1beta.CronJobList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), &list, options)
@@ -850,7 +885,7 @@ func (t *Task) quiesecBetav1CronJobs(ns string, client compat.Client, selectedPV
 		return liberr.Wrap(err)
 	}
 	for _, r := range list.Items {
-		shouldQuiesce := false
+		shouldQuiesce := !multiplePlans
 		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
 				shouldQuiesce = true
@@ -881,18 +916,18 @@ func (t *Task) quiesecBetav1CronJobs(ns string, client compat.Client, selectedPV
 }
 
 // Undo quiescence on all CronJobs
-func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
 		selectedPVCsInNS, exists := selectedPVCs[ns]
-		if !exists {
+		if !exists && multiplePlans {
 			continue
 		}
 		if client.MinorVersion() < 21 {
-			if err := t.unquiesecBetav1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+			if err := t.unquiesecBetav1CronJobs(ns, client, selectedPVCsInNS, multiplePlans); err != nil {
 				return err
 			}
 		} else {
-			if err := t.unquiesecv1CronJobs(ns, client, selectedPVCsInNS); err != nil {
+			if err := t.unquiesecv1CronJobs(ns, client, selectedPVCsInNS, multiplePlans); err != nil {
 				return err
 			}
 		}
@@ -901,7 +936,7 @@ func (t *Task) unQuiesceCronJobs(client compat.Client, namespaces []string, sele
 	return nil
 }
 
-func (t *Task) unquiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+func (t *Task) unquiesecBetav1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string], multiplePlans bool) error {
 	list := batchv1beta.CronJobList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), &list, options)
@@ -909,7 +944,7 @@ func (t *Task) unquiesecBetav1CronJobs(ns string, client compat.Client, selected
 		return liberr.Wrap(err)
 	}
 	for _, r := range list.Items {
-		shouldunQuiesce := false
+		shouldunQuiesce := !multiplePlans
 		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
 				shouldunQuiesce = true
@@ -937,7 +972,7 @@ func (t *Task) unquiesecBetav1CronJobs(ns string, client compat.Client, selected
 	return nil
 }
 
-func (t *Task) unquiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string]) error {
+func (t *Task) unquiesecv1CronJobs(ns string, client compat.Client, selectedPVCsInNS sets.Set[string], multiplePlans bool) error {
 	list := batchv1.CronJobList{}
 	options := k8sclient.InNamespace(ns)
 	err := client.List(context.TODO(), &list, options)
@@ -945,7 +980,7 @@ func (t *Task) unquiesecv1CronJobs(ns string, client compat.Client, selectedPVCs
 		return liberr.Wrap(err)
 	}
 	for _, r := range list.Items {
-		shouldunQuiesce := false
+		shouldunQuiesce := !multiplePlans
 		for _, v := range r.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 			if v.PersistentVolumeClaim != nil && selectedPVCsInNS.Has(v.PersistentVolumeClaim.ClaimName) {
 				shouldunQuiesce = true
@@ -974,9 +1009,9 @@ func (t *Task) unquiesecv1CronJobs(ns string, client compat.Client, selectedPVCs
 }
 
 // Scales down all Jobs
-func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := batchv1.JobList{}
@@ -989,7 +1024,7 @@ func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string, selecte
 			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
-			shouldQuiesce := false
+			shouldQuiesce := !multiplePlans
 			for _, v := range job.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldQuiesce = true
@@ -1022,9 +1057,9 @@ func (t *Task) quiesceJobs(client k8sclient.Client, namespaces []string, selecte
 }
 
 // Scales all Jobs back up
-func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string]) error {
+func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string, selectedPVCs map[string]sets.Set[string], multiplePlans bool) error {
 	for _, ns := range namespaces {
-		if _, ok := selectedPVCs[ns]; !ok {
+		if _, ok := selectedPVCs[ns]; !ok && multiplePlans {
 			continue
 		}
 		list := batchv1.JobList{}
@@ -1037,7 +1072,7 @@ func (t *Task) unQuiesceJobs(client k8sclient.Client, namespaces []string, selec
 			return liberr.Wrap(err)
 		}
 		for _, job := range list.Items {
-			shouldunQuiesce := false
+			shouldunQuiesce := !multiplePlans
 			for _, v := range job.Spec.Template.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					shouldunQuiesce = true
