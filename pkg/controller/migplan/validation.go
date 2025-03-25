@@ -22,6 +22,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	kapi "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1692,6 +1693,9 @@ func (r *ReconcileMigPlan) validateKubeVirtInstalled(ctx context.Context, client
 	}
 	kubevirtList := &virtv1.KubeVirtList{}
 	if err := client.List(ctx, kubevirtList); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil
+		}
 		return liberr.Wrap(err)
 	}
 	if len(kubevirtList.Items) == 0 || len(kubevirtList.Items) > 1 {
