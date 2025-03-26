@@ -1735,7 +1735,7 @@ func (r *ReconcileMigPlan) validateKubeVirtInstalled(ctx context.Context, client
 		kubevirt.Spec.Configuration.DeveloperConfiguration == nil ||
 		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumesUpdateStrategy) ||
 		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumeMigrationConfig) ||
-		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VMLiveUpdateFeatures) {
+		(major == 1 && minor < 5 && !slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VMLiveUpdateFeatures)) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     KubeVirtStorageLiveMigrationNotEnabled,
 			Status:   True,
