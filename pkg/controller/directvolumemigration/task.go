@@ -454,13 +454,13 @@ func (t *Task) Run(ctx context.Context) error {
 	case RunRsyncOperations:
 		allCompleted, anyFailed, failureReasons, err := t.runRsyncOperations()
 		if err != nil {
-			return liberr.Wrap(err)
+			return liberr.Wrap(FatalPlanError, err.Error())
 		}
 		t.Requeue = PollReQ
 		if allCompleted {
 			t.Requeue = NoReQ
 			if anyFailed {
-				t.fail(MigrationFailed, Advisory, failureReasons)
+				t.fail(MigrationFailed, Critical, failureReasons)
 				return nil
 			}
 			if err = t.next(); err != nil {
