@@ -1344,13 +1344,17 @@ func (t *Task) ensureQuiescedPodsTerminated(client compat.Client, namespaces []s
 			return false, liberr.Wrap(err)
 		}
 		for _, pod := range list.Items {
+			skip := false
 			for _, v := range pod.Spec.Volumes {
 				if v.PersistentVolumeClaim != nil && selectedPVCs[ns].Has(v.PersistentVolumeClaim.ClaimName) {
 					t.Log.Info("Found pvc that matches, pod still running", "pvc", v.PersistentVolumeClaim.ClaimName)
 				} else if v.PersistentVolumeClaim != nil {
 					t.Log.Info("No pvc that matches", "pvc", v.PersistentVolumeClaim.ClaimName)
-					continue
+					skip = true
 				}
+			}
+			if skip {
+				continue
 			}
 			if pod.Annotations == nil {
 				pod.Annotations = make(map[string]string)
