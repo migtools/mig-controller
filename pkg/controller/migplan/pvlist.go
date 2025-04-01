@@ -565,12 +565,12 @@ func (r *ReconcileMigPlan) getDefaultSelection(pv core.PersistentVolume,
 	}
 	actions := r.getSupportedActions(pv, claim)
 	selectedAction := ""
-	// if there's only one action, make that the default, otherwise select "copy" (if available)
+	// if there's only one action, make that the default, otherwise select "skip" (if available)
 	if len(actions) == 1 {
 		selectedAction = actions[0]
 	} else {
 		for _, a := range actions {
-			if a == migapi.PvCopyAction {
+			if a == migapi.PvSkipAction {
 				selectedAction = a
 				break
 			}
