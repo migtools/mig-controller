@@ -182,12 +182,10 @@ func (r ReconcileMigMigration) validateMigrationType(ctx context.Context, plan *
 		srcPVCs := []string{}
 		destPVCs := []string{}
 		for _, pv := range plan.Spec.PersistentVolumes.List {
-			if pv.Selection.Action != migapi.PvSkipAction {
-				srcPVCs = append(srcPVCs,
-					fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
-				destPVCs = append(destPVCs,
-					fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
-			}
+			srcPVCs = append(srcPVCs,
+				fmt.Sprintf("%s/%s", pv.PVC.Namespace, pv.PVC.GetSourceName()))
+			destPVCs = append(destPVCs,
+				fmt.Sprintf("%s/%s", nsMap[pv.PVC.Namespace], pv.PVC.GetTargetName()))
 		}
 		conflictingPVCs := toStringSlice(
 			toSet(srcPVCs).Intersect(toSet(destPVCs)))

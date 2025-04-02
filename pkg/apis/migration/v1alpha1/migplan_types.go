@@ -766,8 +766,7 @@ func (r *MigPlan) GetNamespaceMapping() map[string]string {
 // Get whether the plan conflicts with another.
 // Plans conflict when:
 //   - Have any of the clusters in common AND
-//   - Have any of the namespaces in common AND
-//   - Have any of the PVs in common
+//   - Have any of the namespaces in common
 func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 	if !migref.RefEquals(r.Spec.SrcMigClusterRef, plan.Spec.SrcMigClusterRef) &&
 		!migref.RefEquals(r.Spec.DestMigClusterRef, plan.Spec.DestMigClusterRef) &&
@@ -779,22 +778,9 @@ func (r *MigPlan) HasConflict(plan *MigPlan) bool {
 	for _, name := range plan.Spec.Namespaces {
 		nsMap[name] = true
 	}
-	pvMap := map[string]bool{}
-	for _, pv := range plan.Spec.PersistentVolumes.List {
-		if pv.Selection.Action != PvSkipAction {
-			pvMap[pv.Name] = true
-		}
-	}
 	for _, name := range r.Spec.Namespaces {
 		if _, foundNs := nsMap[name]; foundNs {
-			for _, pv := range r.Spec.PersistentVolumes.List {
-				if pv.Selection.Action == PvSkipAction {
-					continue
-				}
-				if _, foundPv := pvMap[pv.Name]; foundPv {
-					return true
-				}
-			}
+			return true
 		}
 	}
 
