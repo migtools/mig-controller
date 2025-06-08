@@ -24,7 +24,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.33.1
-	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
+	github.com/openshift/api 017e9dd0276e
 	github.com/openshift/library-go v0.0.0-20200521120150-e4959e210d3a
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
