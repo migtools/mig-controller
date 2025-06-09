@@ -1737,9 +1737,7 @@ func (r *ReconcileMigPlan) validateKubeVirtInstalled(ctx context.Context, client
 	if kubevirt.Spec.Configuration.VMRolloutStrategy == nil ||
 		*kubevirt.Spec.Configuration.VMRolloutStrategy != virtv1.VMRolloutStrategyLiveUpdate ||
 		kubevirt.Spec.Configuration.DeveloperConfiguration == nil ||
-		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumesUpdateStrategy) ||
-		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumeMigrationConfig) ||
-		(major == 1 && minor < 5 && !slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VMLiveUpdateFeatures)) {
+		isStorageLiveMigrationDisabled(&kubevirt, major, minor) {
 		plan.Status.SetCondition(migapi.Condition{
 			Type:     KubeVirtStorageLiveMigrationNotEnabled,
 			Status:   True,
@@ -1750,6 +1748,18 @@ func (r *ReconcileMigPlan) validateKubeVirtInstalled(ctx context.Context, client
 		return nil
 	}
 	return nil
+}
+
+func isStorageLiveMigrationDisabled(kubevirt *virtv1.KubeVirt, major, minor int) bool {
+	if major == 1 && minor >= 5 || major > 1 {
+		// Those are all GA from 1.5 and onwards
+		// https://github.com/kubevirt/kubevirt/releases/tag/v1.5.0
+		return false
+	}
+
+	return !slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumesUpdateStrategy) ||
+		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VolumeMigrationConfig) ||
+		!slices.Contains(kubevirt.Spec.Configuration.DeveloperConfiguration.FeatureGates, VMLiveUpdateFeatures)
 }
 
 func parseKubeVirtOperatorSemver(operatorVersion string) (int, int, int, error) {
