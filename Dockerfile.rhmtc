@@ -19,17 +19,3 @@ COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/crane/crane .
 USER 65534:65534
 ENTRYPOINT ["/manager"]
-
-LABEL \
-        com.redhat.component="openshift-migration-controller-container" \
-        version="v1.8.7" \
-        name="rhmtc/openshift-migration-controller-rhel8" \
-        summary="Migration Toolkit for Containers Controller" \
-        maintainer="Migration Team <ocp-migrate-team@redhat.com>" \
-        License="ASL 2.0" \
-        io.k8s.display-name="Migration Toolkit for Containers" \
-        io.openshift.tags="migration" \
-        io.k8s.description="Migration Toolkit for Containers Controller" \
-        io.openshift.build.commit.id="5fea3f547f3f9e54463c1870bb4102b209c179c3" \
-        io.openshift.build.source-location="https://github.com/migtools/mig-controller" \
-        io.openshift.build.commit.url="https://github.com/migtools/mig-controller/commit/5fea3f547f3f9e54463c1870bb4102b209c179c3"
