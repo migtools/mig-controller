@@ -1,0 +1,4 @@
+[submodule "crane"]
+	path = crane
+	url = https://github.com/migtools/crane.git
+	branch = release-1.8
