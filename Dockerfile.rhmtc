@@ -17,5 +17,6 @@ FROM registry.redhat.io/ubi8/ubi-minimal:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/crane/crane .
+COPY LICENSE /licenses/
 USER 65534:65534
 ENTRYPOINT ["/manager"]
