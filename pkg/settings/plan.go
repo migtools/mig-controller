@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 // Environment variables.
