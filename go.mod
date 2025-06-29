@@ -41,7 +41,7 @@ require (
 	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
 	kubevirt.io/api v1.3.0
 	kubevirt.io/containerized-data-importer-api v1.59.0
-	sigs.k8s.io/controller-runtime v0.18.1
+	sigs.k8s.io/controller-runtime v0.21.0
 )
 
 require (
@@ -228,5 +228,5 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.29.4
 	k8s.io/client-go => k8s.io/client-go v0.29.4
 	k8s.io/component-base => k8s.io/component-base v0.29.4
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.17.4
+	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.21.0
 )
