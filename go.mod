@@ -30,7 +30,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/common v0.53.0
-	github.com/uber/jaeger-client-go v2.25.0+incompatible
+	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/vmware-tanzu/velero v1.7.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.33.0
