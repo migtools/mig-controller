@@ -17,7 +17,7 @@ require (
 	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/uuid v1.6.0
-	github.com/joho/godotenv v1.3.0
+	github.com/joho/godotenv v1.5.1
 	github.com/konveyor/controller v0.12.0
 	github.com/konveyor/crane-lib v0.1.4
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
