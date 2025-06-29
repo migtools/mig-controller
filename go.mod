@@ -7,8 +7,8 @@ toolchain go1.24.2
 require (
 	cloud.google.com/go/storage v1.30.1
 	github.com/Azure/azure-sdk-for-go v61.4.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.24
-	github.com/Azure/go-autorest/autorest/adal v0.9.18
+	github.com/Azure/go-autorest/autorest v0.11.30
+	github.com/Azure/go-autorest/autorest/adal v0.9.22
 	github.com/aws/aws-sdk-go v1.45.20
 	github.com/containers/image/v5 v5.30.1
 	github.com/deckarep/golang-set v1.7.1
