@@ -21,7 +21,7 @@ require (
 	github.com/konveyor/controller v0.12.0
 	github.com/konveyor/crane-lib v0.1.4
 	github.com/konveyor/openshift-velero-plugin v0.0.0-20210729141849-876132e34f3d
-	github.com/mattn/go-sqlite3 v1.14.22
+	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.33.1
 	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
