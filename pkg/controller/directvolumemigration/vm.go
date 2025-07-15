@@ -19,6 +19,7 @@ import (
 	prometheusapi "github.com/prometheus/client_golang/api"
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	virtv1 "kubevirt.io/api/core/v1"
+
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -40,6 +42,8 @@ const (
 	PodKind                           = "Pod"
 	virtLauncherPodLabelSelectorKey   = "kubevirt.io"
 	virtLauncherPodLabelSelectorValue = "virt-launcher"
+	defaultVirtStorageClass           = "storageclass.kubevirt.io/is-default-virt-class"
+	defaultK8sStorageClass            = "storageclass.kubernetes.io/is-default-class"
 )
 
 var (
@@ -483,18 +487,15 @@ func updateVM(client k8sclient.Client, vm *virtv1.VirtualMachine, sourceVolumes,
 	log.V(5).Info("Setting volume migration strategy to migration", "vm", vmCopy.Name)
 	vmCopy.Spec.UpdateVolumesStrategy = ptr.To[virtv1.UpdateVolumesStrategy](virtv1.UpdateVolumesStrategyMigration)
 
+	volumeNameToPVCMap := make(map[string]string)
+
 	for i := 0; i < len(sourceVolumes); i++ {
 		// Check if we need to update DataVolumeTemplates.
-		for j, dvTemplate := range vmCopy.Spec.DataVolumeTemplates {
-			if dvTemplate.Name == sourceVolumes[i] {
-				log.V(5).Info("Updating DataVolumeTemplate", "source", sourceVolumes[i], "target", targetVolumes[i])
-				vmCopy.Spec.DataVolumeTemplates[j].Name = targetVolumes[i]
-			}
-		}
 		for j, volume := range vm.Spec.Template.Spec.Volumes {
 			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == sourceVolumes[i] {
 				log.V(5).Info("Updating PersistentVolumeClaim", "source", sourceVolumes[i], "target", targetVolumes[i])
 				vmCopy.Spec.Template.Spec.Volumes[j].PersistentVolumeClaim.ClaimName = targetVolumes[i]
+				volumeNameToPVCMap[sourceVolumes[i]] = targetVolumes[i]
 			}
 			if volume.DataVolume != nil && volume.DataVolume.Name == sourceVolumes[i] {
 				log.V(5).Info("Updating DataVolume", "source", sourceVolumes[i], "target", targetVolumes[i])
@@ -502,6 +503,23 @@ func updateVM(client k8sclient.Client, vm *virtv1.VirtualMachine, sourceVolumes,
 					return err
 				}
 				vmCopy.Spec.Template.Spec.Volumes[j].DataVolume.Name = targetVolumes[i]
+				volumeNameToPVCMap[sourceVolumes[i]] = targetVolumes[i]
+			}
+		}
+		for j, dvTemplate := range vmCopy.Spec.DataVolumeTemplates {
+			if dvTemplate.Name == sourceVolumes[i] {
+				log.V(5).Info("Updating DataVolumeTemplate", "source", sourceVolumes[i], "target", targetVolumes[i])
+				vmCopy.Spec.DataVolumeTemplates[j].Name = targetVolumes[i]
+				pvcName := volumeNameToPVCMap[sourceVolumes[i]]
+				sc, err := getStorageClassFromName(client, pvcName, vmCopy.Namespace)
+				if err != nil {
+					return err
+				}
+				if vmCopy.Spec.DataVolumeTemplates[j].Spec.Storage != nil {
+					vmCopy.Spec.DataVolumeTemplates[j].Spec.Storage.StorageClassName = ptr.To(sc)
+				} else if vmCopy.Spec.DataVolumeTemplates[j].Spec.PVC != nil {
+					vmCopy.Spec.DataVolumeTemplates[j].Spec.PVC.StorageClassName = ptr.To(sc)
+				}
 			}
 		}
 	}
@@ -514,6 +532,38 @@ func updateVM(client k8sclient.Client, vm *virtv1.VirtualMachine, sourceVolumes,
 		log.V(5).Info("No changes to VM", "vm", vm.Name)
 	}
 	return nil
+}
+
+func getStorageClassFromName(client k8sclient.Client, name, namespace string) (string, error) {
+	volume := &corev1.PersistentVolumeClaim{}
+	if err := client.Get(context.TODO(), k8sclient.ObjectKey{Namespace: namespace, Name: name}, volume); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if volume.Spec.StorageClassName == nil {
+		// Find the default storage class
+		scList := &storagev1.StorageClassList{}
+		if err := client.List(context.TODO(), scList); err != nil {
+			return "", err
+		}
+		defaultStorageClass := ""
+		for _, sc := range scList.Items {
+			if sc.Annotations != nil && sc.Annotations[defaultK8sStorageClass] == "true" {
+				defaultStorageClass = sc.Name
+			}
+			if sc.Annotations != nil && sc.Annotations[defaultVirtStorageClass] == "true" {
+				return sc.Name, nil
+			}
+		}
+		if defaultStorageClass != "" {
+			return defaultStorageClass, nil
+		}
+		// No default storage class found, return blank
+		return "", nil
+	}
+	return *volume.Spec.StorageClassName, nil
 }
 
 func createBlankDataVolumeFromPVC(client k8sclient.Client, targetPvc *corev1.PersistentVolumeClaim) error {

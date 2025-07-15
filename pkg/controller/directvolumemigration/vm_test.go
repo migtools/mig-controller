@@ -21,6 +21,7 @@ import (
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -31,11 +32,15 @@ import (
 )
 
 const (
-	sourcePVC = "source-pvc"
-	sourceNs  = "source-ns"
-	targetPVC = "target-pvc"
-	targetNs  = "target-ns"
-	targetDv  = "target-dv"
+	sourcePVC                   = "source-pvc"
+	sourceNs                    = "source-ns"
+	targetPVC                   = "target-pvc"
+	targetNs                    = "target-ns"
+	targetDv                    = "target-dv"
+	testPVCName                 = "test-pvc"
+	testStorageClass            = "test-sc"
+	testDefaultStorageClass     = "test-default-sc"
+	testVirtDefaultStorageClass = "test-virt-default-sc"
 )
 
 func TestTask_startLiveMigrations(t *testing.T) {
@@ -1428,6 +1433,60 @@ func TestTaskBuildSourcePrometheusEndPointURL(t *testing.T) {
 	}
 }
 
+func TestGetStorageClassFromName(t *testing.T) {
+	tests := []struct {
+		name          string
+		client        compat.Client
+		expectedError bool
+		expectedSc    string
+	}{
+		{
+			name:          "no pvcs, no storage class, should return blank",
+			client:        getFakeClientWithObjs(),
+			expectedError: false,
+			expectedSc:    "",
+		},
+		{
+			name:          "pvcs, with storage class, should return name",
+			client:        getFakeClientWithObjs(createPVC(testPVCName, testNamespace)),
+			expectedError: false,
+			expectedSc:    testStorageClass,
+		},
+		{
+			name:          "pvcs, no storage class, no default storage class return blank",
+			client:        getFakeClientWithObjs(createNoStorageClassPVC(testPVCName, testNamespace)),
+			expectedError: false,
+			expectedSc:    "",
+		},
+		{
+			name:          "pvcs, no storage class, default storage class, should return name",
+			client:        getFakeClientWithObjs(createNoStorageClassPVC(testPVCName, testNamespace), createDefaultStorageClass(testDefaultStorageClass)),
+			expectedError: false,
+			expectedSc:    testDefaultStorageClass,
+		},
+		{
+			name:          "pvcs, no storage class, virt default storage class, should return name",
+			client:        getFakeClientWithObjs(createNoStorageClassPVC(testPVCName, testNamespace), createDefaultStorageClass(testDefaultStorageClass), createVirtDefaultStorageClass(testVirtDefaultStorageClass)),
+			expectedError: false,
+			expectedSc:    testVirtDefaultStorageClass,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sc, err := getStorageClassFromName(tt.client, testPVCName, testNamespace)
+			if tt.expectedError {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+					t.FailNow()
+				}
+			}
+			if sc != tt.expectedSc {
+				t.Errorf("expected %s, got %s", tt.expectedSc, sc)
+			}
+		})
+	}
+}
+
 func getFakeClientWithObjs(obj ...k8sclient.Object) compat.Client {
 	client, _ := fakecompat.NewFakeClient(obj...)
 	return client
@@ -1577,6 +1636,44 @@ func createRoute(name, namespace, url string) *routev1.Route {
 			Host: url,
 		},
 	}
+}
+
+func createPVC(name, namespace string) *corev1.PersistentVolumeClaim {
+	pvc := createNoStorageClassPVC(name, namespace)
+	pvc.Spec.StorageClassName = ptr.To(testStorageClass)
+	return pvc
+}
+
+func createNoStorageClassPVC(name, namespace string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+func createStorageClass(name string) *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
+
+func createDefaultStorageClass(name string) *storagev1.StorageClass {
+	sc := createStorageClass(name)
+	sc.Annotations = map[string]string{
+		defaultK8sStorageClass: "true",
+	}
+	return sc
+}
+
+func createVirtDefaultStorageClass(name string) *storagev1.StorageClass {
+	sc := createStorageClass(name)
+	sc.Annotations = map[string]string{
+		defaultVirtStorageClass: "true",
+	}
+	return sc
 }
 
 type mockPrometheusClient struct {
