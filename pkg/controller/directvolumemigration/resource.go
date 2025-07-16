@@ -175,19 +175,29 @@ func (t *Task) getLimitRangeForNamespace(ns string, client k8sclient.Client) (*c
 func mergeResourceLimitRangeItems(target *corev1.LimitRangeItem, source *corev1.LimitRangeItem) {
 	if target != nil && source != nil {
 		if source.Max != nil {
+			// if target max map is nil, initialize it
+			if target.Max == nil {
+				target.Max = make(corev1.ResourceList)
+			}
 			// for max limits, the most restrictive value is the one which is the minimum
 			if val, exists := source.Max[corev1.ResourceCPU]; exists {
+
 				if target.Max.Cpu().Cmp(val) > 0 {
 					target.Max[corev1.ResourceCPU] = val
 				}
 			}
 			if val, exists := source.Max[corev1.ResourceMemory]; exists {
+
 				if target.Max.Memory().Cmp(val) > 0 {
 					target.Max[corev1.ResourceMemory] = val
 				}
 			}
 		}
 		if source.Min != nil {
+			// if target min map is nil, initialize it
+			if target.Min == nil {
+				target.Min = make(corev1.ResourceList)
+			}
 			// for min limits, the most restrictive value is the one which is the maximum
 			if val, exists := source.Min[corev1.ResourceCPU]; exists {
 				if target.Min.Cpu().Cmp(val) < 0 {
