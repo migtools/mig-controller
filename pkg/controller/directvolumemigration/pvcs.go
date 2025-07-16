@@ -74,7 +74,7 @@ func (t *Task) createDestinationDV(srcClient, destClient compat.Client, pvc miga
 
 	// Remove any cdi related annotations from the PVC
 	for k := range destPVC.Annotations {
-		if strings.HasPrefix(k, "cdi.kubevirt.io") {
+		if strings.HasPrefix(k, "cdi.kubevirt.io") || strings.HasPrefix(k, "volume.kubernetes.io/selected-node") {
 			delete(destPVC.Annotations, k)
 		}
 	}
