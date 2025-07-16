@@ -260,6 +260,83 @@ func TestTask_getLimitRangeForNamespace(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "when multiple limit ranges are present for a namespace with some of the limit values set as nil on one, don't panic",
+			args: args{
+				ns: "test",
+				client: getFakeCompatClient(
+					&corev1.LimitRange{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "range-1"},
+						Spec: corev1.LimitRangeSpec{
+							Limits: []corev1.LimitRangeItem{
+								{
+									Max: nil,
+									Min: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Type: corev1.LimitTypeContainer,
+								},
+								{
+									Max: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("1Gi"),
+									},
+									Min:  nil,
+									Type: corev1.LimitTypePod,
+								},
+							},
+						},
+					},
+					&corev1.LimitRange{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "range-2"},
+						Spec: corev1.LimitRangeSpec{
+							Limits: []corev1.LimitRangeItem{
+								{
+									Max: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Min: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Type: corev1.LimitTypeContainer,
+								},
+								{
+									Max: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("512Mi"),
+									},
+									Min: corev1.ResourceList{
+										corev1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Type: corev1.LimitTypePod,
+								},
+							},
+						},
+					},
+				),
+			},
+			want: &corev1.LimitRange{
+				Spec: corev1.LimitRangeSpec{
+					Limits: []corev1.LimitRangeItem{
+						{
+							Max: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+							Min: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+							Type: corev1.LimitTypePod,
+						},
+						{
+							Max: corev1.ResourceList{},
+							Min: corev1.ResourceList{
+								corev1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+							Type: corev1.LimitTypeContainer,
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -270,7 +347,7 @@ func TestTask_getLimitRangeForNamespace(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Task.getLimitRangeForNamespace() = %v, want %v", got, tt.want)
+				t.Errorf("Task.getLimitRangeForNamespace() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
