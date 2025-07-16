@@ -347,7 +347,7 @@ func TestTask_getLimitRangeForNamespace(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Task.getLimitRangeForNamespace() = %#v, want %#v", got, tt.want)
+				t.Errorf("Task.getLimitRangeForNamespace() = %v, want %v", got, tt.want)
 			}
 		})
 	}
