@@ -33,11 +33,13 @@ import (
 )
 
 const (
-	prometheusURLKey = "PROMETHEUS_URL"
-	prometheusRoute  = "prometheus-k8s"
-	progressQuery    = "kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} / (kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} + kubevirt_vmi_migration_data_remaining_bytes{name=\"%s\"}) * 100"
-	VMIKind          = "VirtualMachineInstance"
-	PodKind          = "Pod"
+	prometheusURLKey                  = "PROMETHEUS_URL"
+	prometheusRoute                   = "prometheus-k8s"
+	progressQuery                     = "kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} / (kubevirt_vmi_migration_data_processed_bytes{name=\"%s\"} + kubevirt_vmi_migration_data_remaining_bytes{name=\"%s\"}) * 100"
+	VMIKind                           = "VirtualMachineInstance"
+	PodKind                           = "Pod"
+	virtLauncherPodLabelSelectorKey   = "kubevirt.io"
+	virtLauncherPodLabelSelectorValue = "virt-launcher"
 )
 
 var (
@@ -334,6 +336,32 @@ func (t *Task) verifyVMs() error {
 				}
 				if !foundVolume {
 					return liberr.Wrap(FatalPlanError, fmt.Sprintf("volume %s not found in VM %s, it is an ephemeral volume, to fix unplug the volume and hotplug it with the persist flag", sourceVMVolume, vmName))
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *Task) cleanupStaleVirtLauncherPods() error {
+	t.Log.Info("Cleaning up stale virt-launcher pods")
+	sourceClient := t.sourceClient
+	namespaces := sets.NewString()
+	for _, pvc := range t.Owner.Spec.PersistentVolumeClaims {
+		namespaces.Insert(pvc.Namespace)
+	}
+	for _, namespace := range namespaces.List() {
+		podList := &corev1.PodList{}
+		labelSelector := map[string]string{virtLauncherPodLabelSelectorKey: virtLauncherPodLabelSelectorValue}
+		if err := sourceClient.List(context.TODO(), podList, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(labelSelector)); err != nil {
+			return err
+		}
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == corev1.PodSucceeded {
+				if err := sourceClient.Delete(context.TODO(), &pod); err != nil {
+					if !k8serrors.IsNotFound(err) {
+						return err
+					}
 				}
 			}
 		}

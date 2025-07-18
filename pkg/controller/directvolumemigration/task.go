@@ -48,6 +48,7 @@ const (
 	Completed                                   = "Completed"
 	MigrationFailed                             = "MigrationFailed"
 	VerifyVMs                                   = "VerifyVMs"
+	CleanupStaleVirtHandlerPods                 = "CleanupStaleVirtHandlerPods"
 	DeleteStaleVirtualMachineInstanceMigrations = "DeleteStaleVirtualMachineInstanceMigrations"
 )
 
@@ -139,6 +140,7 @@ var VolumeMigration = Itinerary{
 		{phase: RunRsyncOperations},
 		{phase: DeleteRsyncResources},
 		{phase: WaitForRsyncResourcesTerminated},
+		{phase: CleanupStaleVirtHandlerPods},
 		{phase: Completed},
 	},
 }
@@ -161,6 +163,7 @@ var RollbackItinerary = Itinerary{
 		{phase: DeleteStaleVirtualMachineInstanceMigrations},
 		{phase: WaitForStaleRsyncResourcesTerminated},
 		{phase: RunRsyncOperations},
+		{phase: CleanupStaleVirtHandlerPods},
 		{phase: Completed},
 	},
 }
@@ -292,6 +295,15 @@ func (t *Task) Run(ctx context.Context) error {
 		}
 	case VerifyVMs:
 		err := t.verifyVMs()
+		if err != nil {
+			return liberr.Wrap(err)
+		}
+		t.Requeue = NoReQ
+		if err = t.next(); err != nil {
+			return liberr.Wrap(err)
+		}
+	case CleanupStaleVirtHandlerPods:
+		err := t.cleanupStaleVirtLauncherPods()
 		if err != nil {
 			return liberr.Wrap(err)
 		}
