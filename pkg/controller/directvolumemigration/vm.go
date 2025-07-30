@@ -355,6 +355,23 @@ func (t *Task) cleanupStaleVirtLauncherPods() error {
 		namespaces.Insert(pvc.Namespace)
 	}
 	for _, namespace := range namespaces.List() {
+		vmNames, err := getVMNamesInNamespace(sourceClient, namespace)
+		if err != nil {
+			return err
+		}
+		for vmName := range vmNames {
+			migrationStatus := ""
+			retryCount := 0
+			for migrationStatus == "" && retryCount < 10 {
+				migrationStatus, err = virtualMachineMigrationStatus(sourceClient, vmName, namespace, t.Log)
+				if err != nil {
+					return err
+				}
+				time.Sleep(1 * time.Second)
+				retryCount++
+			}
+		}
+
 		podList := &corev1.PodList{}
 		labelSelector := map[string]string{virtLauncherPodLabelSelectorKey: virtLauncherPodLabelSelectorValue}
 		if err := sourceClient.List(context.TODO(), podList, k8sclient.InNamespace(namespace), k8sclient.MatchingLabels(labelSelector)); err != nil {
