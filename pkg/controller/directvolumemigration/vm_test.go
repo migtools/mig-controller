@@ -445,14 +445,14 @@ func TestVirtualMachineMigrationStatus(t *testing.T) {
 		{
 			name:           "In progress VMIM",
 			client:         getFakeClientWithObjs(createInProgressVirtualMachineMigration("vmim", testNamespace, "vm")),
-			expectedStatus: fmt.Sprintf("VMI %s not found in namespace %s", "vm", testNamespace),
-			wantErr:        true,
+			expectedStatus: vmiNotFound,
+			wantErr:        false,
 		},
 		{
 			name:           "No VMIM or VMI",
 			client:         getFakeClientWithObjs(),
-			expectedStatus: fmt.Sprintf("VMI %s not found in namespace %s", "vm", testNamespace),
-			wantErr:        true,
+			expectedStatus: vmiNotFound,
+			wantErr:        false,
 		},
 		{
 			name:           "Failed VMIM with message",
