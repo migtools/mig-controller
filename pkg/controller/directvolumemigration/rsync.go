@@ -1704,6 +1704,9 @@ func (t *Task) updateVolumeLiveMigrationProgressStatus(volumeName, namespace str
 			return err
 		}
 		liveMigrationProgress.VMName = vmName
+		if message == vmiNotFound {
+			return nil
+		}
 		if message != "" {
 			vmMatchString := fmt.Sprintf("%s/%s", namespace, vmName)
 			liveMigrationProgress.Message = message

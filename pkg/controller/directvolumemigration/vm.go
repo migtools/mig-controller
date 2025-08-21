@@ -44,6 +44,7 @@ const (
 	virtLauncherPodLabelSelectorValue = "virt-launcher"
 	defaultVirtStorageClass           = "storageclass.kubevirt.io/is-default-virt-class"
 	defaultK8sStorageClass            = "storageclass.kubernetes.io/is-default-class"
+	vmiNotFound                       = "not found"
 )
 
 var (
@@ -438,7 +439,7 @@ func virtualMachineMigrationStatus(client k8sclient.Client, vmName, namespace st
 		if !k8serrors.IsNotFound(err) {
 			return err.Error(), err
 		}
-		return fmt.Sprintf("VMI %s not found in namespace %s", vmName, namespace), err
+		return vmiNotFound, nil
 	}
 	volumeChange := false
 	liveMigrateable := false
