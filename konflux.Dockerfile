@@ -1,5 +1,4 @@
-#@follow_tag(registry-proxy.engineering.redhat.com/rh-osbs/openshift-golang-builder:rhel_8_golang_1.23)
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_golang_1.23 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_golang_1.24 AS builder
 COPY . /workspace
 WORKDIR /workspace
 USER root
@@ -12,8 +11,7 @@ RUN GOMODCACHE=/workspace/mig-controller/deps/gomod/pkg/mod CGO_ENABLED=1 GOOS=l
 WORKDIR /workspace/crane/
 RUN GOMODCACHE=/workspace/crane/deps/gomod/pkg/mod CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -mod=readonly -tags strictfipsruntime -ldflags '-w' -o crane main.go
 
-#@follow_tag(registry.redhat.io/ubi8/ubi-minimal)
-FROM registry.redhat.io/ubi8/ubi-minimal:latest
+FROM registry.redhat.io/ubi8/ubi:latest
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/crane/crane .
