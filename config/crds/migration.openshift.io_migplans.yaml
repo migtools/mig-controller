@@ -384,6 +384,12 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-validations:
+                          - message: Illegal AccessMode, either use 'auto' for inferring
+                              access mode or a combination of known access modes
+                            rule: self.size() == 1 && self[0] == 'auto' || self.all(am,
+                              am in ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany',
+                              'ReadWriteOncePod'])
                         hasReference:
                           type: boolean
                         name:
@@ -395,6 +401,10 @@ spec:
                         volumeMode:
                           description: PersistentVolumeMode describes how a volume
                             is intended to be consumed, either Block or Filesystem.
+                          enum:
+                          - Block
+                          - Filesystem
+                          - auto
                           type: string
                       type: object
                     selection:

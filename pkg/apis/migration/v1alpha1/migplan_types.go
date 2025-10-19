@@ -887,12 +887,14 @@ const (
 
 // PVC
 type PVC struct {
-	Namespace    string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
-	Name         string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	AccessModes  []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
-	VolumeMode   kapi.PersistentVolumeMode         `json:"volumeMode,omitempty"`
-	HasReference bool                              `json:"hasReference,omitempty"`
-	OwnerType    OwnerType                         `json:"ownerType,omitempty"`
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	// +kubebuilder:validation:XValidation:rule="self.size() == 1 && self[0] == 'auto' || self.all(am, am in ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany', 'ReadWriteOncePod'])", message="Illegal AccessMode, either use 'auto' for inferring access mode or a combination of known access modes"
+	AccessModes []kapi.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	// +kubebuilder:validation:Enum="Block";"Filesystem";"auto"
+	VolumeMode   kapi.PersistentVolumeMode `json:"volumeMode,omitempty"`
+	HasReference bool                      `json:"hasReference,omitempty"`
+	OwnerType    OwnerType                 `json:"ownerType,omitempty"`
 }
 
 // GetTargetName returns name of the target PVC
