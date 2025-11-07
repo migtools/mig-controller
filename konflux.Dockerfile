@@ -18,3 +18,10 @@ COPY --from=builder /workspace/crane/crane .
 COPY LICENSE /licenses/
 USER 65534:65534
 ENTRYPOINT ["/manager"]
+
+LABEL \
+        "io.k8s.description"="Migration Toolkit for Containers Controller" \
+        "io.k8s.display-name"="Migration Toolkit for Containers" \
+        "io.openshift.tags"="migration" \
+        "summary"="Migration Toolkit for Containers Controller" \
+        "io.openshift.maintainer.project"="MIG"
