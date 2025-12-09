@@ -492,7 +492,7 @@ func TestVirtualMachineMigrationStatus(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:   virtv1.VirtualMachineInstanceIsMigratable,
+					Type:   virtv1.VirtualMachineInstanceIsStorageLiveMigratable,
 					Status: corev1.ConditionTrue,
 				},
 			})),
@@ -506,7 +506,7 @@ func TestVirtualMachineMigrationStatus(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:    virtv1.VirtualMachineInstanceIsMigratable,
+					Type:    virtv1.VirtualMachineInstanceIsStorageLiveMigratable,
 					Status:  corev1.ConditionFalse,
 					Message: "Migration not possible",
 				},

@@ -1478,7 +1478,7 @@ func TestTask_updateVolumeLiveMigrationProgressStatus(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:    virtv1.VirtualMachineInstanceIsMigratable,
+					Type:    virtv1.VirtualMachineInstanceIsStorageLiveMigratable,
 					Status:  corev1.ConditionFalse,
 					Message: "Unable to live migrate because of the test reason",
 				},
@@ -1511,7 +1511,7 @@ func TestTask_updateVolumeLiveMigrationProgressStatus(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:    virtv1.VirtualMachineInstanceIsMigratable,
+					Type:    virtv1.VirtualMachineInstanceIsStorageLiveMigratable,
 					Status:  corev1.ConditionFalse,
 					Message: "Unable to live migrate because of the test reason",
 				},
