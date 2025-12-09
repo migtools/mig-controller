@@ -448,7 +448,7 @@ func virtualMachineMigrationStatus(client k8sclient.Client, vmName, namespace st
 		if condition.Type == virtv1.VirtualMachineInstanceVolumesChange {
 			volumeChange = condition.Status == corev1.ConditionTrue
 		}
-		if condition.Type == virtv1.VirtualMachineInstanceIsMigratable {
+		if condition.Type == virtv1.VirtualMachineInstanceIsStorageLiveMigratable {
 			liveMigrateable = condition.Status == corev1.ConditionTrue
 			liveMigrateableMessage = condition.Message
 		}
