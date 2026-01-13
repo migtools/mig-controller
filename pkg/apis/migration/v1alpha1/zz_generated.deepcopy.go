@@ -1545,6 +1545,11 @@ func (in *MigPlanStatus) DeepCopyInto(out *MigPlanStatus) {
 	in.UnhealthyResources.DeepCopyInto(&out.UnhealthyResources)
 	in.Conditions.DeepCopyInto(&out.Conditions)
 	in.Incompatible.DeepCopyInto(&out.Incompatible)
+	if in.Suffix != nil {
+		in, out := &in.Suffix, &out.Suffix
+		*out = new(string)
+		**out = **in
+	}
 	if in.ExcludedResources != nil {
 		in, out := &in.ExcludedResources, &out.ExcludedResources
 		*out = make([]string, len(*in))
@@ -1725,6 +1730,11 @@ func (in *PVCToMigrate) DeepCopyInto(out *PVCToMigrate) {
 		in, out := &in.TargetAccessModes, &out.TargetAccessModes
 		*out = make([]v1.PersistentVolumeAccessMode, len(*in))
 		copy(*out, *in)
+	}
+	if in.TargetVolumeMode != nil {
+		in, out := &in.TargetVolumeMode, &out.TargetVolumeMode
+		*out = new(v1.PersistentVolumeMode)
+		**out = **in
 	}
 }
 
