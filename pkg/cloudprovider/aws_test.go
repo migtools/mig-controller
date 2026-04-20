@@ -9,11 +9,11 @@ func TestValidateRejectsInternalSvcEndpoints(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
 	tests := []struct {
-		name          string
-		s3URL         string
-		publicURL     string
-		expectS3Svc   bool
-		expectPubSvc  bool
+		name         string
+		s3URL        string
+		publicURL    string
+		expectS3Svc  bool
+		expectPubSvc bool
 	}{
 		{
 			name:        "internal .svc S3 endpoint",
