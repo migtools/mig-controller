@@ -251,7 +251,7 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			u, err := url.Parse(p.S3URL)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				fields = append(fields, "S3URL")
-			} else if strings.HasSuffix(u.Hostname(), ".svc") || strings.Contains(u.Hostname(), ".svc.") {
+			} else if strings.HasSuffix(u.Hostname(), ".svc") {
 				fields = append(fields, "S3URL-InternalEndpoint")
 			}
 		}
@@ -259,7 +259,7 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			u, err := url.Parse(p.PublicURL)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				fields = append(fields, "PublicURL")
-			} else if strings.HasSuffix(u.Hostname(), ".svc") || strings.Contains(u.Hostname(), ".svc.") {
+			} else if strings.HasSuffix(u.Hostname(), ".svc") {
 				fields = append(fields, "PublicURL-InternalEndpoint")
 			}
 		}

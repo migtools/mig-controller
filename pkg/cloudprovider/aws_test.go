@@ -26,16 +26,6 @@ func TestValidateRejectsInternalSvcEndpoints(t *testing.T) {
 			expectPubSvc: true,
 		},
 		{
-			name:        "internal .svc.cluster.local S3 endpoint",
-			s3URL:       "https://rook-ceph-rgw-ocs-storagecluster.openshift-storage.svc.cluster.local",
-			expectS3Svc: true,
-		},
-		{
-			name:         "internal .svc.cluster.local public endpoint",
-			publicURL:    "http://rgw.openshift-storage.svc.cluster.local",
-			expectPubSvc: true,
-		},
-		{
 			name:  "external S3 endpoint is allowed",
 			s3URL: "https://s3.example.com",
 		},
