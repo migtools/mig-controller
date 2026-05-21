@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	liberr "github.com/konveyor/controller/pkg/error"
 	migapi "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
@@ -20,6 +21,7 @@ const (
 	InvalidBSProvider       = "InvalidBackupStorageProvider"
 	InvalidBSCredsSecretRef = "InvalidBackupStorageCredsSecretRef"
 	InvalidBSFields         = "InvalidBackupStorageSettings"
+	InternalEndpointUsed    = "InternalEndpointUsed"
 	InvalidVSProvider       = "InvalidVolumeSnapshotProvider"
 	InvalidVSCredsSecretRef = "InvalidVolumeSnapshotCredsSecretRef"
 	InvalidVSFields         = "InvalidVolumeSnapshotSettings"
@@ -136,16 +138,37 @@ func (r ReconcileMigStorage) validateBackupStorage(ctx context.Context, storage 
 	// Fields
 	fields := provider.Validate(secret)
 	if len(fields) > 0 {
-		storage.Status.SetCondition(migapi.Condition{
-			Type:     InvalidBSFields,
-			Status:   True,
-			Reason:   NotSupported,
-			Category: Critical,
-			Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`,"+
-				" subject: %s, [].", path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace,
-				storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
-			Items: fields,
-		})
+		var internalEndpointFields []string
+		var otherFields []string
+		for _, f := range fields {
+			if strings.HasSuffix(f, "-InternalEndpoint") {
+				internalEndpointFields = append(internalEndpointFields, f)
+			} else {
+				otherFields = append(otherFields, f)
+			}
+		}
+		if len(internalEndpointFields) > 0 {
+			storage.Status.SetCondition(migapi.Condition{
+				Type:     InternalEndpointUsed,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message:  "The S3 endpoint uses an internal `.svc` hostname that is not accessible across clusters. Use an externally reachable endpoint (e.g. an Object Gateway route) for cross-cluster migrations.",
+				Items:    internalEndpointFields,
+			})
+		}
+		if len(otherFields) > 0 {
+			storage.Status.SetCondition(migapi.Condition{
+				Type:     InvalidBSFields,
+				Status:   True,
+				Reason:   NotSupported,
+				Category: Critical,
+				Message: fmt.Sprintf("The `backupStorageConfig.credsSecretRef` must reference a valid `secret`,"+
+					" subject: %s, [].", path.Join(storage.Spec.BackupStorageConfig.CredsSecretRef.Namespace,
+					storage.Spec.BackupStorageConfig.CredsSecretRef.Name)),
+				Items: otherFields,
+			})
+		}
 		return nil
 	}
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -250,12 +251,16 @@ func (p *AWSProvider) Validate(secret *kapi.Secret) []string {
 			u, err := url.Parse(p.S3URL)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				fields = append(fields, "S3URL")
+			} else if strings.HasSuffix(u.Hostname(), ".svc") || strings.HasSuffix(u.Hostname(), ".svc.cluster.local") {
+				fields = append(fields, "S3URL-InternalEndpoint")
 			}
 		}
 		if p.PublicURL != "" {
 			u, err := url.Parse(p.PublicURL)
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 				fields = append(fields, "PublicURL")
+			} else if strings.HasSuffix(u.Hostname(), ".svc") || strings.HasSuffix(u.Hostname(), ".svc.cluster.local") {
+				fields = append(fields, "PublicURL-InternalEndpoint")
 			}
 		}
 	case VolumeSnapshot:
