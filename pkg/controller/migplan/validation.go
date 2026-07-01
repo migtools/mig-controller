@@ -1902,7 +1902,7 @@ func (r *NfsValidation) validate() error {
 				}
 			}
 		} else {
-			address := fmt.Sprintf("%s:%s", pv.NFS.Server, NfsPort)
+			address := net.JoinHostPort(pv.NFS.Server, NfsPort)
 			conn, err := net.Dial("tcp", address)
 			if err == nil {
 				conn.Close()

@@ -80,7 +80,7 @@ generate: conversion-gen controller-gen
 
 # Generate conversion functions
 conversion-gen:  conversion-gen-dl
-	${CONVERSION_GEN} --go-header-file ./hack/boilerplate.go.txt --output-file-base zz_conversion_generated -i github.com/konveyor/mig-controller/pkg/compat/conversion/...
+	${CONVERSION_GEN} --go-header-file ./hack/boilerplate.go.txt --output-file zz_conversion_generated.go github.com/konveyor/mig-controller/pkg/compat/conversion/...
 
 # Build the docker image
 #docker-build: test
@@ -102,7 +102,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.15.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.20.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen
@@ -119,7 +119,7 @@ ifeq (, $(shell which conversion-gen))
 	CONVERSION_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONVERSION_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install k8s.io/code-generator/cmd/conversion-gen@v0.19.16 ;\
+	go install k8s.io/code-generator/cmd/conversion-gen@v0.35.6 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONVERSION_GEN=$(GOBIN)/conversion-gen
