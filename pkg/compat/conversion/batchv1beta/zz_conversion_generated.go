@@ -147,6 +147,7 @@ func Convert_v1beta1_CronJobList_To_v1_CronJobList(in *v1beta1.CronJobList, out 
 
 func autoConvert_v1_CronJobSpec_To_v1beta1_CronJobSpec(in *v1.CronJobSpec, out *v1beta1.CronJobSpec, s conversion.Scope) error {
 	out.Schedule = in.Schedule
+	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
 	out.ConcurrencyPolicy = v1beta1.ConcurrencyPolicy(in.ConcurrencyPolicy)
 	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
@@ -165,6 +166,7 @@ func Convert_v1_CronJobSpec_To_v1beta1_CronJobSpec(in *v1.CronJobSpec, out *v1be
 
 func autoConvert_v1beta1_CronJobSpec_To_v1_CronJobSpec(in *v1beta1.CronJobSpec, out *v1.CronJobSpec, s conversion.Scope) error {
 	out.Schedule = in.Schedule
+	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
 	out.ConcurrencyPolicy = v1.ConcurrencyPolicy(in.ConcurrencyPolicy)
 	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
