@@ -805,6 +805,14 @@ var accessModeList = []provisionerAccessModes{
 		},
 	},
 	provisionerAccessModes{
+		Provisioner: "csi.trident.netapp.io",
+		// Note: some backends won't support RWX
+		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
+			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+			kapi.PersistentVolumeBlock:      {kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
+	},
+	provisionerAccessModes{
 		Provisioner: "csi.kubevirt.io",
 		AccessModes: map[kapi.PersistentVolumeMode][]kapi.PersistentVolumeAccessMode{
 			kapi.PersistentVolumeFilesystem: {kapi.ReadWriteOnce},
