@@ -1,6 +1,10 @@
-FROM quay.io/konveyor/builder:latest AS builder
+FROM golang:1.26.6-alpine AS builder
 
-# Copy in the go src
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev git
+
+# Set up workspace
+ENV APP_ROOT=/opt/app-root
 WORKDIR $APP_ROOT/src/github.com/konveyor/mig-controller
 COPY pkg/    pkg/
 COPY cmd/    cmd/
