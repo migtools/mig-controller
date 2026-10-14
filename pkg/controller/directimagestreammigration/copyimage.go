@@ -2,10 +2,13 @@ package directimagestreammigration
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 
 	"github.com/containers/image/v5/copy"
 	"github.com/containers/image/v5/types"
 	liberr "github.com/konveyor/controller/pkg/error"
+	v1alpha1 "github.com/konveyor/mig-controller/pkg/apis/migration/v1alpha1"
 	"github.com/konveyor/mig-controller/pkg/compat"
 	"github.com/konveyor/openshift-velero-plugin/velero-plugins/imagecopy"
 )
@@ -57,18 +60,24 @@ func (t *Task) migrateInternalImages() error {
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	sourceCtx, err := internalRegistrySystemContext(srcClient)
+	sourceCtx, srcTempDir, err := internalRegistrySystemContext(srcClient, srcCluster)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if srcTempDir != "" {
+		defer os.RemoveAll(srcTempDir)
 	}
 
 	destClient, err := t.getDestinationClient()
 	if err != nil {
 		return liberr.Wrap(err)
 	}
-	destinationCtx, err := internalRegistrySystemContext(destClient)
+	destinationCtx, destTempDir, err := internalRegistrySystemContext(destClient, destCluster)
 	if err != nil {
 		return liberr.Wrap(err)
+	}
+	if destTempDir != "" {
+		defer os.RemoveAll(destTempDir)
 	}
 
 	return imagecopy.CopyLocalImageStreamImages(*imageStream,
@@ -84,19 +93,50 @@ func (t *Task) migrateInternalImages() error {
 		false)
 }
 
-func internalRegistrySystemContext(c compat.Client) (*types.SystemContext, error) {
+func internalRegistrySystemContext(c compat.Client, cluster *v1alpha1.MigCluster) (*types.SystemContext, string, error) {
 	config := c.RestConfig()
 	if config.BearerToken == "" {
-		return nil, errors.New("BearerToken not found, can't authenticate with registry")
+		return nil, "", errors.New("BearerToken not found, can't authenticate with registry")
 	}
+
+	// Enable TLS verification by default, only disable if explicitly set
+	var insecureSkipTLS types.OptionalBool
+	if cluster.Spec.Insecure {
+		insecureSkipTLS = types.OptionalBoolTrue
+	} else {
+		insecureSkipTLS = types.OptionalBoolFalse
+	}
+
 	ctx := &types.SystemContext{
-		DockerDaemonInsecureSkipTLSVerify: true,
-		DockerInsecureSkipTLSVerify:       types.OptionalBoolTrue,
+		DockerDaemonInsecureSkipTLSVerify: cluster.Spec.Insecure,
+		DockerInsecureSkipTLSVerify:       insecureSkipTLS,
 		DockerDisableDestSchema1MIMETypes: true,
 		DockerAuthConfig: &types.DockerAuthConfig{
 			Username: "ignored",
 			Password: config.BearerToken,
 		},
 	}
-	return ctx, nil
+
+	var tempDir string
+	// Configure custom CA bundle if TLS is enabled and CABundle is provided
+	if !cluster.Spec.Insecure && len(cluster.Spec.CABundle) > 0 {
+		// Create temporary directory for CA certificate
+		var err error
+		tempDir, err = os.MkdirTemp("", "registry-ca-")
+		if err != nil {
+			return nil, "", liberr.Wrap(err)
+		}
+
+		// Write CA bundle to ca.crt in the temp directory
+		caFile := filepath.Join(tempDir, "ca.crt")
+		if err := os.WriteFile(caFile, cluster.Spec.CABundle, 0600); err != nil {
+			os.RemoveAll(tempDir)
+			return nil, "", liberr.Wrap(err)
+		}
+
+		// Point registry client to the CA certificate directory
+		ctx.DockerCertPath = tempDir
+	}
+
+	return ctx, tempDir, nil
 }
