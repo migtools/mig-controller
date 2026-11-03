@@ -18,10 +18,12 @@ package v1alpha1
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -246,6 +248,98 @@ func TestMigCluster_GetRegistryLivenessTimeout(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("MigCluster.GetRegistryLivenessTimeout() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMigCluster_accessModesForProvisioner(t *testing.T) {
+	m := &MigCluster{}
+	tests := []struct {
+		name        string
+		provisioner string
+		volumeMode  kapi.PersistentVolumeMode
+		want        []kapi.PersistentVolumeAccessMode
+	}{
+		{
+			name:        "csi.trident.netapp.io Filesystem should return RWO and ROX",
+			provisioner: "csi.trident.netapp.io",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
+		{
+			name:        "csi.trident.netapp.io Block should return RWO, ROX, and RWX",
+			provisioner: "csi.trident.netapp.io",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
+		{
+			name:        "legacy netapp.io/trident Filesystem should return RWO and ROX",
+			provisioner: "netapp.io/trident",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany},
+		},
+		{
+			name:        "legacy netapp.io/trident Block should return RWO, ROX, and RWX",
+			provisioner: "netapp.io/trident",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
+		{
+			name:        "CSI and legacy Trident should return identical Filesystem modes",
+			provisioner: "csi.trident.netapp.io",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        m.accessModesForProvisioner("netapp.io/trident", kapi.PersistentVolumeFilesystem),
+		},
+		{
+			name:        "CSI and legacy Trident should return identical Block modes",
+			provisioner: "csi.trident.netapp.io",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        m.accessModesForProvisioner("netapp.io/trident", kapi.PersistentVolumeBlock),
+		},
+		{
+			name:        "rbd.csi.ceph.com suffix match for Filesystem should return RWO",
+			provisioner: "openshift-storage.rbd.csi.ceph.com",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		},
+		{
+			name:        "rbd.csi.ceph.com suffix match for Block should return RWO, ROX, and RWX",
+			provisioner: "openshift-storage.rbd.csi.ceph.com",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce, kapi.ReadOnlyMany, kapi.ReadWriteMany},
+		},
+		{
+			name:        "unknown provisioner Filesystem should fall back to RWO",
+			provisioner: "example.com/unknown-driver",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		},
+		{
+			name:        "unknown provisioner Block should fall back to nil",
+			provisioner: "example.com/unknown-driver",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        nil,
+		},
+		{
+			name:        "kubernetes.io/aws-ebs Filesystem should return RWO",
+			provisioner: "kubernetes.io/aws-ebs",
+			volumeMode:  kapi.PersistentVolumeFilesystem,
+			want:        []kapi.PersistentVolumeAccessMode{kapi.ReadWriteOnce},
+		},
+		{
+			name:        "kubernetes.io/aws-ebs Block should return nil (not in map)",
+			provisioner: "kubernetes.io/aws-ebs",
+			volumeMode:  kapi.PersistentVolumeBlock,
+			want:        nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.accessModesForProvisioner(tt.provisioner, tt.volumeMode)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("accessModesForProvisioner(%q, %q) = %v, want %v",
+					tt.provisioner, tt.volumeMode, got, tt.want)
 			}
 		})
 	}
