@@ -1,4 +1,4 @@
-FROM quay.io/konveyor/builder:latest AS builder
+FROM quay.io/konveyor/builder:ubi8-v1.26 AS builder
 
 # Copy in the go src
 WORKDIR $APP_ROOT/src/github.com/konveyor/mig-controller
